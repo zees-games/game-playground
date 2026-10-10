@@ -11,6 +11,7 @@ const PlaygroundPickup := preload("playground_pickup.gd")
 const PlaygroundBuilds := preload("playground_builds.gd")
 const PlaygroundNetBridge := preload("net/playground_net_bridge.gd")
 const PlaygroundPlatform := preload("playground_platform.gd")
+const PlaygroundAvatars := preload("playground_avatars.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
 const PlaygroundProgress := preload("playground_progress.gd")
 const PlaygroundServices := preload("playground_services.gd")
@@ -172,6 +173,12 @@ func _module_load() -> DotResult:
 
 	if not extras.ok:
 		return extras
+
+	# Who people are and what they wear. Never fatal: a server with no identity stack is a
+	# server where everybody wears the stock look, which is a configuration.
+	var dressed: DotResult = await _build_identity()
+	if not dressed.ok:
+		DotLog.result(CHANNEL, "the identity layer", dressed)
 
 	# --- The timer ---------------------------------------------------------
 	add_command(
@@ -468,7 +475,74 @@ func _report_map(map: DotMapDef, _world: Node = null) -> void:
 		server.games.set_current_map(String(map.id) if map != null else "")
 
 
+## The identity layer this module built, or null when it found one already running.
+var _identity: DotPlatformIdentity = null
+var _loaded_platform := false
+
+
+## Resolves who a session is and what they wear, through dot-platform.
+##
+## [b]This game's module is not a DotGameModule[/b] (see CLAUDE.md, `[services-1]`), so it
+## does here what that base does for the games on it: build `DotPlatformIdentity` with this
+## game's avatar schema, a stock look and the site translation, then load dot-platform's
+## module. Without it nothing on a deployed server ever resolved a member's avatar, and every
+## player in the sandbox was a coloured capsule. A platform module already loaded (the
+## dedicated example builds `PlaygroundPlatform` and loads one) is used as it is.
+func _build_identity() -> DotResult:
+	if bridge != null:
+		bridge.skin_fn = _skins_for
+		hook_post("player_admitted", _on_profile)
+		hook_post("player_avatar_changed", _on_profile)
+
+	if server == null or server.modules == null or server.modules.has_module("platform"):
+		return DotResult.success(null)
+
+	_identity = DotPlatformIdentity.new()
+	_identity.name = "Identity"
+	_identity.avatar_schema = PlaygroundAvatars.schema()
+	_identity.stock_avatar_fn = PlaygroundAvatars.stock_avatar
+	_identity.avatar_translate_fn = PlaygroundAvatars.from_site
+	add_child(_identity)
+
+	var ready: Variant = await _identity.setup()
+
+	if not (ready is DotResult) or not (ready as DotResult).ok:
+		_identity.queue_free()
+		_identity = null
+		return ready if ready is DotResult else DotResult.fail(DotError.CODE_INTERNAL, "no result from setup()")
+
+	var loaded: DotResult = await server.modules.load_module("res://addons/dot_platform/dot_platform_module.gd")
+	_loaded_platform = loaded.ok
+	return loaded
+
+
+## What a session wears: their avatar's skins, or empty for the stock look.
+func _skins_for(session_id: int) -> PackedInt32Array:
+	var session := server.session_by_userid(session_id) if server != null else null
+	var platform: Object = server.modules.get_module("platform") \
+		if server != null and server.modules != null else null
+
+	if session == null or platform == null or not platform.has_method("player_for"):
+		return PackedInt32Array()
+
+	var player: Variant = platform.call("player_for", session)
+	var avatar: Variant = (player as Object).get("avatar") if player is Object else null
+	var skins := PlaygroundAvatars.skins_of(avatar as DotAvatar if avatar is DotAvatar else null)
+
+	return PackedInt32Array() if skins == PackedInt32Array([-1, -1, -1]) else skins
+
+
+## A profile resolved or an avatar changed after the join: dress them and say so.
+func _on_profile(event: DotEvent) -> void:
+	if bridge != null and event != null:
+		bridge.refresh_skins(event.get_int("userid"))
+
+
 func _module_unload() -> void:
+	if _loaded_platform and server != null and server.modules != null and server.modules.has_module("platform"):
+		server.modules.unload_module("platform")
+	_loaded_platform = false
+
 	if server != null and server.client_disconnected.is_connected(_on_client_disconnected):
 		server.client_disconnected.disconnect(_on_client_disconnected)
 

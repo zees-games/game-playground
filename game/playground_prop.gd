@@ -23,6 +23,8 @@ extends RigidBody3D
 ## is immediately thrown away. Configuring instead of rebuilding also means the
 ## collision shape is only ever created once.
 
+const PlaygroundFigure := preload("playground_figure.gd")
+
 const CHANNEL := "playground.prop"
 
 ## Extent used when a definition says nothing. A one-metre crate.
@@ -138,6 +140,17 @@ func _build_body() -> void:
 	mesh.material_override = material
 
 	add_child(mesh)
+
+	# An NPC is a person, so it is drawn as one: the kit's figure, its look chosen by what
+	# it is (every soldier alike, a rebel unlike them). The collision stays the definition's
+	# shape. Rebuilt with the body, because a resize changes its height.
+	var old_figure := get_node_or_null(^"Figure")
+	if old_figure != null:
+		old_figure.name = "FigureOld"
+		remove_child(old_figure)
+		old_figure.queue_free()
+	if def != null and String(def.id).begins_with("npc_"):
+		var _dressed := PlaygroundFigure.dress_body(self, extent.y, String(def.id))
 
 	# Continuous collision detection, because a sandbox's whole point is throwing
 	# things hard. A punted prop at 40 m/s moves 31 cm in a 128 Hz step, which is

@@ -4,6 +4,7 @@ const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundEvent := preload("../game/net/playground_event.gd")
 const PlaygroundEvents := preload("../game/net/playground_events.gd")
+const PlaygroundAvatars := preload("../game/playground_avatars.gd")
 const PlaygroundNetBridge := preload("../game/net/playground_net_bridge.gd")
 const PlaygroundNetCommand := preload("../game/net/playground_net_command.gd")
 const PlaygroundPlayer := preload("../game/playground_player.gd")
@@ -57,13 +58,13 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 351
+const CHECKS := 357
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 42
+const SECTIONS := 43
 
 var _passed := 0
 var _failed := 0
@@ -174,6 +175,7 @@ func _run() -> void:
 		await _test_held_over_the_wire()
 		await _test_glass_over_the_wire()
 		await _test_swimming_over_the_wire()
+		await _test_avatars_over_the_wire()
 		await _test_leave()
 
 	_report()
@@ -1120,6 +1122,53 @@ func _forward() -> DotFpsCommand:
 
 func _server_player() -> PlaygroundPlayer:
 	return _server_game.players.get(&"u%d" % SESSION)
+
+
+func _test_avatars_over_the_wire() -> void:
+	_section("what a member wears reaches every client")
+
+	# The translation: a site avatar's face, top and legs, each its own skin.
+	var site := DotAvatar.new()
+	site.schema_id = &"builtin"
+	site.set_part(&"face", &"face.skin-b")
+	site.set_part(&"top", &"top.skin-k")
+	site.set_part(&"legs", &"legs.skin-r")
+	var translated := PlaygroundAvatars.from_site(site)
+	_check(
+		PlaygroundAvatars.skins_of(translated) == PackedInt32Array([1, 10, 17]),
+		"a site avatar is three skins, face, top and legs", str(PlaygroundAvatars.skins_of(translated))
+	)
+	var other := DotAvatar.new()
+	other.schema_id = &"some_game"
+	_check(PlaygroundAvatars.from_site(other) == null, "and somebody else's document is not guessed at")
+
+	# The wire: skins after the style byte, and a JOIN without them still reads.
+	var with_skins := PlaygroundEvents.write_join(7, 9, "Ada", 1, PackedInt32Array([1, 10, 17]))
+	var read := PlaygroundEvents.read_join(DotNetReader.new(with_skins))
+	_check(bool(read["ok"]) and read["skins"] == PackedInt32Array([1, 10, 17]), "JOIN carries them", str(read["skins"]))
+	var old := with_skins.slice(0, with_skins.size() - 3)
+	var read_old := PlaygroundEvents.read_join(DotNetReader.new(old))
+	_check(bool(read_old["ok"]) and (read_old["skins"] as PackedInt32Array).is_empty() and int(read_old["style_index"]) == 1,
+		"and a JOIN from before them reads with none", str(read_old))
+
+	# The server dresses its player and tells everybody; the client's body changes with it.
+	# A face that cannot be the stock one this player's id picks, or the figure check below
+	# passes on the stock look -- which it did, the first time this was armed.
+	var face := (PlaygroundAvatars.stock_index("u%d" % SESSION) + 7) % PlaygroundAvatars.LETTERS.length()
+	var dressed := PackedInt32Array([face, 10, 17])
+	_server_bridge.skin_fn = func(_session: int) -> PackedInt32Array: return dressed
+	_server_bridge.refresh_skins(SESSION)
+	await _exchange_steps(8)
+	var mine := _client_player()
+	_check(mine != null and mine.skins == dressed, "the client has them",
+		str(mine.skins) if mine != null else "no player")
+	var figure: Node = mine.character.rig.find_child("Figure", true, false) if mine != null and mine.character != null else null
+	var head := figure.find_child("head", true, false) as MeshInstance3D if figure != null else null
+	var head_texture := ((head.material_override as StandardMaterial3D).albedo_texture as Texture2D) if head != null and head.material_override is StandardMaterial3D else null
+	_check(head_texture != null and head_texture.resource_path.ends_with("texture-%s.png" % PlaygroundAvatars.LETTERS[face]),
+		"and draws the member's face on the figure", head_texture.resource_path if head_texture != null else "no head")
+	_server_bridge.skin_fn = Callable()
+	_done()
 
 
 func _client_player() -> PlaygroundPlayer:
@@ -3896,7 +3945,13 @@ func _test_zee_over_the_wire() -> void:
 	# every gun at the capsule's centre with two pixels of barrel showing (rendered with
 	# `tools/screenshot_net.sh --zee=rifle`). Armed: mounted on "Torso" this is 0.00 m.
 	var torso: Variant = mirror.character.rig.find_child("Torso", true, false) if mirror != null and mirror.character != null else null
-	var torso_radius := ((torso as MeshInstance3D).mesh as CapsuleMesh).radius if torso is MeshInstance3D else 0.0
+	var torso_radius := ((torso as MeshInstance3D).mesh as CapsuleMesh).radius if torso is MeshInstance3D and (torso as MeshInstance3D).mesh is CapsuleMesh else 0.0
+	# A body drawn as the character kit's figure has no capsule: its torso is the kit's own
+	# `torso` mesh, and "outside the body" is past half its widest horizontal extent.
+	var kit_torso: Variant = mirror.character.rig.find_child("torso", true, false) if mirror != null and mirror.character != null else null
+	if torso_radius <= 0.0 and kit_torso is MeshInstance3D:
+		var box := (kit_torso as MeshInstance3D).global_transform * (kit_torso as MeshInstance3D).get_aabb()
+		torso_radius = maxf(box.size.x, box.size.z) * 0.5
 	var off_axis := -1.0
 	if drawn is ZeeWorldModel:
 		var at := (drawn as ZeeWorldModel).global_position - mirror.global_position

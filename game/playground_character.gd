@@ -25,6 +25,8 @@ extends DotPlayerModelVisual
 
 const CHANNEL := "playground.character"
 
+const PlaygroundFigure := preload("playground_figure.gd")
+
 ## Parts of a body, as a fraction of the character's height.
 const HEAD_FRACTION := 0.22
 const TORSO_FRACTION := 0.46
@@ -44,14 +46,21 @@ var _leg_radius := 0.0
 ## use the whole addon: `DotPlayerModelRig.build_from` returns success and builds nothing
 ## when `rig_scene` is empty, and `adopt` hands it the node this class made instead. Every
 ## mount, every attachment and every tint then works exactly as it would over a real rig.
-func build_for(def: DotPlayerCharDef, colour: Color) -> void:
+func build_for(
+	def: DotPlayerCharDef, colour: Color,
+	skins: PackedInt32Array = PackedInt32Array(), figure_key: String = ""
+) -> void:
 	if def == null:
 		return
 
-	if _built_for == def.id and _parts != null and is_instance_valid(_parts):
+	# The skins are part of what was built: a member's avatar arriving after the join has to
+	# rebuild a body that was built with the stock look.
+	var built_key := StringName("%s|%s|%s" % [def.id, skins, figure_key])
+
+	if _built_for == built_key and _parts != null and is_instance_valid(_parts):
 		return
 
-	_built_for = def.id
+	_built_for = built_key
 
 	if _parts != null and is_instance_valid(_parts):
 		_parts.queue_free()
@@ -84,30 +93,45 @@ func build_for(def: DotPlayerCharDef, colour: Color) -> void:
 	var torso_height := height * TORSO_FRACTION
 	var legs_height := maxf(height - head_height - torso_height, 0.05)
 
-	_capsule("Legs", radius * 0.85, legs_height, legs_height * 0.5, colour.darkened(0.35))
-	_capsule(
-		"Torso", radius, torso_height, legs_height + torso_height * 0.5, colour
-	)
-	# A head has to be WIDER than it is tall to read as a head at this size. The entity
-	# icons in the spawn menu had the opposite problem — a torso that spanned the full
-	# height covered the head entirely and every NPC in the menu came out a coloured bar.
-	_sphere(
-		"Head",
-		radius * 0.78,
-		legs_height + torso_height + head_height * 0.5,
-		colour.lightened(0.25)
-	)
+	# The kit's figure when this build has it, so a person looks like a person and a member
+	# looks like what they chose on the site; the capsules otherwise, which is what a build
+	# without the art (a suite with no assets, a server stripped of them) still draws.
+	var figure := PlaygroundFigure.build(height, skins, figure_key) if figure_key != "" or not skins.is_empty() else null
 
-	# A nose, so a body four metres away has a visible FACING. Without one a capsule
-	# looks identical from every angle and a third-person camera behind a player who has
-	# turned round shows no change at all — which reads as the turn not working.
-	_marker(
-		"Facing",
-		radius * 0.3,
-		legs_height + torso_height + head_height * 0.5,
-		-radius * 0.9,
-		colour.lightened(0.5)
-	)
+	if figure != null:
+		_parts.add_child(figure)
+		# The rig finds its mounts by name (`_model_def`), and the eye mount is the head: the
+		# capsules were those nodes, so with a figure they are markers at the same heights.
+		for marker: Array in [["Head", legs_height + torso_height + head_height * 0.5], ["Torso", legs_height + torso_height * 0.5]]:
+			var mount := Node3D.new()
+			mount.name = marker[0]
+			mount.position = Vector3(0.0, float(marker[1]), 0.0)
+			_parts.add_child(mount)
+	else:
+		_capsule("Legs", radius * 0.85, legs_height, legs_height * 0.5, colour.darkened(0.35))
+		_capsule(
+			"Torso", radius, torso_height, legs_height + torso_height * 0.5, colour
+		)
+		# A head has to be WIDER than it is tall to read as a head at this size. The entity
+		# icons in the spawn menu had the opposite problem — a torso that spanned the full
+		# height covered the head entirely and every NPC in the menu came out a coloured bar.
+		_sphere(
+			"Head",
+			radius * 0.78,
+			legs_height + torso_height + head_height * 0.5,
+			colour.lightened(0.25)
+		)
+
+		# A nose, so a body four metres away has a visible FACING. Without one a capsule
+		# looks identical from every angle and a third-person camera behind a player who has
+		# turned round shows no change at all — which reads as the turn not working.
+		_marker(
+			"Facing",
+			radius * 0.3,
+			legs_height + torso_height + head_height * 0.5,
+			-radius * 0.9,
+			colour.lightened(0.5)
+		)
 
 	# Where a held weapon hangs: in front of the torso's right side, not its middle. The
 	# mount named the torso until zee-dot-weapons' world model arrived, and a rifle hung at
@@ -195,7 +219,13 @@ func _apply_pose() -> void:
 
 		var standing_y := float(node.get_meta(&"standing_y"))
 
-		if node.name == &"Legs":
+		if node.name == &"Figure":
+			# The kit's legs swing forward from the hip, a quarter turn about X in the
+			# model's own space (whose forward is +Z before the figure's half turn).
+			for leg in PlaygroundFigure.legs(node):
+				leg.rotation = Vector3(-PI * 0.5 if _seated_pose else 0.0, 0.0, 0.0)
+			node.position.y = standing_y - drop
+		elif node.name == &"Legs":
 			if _seated_pose:
 				# Laid forward (-Z) along the seat, at the height of a thigh on a cushion.
 				node.rotation = Vector3(PI * 0.5, 0.0, 0.0)

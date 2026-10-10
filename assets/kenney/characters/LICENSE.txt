@@ -1,0 +1,10 @@
+Kenney Blocky Characters — CC0 1.0 Universal (public domain dedication).
+
+Source: Kenney Game Assets All-in-1 (kenney.itch.io/kenney-game-assets), bought
+2026-09-05. CC0 requires no attribution; this file records provenance anyway so the
+next reader knows these are not ours and do not need to be.
+
+All 18 GLBs share byte-identical geometry (leg-left, leg-right, torso, arm-left,
+arm-right, head) and differ ONLY by the 1024x1024 atlas in Textures/. That is why
+`tools/build_avatar_parts.gd` can generate 18 bodies and 18 heads from them without
+touching a mesh, and why the whole set costs about 2.3 MB.

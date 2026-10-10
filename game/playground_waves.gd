@@ -1,6 +1,7 @@
 extends Node
 
 const PlaygroundPaths := preload("playground_paths.gd")
+const PlaygroundFigure := preload("playground_figure.gd")
 
 const Playground := preload("playground.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
@@ -117,6 +118,16 @@ static func _add(
 
 static var _shared: DotNpcCatalogue = null
 
+## Draws a wave NPC as a person rather than its capsule, as tall as the capsule. Static, so
+## a client's mirror is dressed by the same rule (`PlaygroundNetBridge`).
+static func dress(body: Node3D, kind: String) -> void:
+	if body == null:
+		return
+	var collision := body.get_node_or_null(^"Collision") as CollisionShape3D
+	var capsule := collision.shape as CapsuleShape3D if collision != null else null
+	var _dressed := PlaygroundFigure.dress_body(body, capsule.height if capsule != null else 1.8, kind)
+
+
 static func shared_catalogue() -> DotNpcCatalogue:
 	if _shared == null:
 		_shared = catalogue()
@@ -162,7 +173,8 @@ func setup(p_game: Playground) -> DotResult:
 	sounds.attach(spawner)
 	add_child(spawner)
 
-	spawner.spawned.connect(func(_npc: DotNpcInstance) -> void:
+	spawner.spawned.connect(func(npc: DotNpcInstance) -> void:
+		dress(npc.node as Node3D, String(npc.def.id))
 		wave_changed.emit(spawner.world_count())
 	)
 	spawner.removed.connect(func(_npc: DotNpcInstance, _why: StringName) -> void:

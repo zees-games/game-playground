@@ -187,14 +187,20 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 
 # --- Players ---------------------------------------------------------------
 
+## [param skins] is what the player wears, [face, top, legs] as kit indices, written last as
+## index + 1 so 0 is "the stock look": appended, so a JOIN without them -- from a server
+## older than avatars here -- still reads, with no skins.
 static func write_join(
-	player_id: int, net_id: int, display_name: String, style_index: int
+	player_id: int, net_id: int, display_name: String, style_index: int,
+	skins: PackedInt32Array = PackedInt32Array()
 ) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
 	w.write_varint(net_id)
 	w.write_string(display_name, NAME_BYTES)
 	w.write_uint(maxi(style_index, 0), 8)
+	for i in range(3):
+		w.write_uint(clampi(skins[i] + 1, 0, 255) if i < skins.size() else 0, 8)
 	return w.to_bytes()
 
 
@@ -203,11 +209,21 @@ static func read_join(r: DotNetReader) -> Dictionary:
 	var net_id := r.read_varint()
 	var display_name := r.read_string(NAME_BYTES)
 	var style_index := r.read_uint(8)
+	var skins := PackedInt32Array()
+	if not r.at_end():
+		var any := false
+		for i in range(3):
+			var v := r.read_uint(8) - 1
+			skins.append(v)
+			any = any or v >= 0
+		if not any:
+			skins = PackedInt32Array()
 	return {
 		"player_id": player_id,
 		"net_id": net_id,
 		"name": display_name,
 		"style_index": style_index,
+		"skins": skins,
 		"ok": r.ok(),
 	}
 

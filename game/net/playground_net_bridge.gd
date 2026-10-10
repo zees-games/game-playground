@@ -383,6 +383,24 @@ func _style_id(index: int) -> StringName:
 
 # --- Server: players -------------------------------------------------------
 
+## What a session wears, as [face, top, legs] kit skins (see `playground_avatars.gd`), or an
+## empty array for the stock look. Set by the module from dot-platform; asked as a player is
+## added, before their JOIN.
+var skin_fn: Callable = Callable()
+
+
+## Re-dresses a player whose avatar changed after they joined, and tells everybody.
+func refresh_skins(session_id: int) -> void:
+	if net == null or not net.is_server or not skin_fn.is_valid():
+		return
+	var player: PlaygroundPlayer = game.players.get(_player_key(session_id))
+	var dressed: Variant = skin_fn.call(session_id)
+	if player == null or not (dressed is PackedInt32Array) or (dressed as PackedInt32Array) == player.skins:
+		return
+	player.set_skins(dressed)
+	_broadcast(PlaygroundEvents.Kind.JOIN, _join_body(session_id))
+
+
 func add_player(peer_id: int, session_id: int, display_name: String) -> DotResult:
 	if net == null or not net.is_server:
 		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only the server adds players.")
@@ -476,6 +494,13 @@ func _on_player_added(id: StringName) -> void:
 	var player: PlaygroundPlayer = game.players.get(id)
 	if player == null:
 		return
+
+	# Dressed before the JOIN that describes them goes out, so nobody sees the stock look
+	# first and the member's own a moment later.
+	if skin_fn.is_valid():
+		var dressed: Variant = skin_fn.call(session_id)
+		if dressed is PackedInt32Array:
+			player.set_skins(dressed)
 
 	var identity := _build_entity(player, peer_for_player(session_id))
 	var registered := net.registry.register(identity, 0, net.clock.tick, net.config)
@@ -1134,7 +1159,8 @@ func _join_body(session_id: int) -> PackedByteArray:
 		session_id,
 		behaviour.identity.net_id,
 		player.display_name,
-		_style_index(player.movement_style.id if player.movement_style != null else &"normal")
+		_style_index(player.movement_style.id if player.movement_style != null else &"normal"),
+		player.skins
 	)
 
 
@@ -1940,6 +1966,9 @@ func _apply_join(reader: DotNetReader) -> void:
 		player.display_name = str(join["name"])
 
 	game.set_player_style(id, _style_id(int(join["style_index"])))
+	var mirrored: PlaygroundPlayer = game.players.get(id)
+	if mirrored != null:
+		mirrored.set_skins(join.get("skins", PackedInt32Array()))
 	roster_changed.emit(session_id)
 
 
@@ -2058,6 +2087,9 @@ func _apply_prop(reader: DotNetReader) -> void:
 	var as_prop := body as PlaygroundProp
 	if as_prop != null and def != null:
 		as_prop.configure(def)
+	elif def == null:
+		# A wave NPC's mirror, dressed by the rule the server's own copy was.
+		PlaygroundWaves.dress(body, str(info["kind_id"]))
 
 	# [b]On the layout's layer, not the scene's 1/1.[/b] The server classifies every
 	# spawned body (`Playground._classify_spawned`) and a mirror used to keep whatever the

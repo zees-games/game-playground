@@ -284,16 +284,37 @@ func build_view_switch() -> bool:
 ## metres behind nothing.
 ##
 ## [param colour] is the player's own, so two people in a sandbox are told apart.
+## What this person wears: [face, top, legs] as kit skins (see `playground_avatars.gd`), empty
+## for the stock look their id picks. Set by the server from their avatar and sent in JOIN.
+var skins := PackedInt32Array()
+
+var _character_def: DotPlayerCharDef = null
+var _character_colour := Color.WHITE
+
+
+## Dresses this player in [param p_skins] and rebuilds the body if it changed.
+func set_skins(p_skins: PackedInt32Array) -> void:
+	if p_skins == skins:
+		return
+	skins = p_skins
+	if _character_def != null:
+		build_character(_character_def, _character_colour)
+		refresh_body()
+
+
 func build_character(def: DotPlayerCharDef, colour: Color) -> void:
 	if def == null:
 		return
+
+	_character_def = def
+	_character_colour = colour
 
 	if character == null:
 		character = PlaygroundCharacter.new()
 		character.name = "Character"
 		add_child(character)
 
-	character.build_for(def, colour)
+	character.build_for(def, colour, skins, String(player_id))
 	character.set_seated(riding)
 
 	if anim == null:
