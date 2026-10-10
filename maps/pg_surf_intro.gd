@@ -238,7 +238,7 @@ const BANK_SPLITS := [1.0 / 3.0, 2.0 / 3.0]
 # Not two faces in line, which is what this was first built as: a rider leaving a face
 # over its far END is stopped dead by the motor at that edge (the long bank's rider is
 # too, 0.1 m short of its far edge, and slides off onto the finish pad below, which is
-# why nobody saw it — see CLAUDE.md). Leaving over the LOW LIP keeps the speed, because
+# why nobody saw it — see docs/routes.md). Leaving over the LOW LIP keeps the speed, because
 # the clip there is along the lip, which is the way the rider is going.
 #
 # The second face is pitched steeper than the first, so the half after the transfer is

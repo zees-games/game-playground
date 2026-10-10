@@ -2101,7 +2101,7 @@ func _apply_prop(reader: DotNetReader) -> void:
 	#
 	# The PROP event carries no frozen state, so a mirror is classified as the spawn left
 	# it on the server only when that is unfrozen; a prop frozen or held later is
-	# reclassified on the server and not here. See the CLAUDE.md note on `[prop-mirror-layer-1]`.
+	# reclassified on the server and not here. See docs/netcode.md on `[prop-mirror-layer-1]`.
 	if game.player_stack != null and def != null:
 		var _put := game.player_stack.classify(body, Playground.layer_for(def, false))
 

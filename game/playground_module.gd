@@ -482,7 +482,7 @@ var _loaded_platform := false
 
 ## Resolves who a session is and what they wear, through dot-platform.
 ##
-## [b]This game's module is not a DotGameModule[/b] (see CLAUDE.md, `[services-1]`), so it
+## [b]This game's module is not a DotGameModule[/b] (see docs/simulation.md, "The server module"), so it
 ## does here what that base does for the games on it: build `DotPlatformIdentity` with this
 ## game's avatar schema, a stock look and the site translation, then load dot-platform's
 ## module. Without it nothing on a deployed server ever resolved a member's avatar, and every

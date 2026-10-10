@@ -2306,7 +2306,7 @@ const CONVERGE_LIMIT_TICKS := 64
 ##
 ## The figures are printed; what is asserted is only that the mirror follows (key to
 ## visible under a generous bound) and converges once the car stops. The decision taken on
-## these numbers is in CLAUDE.md, "What a driver feels".
+## these numbers is in docs/vehicles.md, "What a driver feels".
 func _measure_round_trip(
 	vehicle: DotVehicleInstance, mirror: Node3D, brake: DotFpsCommand
 ) -> void:
