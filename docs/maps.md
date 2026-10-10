@@ -1,6 +1,6 @@
 # Maps
 
-Maps are content, not projects (see dot-map's [CLAUDE.md](../../dot-map/CLAUDE.md) for why a project per map falls apart). The built-in maps are `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built scripts), `pg_generated` (seeded) and `pg_data` (builds any JSON map document). The custom maps are documents from game-playground-maps, linked in as `maps/custom`. Every timed route on the hand-built maps is in [routes.md](routes.md).
+Maps are content, not projects (see dot-map's [docs/content.md](../../dot-map/docs/content.md) for why a project per map falls apart). The built-in maps are `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built scripts), `pg_generated` (seeded) and `pg_data` (builds any JSON map document). The custom maps are documents from game-playground-maps, linked in as `maps/custom`. Every timed route on the hand-built maps is in [routes.md](routes.md).
 
 ## Geometry and zones come from one description
 
