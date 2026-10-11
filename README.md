@@ -1,6 +1,6 @@
 This is a game to demonstrate the capabilities of the [**Dot collection**](https://moddingcommunity.com/co/4-dot-assets) built on-top of [Godot 4](https://godotengine.org/) and [TMC's gaming platform](https://moddingcommunity.com/play). In this 3D game, players are allowed to do whatever they want. It is intended to be a sandbox game. Players may hold the **Q** button in-game to bring up a menu to spawn props, NPCs, and weapons. You may also interact with props in the world using the physics and gravity guns. This is inspired by classic Sandbox games like Garry's Mod!
 
-![Preview](https://github.com/gamemann/game-playground/blob/main/images/preview.gif?raw=true)
+![Preview](https://github.com/zees-games/game-playground/blob/main/images/preview.gif?raw=true)
 
 *Play on my test server [here](https://moddingcommunity.com/playground/s/pg01/play)!*
 
@@ -20,7 +20,7 @@ Hold **Q** to open the spawn menu. Clicking something in it spawns it, and the m
 | --- | --- |
 | **Props** | Planks, panels, beams and pillars to build with; crates and barrels; balls from a beach ball to a boulder; and buttons, levers and doors |
 | **Entities** | NPCs. One wanders, one chases you, one hops, one spins, a hunter, and soldiers and rebels that carry weapons. Soldiers fight players and rebels; rebels fight soldiers and follow you |
-| **Weapons** | A launcher that fires props, a remover, an impulse gun, and the twenty-seven weapons of [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons). Right click a weapon in the menu to drop it on the ground |
+| **Weapons** | A launcher that fires props, a remover, an impulse gun, and the twenty-seven weapons of [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons). Right click a weapon in the menu to drop it on the ground |
 | **Tools** | The tool gun: inflate, colour, remove, weld, no-collide, rope, balloon, physical properties, wire, giving an NPC a weapon, and editing a selected prop |
 
 Some of what you can do:
@@ -172,7 +172,7 @@ With `pg_shop 1`, spawning costs money. A player's bag is a 10 x 6 grid with a 4
 [`CLAUDE.md`](CLAUDE.md) has the design decisions and the reasoning behind them.
 
 ## Credits
-The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons), which credits its own art. The props and the menu icons are drawn from their definitions. People and NPCs are drawn with [Kenney's Blocky Characters](https://kenney.nl/assets/blocky-characters) (CC0), in `assets/kenney/characters/` with its licence beside it. The maps are drawn over [Kenney's Prototype Textures](https://kenney.nl/assets/prototype-textures) (CC0), in `assets/kenney/prototype/` with its licence.
+The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons), which credits its own art. The props and the menu icons are drawn from their definitions. People and NPCs are drawn with [Kenney's Blocky Characters](https://kenney.nl/assets/blocky-characters) (CC0), in `assets/kenney/characters/` with its licence beside it. The maps are drawn over [Kenney's Prototype Textures](https://kenney.nl/assets/prototype-textures) (CC0), in `assets/kenney/prototype/` with its licence.
 
 ## License
 MIT. See [LICENSE](LICENSE).
