@@ -32,6 +32,10 @@ var _camera: Camera3D = null
 
 
 func _initialize() -> void:
+	# Settings to a scratch directory emptied first (see
+	# `PlaygroundPresentation.use_scratch_settings`): a render must not save into a player's
+	# file, nor draw from whatever the player last saved there.
+	var _scratch := PlaygroundPresentation.use_scratch_settings("screenshot")
 	var args := OS.get_cmdline_user_args()
 	var index := args.find("--map")
 	var id := args[index + 1] if index >= 0 and index + 1 < args.size() else "pg_lobby"

@@ -22,7 +22,7 @@ const PlaygroundWorldGen := preload("../game/playground_worldgen.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 107
+const CHECKS := 109
 
 var _passed := 0
 var _failed := 0
@@ -30,8 +30,19 @@ var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
 
+## The player's own settings directory as it was before this run: every file's name,
+## modification time and digest. Checked at the end; see
+## [method PlaygroundPresentation.use_scratch_settings].
+var _player_files_were: String = ""
+
 
 func _ready() -> void:
+	# Before anything builds a presentation layer: the Escape menu section drags the volume
+	# to 0.15 and that used to land in this machine's real `user://playground_settings`, so
+	# the next real session started nearly silent. Everything goes to a scratch directory
+	# emptied first, never the player's.
+	_player_files_were = _player_files_stamp()
+	var _scratch := PlaygroundPresentation.use_scratch_settings("headless_presentation")
 	DotLog.set_level(
 		DotLog.Level.DEBUG if "--verbose" in OS.get_cmdline_user_args()
 		else DotLog.Level.ERROR
@@ -58,7 +69,18 @@ func _run() -> void:
 	_test_every_sound_has_a_voice()
 	_test_the_vote_is_heard()
 
+	# A settings manager writes on a debounce, and a freed one writes in `_exit_tree`:
+	# the Escape menu section's presentation is queued for freeing and only reaches the
+	# disk at the end of this frame. Without these the check below looked before the
+	# write and passed on the code that wrote the player's file.
+	await get_tree().process_frame
+	await get_tree().process_frame
 	print("")
+	_check(
+		_player_files_stamp() == _player_files_were,
+		"the player's own settings files were not touched",
+		PlaygroundPresentation.PLAYER_SETTINGS
+	)
 	_check(
 		_completed == _entered,
 		"every section ran to its last line (%d of %d)" % [_completed, _entered],
@@ -78,6 +100,20 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+## Every file in the player's own settings directory, as name, modification time and MD5,
+## or "" when there is no directory. A digest as well as a time, because a write within
+## the same second as the stamp leaves the time where it was.
+static func _player_files_stamp() -> String:
+	var dir := ProjectSettings.globalize_path(PlaygroundPresentation.PLAYER_SETTINGS)
+	if not DirAccess.dir_exists_absolute(dir):
+		return ""
+	var lines := PackedStringArray()
+	for f in DirAccess.get_files_at(dir):
+		var path := dir.path_join(f)
+		lines.append("%s %d %s" % [f, FileAccess.get_modified_time(path), FileAccess.get_md5(path)])
+	return "\n".join(lines)
 
 
 func _make() -> PlaygroundPresentation:
@@ -835,6 +871,13 @@ func _test_escape_menu() -> void:
 	if not _check(p.setup().ok, "a presentation layer to read the settings from"):
 		_done()
 		return
+	# This section writes through the real file store (the menu's Apply is what it is
+	# about), so the store must be the scratch one `_ready` chose, not the player's.
+	_check(
+		PlaygroundPresentation.settings_directory.begins_with("user://scratch/"),
+		"its settings are a scratch document, not the player's",
+		PlaygroundPresentation.settings_directory
+	)
 
 	var stack := DotScreenStack.new()
 	stack.name = "Stack"

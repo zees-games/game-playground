@@ -10,6 +10,7 @@ const PlaygroundMapSurvey := preload("../game/playground_map_survey.gd")
 const PlaygroundPickup := preload("../game/playground_pickup.gd")
 const PlaygroundBuilds := preload("../game/playground_builds.gd")
 const PlaygroundPlayer := preload("../game/playground_player.gd")
+const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundProp := preload("../game/playground_prop.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
@@ -76,6 +77,10 @@ var playground: Playground = null
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
+	# The real `PlaygroundClient`s below each build a presentation layer, and that layer's
+	# settings go to a scratch directory emptied first, never the player's own file (see
+	# `PlaygroundPresentation.use_scratch_settings`).
+	var _scratch := PlaygroundPresentation.use_scratch_settings("headless_playground")
 	_run.call_deferred()
 
 

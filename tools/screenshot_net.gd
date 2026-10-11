@@ -105,6 +105,10 @@ var _presentation: PlaygroundPresentation = null
 
 
 func _ready() -> void:
+	# Settings to a scratch directory emptied first (see
+	# `PlaygroundPresentation.use_scratch_settings`): a render must not save into a player's
+	# file, nor draw from whatever the player last saved there.
+	var _scratch := PlaygroundPresentation.use_scratch_settings("screenshot_net")
 	DotLog.set_level(DotLog.Level.ERROR)
 	Engine.max_fps = RENDER_FPS
 	_run.call_deferred()

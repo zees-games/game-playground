@@ -36,6 +36,10 @@ var _failed := 0
 
 
 func _initialize() -> void:
+	# Settings to a scratch directory emptied first (see
+	# `PlaygroundPresentation.use_scratch_settings`): a render must not save into a player's
+	# file, nor draw from whatever the player last saved there.
+	var _scratch := PlaygroundPresentation.use_scratch_settings("audio_probe")
 	DotLog.set_level(DotLog.Level.WARN)
 	print("driver:  %s" % AudioServer.get_driver_name())
 

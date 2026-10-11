@@ -52,6 +52,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 - **Run `godot --headless --path . --script tools/export_zones.gd` after changing a map**, or the zone-file check fails. [maps](docs/maps.md#geometry-and-zones-come-from-one-description)
 - `headless_playground -- --only=<method>` runs one section; it is then on whatever map the boot left. [testing](docs/testing.md#the-suites)
 - **Add a `headless_net` test at the end of the connected-player sequence**: both halves share one physics space and the suite is order-sensitive. [testing](docs/testing.md#traps-the-suites-have-hit)
+- A suite or tool that builds a presentation or client calls `PlaygroundPresentation.use_scratch_settings` first: never the player's file. [testing](docs/testing.md#traps-the-suites-have-hit)
 - **Render after touching the client, a menu or a map** (`tools/screenshot*.sh`, under `xvfb-run`). No assertion sees the screen. [client](docs/client.md#looking-at-it)
 
 ## Rules that bite

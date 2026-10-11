@@ -23,6 +23,13 @@ const CHANNEL := "playground.presentation"
 const SCHEMA_VERSION := 1
 const SOUND_DIR := "res://audio"
 
+## Where the player's settings document lives. Only a suite or a render tool changes it,
+## through [method use_scratch_settings]; see that.
+const PLAYER_SETTINGS := "user://playground_settings"
+
+## The directory the next [PlaygroundPresentation] stores its settings in.
+static var settings_directory: String = PLAYER_SETTINGS
+
 ## The ping an administrator's beacon makes. See [method sound_catalogue].
 const BEACON_SOUND := &"beacon"
 ## Where the two effect scenes are: `spawn_puff.tscn` and `tool_beam.tscn`. Neither has a
@@ -161,11 +168,31 @@ static func schema() -> DotSettingsSchema:
 	return s
 
 
+## Points every [PlaygroundPresentation] made after this at a fresh, empty settings
+## directory named [param tag], and returns it.
+##
+## [b]For a suite or a render tool, never a player.[/b] `headless_presentation` drove the
+## Escape menu's volume to 0.15 through the real `user://playground_settings`, so every
+## real session after a test run started nearly silent. Swapping the store after
+## [method setup] is too late for a tool, which has already drawn from what the player
+## saved; a scratch directory emptied first means a run starts from the defaults.
+static func use_scratch_settings(tag: String) -> String:
+	var dir := "user://scratch/%s" % tag
+	var abs_dir := ProjectSettings.globalize_path(dir)
+	if DirAccess.dir_exists_absolute(abs_dir):
+		for f in DirAccess.get_files_at(abs_dir):
+			var _gone := DirAccess.remove_absolute(abs_dir.path_join(f))
+	else:
+		var _made := DirAccess.make_dir_recursive_absolute(abs_dir)
+	settings_directory = dir
+	return dir
+
+
 func _build_settings() -> DotResult:
 	settings = DotSettingsManager.new()
 	settings.name = "Settings"
 	settings.schema = schema()
-	settings.local_store = DotSettingsStoreFile.new("user://playground_settings")
+	settings.local_store = DotSettingsStoreFile.new(settings_directory)
 	settings.app_namespace = &"game_playground"
 	settings.shared_namespace = &"tmc_account"
 	add_child(settings)
