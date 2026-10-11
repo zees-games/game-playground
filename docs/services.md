@@ -61,3 +61,5 @@ The module follows the server's hibernation with both map clocks (`vote.director
 ## The server browser's server half
 
 `PlaygroundQueryProvider` (an inner class of `playground_module.gd`) contributes to the query host. **The interesting part of a sandbox's listing row is which of `pg_arena`, `pg_waves` and `pg_shop` are on**, because each turns this into a different server; the map, occupancy, prop count and tick rate go beside them. The prop count is the spawner's own `world_count()` and the player count the module's `_joined`, asserted as such: a row built from a second tally is a second number that can disagree. (The browser shipped for a while against a server that answered nothing: `dedicated` had `query_enabled = false`.)
+
+`PlaygroundBrowser`, the client half, starts from history and typed addresses. With a site configured (`--browser-backbone-url=<origin>` or `DOT_BROWSER_BACKBONE_URL`) it also reads the site's listing of this game's servers (`DotBrowserSourceBackbone`, app `playground`, website-city's `/api/content/server/list`), addresses only; without one nothing reaches out to a website.

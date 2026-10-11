@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 874
+const CHECKS := 876
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -3487,6 +3487,31 @@ func _test_spawn_menu() -> void:
 		servers.browser.filter != null,
 		"and a filter the client owns rather than one the server answers"
 	)
+
+	# The site's listing: off unless a site is named, and this game's servers when one is.
+	var env_key := "DOT_BROWSER_BACKBONE_URL"
+	var had := OS.get_environment(env_key)
+	OS.unset_environment(env_key)
+	var off: DotResult = PlaygroundBrowser.site_listing()
+	_check(
+		off.ok and off.value == null
+			and not servers.browser.sources().any(
+				func(s: DotBrowserSource) -> bool: return s.source_name() == &"backbone"
+			),
+		"no site listing is read when none is configured"
+	)
+	OS.set_environment(env_key, "http://127.0.0.1:9")
+	var on: DotResult = PlaygroundBrowser.site_listing()
+	var listing: DotBrowserSourceBackbone = on.value if on.ok else null
+	_check(
+		listing != null and listing.config.page_url(1).contains("app=playground"),
+		"and this game's servers are when one is",
+		listing.config.page_url(1) if listing != null else str(on.error)
+	)
+	if had != "":
+		OS.set_environment(env_key, had)
+	else:
+		OS.unset_environment(env_key)
 
 	stack.pop()
 	servers.queue_free()
