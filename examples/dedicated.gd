@@ -46,7 +46,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 27
-const CHECKS := 244
+const CHECKS := 245
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -1702,10 +1702,24 @@ func _test_live_tools() -> void:
 	var _off := await _run_command_later("noclip Pat off")
 
 	# A slap is a shove in a direction the slapper knows: speed nobody earned.
-	player.timer.run.begin(0.0)
+	#
+	# Out of the start zone first. Pat joined at the spawn, which is inside the start, and
+	# standing in the start ends a live run (dot-timer's REASON_RESET): the run begun
+	# here was thrown away on the first tick after the slap and replaced by a clean one,
+	# so the check read a run the slap never touched. Up in the air is in no zone at all.
+	# Then let the timer see the move: leaving the start is what STARTS a run, so a run
+	# begun before that tick is replaced by the timer's own the moment it is processed.
+	player.teleport(Vector3(0.0, 400.0, 0.0))
+	for _i in 4:
+		await get_tree().physics_frame
+	if not player.timer.run.is_active():
+		player.timer.run.begin(0.0)
 	var clean_before_slap := not player.timer.run.tainted
 	var _slapped := await _run_command_later("slap Pat")
-	_check(clean_before_slap and player.timer.run.tainted,
+	# Two checks, not one `and`: when it was one, a failure could not say whether the run
+	# was already tainted before the slap or the slap failed to taint it.
+	_check(clean_before_slap, "a run begun after noclip is turned off starts clean")
+	_check(player.timer.run.tainted,
 		"a slap taints the course run it lands in, so it is not a boost with a time at the end")
 
 	player.timer.run_stopped.disconnect(on_stop)
