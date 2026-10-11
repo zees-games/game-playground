@@ -5,7 +5,7 @@ extends "playground_entity.gd"
 ## [b]`extends` a PATH, not a class, and that is the point of this file.[/b] It is the
 ## template an entity delivered in a dot-cloud pack copies, and a mounted pack's
 ## `class_name` globals are not registered in the host — measured, and written down in
-## the family's CLAUDE.md — so every cross-file type reference inside a pack fails to
+## game-dev/docs/bugs-found.md — so every cross-file type reference inside a pack fails to
 ## compile while `extends "res://x.gd"` works. Writing the shipped entities the way a
 ## delivered one has to be written is what keeps that path honest: if it ever stopped
 ## working, these would stop working with it.

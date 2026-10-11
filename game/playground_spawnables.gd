@@ -21,7 +21,7 @@ const PlaygroundZee := preload("playground_zee.gd")
 ## [b]The script is named by PATH, and that is not a style choice.[/b] A game
 ## delivered through dot-cloud is a mounted `.pck`, and **a mounted pack's
 ## `class_name` globals are not registered in the host** — measured, and written down
-## in the family's own CLAUDE.md. So every cross-file type reference inside a pack
+## in game-dev/docs/bugs-found.md. So every cross-file type reference inside a pack
 ## fails to compile and the pack's scripts are dead, while `preload("res://x.gd")` and
 ## `extends "res://x.gd"` both work. A catalogue that named a class could therefore
 ## only ever ship inside the build. Naming a path is what makes an entity deliverable,

@@ -150,7 +150,7 @@ func _run() -> void:
 	# Stalls and extrapolations are frames the interpolator had nothing newer than its render
 	# time to blend toward and guessed instead, out of `samples`. Near zero on this loopback.
 	# Until 2026-09-24 it was most frames — 1,684 stalls in six seconds — because dot-net
-	# subtracted a buffer counted in SNAPSHOTS from a tick number (dot-net's CLAUDE.md, #18).
+	# subtracted a buffer counted in SNAPSHOTS from a tick number (dot-net's docs/history.md, #18).
 	print("interpolator: ", _client_net.interpolator.describe())
 	get_tree().quit()
 

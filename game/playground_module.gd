@@ -1147,7 +1147,7 @@ func _physics_process(_delta: float) -> void:
 ## a legitimate thing to find, so it returned quietly and NOBODY EVER JOINED. Nothing
 ## errored, in every configuration, for as long as this module has existed; it survived
 ## because the only thing that had ever loaded it was a headless test that adds its
-## players directly. The family's CLAUDE.md has carried this exact warning since
+## players directly. game-dev/docs/bugs-found.md has carried this exact warning since
 ## game-hungario hit it.
 func _on_client_spawn(event: DotEvent) -> void:
 	var session := server.session_by_userid(event.get_int("userid"))
