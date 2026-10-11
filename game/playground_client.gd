@@ -740,18 +740,22 @@ func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 	var window: DotChatWindow = presentation.chat_window if presentation != null else null
 	var colour := chan.colour if chan != null else Color(0.88, 0.90, 0.94)
 
+	# [b]In the chat box, and on the notice line only when there is no box.[/b] Both drew
+	# every line: a map vote's ballot was printed at the notice line in the middle left and
+	# again in the box bottom left, beside the drawn ballot panel. The notice line keeps what
+	# is the game's (budget reached, a tool's refusal), which never comes through chat.
 	if message.is_from_server() or message.sender_name == "":
-		hud.notice("%s%s" % [prefix, message.text])
-
 		if window != null:
 			window.add_text("%s%s" % [prefix, message.text], Color(0.80, 0.82, 0.86))
+		else:
+			hud.notice("%s%s" % [prefix, message.text])
 
 		return
 
-	hud.notice("%s%s: %s" % [prefix, message.sender_name, message.text])
-
 	if window != null:
 		window.add_said("%s%s" % [prefix, message.sender_name], message.text, colour)
+	else:
+		hud.notice("%s%s: %s" % [prefix, message.sender_name, message.text])
 
 
 ## Somebody's health changed, or they died. Drawn, never decided.

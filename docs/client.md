@@ -55,6 +55,7 @@ dot-ui's `DotChatWindow` beside the console. **The channels come from `Playgroun
 | `chat_open_key` | `Y` |
 | `chat_near_key` | `U` |
 
+- **Every chat line goes to the box, and to the HUD's notice line only when there is no box** (`PlaygroundClient._on_chat_message`). Both drew every line, so a map vote's ballot was printed at the notice line in the middle left and again in the box, beside the drawn ballot panel. The notice line keeps the game's own messages (budget reached, a tool's refusal), which never come through chat. `headless_presentation` checks it; `screenshot_views`' `chat_ballot` frame shows it.
 - **dot-server's `chat_received` is connected and its lines are ignored**: this game routes every line through its own wire, so the handler takes only the `{kind: "state"}` notice saying what is carrying chat.
 - **`swallows_input()` covers the box as well as the console, and `DotFpsSampler.suspended` is set beside it**: movement is polled, so typing "sw" otherwise walks the player backwards through their build.
 - **The console is dot-console's `DotConsoleKit`, built by `PlaygroundPresentation.build_console(menu)` after the client's `DotMenu`**, so it is one of the menu's overlays; `_refresh_suspended` runs on `overlays_changed` and on the chat box, and suspends while the box, the console or the menu is open (`headless_playground`'s boot section holds W to prove it).
@@ -67,6 +68,6 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | --- | --- |
 | `tools/screenshot.sh <map>` | a map and its routes (`--fx` for the effects) |
 | `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, the edit panel), dot-menu's pages, the Tab board, the console open |
-| `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline |
+| `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline, a map ballot's chat line beside the drawn panel |
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |
 | `tools/audio_probe.sh` | whether the client makes a sound |

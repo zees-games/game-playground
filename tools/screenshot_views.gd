@@ -5,6 +5,8 @@ const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundPlayer := preload("../game/playground_player.gd")
 const PlaygroundHud := preload("../game/playground_hud.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
+const PlaygroundPresentation := preload("../game/playground_presentation.gd")
+const PlaygroundServices := preload("../game/playground_services.gd")
 
 ## Renders the sandbox in first person and in third, so a person can look at both.
 ##
@@ -46,6 +48,12 @@ var _other: PlaygroundPlayer = null
 ## the beacon's column is drawn without a depth test, and a mesh is all that needs.
 var _wall: MeshInstance3D = null
 var _hud: PlaygroundHud = null
+
+## `chat_ballot`'s pieces: the client's presentation (its chat box), a client never added to
+## the tree whose chat handler draws the ballot's line, and the shell's ballot panel.
+var _presentation: PlaygroundPresentation = null
+var _chat_client = null
+var _ballot: DotBallotPanel = null
 var _shots: Array[Dictionary] = []
 var _at := 0
 var _wait := SETTLE
@@ -122,6 +130,10 @@ func _process(_delta: float) -> bool:
 			{"name": "edit_selection", "third": false, "edit": true},
 			{"name": "body_standing", "third": false, "other": true},
 			{"name": "rider_seated", "third": false, "other": true, "seated": true},
+			# A map vote as a connected player sees it: the ballot's chat line, through the
+			# client's own chat handler, and the drawn panel a client shell puts top right. The
+			# line must be in the chat box once and not on the notice line as well.
+			{"name": "chat_ballot", "third": false, "ballot": true},
 		]
 		return false
 
@@ -164,7 +176,9 @@ func _process(_delta: float) -> bool:
 		if bool(shot.get("edit", false)):
 			_arrange_edit()
 		_player.creative = bool(shot.get("creative", false))
-		_hud.visible = shot.has("clock") or shot.has("beacon") or shot.has("blind") or shot.has("creative")
+		if bool(shot.get("ballot", false)):
+			_arrange_ballot()
+		_hud.visible = shot.has("clock") or shot.has("beacon") or shot.has("blind") or shot.has("creative") or shot.has("ballot")
 		if shot.has("clock"):
 			var view := DotVoteClockView.new()
 			view.adopt(shot["clock"], Time.get_ticks_msec() / 1000.0)
@@ -256,6 +270,47 @@ func _arrange_edit() -> void:
 		var box := PlaygroundClient.selection_box()
 		picked.add_child(box)
 		PlaygroundClient.fit_selection_box(box, picked)
+
+
+## The `chat_ballot` frame: the presentation's chat box, the ballot's line through
+## `PlaygroundClient._on_chat_message` (the handler a connected client runs), and the drawn
+## panel where a client shell's notice overlay puts it.
+func _arrange_ballot() -> void:
+	PlaygroundPresentation.use_scratch_settings("screenshot_views")
+	_presentation = PlaygroundPresentation.new()
+	_presentation.name = "Presentation"
+	root.add_child(_presentation)
+	var _built := _presentation.setup()
+	_presentation.settings.local_store = DotSettingsStoreMemory.new()
+	_presentation.settings.load_now()
+	_presentation.apply_all()
+
+	var chat := DotChatClient.new()
+	chat.channels = PlaygroundServices.chat_channels()
+	_chat_client = PlaygroundClient.new()
+	_chat_client.hud = _hud
+	_chat_client.chat = chat
+	_chat_client.presentation = _presentation
+
+	var maps := ["Surf: Introduction", "Bhop: Introduction", "Lobby", "Canyon"]
+	_chat_client._on_chat_message(
+		DotChatMessage.system(PlaygroundServices.CHANNEL_ALL, "Vote: %s (30s)" % ", ".join(maps)),
+		PlaygroundServices.CHANNEL_ALL
+	)
+
+	var options := []
+	for i in maps.size():
+		options.append({"id": "m%d" % i, "label": maps[i], "votes": [1, 0, 2, 0][i]})
+	_ballot = DotBallotPanel.new()
+	_ballot.name = "Ballot"
+	_ballot.ui_theme = DotUiTheme.space()
+	_ballot.panel_width = 360.0
+	_ballot.position = Vector2(root.size.x - 360.0 - 24.0, 120.0)
+	root.add_child(_ballot)
+	_ballot.show_state({
+		"open": true, "title": "Next map", "command": "nominate", "seconds": 30,
+		"options": options, "voters": {"u1": 0, "u2": 2, "u3": 2},
+	})
 
 
 func _capture(shot_name: String) -> void:

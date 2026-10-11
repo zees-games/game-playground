@@ -7,6 +7,8 @@ const PlaygroundVote := preload("../game/playground_vote.gd")
 const PlaygroundServices := preload("../game/playground_services.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundWorldGen := preload("../game/playground_worldgen.gd")
+const PlaygroundHud := preload("../game/playground_hud.gd")
+const PlaygroundClient := preload("../game/playground_client.gd")
 
 ## The five addons this game gained at once: settings, randomness, audio, effects and a
 ## console — plus the generated map, the carried inventory, and the party.
@@ -22,7 +24,7 @@ const PlaygroundWorldGen := preload("../game/playground_worldgen.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 109
+const CHECKS := 112
 
 var _passed := 0
 var _failed := 0
@@ -857,7 +859,67 @@ func _test_chat_box() -> void:
 	window.close()
 	_check(not p.swallows_input(), "and gives it back when it closes")
 
+	_test_chat_drawn_once(p)
+
 	_done()
+
+
+## Every chat line is drawn once: in the box when there is one, on the notice line only
+## when there is not. Both drew it, so a map vote's ballot was printed at the notice line
+## and again in the box, beside the drawn ballot panel. The client is never added to the
+## tree (its `_ready` builds the netcode); only the handler and the three fields it reads
+## are used.
+func _test_chat_drawn_once(p: PlaygroundPresentation) -> void:
+	var hud := PlaygroundHud.new()
+	hud.name = "ChatHud"
+	add_child(hud)
+	var notice: Label = hud.get_node("Notice")
+
+	var chat := DotChatClient.new()
+	chat.channels = PlaygroundServices.chat_channels()
+
+	var client = PlaygroundClient.new()
+	client.hud = hud
+	client.chat = chat
+	client.presentation = p
+
+	var window := p.chat_window
+	var before := window.line_count()
+	client._on_chat_message(
+		DotChatMessage.system(PlaygroundServices.CHANNEL_ALL, "Vote: Surf, Bhop, Lobby (30s)"),
+		PlaygroundServices.CHANNEL_ALL
+	)
+	_check(
+		window.line_count() == before + 1 and notice.text == "",
+		"a server line (a ballot) is drawn in the chat box and not on the notice line too",
+		"box %d -> %d, notice '%s'" % [before, window.line_count(), notice.text]
+	)
+
+	before = window.line_count()
+	client._on_chat_message(
+		DotChatMessage.say(PlaygroundServices.CHANNEL_ALL, "k1", "ada", "gg"),
+		PlaygroundServices.CHANNEL_ALL
+	)
+	_check(
+		window.line_count() == before + 1 and notice.text == "",
+		"and so is a player's line",
+		"box %d -> %d, notice '%s'" % [before, window.line_count(), notice.text]
+	)
+
+	client.presentation = null
+	client._on_chat_message(
+		DotChatMessage.say(PlaygroundServices.CHANNEL_ALL, "k1", "ada", "still here"),
+		PlaygroundServices.CHANNEL_ALL
+	)
+	_check(
+		notice.text.contains("ada") and notice.text.contains("still here"),
+		"with no box the notice line carries it, so a line is never lost",
+		"notice '%s'" % notice.text
+	)
+
+	client.free()
+	chat.free()
+	hud.queue_free()
 
 
 # --- Harness ---------------------------------------------------------------
