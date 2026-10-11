@@ -24,7 +24,9 @@ const CHANNEL := "playground.voice"
 
 ## Held to talk. `V` because it is not a movement key and not one this game already uses:
 ## `1` and `2` are the tools, `Q` is the menu, `E` spawns, `F` gets into a vehicle.
-const KEY_TALK := KEY_V
+## The talk key when nothing has bound dot-voice's action: K, because V loads a checkpoint here
+## (as in the timer game this sandbox copies). Every other game talks on V.
+const KEY_TALK := KEY_K
 
 
 signal talking_changed(talking: bool)
@@ -79,17 +81,20 @@ func setup(enable_capture: bool = true) -> DotResult:
 		})
 		return DotResult.success(false)
 
-	if not enable_capture:
-		return DotResult.success(false)
+	# [b]Not opened here.[/b] The first press of the talk key opens it ([method set_talking],
+	# dot-voice's update_talk): a microphone opened as the client loads is one nobody agreed
+	# to, and in a browser it is a permission prompt in front of somebody who has not asked.
+	if not InputMap.has_action(DotVoiceManager.TALK_ACTION):
+		InputMap.add_action(DotVoiceManager.TALK_ACTION)
+		var key := InputEventKey.new()
+		key.physical_keycode = KEY_TALK
+		InputMap.action_add_event(DotVoiceManager.TALK_ACTION, key)
 
-	var opened := manager.start_capture()
+	# The menu's voice rows bind to it, and the server's sv_voice_enable reaches it.
+	manager.publish_as_client()
+	var _following := manager.follow_cvars(DotRegistry.get_service(&"dot_client_link"))
 
-	if not opened.ok:
-		available = false
-		unavailable_reason = opened.error.message
-		return DotResult.success(false)
-
-	return DotResult.success(true)
+	return DotResult.success(enable_capture)
 
 
 ## The talk key. Edge triggered on both edges, and the release is the one that matters.
@@ -97,12 +102,10 @@ func handle_event(event: InputEvent) -> bool:
 	if not (event is InputEventKey) or event.is_echo():
 		return false
 
-	var key := event as InputEventKey
-
-	if key.keycode != KEY_TALK:
+	if not event.is_action(DotVoiceManager.TALK_ACTION):
 		return false
 
-	set_talking(key.pressed)
+	set_talking(event.is_pressed())
 	return true
 
 
@@ -110,9 +113,16 @@ func set_talking(pressed: bool) -> void:
 	if manager == null or not available or _talking == pressed:
 		return
 
-	_talking = pressed
-	manager.set_talking(pressed)
-	talking_changed.emit(pressed)
+	var started := manager.update_talk(pressed)
+
+	if pressed and not started.ok:
+		available = false
+		unavailable_reason = started.error.message
+		DotLog.info(CHANNEL, "no microphone; listening only", {"why": unavailable_reason})
+		return
+
+	_talking = pressed and manager.server_enabled
+	talking_changed.emit(_talking)
 
 
 ## Everything goes quiet: a screen took the keyboard, the window lost focus, the client

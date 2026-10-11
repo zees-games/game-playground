@@ -46,7 +46,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 27
-const CHECKS := 246
+const CHECKS := 248
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -870,6 +870,18 @@ func _test_services() -> void:
 			== PlaygroundServices.voice_config().format_fingerprint(),
 		"and its format is the one a client builds from the same file"
 	)
+
+	# The operator's switch: registered by the module, replicated so clients hide their key,
+	# and enforced on the router.
+	var voice_cvar: DotConVar = server.console.find_cvar("sv_voice_enable")
+	_check(voice_cvar != null and DotConsole.is_replicated(voice_cvar),
+		"sv_voice_enable is registered and replicated to clients")
+	var off_enabled := true
+	if voice_cvar != null:
+		var _off := voice_cvar.set_value("0")
+		off_enabled = services.voice.enabled
+		var _on := voice_cvar.set_value("1")
+	_check(not off_enabled and services.voice.enabled, "and turns the router off and on")
 
 	# dot-server's own chat is cancelled rather than run beside the router.
 	var legacy := server.events.fire("player_chat", {

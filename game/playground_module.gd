@@ -586,6 +586,11 @@ func _build_extras() -> DotResult:
 	if not serviced.ok:
 		return serviced.wrap("The services could not be set up")
 
+	# sv_voice_enable and sv_voice_mode: enforced on the router, replicated so a client hides
+	# its key. On this module, so they go when it unloads.
+	if services.voice != null and services.voice.has_method(&"bind_cvars"):
+		var _voice_cvars: Variant = services.voice.call(&"bind_cvars", add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+
 	bridge.say_requested.connect(_on_say_requested)
 	bridge.voice_requested.connect(_on_voice_requested)
 	bridge.vote_requested.connect(_on_vote_requested)
