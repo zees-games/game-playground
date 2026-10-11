@@ -67,7 +67,7 @@ One line each; the detail is in [bugs-found.md](../../../docs/bugs-found.md) or 
 
 **A barrel's blast reached the barrel**, still in the spawner while it exploded, and recursed until the stack ran out.
 
-**A grenade fuse flown as given went off in half the time**: the pack counts at 64 Hz and this server runs 128. The fuse is rescaled; nothing else in the pack is (open; see [sandbox.md](sandbox.md#zee-dot-weapons-beside-the-toys)).
+**A grenade fuse flown as given went off in half the time**: the pack counts at 64 Hz and this server runs 128. `PlaygroundProjectiles.accept` rescaled fuses by hand, and nothing else in the pack was: every zee weapon fired, reloaded and deployed twice as fast here. Fixed 2026-10-11 at the source: dot-weapon scales a row by its `authored_tick_rate` (the pack sets 64), spawns arrive in this server's ticks, and the hand rescale is gone, because keeping it would halve every fuse again. The zee section of `headless_playground` counts a second of SMG fire against 64 Hz.
 
 **A player's soldiers and rebels were one squad**, so each side's fire-lane check found its own target in the lane and nobody fired. A probe printing every gate found it. **The turret counted as an NPC** because entities were grouped by script name. **A cost budget left over from an earlier section** refused a turret with a message about NPCs: the confusion per-kind limits remove.
 

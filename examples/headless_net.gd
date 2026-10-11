@@ -4193,13 +4193,14 @@ func _test_grenade_over_the_wire() -> void:
 	spawn.radius = 0.08
 	spawn.splash_radius = 5.2
 	spawn.splash_damage = 0.0
-	# In the catalogue's 64 Hz ticks, as a weapon makes them: one second.
-	spawn.fuse_ticks = 64
-	spawn.life_ticks = 128
+	# In the server's own ticks, as dot-weapon hands a spawn over (it scales the pack's
+	# 64 Hz rows to the arsenal's rate): one second.
+	spawn.fuse_ticks = _server_game.tick_rate
+	spawn.life_ticks = _server_game.tick_rate * 2
 	outcome.spawns.append(spawn)
 	var thrown := _server_game.projectiles.accept(outcome, &"u1")
 	_check(thrown == 1 and spawn.fuse_ticks == _server_game.tick_rate,
-		"the server flies it, its fuse rescaled to the server's tick rate",
+		"the server flies it as given, not rescaled a second time",
 		"fuse %d ticks at %d Hz" % [spawn.fuse_ticks, _server_game.tick_rate])
 
 	var blasts: Array = []

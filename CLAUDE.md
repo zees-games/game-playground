@@ -126,7 +126,6 @@ Short forms; the reasoning is in the linked file.
 ## Not here yet
 
 - **The module is a `DotModule`, not a `DotGameModule`**, deliberately for now: converting is its own piece of work (typed fields, build order, its own roster). Because of it the module wires identity and hibernation itself. [simulation](docs/simulation.md#the-server-module)
-- **zee weapons run at double speed** on this 128 Hz server (only fuses are rescaled). Open; the fix is in the addons. [sandbox](docs/sandbox.md#zee-dot-weapons-beside-the-toys)
 - **`ask_restart`, `ask_checkpoint` and `publish_loadout`** are on the bridge and handled by the server, and no key or menu calls them, so a networked client cannot restart a run, use a practice checkpoint, or publish a loadout. Each is a decision about bindings, not a deliberate omission.
 - **A bag screen and buying into the bag; saving a bag.** [inventory](docs/inventory.md#not-here-yet)
 - **A wardrobe.** [client](docs/client.md#people-are-drawn-as-people)

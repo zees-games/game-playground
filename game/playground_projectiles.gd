@@ -108,14 +108,6 @@ var game: Node = null
 ## the wrong clock is one that expired before it was made or never does.
 var _boards: Array = []
 
-## The tick rate a spawn's `fuse_ticks` and `life_ticks` are counted at: the weapon
-## catalogue's, which for zee-dot-weapons is 64 whatever the server runs at.
-##
-## [b]Rescaled on the way in[/b], to [member game]'s tick rate. Flown as given on a 128 Hz
-## sandbox, a three-second frag went off in a second and a half, still in the air, which
-## reads as a grenade with a short fuse rather than as a unit error.
-var authored_rate: int = 64
-
 ## Where the `sticks` rule is read from, by the spawn's id. Null leaves every fused spawn a
 ## bouncer.
 var catalogue: DotWeaponCatalogue = null
@@ -155,12 +147,10 @@ func accept(outcome: DotWeaponOutcome, owner_id: StringName, owner_body: Node = 
 	if owner_body is CollisionObject3D:
 		rid = (owner_body as CollisionObject3D).get_rid()
 
-	var rate := int(game.get("tick_rate")) if game != null else authored_rate
-	var scale := float(maxi(rate, 1)) / float(maxi(authored_rate, 1))
-
+	# Flown as given: a spawn's fuse and life arrive in this server's ticks, because
+	# dot-weapon scales a row written at 64 Hz (the pack's) to the arsenal's rate before
+	# the behaviour hands it over. Rescaling here as well would halve every fuse again.
 	for spawn: DotWeaponSpawn in outcome.spawns:
-		spawn.fuse_ticks = int(round(spawn.fuse_ticks * scale))
-		spawn.life_ticks = int(round(spawn.life_ticks * scale))
 		var _flying := launch(spawn, owner_id, rid)
 
 	return outcome.spawns.size()

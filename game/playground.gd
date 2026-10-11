@@ -1527,7 +1527,6 @@ func _build_npc_world() -> void:
 	projectiles.game = self
 	projectiles.authority = authoritative
 	projectiles.catalogue = PlaygroundZee.catalogue()
-	projectiles.authored_rate = ZeeWeaponPack.TICK_RATE
 	projectiles.add_board(npc_sounds, npc_world.now)
 	add_child(projectiles)
 

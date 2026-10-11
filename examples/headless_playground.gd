@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 876
+const CHECKS := 879
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -3265,6 +3265,42 @@ func _test_zee_weapons() -> void:
 
 	PlaygroundZee.disarm(player)
 	_check(player.zee_rig == null, "disarmed, the rig is gone")
+
+	# [b]The pack is written at 64 Hz and this server runs 128[/b]; until dot-weapon scaled
+	# a row by its authored_tick_rate every zee weapon here fired, reloaded and deployed
+	# twice as fast. A second on an SMG's trigger is as many shots as at 64 Hz.
+	var smg := PlaygroundZee.arm(
+		player, playground.weapon_def(&"zee_smg"), ZeeWeaponRig.Role.SERVER, true,
+		playground.tick_rate, playground.current_tick()
+	)
+	var rate := playground.tick_rate
+	_check(smg != null and smg.arsenal.tick_rate == rate,
+		"a zee rig's arsenal runs at the server's rate", "%d Hz" % rate)
+	if smg != null:
+		var row := smg.current_def()
+		var base := playground.current_tick() + 1000
+		var fired := 0
+		for i in range(rate * 3):
+			var held := DotFpsCommand.BUTTON_USER_0 if i >= rate * 2 else 0
+			var out := smg.simulate_tick(
+				PlaygroundZee.command_for(held, state.yaw, state.pitch, PlaygroundZee.slot_of(smg)),
+				base + i
+			)
+			if out != null and out.used and i >= rate * 2:
+				fired += 1
+		var at_64 := int(ceil(float(ZeeWeaponPack.TICK_RATE) / float(row.use_interval_ticks)))
+		_check(fired == at_64, "a second of SMG fire is as many shots at %d Hz as at 64" % rate,
+			"%d here, %d at 64" % [fired, at_64])
+		var reload_here := float(smg.arsenal.ticks_for(row, row.reload_ticks)) / float(rate)
+		var deploy_here := float(smg.arsenal.ticks_for(row, row.deploy_ticks)) / float(rate)
+		var tick64 := 1.0 / float(ZeeWeaponPack.TICK_RATE)
+		_check(
+			absf(reload_here - float(row.reload_ticks) * tick64) <= tick64
+				and absf(deploy_here - float(row.deploy_ticks) * tick64) <= tick64,
+			"and its reload and deploy take the same seconds",
+			"reload %.3f s, deploy %.3f s" % [reload_here, deploy_here]
+		)
+	PlaygroundZee.disarm(player)
 
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	_done()
