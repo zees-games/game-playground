@@ -57,7 +57,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 867
+const CHECKS := 871
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7274,6 +7274,43 @@ func _test_the_client_boots() -> void:
 		client.active_sampler() == client.player.sampler,
 		"a local client's mouse feeds the player's own sampler"
 	)
+
+	# [b]Typing at the console must not walk the player.[/b] The sampler polls the keys
+	# every tick and a focused line edit does not stop `Input.is_action_pressed`; the
+	# console is one of dot-menu's overlays (DotConsoleKit registers it), and the menu's
+	# `overlays_changed` is what suspends the sampler. W held, measured in metres.
+	var console := client.presentation.console if client.presentation != null else null
+	var forward: StringName = client.player.sampler.actions["forward"]
+	for _i in range(60):
+		await get_tree().physics_frame
+	var _opened := console.open() if console != null else false
+	await get_tree().process_frame
+	_check(console != null and client.game_menu.any_open() and client.player.sampler.suspended,
+		"the console opens as one of the menu's overlays and suspends the sampler")
+	var typing_from := client.player.global_position
+	Input.action_press(forward)
+	for _i in range(30):
+		await get_tree().physics_frame
+	Input.action_release(forward)
+	var typed := client.player.global_position.distance_to(typing_from)
+	_check(typed < 0.001, "W held with the console open moves nobody", "%.3f m" % typed)
+	if console != null:
+		console.close()
+	await get_tree().process_frame
+	_check(not client.player.sampler.suspended and not client.game_menu.any_open(),
+		"closing it gives the keys back")
+	var walking_from := client.player.global_position
+	Input.action_press(forward)
+	for _i in range(30):
+		await get_tree().physics_frame
+	Input.action_release(forward)
+	var walked := client.player.global_position.distance_to(walking_from)
+	_check(walked > 0.1, "and the same W walks again (the control)", "%.3f m" % walked)
+	# The control walk coasts; the checks below expect a player standing still.
+	for _i in range(60):
+		await get_tree().physics_frame
+	# Closing an overlay recaptures the pointer, which moves the override; put it back.
+	client.mouse_capture_override = true
 
 	var networked := PlaygroundClient.new()
 	networked.link = Node.new()

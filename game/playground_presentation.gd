@@ -37,6 +37,7 @@ var settings: DotSettingsManager = null
 var rng: DotRandomManager = null
 var audio: DotAudioManager = null
 var fx: DotFxManager = null
+## The player's console, built by [method build_console] once the client has a menu.
 var console: DotConsoleController = null
 var console_panel: DotConsolePanel = null
 
@@ -49,7 +50,6 @@ var chat_window: DotChatWindow = null
 
 var client: Node = null
 
-var _layer: CanvasLayer = null
 var _chat_layer: CanvasLayer = null
 
 ## Whether the server said something else is carrying chat. See [method set_chat_relayed].
@@ -75,10 +75,6 @@ func setup() -> DotResult:
 	var drawn := _build_fx()
 	if not drawn.ok:
 		return drawn
-	var consoled := _build_console()
-	if not consoled.ok:
-		return consoled
-
 	_build_chat()
 
 	apply_all()
@@ -568,31 +564,35 @@ func _apply_chat_visibility() -> void:
 			chat_window.enabled = not _chat_relayed
 
 
-func _build_console() -> DotResult:
-	console = DotConsoleController.new()
-	console.name = "Console"
-	console.config = DotConsoleConfig.new()
-	console.config.mirror_log = true
-	console.config.mirror_from = DotLog.Level.INFO
-	add_child(console)
+## dot-console's kit: `help`, `clear`, `settings`, every setting by its own name, the
+## in-process server's console, and the panel on layer 128, registered with [param menu].
+## This game adds `quit` and `seed`, ahead of the server's console so a listen server's own
+## `quit` is not the one that answers.
+##
+## Called by [PlaygroundClient] after its [DotMenu] exists, not from [method setup]: the
+## menu is built from this layer's settings, and the kit makes the console one of the
+## menu's overlays, which is what stops the player. A console that is not an overlay walks
+## the player while they type: the sampler polls the keys, and a focused line edit does
+## not stop `Input.is_action_pressed`.
+func build_console(menu: Object = null) -> void:
+	console = DotConsoleKit.build(self, settings, menu)
 
-	var res := console.setup()
-	if not res.ok:
-		return res.wrap("the playground's console")
+	var server_sources := console.sources().slice(1)
+	for s in server_sources:
+		console.remove_source(s)
+	console.add_source(_local_commands())
+	for s in server_sources:
+		console.add_source(s)
 
+	console_panel = get_node_or_null(^"ConsoleLayer/ConsolePanel") as DotConsolePanel
+
+
+## This game's own commands; the kit has `help`, `clear`, `settings` and every setting.
+func _local_commands() -> DotConsoleLocal:
 	var local := DotConsoleLocal.new()
-	local.add_command(&"help", "List what this client can do", func(_a: PackedStringArray) -> Variant:
-		var lines := PackedStringArray(["Client commands:"])
-		for n in console.all_names():
-			lines.append("  %-22s %s" % [n, console.help_for(n)])
-		return lines
-	)
 	local.add_command(&"quit", "Leave", func(_a: PackedStringArray) -> Variant:
 		get_tree().quit()
 		return null
-	)
-	local.add_command(&"settings", "Show every setting", func(_a: PackedStringArray) -> Variant:
-		return settings.describe_lines()
 	)
 	local.add_command(&"seed", "Show this session's seed", func(_a: PackedStringArray) -> Variant:
 		# The one command this game needs more than the others: a generated map nobody can
@@ -600,29 +600,7 @@ func _build_console() -> DotResult:
 		# most-requested feature every generated world gets.
 		return rng.describe_lines()
 	)
-	local.add_command(&"clear", "Empty the scrollback", func(_a: PackedStringArray) -> Variant:
-		console.buffer.clear()
-		return null
-	)
-	for key in settings.schema.keys():
-		var def := settings.schema.find(key)
-		local.bind_setting(key, settings, def.description if def != null else "")
-	console.add_source(local)
-
-	var server: Object = DotRegistry.get_service(&"dot_server")
-	if server != null and server.get("console") != null:
-		console.add_source(DotConsoleBridge.wrap(server.get("console"), "server"))
-
-	_layer = CanvasLayer.new()
-	_layer.name = "ConsoleLayer"
-	_layer.layer = 128
-	add_child(_layer)
-
-	console_panel = DotConsolePanel.new()
-	console_panel.name = "ConsolePanel"
-	console_panel.controller = console
-	_layer.add_child(console_panel)
-	return DotResult.success(null)
+	return local
 
 
 # --- What the game asks for -------------------------------------------------
@@ -644,6 +622,8 @@ func camera_shake() -> Vector3:
 ## reading movement while somebody types walks them across the map, and in a sandbox it
 ## also fires whatever tool they are holding at whatever they were building.
 func swallows_input() -> bool:
+	if console != null and console.is_open():
+		return true
 	if console_panel != null and console_panel.has_keyboard_focus():
 		return true
 

@@ -57,6 +57,7 @@ dot-ui's `DotChatWindow` beside the console. **The channels come from `Playgroun
 
 - **dot-server's `chat_received` is connected and its lines are ignored**: this game routes every line through its own wire, so the handler takes only the `{kind: "state"}` notice saying what is carrying chat.
 - **`swallows_input()` covers the box as well as the console, and `DotFpsSampler.suspended` is set beside it**: movement is polled, so typing "sw" otherwise walks the player backwards through their build.
+- **The console is dot-console's `DotConsoleKit`, built by `PlaygroundPresentation.build_console(menu)` after the client's `DotMenu`**, so it is one of the menu's overlays; `_refresh_suspended` runs on `overlays_changed` and on the chat box, and suspends while the box, the console or the menu is open (`headless_playground`'s boot section holds W to prove it).
 
 ## Looking at it
 
@@ -65,7 +66,7 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | Tool | Renders |
 | --- | --- |
 | `tools/screenshot.sh <map>` | a map and its routes (`--fx` for the effects) |
-| `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, the edit panel), dot-menu's pages, the Tab board |
+| `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, the edit panel), dot-menu's pages, the Tab board, the console open |
 | `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline |
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |
 | `tools/audio_probe.sh` | whether the client makes a sound |

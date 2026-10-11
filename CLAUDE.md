@@ -118,7 +118,7 @@ Short forms; the reasoning is in the linked file.
 - Wait on `playground.booted`, not only the signal. [client](docs/client.md#booting)
 - Escape releases then opens dot-menu; only a click captures. This client owns the pointer. [client](docs/client.md#escape-the-pointer-and-the-menu)
 - The character body goes under the rig, not the visual; `auto_drive` off. [client](docs/client.md#third-person-and-the-body)
-- Typing suspends the sampler as well as swallowing input. [client](docs/client.md#the-chat-box)
+- Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`build_console(menu)`). [client](docs/client.md#the-chat-box)
 
 ## Not here yet
 

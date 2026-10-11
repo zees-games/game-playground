@@ -63,6 +63,8 @@ func _initialize() -> void:
 	_game_menu.manage_pointer = false
 	root.add_child(_game_menu)
 	var _set := _game_menu.setup()
+	# As the client does: the console after the menu, so it is one of the menu's overlays.
+	_presentation.build_console(_game_menu)
 	_game_menu.scoreboard.source = func() -> Dictionary:
 		return {
 			"server": {"name": "Playground  |  build anything", "map": "pg_lobby", "players": 4, "max": 24},
@@ -95,6 +97,8 @@ func _initialize() -> void:
 		{"id": &"game_menu", "file": "menu_video.png", "page": &"video"},
 		{"id": &"game_menu", "file": "menu_audio.png", "page": &"audio"},
 		{"id": &"board", "file": "menu_scoreboard.png"},
+		# The console, open: DotConsoleKit's panel, on the layer it puts it on.
+		{"id": &"console", "file": "console.png"},
 	]
 
 
@@ -108,7 +112,14 @@ func _process(_delta: float) -> bool:
 
 	var shot: Dictionary = _shots[_at]
 
-	if _wait == SETTLE and StringName(shot["id"]) in [&"game_menu", &"board"]:
+	if _wait == SETTLE and StringName(shot["id"]) == &"console":
+		_stack.clear()
+		_game_menu.close_all()
+		_game_menu.scoreboard.close()
+		# `help` only: a setting typed here would be written to this machine's settings.
+		var _ran := _presentation.console.submit("help")
+		var _opened := _presentation.console.open()
+	elif _wait == SETTLE and StringName(shot["id"]) in [&"game_menu", &"board"]:
 		_stack.clear()
 		_game_menu.close_all()
 		if StringName(shot["id"]) == &"board":

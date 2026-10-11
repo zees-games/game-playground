@@ -683,17 +683,8 @@ func _wire_chat_window() -> void:
 
 	window.submitted.connect(_on_chat_submitted)
 
-	window.opened.connect(func(_channel: StringName) -> void:
-		var sampler := active_sampler()
-		if sampler != null:
-			sampler.suspended = true
-	)
-
-	window.closed.connect(func() -> void:
-		var sampler := active_sampler()
-		if sampler != null:
-			sampler.suspended = false
-	)
+	window.opened.connect(func(_channel: StringName) -> void: _refresh_suspended())
+	window.closed.connect(func() -> void: _refresh_suspended())
 
 	var client_link := DotRegistry.get_service(&"dot_client_link")
 
@@ -861,6 +852,18 @@ func _build_screens() -> void:
 	_build_pause()
 
 
+## Movement stops while anything has the keyboard or the screen: the chat box, the console,
+## or dot-menu's menu. Only when none does is it given back, so the console closing while
+## the chat box is still open does not walk the player. The console reaches this as one of
+## the menu's overlays (`overlays_changed`); see [method PlaygroundPresentation.build_console].
+func _refresh_suspended() -> void:
+	var sampler := active_sampler()
+	if sampler == null:
+		return
+	sampler.suspended = (presentation != null and presentation.swallows_input()) \
+		or (game_menu != null and game_menu.any_open())
+
+
 ## The escape menu.
 ##
 ## [b]dot-menu's since 2026-10-09.[/b] It was dot-ui's pause screen (Resume, Settings,
@@ -886,6 +889,10 @@ func _build_pause() -> void:
 	game_menu.manage_pointer = false
 	add_child(game_menu)
 	var _set := game_menu.setup()
+	# The console after the menu, so DotConsoleKit registers it as one of the menu's
+	# overlays: opening it then stops the player through `overlays_changed` below.
+	if presentation != null:
+		presentation.build_console(game_menu)
 
 	var general := game_menu.page(&"general")
 	if general != null:
@@ -898,7 +905,8 @@ func _build_pause() -> void:
 	game_menu.action_requested.connect(_on_menu_action_chosen)
 	game_menu.overlays_changed.connect(func(open: bool) -> void:
 		# Back onto the view the instant it closes, as the screen stack does for its own.
-		_set_captured(not open))
+		_set_captured(not open)
+		_refresh_suspended())
 
 	if settings != null:
 		applier = DotMenuApplier.new()

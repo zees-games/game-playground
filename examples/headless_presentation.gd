@@ -85,6 +85,8 @@ func _make() -> PlaygroundPresentation:
 	p.name = "P%d" % _entered
 	add_child(p)
 	p.setup()
+	# The client builds the console after its menu; there is no menu here.
+	p.build_console()
 	p.settings.local_store = DotSettingsStoreMemory.new()
 	p.settings.load_now()
 	p.apply_all()
