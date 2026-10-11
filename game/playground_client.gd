@@ -670,11 +670,10 @@ func _build_client_services() -> void:
 ## the device every physics frame and does not care what consumed an event. Without
 ## `suspended`, typing "sw" walks the player backwards through whatever they were building.
 ##
-## [b]dot-server's `chat_received` is connected here and its LINES are ignored.[/b] This
-## game routes every line through its own wire on purpose — connecting both would draw one
-## line twice — but the state payload that says what is carrying chat comes down
-## dot-server's side and there is nowhere else to hear it. So the handler takes the one
-## kind it came for and drops everything else.
+## [b]dot-server's `chat_received` is connected here for its state and the server's own
+## lines.[/b] This game routes every PLAYER's line through its own wire on purpose —
+## connecting both would draw one line twice — but the state payload and the server's system
+## and admin lines come down dot-server's side and there is nowhere else to hear them.
 func _wire_chat_window() -> void:
 	var window: DotChatWindow = presentation.chat_window if presentation != null else null
 
@@ -692,11 +691,16 @@ func _wire_chat_window() -> void:
 		client_link.connect("chat_received", _on_server_chat_state)
 
 
-## dot-server's chat payload, read ONLY for what is carrying the conversation.
+## dot-server's chat payload: what is carrying the conversation, and the server's own lines.
+##
+## [b]A player's line is never drawn from here[/b]: this game routes those over its own wire,
+## and drawing them here as well is the same line twice. [b]The server's own lines are[/b] (a
+## vote between games, "Ada joined the game.", an admin's `say`): they come only this way,
+## and ignoring them with the players' lines is how this game never showed one.
 func _on_server_chat_state(payload: Dictionary) -> void:
 	if str(payload.get("kind", "")) != "state":
-		# A line. This game draws lines off its own wire and drawing them here as well is
-		# the same line twice.
+		var window: DotChatWindow = presentation.chat_window if presentation != null else null
+		var _drawn := DotGameChatClient.draw_server_line(window, payload)
 		return
 
 	if presentation != null:
