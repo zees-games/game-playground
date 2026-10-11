@@ -46,7 +46,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 27
-const CHECKS := 245
+const CHECKS := 246
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -1967,8 +1967,27 @@ func _test_saved_builds() -> void:
 	_check(summaries.size() == 1 and summaries[0]["name"] == "tower" and int(summaries[0]["props"]) == 2,
 		"the Builds tab is sent what pg_builds lists", str(summaries))
 	game.props.clear_player(&"u81")
+	# The click is answered over the wire with a NOTICE to the clicker. 8101 is a session
+	# this suite adopted with no socket behind it, so sent for real that NOTICE was an
+	# `rpc_id` to a peer the multiplayer API has never heard of, and every green run printed
+	# "Attempt to call RPC with unknown peer ID: 8101". Caught on the link's loopback for the
+	# one call instead: the reply becomes a check, and a real unknown-peer line in this
+	# suite's stderr is a real one.
+	var link: Variant = module.get("bridge").get("link")
+	var replies: Array = []
+	if link != null:
+		link.loopback = func(method: StringName, peer_id: int, payload: PackedByteArray) -> void:
+			replies.append({"method": method, "peer": peer_id, "payload": payload})
 	module.get("bridge").build_load_requested.emit(session.peer_id, "tower")
+	if link != null:
+		link.loopback = Callable()
 	_check(game.props.props_of(&"u81").size() == 2, "and a click on it puts it down, as pg_load does")
+	var told := false
+	for reply: Dictionary in replies:
+		if reply["method"] == &"event" and int(reply["peer"]) == session.peer_id \
+				and (reply["payload"] as PackedByteArray).hex_encode().contains("Put down".to_utf8_buffer().hex_encode()):
+			told = true
+	_check(link != null and told, "and the clicker alone is told it was put down", str(replies.map(func(r: Dictionary) -> String: return "%s->%d" % [r["method"], r["peer"]])))
 	said = _run_as(session, "pg_build_delete tower")
 	_check(_said(said, "deleted") and not _said(_run_as(session, "pg_builds"), "tower"), "and `pg_build_delete` takes it away", " | ".join(said))
 

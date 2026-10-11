@@ -107,6 +107,10 @@ One line each; the detail is in [bugs-found.md](../../../docs/bugs-found.md) or 
 
 **`headless_net` order-sensitivity, measured**: one new test that spawns no body and only advances the world, moved through the sequence, five runs each. Not there: 4/5 clean. Before the vehicle test: 0/3. Between the vehicle and the timer: 3/5. After everything that reads physics: 5/5. Hence: add new tests at the end.
 
+**`headless_net`'s moving deck failed once at 14 corrections against 12, and it was not load sharing a physics space.** `PlaygroundPropNet` measured a mirror's velocity as its drawn position over `Time.get_ticks_usec()` between draws, and `_ride_prop` feeds that into the client's PREDICTED tick, so the same ticks predicted differently depending on how far apart in wall time two snapshots were handled. Fifteen runs idle gave 7 to 12, fifteen loaded (three suites in parallel beside ten busy loops) 8 to 16 with one failure; measured from the server's position at each snapshot tick instead, 4 in all thirty, idle and loaded, and the worst gap fell from 0.058-0.155 m to 0.049 m. The limit went down to 6, not up.
+
+**`dedicated` printed "Attempt to call RPC with unknown peer ID: 8101" on every green run.** 8101 is a session the saved-builds section adopts with no socket behind it, and the Builds tab's click is answered with a NOTICE to the clicker, which went to the link as a real `rpc_id`. The section now catches that one call on the link's loopback and checks the clicker alone was told, so the line in its stderr would now be a real one.
+
 **A method `DotTimerZone` does not have took two checks out of a run that reported "0 failed".** `dedicated` had no section counter or CHECKS total until then.
 
 **"With picking up off, nobody is held" was aiming the beam the wrong way** and passed with nobody in it. **The glass sprint path ran into the end of a wall** and broke it, correctly. **A button at a falling player's eye height** was pressed once by luck.
