@@ -744,11 +744,18 @@ func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 	# every line: a map vote's ballot was printed at the notice line in the middle left and
 	# again in the box bottom left, beside the drawn ballot panel. The notice line keeps what
 	# is the game's (budget reached, a tool's refusal), which never comes through chat.
+	# A join or leave notice is a name and no text (dot-chat's `_presence`): drawn by its
+	# text it was an empty line in the box, and by name and text a bare "Guest 435:".
+	# `describe()` words it ("Guest 435 joined"); every other kind is drawn by its text.
+	var text := message.describe() \
+		if message.kind in [DotChatMessage.Kind.JOIN, DotChatMessage.Kind.LEAVE] \
+		else message.text
+
 	if message.is_from_server() or message.sender_name == "":
 		if window != null:
-			window.add_text("%s%s" % [prefix, message.text], Color(0.80, 0.82, 0.86))
+			window.add_text("%s%s" % [prefix, text], Color(0.80, 0.82, 0.86))
 		else:
-			hud.notice("%s%s" % [prefix, message.text])
+			hud.notice("%s%s" % [prefix, text])
 
 		return
 

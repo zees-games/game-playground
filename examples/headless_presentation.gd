@@ -24,7 +24,7 @@ const PlaygroundClient := preload("../game/playground_client.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 112
+const CHECKS := 113
 
 var _passed := 0
 var _failed := 0
@@ -904,6 +904,25 @@ func _test_chat_drawn_once(p: PlaygroundPresentation) -> void:
 		window.line_count() == before + 1 and notice.text == "",
 		"and so is a player's line",
 		"box %d -> %d, notice '%s'" % [before, window.line_count(), notice.text]
+	)
+
+	# A join notice is a name and NO text (dot-chat's `_presence`). Drawn by its text it
+	# was an empty row in the box; drawn by name and text, a bare "Guest 435:", which read
+	# as a chat command echoed with its text stripped.
+	client._on_chat_message(
+		DotChatMessage.make(
+			DotChatMessage.Kind.JOIN, PlaygroundServices.CHANNEL_ALL, "k2", "Guest 435", ""
+		),
+		PlaygroundServices.CHANNEL_ALL
+	)
+	var rows := window.history()
+	var drawn := ""
+	for part in (rows[rows.size() - 1] if not rows.is_empty() else []):
+		drawn += str((part as Dictionary).get("text", ""))
+	_check(
+		drawn.contains("Guest 435") and drawn.contains("joined"),
+		"a join notice is drawn as a sentence, not as an empty line or a bare name",
+		"'%s'" % drawn
 	)
 
 	client.presentation = null
