@@ -24,7 +24,7 @@ var _wander: Vector3 = Vector3.FORWARD
 
 func _entity_ready() -> void:
 	_wander = Vector3.FORWARD.rotated(
-		Vector3.UP, float(instance.instance_id if instance != null else 0)
+		Vector3.UP, float(npc.seed if npc != null else 0)
 	)
 
 

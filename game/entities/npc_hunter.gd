@@ -18,7 +18,7 @@ extends "playground_entity.gd"
 ##   that turns and commits on the tick it first perceives somebody is one no player can
 ##   ever surprise, and that is the difference between a bot and a target.
 ## - **A character per NPC, which the server moves rather than replaces.** Each one gets its
-##   own seed from its instance id, so twenty of them do not all react at the same moment —
+##   own seed from its spawn (`npc.seed`), so twenty of them do not all react at the same moment —
 ##   which reads as a firing squad and is the bug the seeding exists to prevent. `npc_skill`
 ##   and `npc_reaction_scale` ([member Playground.npc_skill]) shift it live.
 ## - **Separation.** Twelve of these converging on one player climb each other, and the one
@@ -57,11 +57,11 @@ func _entity_ready() -> void:
 	_speed = tune(&"speed", 5.0)
 	_stand_off = tune(&"stand_off", 1.8)
 
-	# [b]A character per NPC, seeded from the instance.[/b] A preset is one resource, and
+	# [b]A character per NPC, seeded from the spawn.[/b] A preset is one resource, and
 	# twenty NPCs sharing it share a seed — so every one of them reacts at the same
 	# moment, which reads as a firing squad. `with_seed` is the one call that prevents it.
 	_base_character = DotNpcAiCharacter.preset(tune_string(&"skill", "normal")).with_seed(
-		instance.instance_id if instance != null else 1
+		npc.seed if npc != null else 0
 	)
 
 	blackboard = DotNpcAiBlackboard.new()
@@ -69,7 +69,7 @@ func _entity_ready() -> void:
 	_refresh_character()
 
 	_heading = Vector3.FORWARD.rotated(
-		Vector3.UP, float(instance.instance_id if instance != null else 0)
+		Vector3.UP, float(npc.seed if npc != null else 0)
 	)
 
 	machine = DotNpcAiMachine.new()
@@ -145,7 +145,7 @@ func _patrol(ctx: DotNpcAiContext) -> void:
 	# players never meet.
 	var angle := DotNpcAiSteering.wander(
 		atan2(_heading.z, _heading.x), 0.35,
-		(instance.instance_id if instance != null else 0) + int(ctx.now * 3.0)
+		(npc.seed if npc != null else 0) + int(ctx.now * 3.0)
 	)
 	_heading = DotNpcAiSteering.angle_to_direction(angle)
 

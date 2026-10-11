@@ -107,7 +107,7 @@ func _search(ctx: DotNpcAiContext) -> DotNpcAiNode.Status:
 
 func _wander(ctx: DotNpcAiContext) -> DotNpcAiNode.Status:
 	var angle := float(blackboard.get_value(&"angle", ctx.now, 0.0))
-	angle = DotNpcAiSteering.wander(angle, 0.3, npc.instance_id + int(ctx.now * 2.0))
+	angle = DotNpcAiSteering.wander(angle, 0.3, npc.seed + int(ctx.now * 2.0))
 	blackboard.put(&"angle", angle, ctx.now, 0.0)
 
 	steer_toward(

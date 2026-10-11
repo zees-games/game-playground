@@ -97,6 +97,9 @@ func _make_npc() -> DotNpcInstance:
 	row.def = npc_def
 	row.node = self
 	row.instance_id = get_instance_id()
+	# Built by hand rather than by a DotNpcSpawner, so nobody else seeds it. The id above is
+	# an identity; this is what the brain draws from.
+	row.seed = game.next_seed(&"entity") if game != null else 0
 	row.owner_id = instance.owner_id if instance != null else &""
 	row.health = npc_def.max_health
 

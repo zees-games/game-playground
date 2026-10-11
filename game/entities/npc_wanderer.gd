@@ -27,11 +27,11 @@ var _rng := RandomNumberGenerator.new()
 
 
 func _entity_ready() -> void:
-	# Seeded from the instance rather than randomised, so two wanderers spawned in the
+	# Seeded from the spawn rather than randomised, so two wanderers spawned in the
 	# same place do not walk in lockstep for ever — and so a headless test that spawns
 	# one gets the same walk every run. Props are server-authoritative and never
 	# predicted, so nothing here has to agree with a client.
-	_rng.seed = hash(instance.instance_id if instance != null else 0)
+	_rng.seed = hash(npc.seed if npc != null else 0)
 
 	_heading = _random_heading()
 	_next_turn = tune(&"turn_seconds", 3.0)

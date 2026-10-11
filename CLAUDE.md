@@ -75,6 +75,7 @@ Short forms; the reasoning is in the linked file.
 - One prop scene; the body is built by `configure`, never `_ready`; a resize rebuilds, never `scale`s. [sandbox](docs/sandbox.md#one-scene-every-prop)
 - Entity and weapon scripts are named by **path**, never `class_name` (pack delivery). [sandbox](docs/sandbox.md#an-entity-is-a-prop-with-a-script-named-by-a-path)
 - An entity is a prop first (budget, undo, liftable); a wave NPC is the server's and is not. [sandbox](docs/sandbox.md#perception-is-dot-npcs-being-a-prop-is-still-dot-props), [modes](docs/modes.md#waves-pg_waves)
+- An NPC brain and debris seed from `npc.seed` / `Playground.next_seed`, never `instance_id` (an object id moves with every allocation). dot-npc `docs/runtime.md`
 - Weapons are not `DotPropDef`s. The toys and zee guns run on the server; client arming is prediction. [sandbox](docs/sandbox.md#a-weapon-is-a-script-too-and-not-in-the-prop-catalogue)
 - A zee shot hurts only with `pg_arena` on; NPC shots reach players only through `arena_hurt`. `PlaygroundPlayer.component()` is load-bearing. [sandbox](docs/sandbox.md#zee-dot-weapons-beside-the-toys)
 - One catalogue: icons, items, prices, the loadout and vehicle prop rows are all **derived**, never a second list. [sandbox](docs/sandbox.md#the-icons-are-drawn-from-the-definition)

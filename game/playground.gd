@@ -2356,7 +2356,7 @@ func _on_prop_broken(prop: DotPropInstance, at: Vector3, _by: StringName) -> voi
 	var extent := PlaygroundProp.extent_of(prop.def) if prop.def != null else Vector3.ONE
 	var count := mini(config.debris_pieces, maxi(1, int(ceil(extent.x * extent.y * extent.z * 4.0))))
 	var rng := RandomNumberGenerator.new()
-	rng.seed = prop.instance_id
+	rng.seed = next_seed(&"debris")
 
 	for i in count:
 		var offset := Vector3(rng.randf_range(-0.5, 0.5) * extent.x, rng.randf_range(0.0, 0.5) * extent.y, rng.randf_range(-0.5, 0.5) * extent.z)
@@ -2461,6 +2461,11 @@ func change_map(id: StringName) -> DotResult:
 	return await maps.change_to(id)
 
 
+## How many [method next_seed]s have been handed out. Never reset, so a second round does not
+## replay the first.
+var _seed_serial: int = 0
+
+
 ## The seed a generated map is built from.
 ##
 ## [b]Zero means "pick one and announce it", which is the only honest default.[/b] A
@@ -2482,6 +2487,19 @@ func map_seed() -> int:
 	# one, because a sandbox that is a different shape on every boot and cannot say why
 	# is worse than one that is always the same.
 	return 1
+
+
+## A stable seed for the next thing that wants its own randomness: a scripted entity's
+## [member DotNpcInstance.seed], or a broken prop's debris. The session's [method map_seed]
+## and a count of what has asked, on a stream per kind.
+##
+## [b]Never an object id.[/b] Entities and debris were seeded from `instance_id`, the Godot
+## object id, which moves whenever anything earlier in the process allocates one more object:
+## the same session then walked its NPCs and scattered its debris differently from build to
+## build. Always above 1, because dot-npc-ai reads a character seed of 0 or 1 as the preset's.
+func next_seed(kind: StringName) -> int:
+	_seed_serial += 1
+	return DotRandomStream.new(map_seed()).stream_for(kind, _seed_serial).range_i_at(0, 2, 0x7FFFFFFF)
 
 
 func _on_map_changing(_from: DotMapDef, _to: DotMapDef) -> void:

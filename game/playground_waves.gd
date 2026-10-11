@@ -163,6 +163,9 @@ func setup(p_game: Playground) -> DotResult:
 	spawner.catalogue = shared_catalogue()
 	spawner.limits = limits
 	spawner.authoritative = true
+	# Each wave NPC's own seed (`npc.seed`) comes from the session's seed and its spawn count,
+	# never its object id: see dot-npc's docs/runtime.md.
+	spawner.seed_base = game.map_seed() if game != null else 0
 	# The world's own node, so a wave NPC is in the same physics space as everything else
 	# — which is what makes its line-of-sight cast see the sandbox's walls.
 	spawner.world_ref = DotNodeRef.of_service(Playground.SERVICE)
