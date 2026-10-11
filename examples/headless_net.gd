@@ -3796,8 +3796,13 @@ func _test_riding_over_the_wire() -> void:
 	# Measured 2026-10-06: before the client carried itself, 32 (one every snapshot) moving
 	# and 32 still, the second because the client's player had mask 1 and stood on nothing.
 	# With both fixed, 8 moving and 0 still: the 8 are the start, while the mirror's
-	# interpolated motion catches up from rest. Held to that, with room for a loaded machine.
-	_check(still <= 2 and moving <= 12, "and a client stands on a still deck with no corrections, and rides a moving one with few",
+	# interpolated motion catches up from rest. That 8 was really 7 to 12 idle and up to 16
+	# under load: the mirror's velocity was measured against the wall clock between draws.
+	# Measured 2026-10-11 from the server's positions per snapshot tick instead: 4, in 30 runs
+	# out of 30, idle and loaded alike. No room for a loaded machine is needed, because
+	# nothing here reads a clock; 6 is margin for a schedule change, and the old wall-clock
+	# measure never came in under 7.
+	_check(still <= 2 and moving <= 6,"and a client stands on a still deck with no corrections, and rides a moving one with few",
 		"%d moving, %d still" % [moving, still])
 
 	var _gone := _server_game.props.remove(deck.instance_id)

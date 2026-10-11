@@ -2128,6 +2128,7 @@ func _apply_prop(reader: DotNetReader) -> void:
 
 	_prop_nets[net_id] = behaviour
 	behaviour.mirror_of = _mirror_node
+	behaviour.tick_seconds_fn = func() -> float: return net.clock.tick_duration()
 	props_changed.emit()
 	prop_arrived.emit(body.global_position, int(info["owner_id"]))
 

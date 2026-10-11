@@ -130,7 +130,8 @@ func _net_simulate(_tick: int, _delta: float) -> void:
 ## A remote prop, on a snapshot. Written straight to the node: nothing here is
 ## predicted, so there is no reconciliation to spoil by moving it — the reason
 ## [PlaygroundPlayerNet] guards this line does not apply.
-func _net_state_applied(_tick: int) -> void:
+func _net_state_applied(tick: int) -> void:
+	_note_velocity(tick)
 	_draw()
 
 
@@ -147,7 +148,6 @@ func _draw() -> void:
 	if identity != null and identity.is_authoritative:
 		return
 
-	_note_velocity()
 	prop.global_position = net_position
 	prop.global_basis = Basis(net_rotation)
 
@@ -162,20 +162,42 @@ func _draw() -> void:
 	_draw_rope()
 
 
-## The mirror's velocity, from how far its drawn position moved since the last draw, kept as
-## the node's `mirror_velocity` meta for whoever stands on it ([method PlaygroundPlayer._ride_prop]).
-## A mirror is frozen and moved by writing its position, so its own `linear_velocity` is zero,
-## and a client's rider would otherwise stand still on a moving deck and be pulled along only
-## by the server's corrections: one a snapshot, measured.
-func _note_velocity() -> void:
-	var now := Time.get_ticks_usec()
-	if _drawn_at > 0 and now > _drawn_at:
-		var velocity := (net_position - prop.global_position) / (float(now - _drawn_at) / 1000000.0)
-		prop.set_meta(&"mirror_velocity", velocity)
-	_drawn_at = now
+## The mirror's velocity, kept as the node's `mirror_velocity` meta for whoever stands on it
+## ([method PlaygroundPlayer._ride_prop]). A mirror is frozen and moved by writing its
+## position, so its own `linear_velocity` is zero, and a client's rider would otherwise stand
+## still on a moving deck and be pulled along only by the server's corrections: one a
+## snapshot, measured.
+##
+## [b]From the server's positions and the ticks they were taken on, never from a clock.[/b]
+## It was the drawn position over `Time.get_ticks_usec()` between draws, and the rider feeds
+## it into a PREDICTED tick, so the prediction depended on how far apart in wall time two
+## frames happened to land: `headless_net`'s moving deck cost 7 to 12 corrections on an idle
+## machine and up to 16 under load, against a limit of 12, for identical ticks. The baseline
+## (what the server last sent, not the interpolator's blend the property holds between
+## snapshots) at two snapshot ticks is the server's own motion, the same on every machine.
+func _note_velocity(tick: int) -> void:
+	if prop == null or not is_instance_valid(prop):
+		return
+	if identity != null and identity.is_authoritative:
+		return
+	var sent: Variant = received_values().get(&"net_position")
+	if not (sent is Vector3):
+		return
+	var at := sent as Vector3
+	var seconds := float(tick_seconds_fn.call()) if tick_seconds_fn.is_valid() else 0.0
+	if _sent_tick >= 0 and tick > _sent_tick and seconds > 0.0:
+		prop.set_meta(&"mirror_velocity", (at - _sent_position) / (float(tick - _sent_tick) * seconds))
+	_sent_tick = tick
+	_sent_position = at
 
 
-var _drawn_at: int = 0
+## `func() -> float`: seconds per server tick, for [method _note_velocity]. Set by a client's
+## bridge on every mirror; unset, a mirror reports no velocity.
+var tick_seconds_fn: Callable = Callable()
+
+## The snapshot tick and the server's position at it, last time one arrived.
+var _sent_tick: int = -1
+var _sent_position: Vector3 = Vector3.ZERO
 
 
 ## The resize and the paint, applied to the mirror only when they changed: a resize
