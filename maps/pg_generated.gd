@@ -68,7 +68,7 @@ func configure(p_seed: int, p_source: Object = null) -> void:
 
 
 func _build() -> void:
-	PlaygroundGeometry.sun(self)
+	PlaygroundGeometry.light(self)
 
 	# A fallback first, so a failed generation still leaves somewhere to stand rather
 	# than dropping the player into nothing. A generated map that fails is rare -- ten

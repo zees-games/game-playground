@@ -172,7 +172,7 @@ With `pg_shop 1`, spawning costs money. A player's bag is a 10 x 6 grid with a 4
 [`CLAUDE.md`](CLAUDE.md) has the design decisions and the reasoning behind them.
 
 ## Credits
-The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons), which credits its own art. The props and the menu icons are drawn from their definitions. People and NPCs are drawn with [Kenney's Blocky Characters](https://kenney.nl/assets/blocky-characters) (CC0), in `assets/kenney/characters/` with its licence beside it.
+The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons), which credits its own art. The props and the menu icons are drawn from their definitions. People and NPCs are drawn with [Kenney's Blocky Characters](https://kenney.nl/assets/blocky-characters) (CC0), in `assets/kenney/characters/` with its licence beside it. The maps are drawn over [Kenney's Prototype Textures](https://kenney.nl/assets/prototype-textures) (CC0), in `assets/kenney/prototype/` with its licence.
 
 ## License
 MIT. See [LICENSE](LICENSE).

@@ -295,7 +295,7 @@ const TRANSFER_SECOND_SPLIT := 0.5
 
 
 func _build() -> void:
-	PlaygroundGeometry.sun(self)
+	PlaygroundGeometry.light(self)
 
 	fallback_spawn = Vector3(0.0, START_Y + 1.0, START_Z + 6.0)
 

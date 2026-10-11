@@ -61,18 +61,8 @@ func _initialize() -> void:
 	if map_node.has_method("map_props"):
 		_draw_props(map_node.call("map_props"))
 
-	# The map builds its own sun, but not a sky or any ambient light — a server has no
-	# use for either. Without them every surface facing away from the sun is pure black,
-	# which is a screenshot that says nothing about the shape of anything.
-	var env := WorldEnvironment.new()
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_SKY
-	environment.sky = Sky.new()
-	environment.sky.sky_material = ProceduralSkyMaterial.new()
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 0.6
-	env.environment = environment
-	root.add_child(env)
+	# The map brings its own sun, sky and fill light (`PlaygroundGeometry.light`), the same
+	# ones the client draws, so a second environment here would be the one ignored.
 
 	_camera = Camera3D.new()
 	_camera.fov = 70.0

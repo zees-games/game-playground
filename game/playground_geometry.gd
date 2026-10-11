@@ -1,5 +1,8 @@
 extends RefCounted
 
+const PlaygroundLighting := preload("playground_lighting.gd")
+const PlaygroundPaths := preload("playground_paths.gd")
+
 ## Builds dev-textured collision geometry in code, so the maps need no art.
 ##
 ## [b]Why the maps are built by a script rather than authored in the editor.[/b] Two
@@ -14,17 +17,34 @@ extends RefCounted
 ## [code]DotTimerZonePainter[/code]. This is a test fixture that happens to be
 ## playable.
 
-## Colours for the three surfaces a movement map is made of, so it is readable
-## without textures.
-const COLOUR_FLOOR := Color(0.32, 0.34, 0.38)
-const COLOUR_RAMP := Color(0.26, 0.42, 0.55)
-const COLOUR_START := Color(0.22, 0.55, 0.28)
-const COLOUR_END := Color(0.60, 0.24, 0.24)
-const COLOUR_PLATFORM := Color(0.42, 0.40, 0.34)
-## A booster: something on the map that throws the player.
-const COLOUR_BOOST := Color(0.85, 0.60, 0.15)
+## The palette: what each kind of surface a movement map is made of is drawn in.
+##
+## [b]Pastels over a light grid, so a surface says what it is and the map reads as a sunny
+## place[/b] rather than a grey test level: a near-white floor, sky-blue ramps, a mint start,
+## a pink end, lavender platforms, a saturated yellow for anything that throws you. Every
+## built-in map and every custom document that names a colour ("ramp", "start") takes these,
+## so a repaint is here and nowhere else; a document's own hex colours stay its own. They
+## are albedo, sRGB, chosen bright because the grid texture under them is about 0.82 grey.
+## Start and end keep their old meanings (green-ish and red-ish) so a route still reads.
+const COLOUR_FLOOR := Color(0.90, 0.91, 0.97)
+const COLOUR_RAMP := Color(0.60, 0.82, 1.00)
+const COLOUR_START := Color(0.58, 0.96, 0.78)
+const COLOUR_END := Color(1.00, 0.62, 0.72)
+const COLOUR_PLATFORM := Color(0.82, 0.74, 1.00)
+## A booster: something on the map that throws the player. The one saturated colour.
+const COLOUR_BOOST := Color(1.00, 0.78, 0.22)
 ## pg_bhop_intro's float: columns standing in a low-gravity zone, which is invisible.
-const COLOUR_FLOAT := Color(0.55, 0.45, 0.75)
+const COLOUR_FLOAT := Color(0.48, 0.90, 0.90)
+
+## Kenney's Prototype Textures (CC0): the light grid with white lines for every surface,
+## and the light tiles for the floor colour, so the ground a player crosses reads as ground
+## and a wall or a ramp beside it as something standing on it. Tinted per material.
+const GRID_PATH := "res://assets/kenney/prototype/grid.png"
+const TILES_PATH := "res://assets/kenney/prototype/tiles.png"
+
+## Metres one copy of the grid texture covers. It has two major cells across, so 2 m puts
+## a major line every metre (the unit a gap is counted in) and a faint one every 25 cm.
+const GRID_METRES := 2.0
 
 
 ## A static box with collision and a visible mesh.
@@ -61,41 +81,46 @@ static func box(
 	return body
 
 
-## One material per colour, shared by every box of that colour.
+## One material per colour, shared by every box of that colour: the client draws with the
+## Compatibility renderer, where a material change is a state change per draw.
 static var _materials: Dictionary = {}
 
-## The grid every surface is drawn with, built once.
-static var _grid: ImageTexture = null
+## The grid every surface is drawn with, loaded (or generated) once.
+static var _grid: Texture2D = null
+static var _tiles: Texture2D = null
 
-## Pixels per metre of the grid texture, and how dark its lines are against the colour.
+## Pixels per metre of the generated fallback grid, and how dark its lines are.
 const GRID_PIXELS := 64
 const GRID_LINE := 0.72
 
 
-## The material a box of [param colour] is drawn with: the colour, multiplied by a
-## one-metre grid laid in WORLD space.
+## The material a box of [param colour] is drawn with: the colour over Kenney's prototype
+## grid, laid in WORLD space and lit by the map's sun.
 ##
-## [b]Flat colour said nothing about size, and a map is mostly a question of size.[/b]
-## These materials were a bare unshaded colour until 2026-09-25, so every face of a box
-## drew the same flat shade: a 3 m block beside a 60 m ramp read as two tiles, a gap
-## could not be judged from any angle, and the edges between two faces of one box
-## vanished. A world-space grid fixes all three without lights — the lines are a metre
-## apart on everything, so a gap is counted in squares, and they bend at every edge.
-## World-triplanar rather than UV, because a box's own UVs stretch one texture over its
-## whole face, which is the scale problem again.
+## [b]A grid, because flat colour said nothing about size.[/b] Until 2026-09-25 these were a
+## bare colour, so a 3 m block beside a 60 m ramp read as two tiles and a gap could not be
+## judged from any angle. World-triplanar rather than UV, because a box's own UVs stretch
+## one texture over its whole face, which is the scale problem again.
+##
+## [b]Lit, since every map carries a sun, a sky and a fill light[/b] (`playground_lighting.gd`).
+## They were unshaded while the maps had no light worth the name; lit, a face turned from
+## the sun is a shade darker and the edges of a box show without a line drawn on them.
 static func _material(colour: Color) -> StandardMaterial3D:
 	if _materials.has(colour):
 		return _materials[colour]
 
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour
-	# Unshaded, because this project ships no lights either and a lit grey box in an
-	# unlit scene is a black box.
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_texture = _grid_texture()
+	var texture := _grid_texture()
+	if colour == COLOUR_FLOOR:
+		texture = _tiles_texture()
+	material.albedo_texture = texture
+	material.uv1_scale = Vector3.ONE / (GRID_METRES if texture is CompressedTexture2D else 1.0)
 	material.uv1_triplanar = true
 	material.uv1_world_triplanar = true
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	material.roughness = 0.85
+	material.metallic = 0.0
 	# A colour that is not opaque is a see-through material: glass, water, ice. Drawn both
 	# sides, so a pane of glass is seen from inside a room too, and a water surface from
 	# under it.
@@ -106,8 +131,14 @@ static func _material(colour: Color) -> StandardMaterial3D:
 	return material
 
 
-## A white metre with a darker line round it, and a fainter one across the middle.
-static func _grid_texture() -> ImageTexture:
+## Kenney's grid, through the rebase (a delivered game's art is under its mount). A checkout
+## that has not been imported yet falls back to a generated one-metre grid rather than
+## failing, which is why the material asks which of the two it got.
+static func _grid_texture() -> Texture2D:
+	if _grid != null:
+		return _grid
+
+	_grid = _load(GRID_PATH)
 	if _grid != null:
 		return _grid
 
@@ -126,6 +157,18 @@ static func _grid_texture() -> ImageTexture:
 	image.generate_mipmaps()
 	_grid = ImageTexture.create_from_image(image)
 	return _grid
+
+
+## The floor's tiles, or the grid where the checkout has not been imported.
+static func _tiles_texture() -> Texture2D:
+	if _tiles == null:
+		_tiles = _load(TILES_PATH)
+	return _tiles if _tiles != null else _grid_texture()
+
+
+static func _load(path: String) -> Texture2D:
+	var at := PlaygroundPaths.rebase(path)
+	return load(at) as Texture2D if ResourceLoader.exists(at) else null
 
 
 ## A ramp: a long thin box, tilted by [param angle_degrees] about [param axis].
@@ -147,12 +190,8 @@ static func ramp(
 	)
 
 
-## A light, so a lit material is visible if a game adds one.
-##
-## The maps here are unshaded and do not need it; a game that replaces the materials
-## does, and finding out that a map has no light by opening it is a wasted afternoon.
-static func sun(parent: Node3D) -> DirectionalLight3D:
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
-	parent.add_child(light)
-	return light
+## The map's sun, sky and air, from [param lighting] (a dot-lighting document; empty is
+## the game's daylight). Every map calls this once from its build, so the light arrives and
+## leaves with the map. See `playground_lighting.gd`.
+static func light(parent: Node3D, lighting: Dictionary = {}) -> DirectionalLight3D:
+	return PlaygroundLighting.build(parent, lighting)

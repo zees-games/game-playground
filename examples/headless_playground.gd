@@ -57,7 +57,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 871
+const CHECKS := 874
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -6547,6 +6547,13 @@ func _test_the_maps_are_surveyed() -> void:
 		var script := load("res://maps/%s.gd" % id) as GDScript
 		var map: Node3D = script.new()
 		map._build()
+
+		# The map brings its light with it (`PlaygroundGeometry.light`): exactly one sun and
+		# one environment, or the second is silently ignored by the renderer.
+		var suns := map.get_children().filter(func(n: Node) -> bool: return n is DirectionalLight3D).size()
+		var skies := map.get_children().filter(func(n: Node) -> bool: return n is WorldEnvironment).size()
+		_check(suns == 1 and skies == 1, "%s: carries one sun and one sky (its dot-lighting document)" % id,
+			"%d suns, %d environments" % [suns, skies])
 
 		var zones: DotTimerZoneSet = script.build_zones()
 		var spawns: Array[Vector3] = [map.fallback_spawn]

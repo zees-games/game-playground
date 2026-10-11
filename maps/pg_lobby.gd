@@ -374,7 +374,7 @@ const LAUNCH_FLOOR_Y := 1.2
 
 
 func _build() -> void:
-	PlaygroundGeometry.sun(self)
+	PlaygroundGeometry.light(self)
 
 	fallback_spawn = Vector3(0.0, 1.0, 0.0)
 

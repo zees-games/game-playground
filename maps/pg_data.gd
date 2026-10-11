@@ -26,8 +26,13 @@ const PlaygroundMaterials := preload("../game/playground_materials.gd")
 ##  "props": [{"id": "door", "at": [x, y, z], "yaw": 90, "frozen": true,
 ##             "tint": "#rrggbb", "scale": 1.5,
 ##             "physics": {"gravity": true, "weight": 1, "friction": 0.2, "bounce": 0}}],
-##  "wires": [{"from": 0, "out": "pressed", "to": 1, "in": "toggle"}]}
+##  "wires": [{"from": 0, "out": "pressed", "to": 1, "in": "toggle"}],
+##  "lighting": {"sun": {...}, "fog": {...}, "sky_top": [r, g, b]}}
 ## [/codeblock]
+##
+## `lighting` (optional) is a dot-lighting document, the keys `DotLightDocument` reads plus
+## this game's `sky_top`; a map without one gets the game's daylight
+## (`PlaygroundLighting.DAYLIGHT`).
 ##
 ## A box's `material` (optional, 2026-10-07) is one of dot-physics' standard surfaces
 ## (`PlaygroundMaterials`): concrete, metal, wood, glass, dirt, grass, sand, snow, ice, rock,
@@ -142,7 +147,7 @@ func map_wires() -> Array:
 
 
 func _build_fallback() -> void:
-	PlaygroundGeometry.sun(self)
+	PlaygroundGeometry.light(self)
 	PlaygroundGeometry.box(self, Vector3(0.0, -0.5, 0.0), Vector3(40.0, 1.0, 40.0))
 	fallback_spawn = Vector3(0.0, 1.0, 0.0)
 
@@ -192,6 +197,8 @@ static func validate(d: Dictionary) -> DotResult:
 				return DotResult.fail(DotError.CODE_INVALID, "Map %s: box %d is made of %s, which is not a material." % [id, i, material])
 			if PlaygroundMaterials.is_liquid(material) and b.has("turn"):
 				return DotResult.fail(DotError.CODE_INVALID, "Map %s: box %d is %s and turned; a liquid is an axis-aligned volume." % [id, i, material])
+	if d.has("lighting") and not (d["lighting"] is Dictionary):
+		return DotResult.fail(DotError.CODE_INVALID, "Map %s: lighting is a dot-lighting document (an object)." % id)
 	var props: Variant = d.get("props", [])
 	if not (props is Array) or (props as Array).size() > MAX_PROPS:
 		return DotResult.fail(DotError.CODE_INVALID, "Map %s: props is a list of at most %d." % [id, MAX_PROPS])
@@ -217,7 +224,7 @@ static func validate(d: Dictionary) -> DotResult:
 ## Builds a checked document's boxes under [param parent], and returns its liquid volumes:
 ## `[{box: AABB, material: StringName, index: int}]`.
 static func build_into(parent: Node3D, d: Dictionary) -> Array:
-	PlaygroundGeometry.sun(parent)
+	PlaygroundGeometry.light(parent, d.get("lighting", {}))
 	var liquids: Array = []
 	var boxes: Array = d.get("boxes", [])
 	for i in boxes.size():

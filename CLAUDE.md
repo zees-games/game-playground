@@ -38,11 +38,11 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | `game/playground_inventory.gd` | the bag |
 | `game/playground_client.gd`, `playground_hud.gd`, `playground_spawn_menu.gd`, `playground_icons.gd`, `playground_presentation.gd`, `playground_beacon.gd`, `playground_rope_view.gd`, `game/client/` | the client: not headless |
 | `game/net/` | the dot-net bridge, link, per-kind net classes, events and requests, the bag's wire |
-| `game/playground_map.gd`, `playground_geometry.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building, the survey, materials, the generator |
+| `game/playground_map.gd`, `playground_geometry.gd`, `playground_lighting.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building and the palette, each map's dot-lighting, the survey, materials, the generator |
 | `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (builds a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
 | `examples/` | the five suites |
 | `tools/` | `export_zones.gd`, `map_props.gd`, `screenshot*.sh`, `audio_probe.sh` |
-| `assets/` | vendored CC0 art: zee weapons and arms, the character kit |
+| `assets/` | vendored CC0 art: zee weapons and arms, the character kit, Kenney's prototype grid |
 | `scenes/fx/` | the two effect scenes |
 | `game.yml` | the descriptor that travels in the published pack |
 
@@ -89,6 +89,7 @@ Short forms; the reasoning is in the linked file.
 - Unreached ground is allowed only where `survey_declared()` says why. [maps](docs/maps.md#every-hand-built-map-is-surveyed)
 - Custom maps are JSON documents, never scripts; a map prop's missing id is skipped, not the map. [maps](docs/maps.md#custom-maps-are-documents)
 - Material numbers are dot-physics'; liquids and foliage have no collider. [maps](docs/maps.md#map-materials)
+- The palette is `PlaygroundGeometry.COLOUR_*`; a map's light is its dot-lighting document, a child of the map node, never a second `WorldEnvironment`. Render a look change with `RENDERER=forward_plus` too. [maps](docs/maps.md#the-look)
 - A split must be one nobody can skip; a tilted slab drops along its normal; "it finished" is never the only check. [routes](docs/routes.md#rules-every-route-follows)
 
 **Vehicles**

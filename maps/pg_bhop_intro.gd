@@ -367,7 +367,7 @@ const DROP_SPLIT_BLOCKS := [3, 6]
 
 
 func _build() -> void:
-	PlaygroundGeometry.sun(self)
+	PlaygroundGeometry.light(self)
 
 	fallback_spawn = Vector3(0.0, BLOCK_Y + 1.0, START_Z + 10.0)
 

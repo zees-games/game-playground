@@ -14,5 +14,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 map="${1:-pg_lobby}"
-exec xvfb-run -a godot --path . --resolution 1600x900 \
+# RENDERER=forward_plus renders with the other renderer; the project and the client shell
+# draw with gl_compatibility, which is what a player sees, so check a look change in both.
+exec xvfb-run -a godot --path . --resolution 1600x900 ${RENDERER:+--rendering-method "$RENDERER"} \
   --script tools/screenshot.gd -- --map "$map" "${@:2}"

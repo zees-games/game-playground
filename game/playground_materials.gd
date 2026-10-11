@@ -7,7 +7,7 @@ extends RefCounted
 ## density go to the solver from `DotPhysicsSurface`; the player's movement comes from the
 ## same entry through dot-player-controller's `DotFpsSurface.from_physics`, so ice is one
 ## number for a crate and for a person. The only thing this file adds is the LOOK, which is
-## this game's (unshaded boxes on a grid).
+## this game's (a colour over the prototype grid, lit by the map's sun).
 ##
 ## [b]A player's surface is found from the box's metadata[/b] (`dot_fps_surface`), which a
 ## client and a server both build from the same map document: a surface resolved any other
