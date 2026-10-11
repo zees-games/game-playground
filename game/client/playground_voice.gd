@@ -71,16 +71,6 @@ func setup(enable_capture: bool = true) -> DotResult:
 	if buffered_playback:
 		manager.sink_factory = _make_buffer_sink
 
-	var supported := DotVoiceSourceMicrophone.is_supported()
-	available = supported.ok
-
-	if not available:
-		unavailable_reason = supported.error.message
-		DotLog.info(CHANNEL, "no microphone; listening only", {
-			"why": unavailable_reason,
-		})
-		return DotResult.success(false)
-
 	# [b]Not opened here.[/b] The first press of the talk key opens it ([method set_talking],
 	# dot-voice's update_talk): a microphone opened as the client loads is one nobody agreed
 	# to, and in a browser it is a permission prompt in front of somebody who has not asked.
@@ -90,9 +80,20 @@ func setup(enable_capture: bool = true) -> DotResult:
 		key.physical_keycode = KEY_TALK
 		InputMap.action_add_event(DotVoiceManager.TALK_ACTION, key)
 
-	# The menu's voice rows bind to it, and the server's sv_voice_enable reaches it.
+	# The menu's voice rows bind to it, and the server's sv_voice_enable reaches it, with or
+	# without a microphone: a listener must still stop hearing a server that turned voice off.
 	manager.publish_as_client()
 	var _following := manager.follow_cvars(DotRegistry.get_service(&"dot_client_link"))
+
+	var supported := DotVoiceSourceMicrophone.is_supported()
+	available = supported.ok
+
+	if not available:
+		unavailable_reason = supported.error.message
+		DotLog.info(CHANNEL, "no microphone; listening only", {
+			"why": unavailable_reason,
+		})
+		return DotResult.success(false)
 
 	return DotResult.success(enable_capture)
 
