@@ -1517,6 +1517,17 @@ func _give_weapon(session_id: int, id: StringName, weapon_id: StringName) -> voi
 	# the client that holds them; a gun the server did not run is a client deciding what
 	# it hit. So the server holds a rig of its own, and `_drive_tools` ticks it.
 	var def := game.weapon_def(weapon_id)
+
+	# [b]The gun already in hand, asked for again, is ammunition[/b], not a fresh rig: a fresh
+	# one would redraw it and say nothing. The client's drawn gun is not told; it takes the
+	# count from the owner's snapshot once quiet (`PlaygroundPlayerNet._correct_drawn`).
+	if PlaygroundZee.is_zee(def) and _tool_of.get(session_id, &"") == weapon_id \
+			and player.zee_rig is ZeeWeaponRig and is_instance_valid(player.zee_rig):
+		if PlaygroundZee.refill(player.zee_rig):
+			_tell(peer_for_player(session_id), PlaygroundEvents.Kind.NOTICE,
+				PlaygroundEvents.write_notice(session_id, "Ammunition refilled."))
+		return
+
 	_drop_toy(session_id)
 	if PlaygroundZee.is_zee(def):
 		game.phys_gun_release(player)

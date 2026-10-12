@@ -213,6 +213,85 @@ static func top_up(rig: Node) -> void:
 		var _added := zee.arsenal.add_ammo(def.ammo_type, 120)
 
 
+## Fills what [param rig] holds back up: a full magazine and at least the reserve a fresh one
+## is given. True when anything changed. The server's answer to asking for (or walking over)
+## the gun already in hand; the drawn gun on a client is brought to it by [method correct].
+static func refill(rig: Node) -> bool:
+	var zee := rig as ZeeWeaponRig
+
+	if zee == null or zee.arsenal == null or zee.arsenal.current() == null:
+		return false
+
+	var def := zee.current_def()
+
+	if def == null or def.ammo_type == &"":
+		return false
+
+	var held := zee.arsenal.current()
+	var changed := false
+
+	if def.uses_magazine() and held.magazine < def.magazine:
+		held.magazine = def.magazine
+		changed = true
+
+	if not def.infinite_reserve and zee.arsenal.ammo().count(def.ammo_type) < def.reserve:
+		zee.arsenal.ammo().set_count(def.ammo_type, def.reserve)
+		changed = true
+
+	return changed
+
+
+## How long the drawn gun must be quiet before the server's count may overwrite it: longer than
+## a shot takes to reach the server and its snapshot to come back, so a correction never undoes
+## a shot the server has not heard of yet. game-zombie-zone's `VIEW_RIG_SETTLE_SEC`.
+const SETTLE_SEC := 0.6
+
+
+## One tick of the drawn gun's quiet clock on [param player] (`zee_quiet`): reset by a trigger,
+## a reload or a switch, else counted up by [param delta] simulated seconds.
+static func note_drawn(player: Node, rig: ZeeWeaponRig, command: DotWeaponCommand, delta: float) -> void:
+	if player == null or rig == null or rig.arsenal == null:
+		return
+
+	var busy := command != null and (command.is_pressed(DotWeaponCommand.BUTTON_ATTACK)
+		or command.is_pressed(DotWeaponCommand.BUTTON_RELOAD))
+	busy = busy or rig.arsenal.is_reloading() or rig.arsenal.is_switching()
+	var quiet: float = float(player.get("zee_quiet")) if player.get("zee_quiet") != null else 0.0
+	player.set("zee_quiet", 0.0 if busy else quiet + maxf(delta, 0.0))
+
+
+## Brings a connected client's drawn [param rig] to the server's count ([param magazine],
+## [param reserve], for [param slot]) once it has been quiet [constant SETTLE_SEC]. True when it
+## changed anything.
+##
+## [b]The drawn gun predicts, so it can be wrong, and nothing used to put it right.[/b] A shot the
+## server refused, a refill, a fresh rig on the server: each left the HUD on the client's own
+## sum for good. Correcting on every snapshot instead would undo the shots still in flight and
+## make the counter flicker up while you fire.
+static func correct(rig: ZeeWeaponRig, magazine: int, reserve: int, slot: int, server_busy: bool, quiet: float) -> bool:
+	if rig == null or rig.arsenal == null or server_busy or quiet < SETTLE_SEC:
+		return false
+
+	var arsenal := rig.arsenal
+	var held := arsenal.current()
+
+	if held == null or slot != arsenal.current_slot() or arsenal.is_reloading() or arsenal.is_switching():
+		return false
+
+	var changed := false
+
+	if held.def.uses_magazine() and held.magazine != magazine:
+		held.magazine = clampi(magazine, 0, held.def.magazine)
+		changed = true
+
+	if held.def.ammo_type != &"" and not held.def.infinite_reserve \
+			and arsenal.ammo().count(held.def.ammo_type) != reserve:
+		arsenal.ammo().set_count(held.def.ammo_type, maxi(reserve, 0))
+		changed = true
+
+	return changed
+
+
 static func rig_is_melee(rig: Node) -> bool:
 	var def := (rig as ZeeWeaponRig).current_def() if rig is ZeeWeaponRig else null
 	return def != null and def.tags.has(ZeeWeaponIds.TAG_MELEE)

@@ -58,13 +58,13 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 363
+const CHECKS := 369
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 43
+const SECTIONS := 44
 
 var _passed := 0
 var _failed := 0
@@ -176,6 +176,8 @@ func _run() -> void:
 		await _test_glass_over_the_wire()
 		await _test_swimming_over_the_wire()
 		await _test_avatars_over_the_wire()
+		# Arms a gun and puts it away again; adds no body.
+		await _test_drawn_ammo_corrected()
 		await _test_leave()
 
 	_report()
@@ -4281,6 +4283,100 @@ func _test_grenade_over_the_wire() -> void:
 	_check(not blasts.is_empty() and (blasts[0] as Vector3).distance_to(server_at) < 0.05,
 		"where the server says, not where the copy was",
 		"%s against %s" % [str(blasts[0]) if not blasts.is_empty() else "-", str(server_at)])
+	_done()
+
+
+## The gun a connected client draws takes the server's count once it has gone quiet.
+##
+## [b]Nothing used to write the server's count back.[/b] The drawn rig simulates from the same
+## buttons, so the two agree until a shot is refused or the server refills the gun; from then
+## the HUD read the client's own sum for good (game-zombie-zone's 15 / 105). Here the drawn rig
+## fires shots the server never hears (a refused shot), and then both fire and the gun in hand
+## is asked for again (a refill). Armed: without `PlaygroundPlayerNet._correct_drawn` the
+## "takes the server's count" and "the refill reaches the drawn gun" checks fail.
+func _test_drawn_ammo_corrected() -> void:
+	_section("the drawn gun takes the server's ammunition count")
+
+	var theirs := _server_player()
+	var mirror := _client_player()
+	_client_bridge.ask_weapon(&"zee_smg")
+	_exchange()
+	await _steps(4)
+	_exchange()
+	await _steps(4)
+
+	var server_rig: ZeeWeaponRig = theirs.zee_rig as ZeeWeaponRig if theirs != null else null
+	# The client's drawn gun, as PlaygroundClient._arm_zee builds it: LOCAL, no authority.
+	var drawn: ZeeWeaponRig = PlaygroundZee.arm(mirror, _client_game.weapon_def(&"zee_smg"),
+		ZeeWeaponRig.Role.LOCAL, false, _client_game.tick_rate, _tick) if mirror != null else null
+	_check(server_rig != null and drawn != null, "a gun on the server and one drawn on the client")
+	if server_rig == null or drawn == null:
+		_done()
+		return
+
+	var full := drawn.arsenal.current().magazine
+	var tick_sec := 1.0 / float(maxi(_client_game.tick_rate, 1))
+	var settle := int(ceil(PlaygroundZee.SETTLE_SEC / tick_sec)) + 24
+
+	# One tick on both ends, the drawn gun driven the way PlaygroundClient._net_physics does.
+	var drive := func(drawn_fire: bool) -> void:
+		var buttons := DotFpsCommand.BUTTON_USER_0 if drawn_fire else 0
+		var command := PlaygroundZee.command_for(buttons, 0.0, 0.0, PlaygroundZee.slot_of(drawn))
+		var _outcome := drawn.simulate_tick(command, _tick)
+		PlaygroundZee.note_drawn(mirror, drawn, command, tick_sec)
+
+	# Shots the server never hears.
+	for _i in range(40):
+		drive.call(true)
+		await _step()
+	var refused := drawn.arsenal.current().magazine
+	_check(refused < full, "the drawn gun fired shots the server did not", "%d of %d" % [refused, full])
+
+	for _i in range(8):
+		drive.call(false)
+		await _step()
+	_check(drawn.arsenal.current().magazine == refused,
+		"and is not corrected while the shots could still be in flight")
+
+	for _i in range(settle):
+		drive.call(false)
+		await _step()
+	_check(drawn.arsenal.current().magazine == server_rig.arsenal.current().magazine,
+		"once quiet, it takes the server's count",
+		"drawn %d, server %d" % [drawn.arsenal.current().magazine, server_rig.arsenal.current().magazine])
+
+	# Both fire, then the gun in hand is asked for again: the server refills its own rig, and
+	# says nothing to the drawn one but the snapshot.
+	var fire := DotFpsCommand.new()
+	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
+	for _i in range(30):
+		drive.call(true)
+		await _step(fire)
+	for _i in range(8):
+		drive.call(false)
+		await _step()
+	var spent := server_rig.arsenal.current().magazine
+	_client_bridge.ask_weapon(&"zee_smg")
+	_exchange()
+	await _steps(4)
+	var def := server_rig.current_def()
+	_check(theirs.zee_rig == server_rig and spent < def.magazine
+		and server_rig.arsenal.current().magazine == def.magazine
+		and server_rig.arsenal.ammo().count(def.ammo_type) >= def.reserve,
+		"asking for the gun in hand refills it on the server, without a fresh rig",
+		"spent to %d, now %d" % [spent, server_rig.arsenal.current().magazine])
+	for _i in range(settle):
+		drive.call(false)
+		await _step()
+	_check(drawn.arsenal.current().magazine == def.magazine
+		and drawn.arsenal.ammo().count(def.ammo_type) == server_rig.arsenal.ammo().count(def.ammo_type),
+		"and the refill reaches the drawn gun",
+		"drawn %d / %d" % [drawn.arsenal.current().magazine, drawn.arsenal.ammo().count(def.ammo_type)])
+
+	PlaygroundZee.disarm(mirror)
+	_client_bridge.ask_tool(&"phys")
+	_exchange()
+	await _steps(4)
 	_done()
 
 

@@ -3,6 +3,7 @@ extends DotNetBehaviour
 const PlaygroundNetBridge := preload("playground_net_bridge.gd")
 const PlaygroundNetCommand := preload("playground_net_command.gd")
 const PlaygroundPlayer := preload("../playground_player.gd")
+const PlaygroundZee := preload("../playground_zee.gd")
 
 ## What a networked playground player replicates: the movement state, and an
 ## administrator's two marks.
@@ -156,6 +157,7 @@ func _net_state_applied(tick: int) -> void:
 	player.beacon = net_beacon
 	player.creative = net_creative
 	_apply_weapon()
+	_correct_drawn()
 	# NOT the node, on a predicted entity: receive_snapshot calls this before the
 	# predictor reconciles, and reconcile's first act is to read the node as "what the
 	# client is showing". Moving it here makes the measured error the whole replay
@@ -176,6 +178,25 @@ func _net_interpolated(_tick: int) -> void:
 		return
 	DotFpsNetSync.push(self, player.controller.state)
 	player.global_position = player.controller.state.position
+
+
+## The owner's own count (owner-only fields), put onto the gun this client draws once that has
+## been quiet long enough for the server to have heard every shot it fired.
+##
+## [b]Nothing else ever writes the server's count back.[/b] The drawn rig simulates from the same
+## buttons, so the two agree until the server refuses a shot or refills the gun (asking again for
+## the gun in hand), and from then the HUD showed the client's own sum for good. The rig is only
+## the drawn one on its owner: a LOCAL rig without the authority. Watchers have no rig, and the
+## owner-only fields are stale on them.
+func _correct_drawn() -> void:
+	var rig: Variant = player.zee_rig
+	if not (rig is ZeeWeaponRig) or not is_instance_valid(rig):
+		return
+	var drawn := rig as ZeeWeaponRig
+	if drawn.authority or drawn.role != ZeeWeaponRig.Role.LOCAL:
+		return
+	var _corrected := PlaygroundZee.correct(drawn, net_magazine, net_reserve, net_slot,
+		net_reloading or net_switching, player.zee_quiet)
 
 
 ## Somebody's zee weapon, as a watcher sees it: the world model kicks once per snapshot the

@@ -112,6 +112,11 @@ var grav_gun: DotGravGun = null
 ## PlaygroundZee, never built by the player: most players hold a physics gun.
 var zee_rig: Node = null
 
+## Simulated seconds the drawn zee gun on a connected client has gone without a trigger, a
+## reload or a switch (`PlaygroundZee.note_drawn`); the server's count corrects it only past
+## `PlaygroundZee.SETTLE_SEC`.
+var zee_quiet: float = 0.0
+
 ## The zee weapon everybody else sees in this player's hands (a [ZeeWorldModel]), or null.
 ## Built on a client from the server's WEAPON event by [method PlaygroundZee.show_held].
 var zee_world: Node3D = null

@@ -599,12 +599,13 @@ func _net_physics(delta: float) -> void:
 			# fires is drawn and heard here and decided there.
 			var rig := _zee_rig()
 			if rig != null:
-				var _drawn := rig.simulate_tick(
-					PlaygroundZee.command_for(
-						command.buttons, command.yaw, command.pitch, PlaygroundZee.slot_of(rig)
-					),
-					tick
+				var drawn_command := PlaygroundZee.command_for(
+					command.buttons, command.yaw, command.pitch, PlaygroundZee.slot_of(rig)
 				)
+				var _drawn := rig.simulate_tick(drawn_command, tick)
+				# How long it has been quiet, so the server's count may correct it
+				# (`PlaygroundPlayerNet._correct_drawn`) without undoing a shot in flight.
+				PlaygroundZee.note_drawn(player, rig, drawn_command, 1.0 / float(maxi(playground.tick_rate, 1)))
 
 
 func _build_view() -> void:
@@ -1524,6 +1525,14 @@ func _view_basis() -> Basis:
 
 func _set_tool(id: StringName) -> void:
 	if tool == id:
+		# The gun already in hand, picked again (the Q menu, or walked over): ammunition. Asked
+		# of the server when there is one, which refills its own rig; the drawn gun takes the
+		# count once it is quiet (`PlaygroundPlayerNet._correct_drawn`). Offline it is filled here.
+		if _zee_rig() != null and PlaygroundZee.is_zee(playground.weapon_def(id)):
+			if bridge != null:
+				bridge.ask_weapon(id)
+			elif PlaygroundZee.refill(_zee_rig()) and hud != null:
+				hud.notice("Ammunition refilled.")
 		return
 
 	# Everything is let go of on the way out. A gravity gun that kept carrying a
