@@ -486,6 +486,12 @@ const CHAT_KEY_BYTES := 48
 const CHAT_KIND_BITS := 4
 
 
+## Whether every [enum DotChatMessage.Kind] fits in [constant CHAT_KIND_BITS]. dot-chat owns
+## that enum, so it can grow under this game; headless_net reads this.
+static func chat_kinds_fit() -> bool:
+	return DotChatMessage.KIND_NAMES.size() <= (1 << CHAT_KIND_BITS)
+
+
 ## One chat line, from [method DotChatMessage.to_dictionary], plus who said it.
 ##
 ## [b]Encoded field by field rather than as JSON.[/b] A JSON body is a variable-length blob
@@ -798,6 +804,17 @@ const INV_DOC_BYTES := 12000
 const INV_OP_KIND_BITS := 3
 const INV_CELL_MIN := -1
 const INV_CELL_MAX := 254
+
+
+## Whether every sub-kind fits its field: [enum InvAsk] and [enum InvTell] in
+## [constant INV_SUB_BITS], dot-inventory's [enum DotInvOp.Kind] (an enum that grows outside
+## this game, written clamped) in [constant INV_OP_KIND_BITS], and [enum ProjectileTell] in
+## [constant PROJECTILE_SUB_BITS]. What headless_net reads.
+static func sub_kinds_fit() -> bool:
+	return int(InvAsk.values().max()) < (1 << INV_SUB_BITS) \
+		and int(InvTell.values().max()) < (1 << INV_SUB_BITS) \
+		and int(DotInvOp.Kind.values().max()) < (1 << INV_OP_KIND_BITS) \
+		and int(ProjectileTell.values().max()) < (1 << PROJECTILE_SUB_BITS)
 
 
 ## One op, and its sequence number.

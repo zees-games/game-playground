@@ -9,7 +9,11 @@ const PlaygroundEvents := preload("playground_events.gd")
 ## thousands is broken or hostile, and in a sandbox the difference does not matter.
 
 const NAME := &"pg.request"
-const KIND_BITS := 4
+## Room for 32 asks. It was 4 bits with [enum PlaygroundEvents.Ask] at 16 of 16, so the
+## next ask added would have gone out as READY: the writer masks a value to its field without
+## a word (game-zombie-zone sent HURT and AMMO as HELLO and MAP that way). headless_net
+## checks every ask fits ([method fits]).
+const KIND_BITS := 5
 const MAX_BODY := 2048
 
 var kind: int = 0
@@ -46,6 +50,12 @@ func _validate() -> DotResult:
 	if kind < 0 or kind >= PlaygroundEvents.Ask.size():
 		return DotResult.fail(DotError.CODE_INVALID, "Unknown request kind %d." % kind)
 	return DotResult.success(true)
+
+
+## Whether every [enum PlaygroundEvents.Ask] fits in [constant KIND_BITS]. What a check reads: the writer
+## masks a value to its field, so a kind past it goes out as a smaller one and nothing errors.
+static func fits() -> bool:
+	return int(PlaygroundEvents.Ask.values().max()) < (1 << KIND_BITS)
 
 
 func reader() -> DotNetReader:

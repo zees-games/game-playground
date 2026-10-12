@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 357
+const CHECKS := 361
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -445,6 +445,21 @@ func _test_event_wire() -> void:
 		not bool(short_chat["ok"]),
 		"and a truncated chat line is reported as exhausted rather than as an empty one"
 	)
+
+	# A kind goes out in a fixed field the writer masks without a word, so one past it aliases a
+	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
+	_check(PlaygroundEvent.fits(), "every event kind fits the event's kind field",
+		"%d kinds in %d bits" % [PlaygroundEvents.Kind.size(), PlaygroundEvent.KIND_BITS])
+	_check(PlaygroundRequest.fits(), "every request kind fits the request's kind field",
+		"%d kinds in %d bits" % [PlaygroundEvents.Ask.size(), PlaygroundRequest.KIND_BITS])
+	_check(PlaygroundEvents.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
+		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), PlaygroundEvents.CHAT_KIND_BITS])
+	_check(PlaygroundEvents.sub_kinds_fit(), "every inventory and projectile sub-kind fits its field",
+		"inv asks %d, tells %d in %d bits; ops %d in %d; projectile %d in %d" % [
+			PlaygroundEvents.InvAsk.size(), PlaygroundEvents.InvTell.size(), PlaygroundEvents.INV_SUB_BITS,
+			DotInvOp.Kind.size(), PlaygroundEvents.INV_OP_KIND_BITS,
+			PlaygroundEvents.ProjectileTell.size(), PlaygroundEvents.PROJECTILE_SUB_BITS])
+
 	_done()
 
 
