@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 371
+const CHECKS := 372
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1248,6 +1248,13 @@ func _client_player() -> PlaygroundPlayer:
 func _test_handshake() -> void:
 	_section("a client joins")
 
+	# The READY first, as over ENet with loss: a client is PLAYING by its own reckoning once it has
+	# sent `loaded`, on another channel, so its READY can reach the server before its seat. Kept,
+	# and answered by the seat; a bridge that drops it never tells this client who it is.
+	_client_bridge.ask_ready()
+	_exchange()
+	_check(_client_bridge.local_player_id != SESSION, "a READY before the seat is told nothing yet")
+
 	var added := _server_bridge.add_player(CLIENT_PEER, SESSION, "Ada")
 	_check(added.ok, "the server adds the player", str(added.error) if not added.ok else "")
 	_check(_server_player() != null, "and the game has them")
@@ -1255,7 +1262,6 @@ func _test_handshake() -> void:
 	var behaviour_count: Variant = _server_bridge.describe()["players"]
 	_check(int(behaviour_count) == 1, "with an entity replicating them", str(behaviour_count))
 
-	_client_bridge.ask_ready()
 	_exchange()
 	await _steps(4)
 

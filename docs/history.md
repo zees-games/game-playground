@@ -116,3 +116,5 @@ One line each; the detail is in [bugs-found.md](../../../docs/bugs-found.md) or 
 **A method `DotTimerZone` does not have took two checks out of a run that reported "0 failed".** `dedicated` had no section counter or CHECKS total until then.
 
 **"With picking up off, nobody is held" was aiming the beam the wrong way** and passed with nobody in it. **The glass sprint path ran into the end of a wall** and broke it, correctly. **A button at a falling player's eye height** was pressed once by luck.
+
+- **A READY that overtook the seat was dropped (2026-10-12).** A client sends READY when its link says PLAYING, which the link decides itself after sending `loaded` on another ENet channel. Through a lossy link the READY can reach the server first; `_admit` found no player for the peer and returned, and nothing asked again, so that client never got a world. Loopback and WebSocket order the two, so no suite could see it until `headless_net` sent the READY before the seat.
