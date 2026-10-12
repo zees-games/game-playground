@@ -84,6 +84,13 @@ signal held_changed(id: StringName, prop: DotPropInstance, held: bool)
 ## what it was made of. Emitted on every end that removes it, so a client plays the sound.
 signal pane_broken(index: int, at: Vector3, material: StringName)
 
+## A player's shot, blast or blow took something off a body, a breakable prop or a pane: the
+## confirmation the shooter's hit marker and damage numbers are drawn from. The authority's
+## decision, never a client's prediction; the bridge sends it to the shooter alone. Fed from
+## the four places damage is applied ([method confirm_hit]). [param victim] only groups hits
+## on one thing ([method hit_victim_id]); [param point] is where the number goes up.
+signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
+
 ## Somebody walked over a weapon lying in the world. The bridge gives it to them on a
 ## server; the client equips it offline.
 signal weapon_picked_up(player_id: StringName, weapon_id: StringName)
@@ -919,16 +926,20 @@ func _index_panes(map: Node) -> void:
 
 ## Damage to [param node] if it is a breakable map box; true when it was one. The one door
 ## shots, blasts and impacts all come through, as `hurt_prop` is for props.
-func hurt_pane(node: Node, amount: float, _by: StringName) -> bool:
+func hurt_pane(node: Node, amount: float, by: StringName) -> bool:
 	if not authoritative or not panes_break or node == null or not node.has_meta(&"pg_box"):
 		return false
 	var index := int(node.get_meta(&"pg_box"))
 	if not panes.has(index):
 		return false
 	var pane: Dictionary = panes[index]
-	pane["health"] = float(pane["health"]) - amount
-	if float(pane["health"]) <= 0.0:
+	var before := float(pane["health"])
+	pane["health"] = before - amount
+	var at := _pane_bounds(node).get_center() if node is Node3D else Vector3.ZERO
+	var broke := float(pane["health"]) <= 0.0
+	if broke:
 		break_pane(index)
+	confirm_hit(by, hit_victim_id(DotEntity.KIND_OTHER, index + 1), minf(amount, maxf(before, 0.0)), at, broke)
 	return true
 
 
@@ -2340,7 +2351,34 @@ func hurt_prop(node: Node, amount: float, by: StringName) -> bool:
 	if prop == null or _breaking.has(prop.instance_id) or not prop_damage.is_breakable(prop.instance_id):
 		return false
 
-	return prop_damage.hurt(prop.instance_id, amount, by).ok
+	var before := prop_damage.health_of(prop.instance_id)
+	var at := prop.position()
+	var taken := prop_damage.hurt(prop.instance_id, amount, by)
+
+	if taken.ok:
+		confirm_hit(by, hit_victim_id(DotEntity.KIND_PROP, prop.instance_id),
+			minf(amount, maxf(before, 0.0)), at, float(taken.value) <= 0.0)
+
+	return taken.ok
+
+
+## Tells the shooter their hit landed ([signal hit_landed]): from the arena's damage to a
+## player, an NPC's [code]take_damage[/code], [method hurt_prop] and [method hurt_pane].
+##
+## [b]Only for a player, only on the authority, and only for something taken.[/b] An NPC's
+## shot, a barrel nobody lit and the world's own damage confirm nothing to anybody; a hit
+## that took nothing (a dead body, a protected prop) did not land.
+func confirm_hit(by: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool = false) -> void:
+	if not authoritative or amount <= 0.0 or by == &"" or not players.has(by):
+		return
+	hit_landed.emit(by, victim, amount, point, killed, headshot)
+
+
+## A key for [param serial] of [param kind] ([code]DotEntity.KIND_*[/code]) in one space, so the
+## damage numbers on an NPC, a crate and a pane never add up together. Not an entity id: a
+## pane and an NPC have none, and an NPC's serial here is its object id.
+static func hit_victim_id(kind: int, serial: int) -> int:
+	return kind * DotEntity.STRIDE + posmod(serial, DotEntity.STRIDE)
 
 
 ## Broken: a few pieces in its colour where it stood, owned by nobody and gone in

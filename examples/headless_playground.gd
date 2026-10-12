@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 879
+const CHECKS := 881
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -469,7 +469,17 @@ func _test_breaking_props() -> void:
 	crate.node.global_position = eye + aim * 4.0
 	(crate.node as RigidBody3D).linear_velocity = Vector3.ZERO
 	await get_tree().physics_frame
+	var landed: Array = []
+	var on_hit := func(by: StringName, victim: int, amount: float, _at: Vector3, killed: bool, _head: bool) -> void:
+		landed.append([by, victim, amount, killed])
+	playground.hit_landed.connect(on_hit)
 	var fired := _fire_at_crates(rig, player, 400, crate)
+	playground.hit_landed.disconnect(on_hit)
+	var crate_key := Playground.hit_victim_id(DotEntity.KIND_PROP, crate.instance_id)
+	_check(not landed.is_empty() and landed.all(func(h: Array) -> bool: return h[0] == &"bot" and int(h[1]) == crate_key)
+		and bool(landed[landed.size() - 1][3]) and landed.filter(func(h: Array) -> bool: return bool(h[3])).size() == 1,
+		"every shot that took health is confirmed to the shooter, the last as the one that broke it",
+		"%d confirmations for %d shots" % [landed.size(), fired])
 	_check(not crate.is_alive(), "with it on, a pistol shoots a crate apart", "%d shots, health %.0f" % [fired, playground.prop_damage.health_of(crate.instance_id)])
 	var pieces := playground.props.all_props().filter(func(p: DotPropInstance) -> bool: return p.def.id == &"debris")
 	_check(pieces.size() > 0 and playground.props.world_count() >= before - 1 + pieces.size(),
@@ -2760,7 +2770,17 @@ func _test_armed_npcs() -> void:
 	var doomed := playground.props.spawn(&"npc_soldier", &"bot", Vector3(0, 1.2, 0))
 	await get_tree().physics_frame
 	var at: Vector3 = (doomed.node as Node3D).global_position
+	var had := float(doomed.node.get("health"))
+	var landed: Array = []
+	var on_hit := func(by: StringName, victim: int, amount: float, _at: Vector3, killed: bool, _head: bool) -> void:
+		landed.append([by, victim, amount, killed])
+	playground.hit_landed.connect(on_hit)
 	doomed.node.call("take_damage", 9999.0, &"bot")
+	playground.hit_landed.disconnect(on_hit)
+	_check(landed.size() == 1 and landed[0][0] == &"bot" and DotEntity.kind_of(int(landed[0][1])) == DotEntity.KIND_NPC
+		and absf(float(landed[0][2]) - had) < 0.01 and bool(landed[0][3]),
+		"the player who killed it is told so, for the health it had rather than the 9999 thrown",
+		"%s, had %.0f" % [str(landed), had])
 	await get_tree().physics_frame
 	var dropped: DotPropInstance = null
 	for prop in playground.props.all_props():

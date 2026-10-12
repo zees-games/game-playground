@@ -45,6 +45,16 @@
 
 **Still unwired:** `on_prop_landed` (nothing reports a landing), `on_bought` and `on_wave_incoming` (the shop and waves are server-side and no event carries either), `wave_flash` (triggered by nothing) and `DotFxManager.flash_colour` (needs a HUD overlay as well as an event). Tool sounds are offline only.
 
+## The HUD
+
+`PlaygroundHud`: dot-timer's `DotTimerHud` top left, the notice, status and tool lines under it, a crosshair, and three of dot-ui's glance pieces (API level 4), coloured by `PlaygroundHud.piece_theme()` (the timer's translucent black plate, the boost pads' amber for a kill or a head, the start pads' green, the timer's red for a low magazine):
+
+- **`DotAmmoCounter` bottom right**: the zee weapon in hand, magazine and reserve (endless when the weapon says so; the reserve alone for one that feeds straight from it; the name alone for a blade). Nothing with a toy or empty hands, which the tool line names. It reads the client's own rig, which on a connected client is the predicting one. Bottom right because the chat box is bottom left and a shell's ballot top right; it dims under a ballot that reaches it.
+- **`DotHitMarker` and `DotDamageNumbers`**, from `confirm_hit`, which the client calls for each `Kind.HIT` the server sends it (offline, for its own world's `hit_landed`): never from the local prediction ([netcode.md](netcode.md#weapons-over-the-wire)).
+- `headless_presentation` checks the numbers, the counter against the chat box (here and at 854 wide) and under a ballot (armed), and that the pack asks a shell for dot-ui 4. `screenshot_views`' `hud_hits` frame shows them.
+
+**A pack naming these classes does not parse on a client shell whose dot-ui predates them**, and no `DotAddonApi` level check can guard a class name: a release of this game waits for a shell built with dot-ui 4.
+
 ## The chat box
 
 dot-ui's `DotChatWindow` beside the console. **The channels come from `PlaygroundServices.chat_channels()`**, not a list here, so the composer offers exactly what the server routes; the admin channel is filtered out. The second key opens the **near** channel (a sandbox has no teams).
@@ -68,6 +78,6 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | --- | --- |
 | `tools/screenshot.sh <map>` | a map and its routes (`--fx` for the effects) |
 | `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, the edit panel), dot-menu's pages, the Tab board, the console open |
-| `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline, a map ballot's chat line beside the drawn panel |
+| `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline, a weapon's ammunition and two confirmed hits (`hud_hits`), a map ballot's chat line beside the drawn panel |
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |
 | `tools/audio_probe.sh` | whether the client makes a sound |

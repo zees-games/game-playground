@@ -626,6 +626,16 @@ func _on_damage(damage: DotDamage) -> void:
 		damage.health_lost
 	)
 
+	# The shooter's hit marker and number: a player's damage to somebody else, as applied.
+	var attacker := game.entity_table.key_for_id(damage.attacker) as StringName
+	if attacker != victim and not damage.refused:
+		var player: PlaygroundPlayer = game.players.get(victim, null)
+		var at := damage.point
+		if at == Vector3.ZERO and player != null:
+			at = player.controller.state.position + Vector3.UP * 1.5
+		game.confirm_hit(attacker, damage.victim, damage.health_lost, at, damage.lethal,
+			damage.hit_group == DotHitGroup.HEAD)
+
 
 func _on_killed(entity_id: int, damage: DotDamage) -> void:
 	var victim := game.entity_table.key_for_id(entity_id) as StringName

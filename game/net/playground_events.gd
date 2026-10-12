@@ -69,6 +69,10 @@ enum Kind {
 	## A breakable map box broke (glass): its index in the map document. To everybody, and
 	## every one broken so far to a joiner. Last, for the same reason as the others.
 	PANE,
+	## Your hit landed: on what, how much, where, and whether it killed or was a head. Only
+	## ever to the shooter's peer, for the hit marker and the damage numbers, which are drawn
+	## from this and never from the local prediction. Last, for the same reason.
+	HIT,
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
@@ -1082,3 +1086,28 @@ static func write_pane(index: int) -> PackedByteArray:
 static func read_pane(r: DotNetReader) -> Dictionary:
 	var index := r.read_varint()
 	return {"index": index, "ok": r.ok()}
+
+
+# --- HIT -----------------------------------------------------------------------
+
+## Your hit landed ([signal Playground.hit_landed]). The victim as its kind (4 bits) and the
+## low 32 bits of its serial, which only group hits on one body for the damage numbers: a
+## whole id is a kind times 10^12 and does not fit a field worth sending.
+static func write_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(victim / DotEntity.STRIDE, 0, 15), 4)
+	w.write_uint(posmod(victim, DotEntity.STRIDE) & 0xFFFFFFFF, 32)
+	w.write_float_range(clampf(amount, 0.0, 1000.0), 0.0, 1000.0, 14)
+	w.write_vector3_range(point, -WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
+	w.write_uint((1 if killed else 0) | (2 if headshot else 0), 2)
+	return w.to_bytes()
+
+
+static func read_hit(r: DotNetReader) -> Dictionary:
+	var kind := r.read_uint(4)
+	var serial := r.read_uint(32)
+	var amount := r.read_float_range(0.0, 1000.0, 14)
+	var point := r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
+	var flags := r.read_uint(2)
+	return {"victim": kind * DotEntity.STRIDE + serial, "amount": amount, "point": point,
+		"killed": flags & 1 != 0, "headshot": flags & 2 != 0, "ok": r.ok()}

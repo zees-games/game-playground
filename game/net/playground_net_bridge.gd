@@ -102,6 +102,9 @@ signal builds_received(builds: Array)
 ## The tool gun's edit mode picked a prop, or let go of one: `{net_id, name, settings,
 ## refused}`, net id 0 for nothing. Client side, to this player only.
 signal selection_received(state: Dictionary)
+## Client side: this player's hit landed (see [signal Playground.hit_landed]). Only ever sent
+## to the shooter; what the hit marker and the damage numbers are drawn from.
+signal hit_received(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
 
 ## A voice frame arrived. Server side; the payload is unparsed and must not be trusted —
 ## [method DotVoiceRouter.relay] is what stamps the speaker.
@@ -292,6 +295,10 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 		game.pickup.changed.connect(_on_pickup_changed)
 		game.held_changed.connect(_on_held_changed)
 		game.pane_broken.connect(_on_pane_broken)
+		# To the one who hit, and nobody else: a confirmation is about what YOU did.
+		game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+			_tell(peer_for_player(session_of(id)), PlaygroundEvents.Kind.HIT,
+				PlaygroundEvents.write_hit(victim, amount, point, killed, headshot)))
 		game.timers.player_started.connect(_on_run_changed)
 		game.timers.player_stopped.connect(_on_run_stopped)
 		game.run_filed.connect(_on_run_filed)
@@ -1816,6 +1823,11 @@ func _on_event(message: DotNetMessage) -> void:
 			var picked := PlaygroundEvents.read_selection(reader)
 			if bool(picked["ok"]):
 				selection_received.emit(picked)
+		PlaygroundEvents.Kind.HIT:
+			var hit := PlaygroundEvents.read_hit(reader)
+			if bool(hit["ok"]):
+				hit_received.emit(int(hit["victim"]), float(hit["amount"]), hit["point"],
+					bool(hit["killed"]), bool(hit["headshot"]))
 
 
 # --- Projectiles ---------------------------------------------------------------

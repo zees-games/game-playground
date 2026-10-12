@@ -9,6 +9,8 @@ const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundWorldGen := preload("../game/playground_worldgen.gd")
 const PlaygroundHud := preload("../game/playground_hud.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
+const Playground := preload("../game/playground.gd")
+const PlaygroundZee := preload("../game/playground_zee.gd")
 
 ## The five addons this game gained at once: settings, randomness, audio, effects and a
 ## console — plus the generated map, the carried inventory, and the party.
@@ -24,7 +26,7 @@ const PlaygroundClient := preload("../game/playground_client.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 113
+const CHECKS := 122
 
 var _passed := 0
 var _failed := 0
@@ -67,6 +69,7 @@ func _run() -> void:
 	await _test_party_over_http()
 	await _test_escape_menu()
 	_test_chat_box()
+	await _test_glance_pieces()
 
 	_test_every_sound_has_a_voice()
 	_test_the_vote_is_heard()
@@ -939,6 +942,105 @@ func _test_chat_drawn_once(p: PlaygroundPresentation) -> void:
 	client.free()
 	chat.free()
 	hud.queue_free()
+
+
+## The ammunition counter, the hit marker and the damage numbers are dot-ui's glance pieces,
+## handed this game's numbers, out of the chat box's way and under a ballot's.
+func _test_glance_pieces() -> void:
+	_section("What is in hand, and what a shot did")
+
+	var p := _make()
+	var hud := PlaygroundHud.new()
+	hud.name = "GlanceHud"
+	add_child(hud)
+
+	# A real rig, holding the first zee weapon with a magazine, on a stand-in body.
+	var body := Node3D.new()
+	body.name = "Holder"
+	add_child(body)
+	var rig: ZeeWeaponRig = null
+	for def in PlaygroundZee.defs():
+		var weapon := PlaygroundZee.catalogue().get_def(PlaygroundZee.zee_id(def)) if PlaygroundZee.is_zee(def) else null
+		if weapon != null and weapon.magazine > 0 and weapon.ammo_type != &"":
+			rig = PlaygroundZee.arm(body, def, ZeeWeaponRig.Role.SERVER, true, 64, 0)
+			break
+	_check(rig != null, "a zee weapon is armed for the counter to read")
+	if rig == null:
+		hud.queue_free()
+		body.queue_free()
+		_done()
+		return
+
+	var slot := rig.arsenal.current()
+	slot.magazine = 3
+	hud.show_weapon(rig)
+	var reserve := rig.arsenal.ammo().count(slot.def.ammo_type)
+	_check(
+		hud.ammo.count_text() == "3 | %d" % reserve and hud.ammo.low,
+		"the counter shows the magazine and the reserve, low at a quarter",
+		"'%s' low=%s for %d of %d" % [hud.ammo.count_text(), str(hud.ammo.low), slot.magazine, slot.def.magazine]
+	)
+	hud.show_weapon(null)
+	_check(hud.ammo.count_text() == "" and not hud.ammo.footprint().has_area(),
+		"and nothing at all with a toy or empty hands", hud.ammo.count_text())
+	hud.show_weapon(rig)
+
+	hud.confirm_hit(Playground.hit_victim_id(DotEntity.KIND_NPC, 41), 26.0, Vector3(0, 1, -5), true, false)
+	_check(
+		hud.hit_marker.alpha() > 0.0 and hud.hit_marker.kill and Array(hud.damage_numbers.texts()).has("26"),
+		"a confirmed hit flashes the marker and puts the number up",
+		"%s %s" % [str(hud.hit_marker.describe()), str(hud.damage_numbers.texts())]
+	)
+
+	# Out of the chat box's way: both are bottom-anchored, the box from the left and the
+	# counter from the right, so the test is the narrowest frame a client shell draws.
+	await get_tree().process_frame
+	var window := p.chat_window
+	var plate := hud.ammo.get_global_transform() * hud.ammo.footprint()
+	var box := window.get_global_rect()
+	_check(not plate.intersects(box), "the counter does not meet the chat box",
+		"counter %s, box %s" % [str(plate), str(box)])
+	var narrow := 854.0
+	var plate_w := hud.ammo.footprint().size.x
+	_check(
+		window.margin_left + window.width + 8.0 <= narrow + hud.ammo.offset_right - plate_w,
+		"nor at 854 wide, the smallest frame",
+		"box to %.0f, counter from %.0f" % [window.margin_left + window.width, narrow + hud.ammo.offset_right - plate_w]
+	)
+
+	# A ballot where a shell draws one, top right, leaves it alone; one over it dims it.
+	var ballot := DotBallotPanel.new()
+	ballot.name = "GlanceBallot"
+	ballot.panel_width = 360.0
+	add_child(ballot)
+	ballot.show_state({"open": true, "title": "Next map", "command": "nominate", "seconds": 30,
+		"options": [{"id": "a", "label": "Lobby", "votes": 0}, {"id": "b", "label": "Canyon", "votes": 0}],
+		"voters": {}})
+	var view := get_viewport().get_visible_rect().size
+	ballot.position = Vector2(view.x - 360.0 - 24.0, 120.0)
+	await get_tree().process_frame
+	hud.ammo.refresh_cover()
+	_check(not hud.ammo.covered, "a ballot top right leaves the counter alone",
+		"ballot %s, counter %s" % [str(ballot.get_global_rect()), str(plate)])
+	ballot.position = Vector2(view.x - 360.0 - 24.0, view.y - 140.0)
+	await get_tree().process_frame
+	hud.ammo.refresh_cover()
+	_check(hud.ammo.covered and hud.ammo.self_modulate.a < 1.0, "and one over it dims it",
+		"ballot %s" % str(ballot.get_global_rect()))
+
+	# A pack naming these classes does not parse on a shell whose dot-ui predates them, so the
+	# requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+	var asks := DotAddonApi.derive()
+	_check(
+		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		"the pack asks a shell for dot-ui level 4, the glance pieces",
+		str(asks.get("dot_ui"))
+	)
+
+	ballot.queue_free()
+	hud.queue_free()
+	body.queue_free()
+	_done()
 
 
 # --- Harness ---------------------------------------------------------------

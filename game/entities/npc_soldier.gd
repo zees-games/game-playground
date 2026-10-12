@@ -177,7 +177,14 @@ func take_damage(amount: float, by: StringName = &"") -> void:
 	if _dead or amount <= 0.0:
 		return
 
+	var taken := minf(amount, maxf(health, 0.0))
 	health -= amount
+
+	# The shooter's hit marker and number, when the shooter is a player (the game decides).
+	# Above the middle of the body, where a number reads, rather than wherever the pellet went.
+	if game != null and is_inside_tree():
+		game.confirm_hit(by, Playground.hit_victim_id(DotEntity.KIND_NPC, game.npc_entity_id(self)),
+			taken, global_position + Vector3.UP * 1.4, health <= 0.0)
 
 	if brain != null:
 		brain.call("damaged", amount, by)

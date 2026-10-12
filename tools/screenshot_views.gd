@@ -7,6 +7,7 @@ const PlaygroundHud := preload("../game/playground_hud.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundServices := preload("../game/playground_services.gd")
+const PlaygroundZee := preload("../game/playground_zee.gd")
 
 ## Renders the sandbox in first person and in third, so a person can look at both.
 ##
@@ -130,6 +131,9 @@ func _process(_delta: float) -> bool:
 			{"name": "edit_selection", "third": false, "edit": true},
 			{"name": "body_standing", "third": false, "other": true},
 			{"name": "rider_seated", "third": false, "other": true, "seated": true},
+			# A zee weapon in hand and two confirmed hits on Bea, the second a kill: the ammunition
+			# counter bottom right, the marker round the crosshair and the number on her body.
+			{"name": "hud_hits", "third": false, "other": true, "hits": true},
 			# A map vote as a connected player sees it: the ballot's chat line, through the
 			# client's own chat handler, and the drawn panel a client shell puts top right. The
 			# line must be in the chat box once and not on the notice line as well.
@@ -178,7 +182,11 @@ func _process(_delta: float) -> bool:
 		_player.creative = bool(shot.get("creative", false))
 		if bool(shot.get("ballot", false)):
 			_arrange_ballot()
-		_hud.visible = shot.has("clock") or shot.has("beacon") or shot.has("blind") or shot.has("creative") or shot.has("ballot")
+		if bool(shot.get("hits", false)):
+			_arm_for_hits()
+		else:
+			_hud.damage_numbers.clear()
+		_hud.visible = shot.has("clock") or shot.has("beacon") or shot.has("blind") or shot.has("creative") or shot.has("ballot") or shot.has("hits")
 		if shot.has("clock"):
 			var view := DotVoteClockView.new()
 			view.adopt(shot["clock"], Time.get_ticks_msec() / 1000.0)
@@ -188,6 +196,12 @@ func _process(_delta: float) -> bool:
 		return false
 
 	if _wait > 0:
+		# The hits a few frames before the capture: the marker fades in a quarter of a second.
+		if _wait == 3 and bool(shot.get("hits", false)) and _other != null:
+			var on_her := _other.controller.state.position + Vector3.UP * 1.3
+			var her := Playground.hit_victim_id(DotEntity.KIND_PLAYER, 2)
+			_hud.confirm_hit(her, 18.0, on_her, false, false)
+			_hud.confirm_hit(her, 24.0, on_her, true, true)
 		_wait -= 1
 		return false
 
@@ -270,6 +284,21 @@ func _arrange_edit() -> void:
 		var box := PlaygroundClient.selection_box()
 		picked.add_child(box)
 		PlaygroundClient.fit_selection_box(box, picked)
+
+
+## The `hud_hits` frame's weapon: a zee SMG in the hands under the first-person camera, as
+## `PlaygroundClient._arm_zee` builds it, with a magazine a third gone.
+func _arm_for_hits() -> void:
+	PlaygroundZee.use_this_games_art()
+	var camera := _player.get_node("Camera") as Camera3D
+	var hands := ZeeViewModel.new()
+	hands.name = "ZeeViewModel"
+	camera.add_child(hands)
+	var rig := PlaygroundZee.arm(_player, _game.weapon_def(&"zee_smg"), ZeeWeaponRig.Role.LOCAL, true,
+		_game.tick_rate, 0, hands)
+	if rig != null and rig.arsenal.current() != null:
+		rig.arsenal.current().magazine = 21
+	_hud.set_tool("SMG", &"")
 
 
 ## The `chat_ballot` frame: the presentation's chat box, the ballot's line through

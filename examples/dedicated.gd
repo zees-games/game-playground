@@ -46,7 +46,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 27
-const CHECKS := 248
+const CHECKS := 250
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -1918,14 +1918,24 @@ func _test_creative() -> void:
 	arena.admit(&"u80", "Other")
 	for step in range(game.tick_rate * 5):
 		arena.tick(step, 1.0 / float(game.tick_rate))
+	# What the shooter's hit marker hears: only a hit that landed, and only theirs.
+	var confirmed: Array = []
+	var on_hit := func(by: StringName, victim: int, amount: float, _at: Vector3, _killed: bool, _head: bool) -> void:
+		confirmed.append([by, victim, amount])
+	game.hit_landed.connect(on_hit)
 	var at_them := arena.hurt(&"u80", &"u79", 30.0, 5.0)
 	var by_them := arena.hurt(&"u79", &"u80", 30.0, 5.0)
+	_check(confirmed.is_empty(), "and a refused hit confirms nothing to the shooter", str(confirmed))
 	_check(at_them != null and at_them.refused, "nobody can hurt them", str(at_them))
 	_check(by_them != null and by_them.refused, "and they cannot hurt anybody", str(by_them))
 
 	said = _run_as(session, "creative")
 	var lands := arena.hurt(&"u80", &"u79", 30.0, 5.0)
 	_check(not builder.creative and lands != null and not lands.refused, "`!creative` again turns it off, and a hit lands", str(lands))
+	_check(confirmed.size() == 1 and confirmed[0][0] == &"u80" and int(confirmed[0][1]) == arena.entity_id_of(&"u79")
+		and lands != null and absf(float(confirmed[0][2]) - lands.health_lost) < 0.01,
+		"and the one that lands is confirmed to its shooter, for what it took", str(confirmed))
+	game.hit_landed.disconnect(on_hit)
 
 	var _on := _run_as(session, "creative")
 	_run_command("pg_creative 0")

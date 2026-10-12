@@ -333,6 +333,12 @@ func _ready() -> void:
 	# connected client kept counting its own map session's clock through every extend.
 	if bridge != null:
 		hud.clock_view = bridge.clock_view
+	else:
+		# Offline the client IS the server: its own world confirms its hits. Connected, the
+		# server's HIT event does (`_build_netcode`), and this world decides nothing.
+		playground.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+			if id == player_id:
+				_on_hit(victim, amount, point, killed, headshot))
 	_sync_hud()
 
 	# After the HUD, because for a CanvasItem tree order is draw order and a menu
@@ -455,6 +461,7 @@ func _build_netcode() -> DotResult:
 			state["settings"], str(state["refused"]))
 	)
 	bridge.combat_received.connect(_on_combat)
+	bridge.hit_received.connect(_on_hit)
 	bridge.match_received.connect(_on_match)
 	bridge.progress_received.connect(_on_progress)
 	bridge.notice_received.connect(func(_pid: int, text: String) -> void:
@@ -767,6 +774,12 @@ func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 		window.add_said("%s%s" % [prefix, message.sender_name], message.text, colour)
 	else:
 		hud.notice("%s%s: %s" % [prefix, message.sender_name, message.text])
+
+
+## A hit of this player's the server confirmed: the marker and the number on the body.
+func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+	if hud != null:
+		hud.confirm_hit(victim, amount, point, killed, headshot)
 
 
 ## Somebody's health changed, or they died. Drawn, never decided.

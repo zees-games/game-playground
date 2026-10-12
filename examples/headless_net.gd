@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 361
+const CHECKS := 363
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -450,6 +450,12 @@ func _test_event_wire() -> void:
 	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
 	_check(PlaygroundEvent.fits(), "every event kind fits the event's kind field",
 		"%d kinds in %d bits" % [PlaygroundEvents.Kind.size(), PlaygroundEvent.KIND_BITS])
+	var landed := PlaygroundEvents.read_hit(DotNetReader.new(PlaygroundEvents.write_hit(
+		Playground.hit_victim_id(DotEntity.KIND_NPC, 26491176217), 17.5, Vector3(1.0, 1.4, -6.0), true, true)))
+	_check(bool(landed["ok"]) and DotEntity.kind_of(int(landed["victim"])) == DotEntity.KIND_NPC
+		and absf(float(landed["amount"]) - 17.5) < 0.1 and bool(landed["killed"]) and bool(landed["headshot"])
+		and (landed["point"] as Vector3).distance_to(Vector3(1.0, 1.4, -6.0)) < 0.01,
+		"HIT keeps the victim's kind, the amount, the point and both flags", str(landed))
 	_check(PlaygroundRequest.fits(), "every request kind fits the request's kind field",
 		"%d kinds in %d bits" % [PlaygroundEvents.Ask.size(), PlaygroundRequest.KIND_BITS])
 	_check(PlaygroundEvents.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
@@ -1035,8 +1041,20 @@ func _test_glass_over_the_wire() -> void:
 	_client_game.pane_broken.connect(on_broken)
 
 	var server_node: Node = (_server_game.panes[index] as Dictionary)["node"] if index >= 0 else null
+	var hits: Array = []
+	var on_hit := func(victim: int, amount: float, _point: Vector3, killed: bool, _head: bool) -> void:
+		hits.append([victim, amount, killed])
+	_client_bridge.hit_received.connect(on_hit)
+	# The world's damage (nobody behind it) first: it confirms nothing to anybody.
+	var _scratched := _server_game.hurt_pane(server_node, 0.5, &"")
+	var health := float((_server_game.panes[index] as Dictionary)["health"]) if index >= 0 else 0.0
 	var _broke := _server_game.hurt_pane(server_node, 1000.0, &"u%d" % SESSION)
 	await _exchange_steps(8)
+	_client_bridge.hit_received.disconnect(on_hit)
+	_check(hits.size() == 1 and DotEntity.kind_of(int(hits[0][0])) == DotEntity.KIND_OTHER
+		and absf(float(hits[0][1]) - health) < 0.2 and bool(hits[0][2]),
+		"the player who broke it is told their hit landed: what it had left, and that it broke",
+		"%s for %.1f left" % [str(hits), health])
 	_check(not _server_game.panes.has(index) and not _client_game.panes.has(index) and _client_game.broken_panes.has(index),
 		"a pane the server breaks is broken on the client too")
 	var gone := not is_instance_valid(client_node) or not (client_node as Node).is_inside_tree() \

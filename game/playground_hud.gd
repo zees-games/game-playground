@@ -1,6 +1,7 @@
 extends Control
 
 const Playground := preload("playground.gd")
+const PlaygroundGeometry := preload("playground_geometry.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
 
 ## The playground's HUD: the timer, the speedometer, the strafe statistics, and a
@@ -14,6 +15,32 @@ const PlaygroundPlayer := preload("playground_player.gd")
 
 ## How long a notice stays up, in seconds.
 const NOTICE_SECONDS := 4.0
+
+## The glance pieces (dot-ui API level 4) in this game's colours: the timer's translucent
+## black plate, so the corner block and the ammunition read as one HUD, the boost pads'
+## amber for a kill and a head, the start pads' green, and the timer's "behind" red for a
+## low magazine. Set on the HUD, so every piece under it inherits it.
+static func piece_theme() -> Theme:
+	var t := Theme.new()
+	var type := DotHudPiece.THEME_TYPE
+	t.set_color(&"plate", type, Color(0.0, 0.0, 0.0, 0.45))
+	t.set_color(&"plate_edge", type, Color(1.0, 1.0, 1.0, 0.10))
+	t.set_color(&"text", type, Color(0.97, 0.98, 1.0))
+	t.set_color(&"dim", type, Color(0.80, 0.84, 0.92))
+	t.set_color(&"highlight", type, PlaygroundGeometry.COLOUR_BOOST)
+	t.set_color(&"good", type, PlaygroundGeometry.COLOUR_START)
+	t.set_color(&"low", type, Color(0.95, 0.4, 0.35))
+	return t
+
+
+## What is in hand and how much is in it: a zee weapon's magazine and reserve, bottom right.
+## Empty with a toy or nothing in hand, which the tool line already names.
+var ammo: DotAmmoCounter = null
+
+## Every hit the server confirmed ([method confirm_hit]): a mark round the crosshair, and
+## the number on the body. Never the local prediction.
+var hit_marker: DotHitMarker = null
+var damage_numbers: DotDamageNumbers = null
 
 var timer_hud: DotTimerHud = null
 
@@ -149,6 +176,30 @@ func _ready() -> void:
 	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_crosshair)
 
+	theme = piece_theme()
+
+	# Bottom right, where the chat box (bottom left) and a shell's ballot (top right) are
+	# not; it dims under a ballot that reaches it, which is the piece's own default.
+	ammo = DotAmmoCounter.new()
+	ammo.name = "Ammo"
+	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	ammo.offset_left = -420.0
+	ammo.offset_right = -24.0
+	ammo.offset_top = -100.0
+	ammo.offset_bottom = -24.0
+	add_child(ammo)
+
+	# Full rect, centred on the crosshair; both draw only what the server confirmed.
+	damage_numbers = DotDamageNumbers.new()
+	damage_numbers.name = "DamageNumbers"
+	damage_numbers.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(damage_numbers)
+
+	hit_marker = DotHitMarker.new()
+	hit_marker.name = "HitMarker"
+	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(hit_marker)
+
 	set_process(true)
 
 
@@ -180,6 +231,15 @@ func set_tool(p_tool: String, p_prop: StringName) -> void:
 	armed_prop = p_prop
 
 
+## A hit of this player's that the server confirmed (or, offline, this world): the marker
+## flashes and the number goes up on [param point]. [param victim] groups hits on one body.
+func confirm_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+	if hit_marker == null:
+		return
+	hit_marker.flash(killed, headshot)
+	damage_numbers.add(victim, amount, point, headshot)
+
+
 func notice(text: String) -> void:
 	if _notice == null:
 		return
@@ -202,7 +262,11 @@ func _process(delta: float) -> void:
 	var player: PlaygroundPlayer = playground.players.get(player_id)
 
 	if player == null:
+		ammo.clear()
 		return
+
+	var held: Variant = player.zee_rig
+	show_weapon(held as ZeeWeaponRig if is_instance_valid(held) and held is ZeeWeaponRig else null)
 
 	timer_hud.style_name = (
 		player.timer_style.display_name if player.timer_style != null else ""
@@ -265,6 +329,36 @@ func _process(delta: float) -> void:
 			_props_line(),
 			"hold Q to spawn",
 		]))
+
+
+## Hands the counter what [param rig] holds: the magazine and the reserve (endless when the
+## weapon says so), the reserve alone for a weapon that feeds straight from it, the name alone
+## for a blade. Public so a check and a render tool can call it. On a connected client the
+## rig is the predicting one, which spends the same rounds the server's does.
+func show_weapon(rig: ZeeWeaponRig) -> void:
+	if ammo == null:
+		return
+
+	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
+		ammo.clear()
+		return
+
+	var slot := rig.arsenal.current()
+	var def := slot.def
+	var title := def.display_name if def.display_name != "" else String(def.id).capitalize()
+
+	if def.ammo_type == &"":
+		ammo.show_ammo(title, -1, -1)
+		return
+
+	var reserve := rig.arsenal.ammo().count(def.ammo_type)
+
+	if def.magazine > 0:
+		# Low at a quarter of a magazine, which is when a reload is worth starting.
+		ammo.show_ammo(title, slot.magazine, reserve,
+			float(slot.magazine) <= float(def.magazine) * 0.25, def.infinite_reserve)
+	else:
+		ammo.show_ammo(title, reserve, -1, reserve <= 0, false)
 
 
 ## "12/200 props" — the count against this player's props limit, which is the limit a
