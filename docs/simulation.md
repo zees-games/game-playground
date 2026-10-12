@@ -53,6 +53,8 @@ The natural moment to fold a run's statistics in is the moment it finishes, when
 
 Facing a direction is `atan2(-dx, -dz)`: `DotFpsMotor._view_basis` builds forward as `(-sin(yaw), 0, -cos(yaw))`. The obvious `atan2(dx, dz)` is 180 degrees out and mirrored.
 
+**A teleport stops the run, except a map's own TELEPORT zone.** A teleport that kept the clock running is the simplest cheat on a timed map, so `PlaygroundPlayer.teleport` stops it; `Playground._on_effect_requested` passes `keep_run` for a TELEPORT zone, which the timer only asks for on the player's own track and already expects (`DotTimer.MOVING_KINDS`). That is what lets `pg_lobby`'s relay gates be part of a route.
+
 **A respawn here is a teleport of the same body** (`Playground.spawn_player`), so nothing a handler set is lost and `DotModTools.respawned` is never called: blind, beacon, noclip and freeze all survive a respawn (game-arena ends the last two with the body).
 
 `Playground.spawn_player` steps a spawn to the nearest free point on two rings of eight at `SPAWN_SPACING` (1.5 m) (`_clear_of_players`), which stays on the smallest start pad; past seventeen people the centre is shared. Every start here is one point, and without this two players joining stood inside each other's heads.

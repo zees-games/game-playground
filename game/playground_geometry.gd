@@ -35,6 +35,10 @@ const COLOUR_PLATFORM := Color(0.82, 0.74, 1.00)
 const COLOUR_BOOST := Color(1.00, 0.78, 0.22)
 ## pg_bhop_intro's float: columns standing in a low-gravity zone, which is invisible.
 const COLOUR_FLOAT := Color(0.48, 0.90, 0.90)
+## pg_lobby's relay: a gate's frame, and the see-through pane inside it that a player jumps
+## into to be teleported (a TELEPORT zone, which is as invisible as the float's gravity).
+const COLOUR_GATE := Color(0.86, 0.42, 1.00)
+const COLOUR_GATE_PANE := Color(0.86, 0.42, 1.00, 0.30)
 
 ## Kenney's Prototype Textures (CC0): the light grid with white lines for every surface,
 ## and the light tiles for the floor colour, so the ground a player crosses reads as ground
@@ -79,6 +83,24 @@ static func box(
 	parent.add_child(body)
 
 	return body
+
+
+## A box that is drawn and nothing else: no body, no collision.
+##
+## For what a map shows without being ground: a gate's frame and its pane. Not a
+## `StaticBody3D`, so `PlaygroundMapSurvey` (which reads bodies) never sees one and a
+## player passes through it.
+static func panel(
+	parent: Node3D, at: Vector3, size: Vector3, colour: Color = COLOUR_FLOOR
+) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var box_mesh := BoxMesh.new()
+	box_mesh.size = size
+	mesh.mesh = box_mesh
+	mesh.material_override = _material(colour)
+	mesh.position = at
+	parent.add_child(mesh)
+	return mesh
 
 
 ## One material per colour, shared by every box of that colour: the client draws with the

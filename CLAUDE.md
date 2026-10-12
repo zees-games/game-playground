@@ -67,7 +67,7 @@ Short forms; the reasoning is in the linked file.
 - Apply the movement style and the timer style together (`PlaygroundPlayer.set_style`); never write the live tunables (a style rebuild drops it). [simulation](docs/simulation.md#a-style-has-two-halves-and-they-move-together)
 - The timer decides and the game acts. Effects that move a player are applied on the tick, read at the state's own position (`effect_zone_at`), never from `timer.effect()`. [simulation](docs/simulation.md#the-timer-decides-and-the-game-acts)
 - Effect zones (PUSH, GRAVITY) are not track-filtered; that is dot-timer's and an open question. [simulation](docs/simulation.md#the-timer-decides-and-the-game-acts)
-- Teleport through `PlaygroundPlayer.teleport`; a yaw written into the state lasts until the next command. Facing is `atan2(-dx, -dz)`. [simulation](docs/simulation.md#teleport-and-the-spawn-yaw)
+- Teleport through `PlaygroundPlayer.teleport`; a yaw written into the state lasts until the next command. Facing is `atan2(-dx, -dz)`. It stops the run; only a map's TELEPORT zone passes `keep_run`. [simulation](docs/simulation.md#teleport-and-the-spawn-yaw)
 - Reach comes from `PlaygroundMap.jump_reach` / `climb_limit`, never from `DotFpsTunables.new()`. [simulation](docs/simulation.md#the-movement-is-a-bhop-servers-not-the-addons-defaults)
 - `sv_tickrate` goes in `server.cfg`; no `pg_tickrate`. [simulation](docs/simulation.md#the-tick-rate-comes-from-servercfg-and-every-link-is-silent)
 - Zone commands are `CHANGEMAP`; saving a set with a problem is refused. [simulation](docs/simulation.md#the-server-module)

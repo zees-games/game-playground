@@ -372,6 +372,58 @@ const LAUNCH_FINISH := Vector2(6.0, 6.0)
 ## The reset: the air just above the plate under the decks.
 const LAUNCH_FLOOR_Y := 1.2
 
+# --- Bonus 6: the relay ------------------------------------------------------
+#
+# [b]The first route here that is three places rather than one.[/b] Three short legs of
+# columns stand side by side north of the middle, each 4 m higher than the last and
+# running the other way, and nothing joins them but a gate: a frame hanging in the air
+# [constant RELAY_GATE_GAP] past a leg's last deck, holding a dot-timer TELEPORT zone
+# that puts the player on the next leg's pad, stopped dead (the controller's teleport
+# zeroes the velocity) and turned round to face along it (the zone's destination yaw).
+# So it asks what no other course does: start again from standing, facing somewhere
+# you were not, twice in one run. The legs are 10 m apart and 2.5 m apart in height, so
+# no jump joins them; and a gate is entered by jumping at it, because a player who walks
+# off the deck falls under its sill before reaching it. They are the first TELEPORT
+# zones on any map here; `Playground._on_effect_requested` has applied the kind since
+# it was written.
+
+## The track bonus 6 runs on.
+const RELAY_TRACK := DotTimerTrack.BONUS_FIRST + 5
+
+## The west end every leg starts or finishes at, each leg's line (z), and the top of
+## each leg's pad. Leg 0 and leg 2 run east (+X), leg 1 west. North of the middle, clear
+## of the movement corner's steep ramp (z 35 and under), the jump course (x 56 on) and
+## the circuit's inner kerb (z 74 on).
+const RELAY_WEST_X := 10.0
+const RELAY_Z: Array[float] = [46.0, 56.0, 66.0]
+const RELAY_BASE_Y: Array[float] = [2.0, 6.0, 10.0]
+
+## A pad (where a leg starts, or a gate lands you) and a deck: length along the leg,
+## width across it.
+const RELAY_PAD := Vector2(4.0, 4.0)
+const RELAY_DECK := Vector2(3.0, 3.0)
+
+## The clear air before each deck of a leg, and how much higher each deck is than the
+## one before it.
+const RELAY_GAPS: Array[float] = [2.4, 2.7, 3.0]
+const RELAY_RISE := 0.5
+
+## The gate past a leg's last deck: the air before it, its depth along the leg, the
+## opening's height above the deck's top, and how far under the deck's top its sill is.
+## A walk-off at `MOVE_SPEED` has fallen `0.5 g (gap / v)^2` = 1.28 m by the gate, past
+## the sill; a jump is 0.6 m or more over the deck there.
+const RELAY_GATE_GAP := 2.5
+const RELAY_GATE_DEPTH := 1.0
+const RELAY_GATE_HEIGHT := 3.0
+const RELAY_GATE_SILL := 0.5
+
+## The last leg's finish: the air before it (and RELAY_RISE up), its length and width.
+const RELAY_FINISH_GAP := 3.0
+const RELAY_FINISH := Vector2(4.0, 4.0)
+
+## The reset: the air just above the plate under all three legs.
+const RELAY_FLOOR_Y := 1.2
+
 
 func _build() -> void:
 	PlaygroundGeometry.light(self)
@@ -406,6 +458,7 @@ func _build() -> void:
 	_build_circuit()
 	_build_stones()
 	_build_launch()
+	_build_relay()
 
 
 ## The movement corner's steep ramp: past `max_slope_angle`, so it is only ever surfed.
@@ -903,6 +956,7 @@ static func build_zones() -> DotTimerZoneSet:
 	_add_circuit_zones(zones)
 	_add_stones_zones(zones)
 	_add_launch_zones(zones)
+	_add_relay_zones(zones)
 
 	return zones
 
@@ -1482,5 +1536,211 @@ static func _add_launch_zones(zones: DotTimerZoneSet) -> void:
 	reset.set_box(
 		Vector3(LAUNCH_X - 10.0, 0.0, pad.position.z - 4.0),
 		Vector3(LAUNCH_X + 10.0, LAUNCH_FLOOR_Y, finish.end.z + 4.0)
+	)
+	zones.add(reset)
+
+
+# --- Bonus 6: the relay ------------------------------------------------------
+
+## Builds the three legs, each box a column from the plate, and a gate past the end of the
+## first two: a frame and a see-through pane, drawn and nothing else (no body), so the
+## survey never sees one and a player passes through the frame.
+func _build_relay() -> void:
+	for leg in range(RELAY_Z.size()):
+		var boxes := relay_leg(leg)
+		var last := leg == RELAY_Z.size() - 1
+
+		for i in range(boxes.size()):
+			var box: AABB = boxes[i]
+			if i == boxes.size() - 1 and not last:
+				_build_relay_gate(box)
+				continue
+
+			var colour := PlaygroundGeometry.COLOUR_PLATFORM
+			if i == 0:
+				colour = PlaygroundGeometry.COLOUR_START
+			elif i == boxes.size() - 1:
+				colour = PlaygroundGeometry.COLOUR_END
+			PlaygroundGeometry.box(self, box.get_center(), box.size, colour)
+
+
+## A gate standing over [param gate]'s footprint (the opening the zone fills): two posts,
+## a lintel, a sill and the pane between them.
+func _build_relay_gate(gate: AABB) -> void:
+	var zone := relay_gate_zone(gate)
+	var bar := 0.3
+	var mid := zone.get_center()
+	var across := zone.size.z
+	var along := zone.size.x
+
+	for side in [-1.0, 1.0]:
+		PlaygroundGeometry.panel(
+			self, Vector3(mid.x, mid.y, mid.z + side * (across + bar) * 0.5),
+			Vector3(along * 0.4, zone.size.y + bar * 2.0, bar), PlaygroundGeometry.COLOUR_GATE
+		)
+	for end_y in [zone.position.y - bar * 0.5, zone.end.y + bar * 0.5]:
+		PlaygroundGeometry.panel(
+			self, Vector3(mid.x, end_y, mid.z),
+			Vector3(along * 0.4, bar, across + bar * 2.0), PlaygroundGeometry.COLOUR_GATE
+		)
+	PlaygroundGeometry.panel(
+		self, mid, Vector3(0.08, zone.size.y, across), PlaygroundGeometry.COLOUR_GATE_PANE
+	)
+
+
+## +1 for a leg that runs east, -1 for one that runs west.
+static func relay_direction(leg: int) -> float:
+	return 1.0 if leg % 2 == 0 else -1.0
+
+
+## Leg [param leg] as the boxes a player lands on, in order: its pad, its decks, and then
+## either the gate (legs 0 and 1: a column whose top is level with the last deck, standing
+## for the opening, so a jump into it is measured like any other jump) or the finish.
+## Walked edge to edge from the leg's start end, so a gap is the number in the constants.
+static func relay_leg(leg: int) -> Array[AABB]:
+	var lengths: Array[float] = [RELAY_PAD.x]
+	var widths: Array[float] = [RELAY_PAD.y]
+	var gaps: Array[float] = [0.0]
+	var tops: Array[float] = [RELAY_BASE_Y[leg]]
+
+	for i in range(RELAY_GAPS.size()):
+		lengths.append(RELAY_DECK.x)
+		widths.append(RELAY_DECK.y)
+		gaps.append(RELAY_GAPS[i])
+		tops.append(tops[tops.size() - 1] + RELAY_RISE)
+
+	if leg == RELAY_Z.size() - 1:
+		lengths.append(RELAY_FINISH.x)
+		widths.append(RELAY_FINISH.y)
+		gaps.append(RELAY_FINISH_GAP)
+		tops.append(tops[tops.size() - 1] + RELAY_RISE)
+	else:
+		lengths.append(RELAY_GATE_DEPTH)
+		widths.append(RELAY_DECK.y)
+		gaps.append(RELAY_GATE_GAP)
+		tops.append(tops[tops.size() - 1])
+
+	var total := 0.0
+	for i in range(lengths.size()):
+		total += gaps[i] + lengths[i]
+
+	var dir := relay_direction(leg)
+	var origin := RELAY_WEST_X if dir > 0.0 else RELAY_WEST_X + total
+	var near := 0.0
+	var out: Array[AABB] = []
+
+	for i in range(lengths.size()):
+		near += gaps[i]
+		var x0 := origin + near if dir > 0.0 else origin - near - lengths[i]
+		out.append(AABB(
+			Vector3(x0, 0.0, RELAY_Z[leg] - widths[i] * 0.5),
+			Vector3(lengths[i], tops[i], widths[i])
+		))
+		near += lengths[i]
+
+	return out
+
+
+## Bonus 6 as one list, leg after leg: what the drive bot walks. The gate of leg 0 is
+## followed by leg 1's pad, which no jump reaches; the gate is what joins them.
+static func relay_route() -> Array[AABB]:
+	var route: Array[AABB] = []
+	for leg in range(RELAY_Z.size()):
+		route.append_array(relay_leg(leg))
+	return route
+
+
+## The indexes in [method relay_route] of the two gates.
+static func relay_gates() -> Array[int]:
+	var out: Array[int] = []
+	var at := -1
+	for leg in range(RELAY_Z.size() - 1):
+		at += relay_leg(leg).size()
+		out.append(at)
+	return out
+
+
+## The volume a gate's TELEPORT zone fills: the gate column's footprint, from
+## [constant RELAY_GATE_SILL] under its top to [constant RELAY_GATE_HEIGHT] over it.
+static func relay_gate_zone(gate: AABB) -> AABB:
+	return AABB(
+		Vector3(gate.position.x, gate.end.y - RELAY_GATE_SILL, gate.position.z),
+		Vector3(gate.size.x, RELAY_GATE_SILL + RELAY_GATE_HEIGHT, gate.size.z)
+	)
+
+
+## Where a player is put on leg [param leg]'s pad: a metre and a half in from its start
+## end, over the middle.
+static func relay_arrival(leg: int) -> Vector3:
+	var pad: AABB = relay_leg(leg)[0]
+	var dir := relay_direction(leg)
+	var x := pad.position.x + 1.5 if dir > 0.0 else pad.end.x - 1.5
+	return Vector3(x, pad.end.y + 1.0, RELAY_Z[leg])
+
+
+## The yaw facing along leg [param leg] (`atan2(-dx, -dz)`): -90 east, 90 west.
+static func relay_yaw(leg: int) -> float:
+	return rad_to_deg(atan2(-relay_direction(leg), -0.0))
+
+
+## Bonus 6's zones, from the same `relay_leg` the columns are built from.
+static func _add_relay_zones(zones: DotTimerZoneSet) -> void:
+	var track := RELAY_TRACK
+	var legs := RELAY_Z.size()
+
+	var spawn := DotTimerZone.make(DotTimerZone.Kind.SPAWN, track)
+	spawn.destination = relay_arrival(0)
+	spawn.destination_yaw = relay_yaw(0)
+	zones.add(spawn)
+
+	# The whole first pad: the clock starts on leaving it.
+	var pad: AABB = relay_leg(0)[0]
+	var start := DotTimerZone.make(DotTimerZone.Kind.START, track)
+	start.set_box(
+		Vector3(pad.position.x, pad.end.y - 0.5, pad.position.z),
+		Vector3(pad.end.x, pad.end.y + 5.0, pad.end.z)
+	)
+	zones.add(start)
+
+	for leg in range(1, legs):
+		var before := relay_leg(leg - 1)
+		var gate := relay_gate_zone(before[before.size() - 1])
+
+		# The gate: into the opening, onto the next leg's pad, facing along it.
+		var teleport := DotTimerZone.make(DotTimerZone.Kind.TELEPORT, track)
+		teleport.destination = relay_arrival(leg)
+		teleport.destination_yaw = relay_yaw(leg)
+		teleport.set_box(gate.position, gate.end)
+		zones.add(teleport)
+
+		# A split on the pad the gate lands on, which nothing else reaches: a slab over
+		# the pad from under its top to well over the arrival point.
+		var arrival: AABB = relay_leg(leg)[0]
+		var stage := DotTimerZone.make(DotTimerZone.Kind.STAGE, track)
+		stage.number = float(leg)
+		stage.set_box(
+			Vector3(arrival.position.x, arrival.end.y - 0.5, arrival.position.z),
+			Vector3(arrival.end.x, arrival.end.y + 4.0, arrival.end.z)
+		)
+		zones.add(stage)
+
+	# Deep, for `thin_zones`' reason, like every finish here.
+	var last := relay_leg(legs - 1)
+	var finish: AABB = last[last.size() - 1]
+	var end := DotTimerZone.make(DotTimerZone.Kind.END, track)
+	end.set_box(
+		Vector3(finish.position.x, finish.end.y - 1.0, finish.position.z),
+		Vector3(finish.end.x, finish.end.y + 5.0, finish.end.z)
+	)
+	zones.add(end)
+
+	# The plate under all three legs, on bonus 6's track only.
+	var under := AABB(pad.position, Vector3.ZERO)
+	for box in relay_route():
+		under = under.merge(box)
+	var reset := DotTimerZone.make(DotTimerZone.Kind.RESPAWN, track)
+	reset.set_box(
+		Vector3(under.position.x - 4.0, 0.0, under.position.z - 4.0),
+		Vector3(under.end.x + 4.0, RELAY_FLOOR_Y, under.end.z + 4.0)
 	)
 	zones.add(reset)

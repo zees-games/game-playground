@@ -10,6 +10,7 @@ Every timed route on the three hand-built maps, the question each one asks, and 
 | `pg_lobby` | bonus 3 | the circuit | a driven lap ([vehicles.md](vehicles.md#the-circuit)) |
 | `pg_lobby` | bonus 4 | the stepping stones | can you **stop**: shrinking columns a flat-out jump overshoots |
 | `pg_lobby` | bonus 5 | the launch | ride what the map does to you: PUSH boosters, no step is a jump |
+| `pg_lobby` | bonus 6 | the relay | start again: three legs joined only by TELEPORT gates, each landing you stopped and turned round |
 | `pg_surf_intro` | main | the ramps | (see below: level along their length) |
 | `pg_surf_intro` | bonus 1 | the plunge | a 52° face pitched along the route; hold forward |
 | `pg_surf_intro` | bonus 2 | the cascade | jumping **down**: a drop makes a jump longer |
@@ -23,7 +24,7 @@ Every timed route on the three hand-built maps, the question each one asks, and 
 | `pg_bhop_intro` | bonus 5 | the float | re-learn a jump inside a 0.4 GRAVITY zone |
 | `pg_bhop_intro` | bonus 6 | the drop | the ladder turned over: 3 m down every jump |
 
-The track constants (`STONES_TRACK`, `LAUNCH_TRACK`, `CASCADE_TRACK`, `BANK_TRACK`, `TRANSFER_TRACK`, `LADDER_TRACK`, `FLOAT_TRACK`, `DROP_TRACK` …) are on the map scripts. When a route is added, the track-count expectations in other sections of `headless_playground` change with it. New routes go where nothing else is: each map's route notes in its script say what space is taken (the lobby's vehicle tests use the empty corner at (-60, -60)).
+The track constants (`STONES_TRACK`, `LAUNCH_TRACK`, `RELAY_TRACK`, `CASCADE_TRACK`, `BANK_TRACK`, `TRANSFER_TRACK`, `LADDER_TRACK`, `FLOAT_TRACK`, `DROP_TRACK` …) are on the map scripts. When a route is added, the track-count expectations in other sections of `headless_playground` change with it. New routes go where nothing else is: each map's route notes in its script say what space is taken (the lobby's vehicle tests use the empty corner at (-60, -60)).
 
 ## Rules every route follows
 
@@ -60,6 +61,8 @@ A distance or descent that is only asserted is one nobody reads once it passes, 
 **Stepping stones (`pg_lobby` bonus 4).** Ten columns shrinking 2.0 → 1.0 m, each 0.25 m higher, alternating 1 m either side; every gap plus stone is under a flat-out jump's reach (the suite asserts the overshoot for every stone), so each landing means taking speed off in the air.
 
 **The launch (`pg_lobby` bonus 5).** Amber boosters (`COLOUR_BOOST`) with a 1 m PUSH zone at 100 m/s² up: a walk-on leaves at `sqrt(2 (a - g) h)` and peaks `a h / g` = 5 m over the deck (`launch_apex()`); `launch_reach(rise)` is the closed form. The first two steps are 3 m up and the last is level but 6 m out, so no step is a jump and every one is inside the throw. The bot never presses jump.
+
+**The relay (`pg_lobby` bonus 6).** Three legs of columns north of the middle (z 46, 56, 66; x 10 to 38), pads at 2, 6 and 10 m, leg 1 running west and the others east; each a pad, three decks `RELAY_RISE` (0.5 m) up over 2.4-3.0 m gaps, and then either a gate or the finish. A gate is a frame drawn with no body (`PlaygroundGeometry.panel`) hanging `RELAY_GATE_GAP` (2.5 m) past the last deck, holding a dot-timer **TELEPORT** zone (the first on any map here) that puts the player on the next pad, stopped (the controller's teleport zeroes the velocity) and facing along the new leg (`destination_yaw`). The legs are 6 m of air and 2.5 m of height apart, so no jump joins them; a walk-off falls 1.28 m by the gate, under its 0.5 m sill, so a gate is jumped into. In `relay_route()` a gate is a column level with the last deck, so `_check_route_reach` measures the jump into it; the gate-to-pad step is skipped (`relay_gates()`). Splits are on the pads a gate lands on, which nothing else reaches. **A gate keeps the run** (`PlaygroundPlayer.teleport(..., keep_run)`, from `_on_effect_requested` only): every other teleport stops it, and this route's first drive was stopped at the first gate. The survey takes a TELEPORT's destination as a spawn. Not yet driven over the wire: the gates are the server's act, and a connected client's prediction across one is not measured.
 
 **The plunge (`pg_surf_intro` bonus 1).** One face pitched 52° (past 46°) descending along the route, same start height as the main run so the two times compare. Straight on purpose: the bot holds forward and nothing else. A route that needs speed *carried* round a turn (a surf bank) is still not drivable by a scripted bot; one that only needs *facing* somewhere new is.
 

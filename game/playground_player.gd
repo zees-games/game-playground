@@ -549,7 +549,7 @@ func set_style(movement: DotFpsStyle, ranking: DotTimerStyle) -> DotResult:
 ## Moves the player, cancelling any run.
 ##
 ## Used by a respawn zone, a teleport zone, an admin, and the spawn on map load.
-func teleport(to: Vector3, yaw: float = INF) -> void:
+func teleport(to: Vector3, yaw: float = INF, keep_run: bool = false) -> void:
 	_teleported = true
 	# [b]Through the controller's own teleport, and then the view is told too.[/b]
 	#
@@ -590,8 +590,10 @@ func teleport(to: Vector3, yaw: float = INF) -> void:
 	global_position = to
 
 	# The run goes with it. A teleport that kept the clock running is the simplest
-	# possible cheat on any timed map, and a respawn zone is a teleport.
-	if timer != null:
+	# possible cheat on any timed map, and a respawn zone is a teleport. The one exception
+	# is [param keep_run]: a map's own TELEPORT zone on the player's track, which the timer
+	# asked for (it is part of the route: pg_lobby's relay gates) and already expects.
+	if timer != null and not keep_run:
 		timer.stop(DotTimer.REASON_TELEPORT)
 
 

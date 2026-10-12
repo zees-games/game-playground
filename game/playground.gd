@@ -2936,7 +2936,9 @@ func _on_effect_requested(player_id: StringName, zone: DotTimerZone) -> void:
 		DotTimerZone.Kind.RESPAWN:
 			spawn_player(player_id)
 		DotTimerZone.Kind.TELEPORT:
-			player.teleport(zone.destination, zone.destination_yaw)
+			# Part of the route (the timer only asks for a zone on the player's own track,
+			# pg_lobby's relay gates), so the run is kept: a respawn is the one that ends it.
+			player.teleport(zone.destination, zone.destination_yaw, true)
 		DotTimerZone.Kind.SLAY:
 			spawn_player(player_id)
 		_:

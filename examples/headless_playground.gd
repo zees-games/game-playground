@@ -59,13 +59,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 910
+const CHECKS := 931
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 48
+const SECTIONS := 49
 
 var _passed := 0
 var _failed := 0
@@ -157,6 +157,7 @@ func _run() -> void:
 	await _test_the_transfer()
 	await _test_the_stepping_stones()
 	await _test_the_launch()
+	await _test_the_relay()
 	await _test_the_ladder()
 	await _test_the_float()
 	await _test_the_drop()
@@ -1874,6 +1875,7 @@ func _drive_route(
 	var finished: Array[bool] = [false]
 	var splits: Array[int] = []
 	var respawns: Array[int] = [0]
+	var teleports: Array[int] = [0]
 
 	var on_start := func(_run: DotTimerRun) -> void: started[0] = true
 	var on_stage := func(number: int, _split: float) -> void: splits.append(number)
@@ -1881,6 +1883,8 @@ func _drive_route(
 	var on_effect := func(id: StringName, zone: DotTimerZone) -> void:
 		if id == player.player_id and zone.kind == DotTimerZone.Kind.RESPAWN:
 			respawns[0] += 1
+		if id == player.player_id and zone.kind == DotTimerZone.Kind.TELEPORT:
+			teleports[0] += 1
 
 	player.timer.run_started.connect(on_start)
 	player.timer.stage_reached.connect(on_stage)
@@ -2008,6 +2012,7 @@ func _drive_route(
 		"reached": reached,
 		"ticks": ticks,
 		"respawns": respawns[0],
+		"teleports": teleports[0],
 		"walked": walked,
 		"distance": distance,
 		"top_speed": top_speed,
@@ -3863,8 +3868,9 @@ func _test_the_sandbox_and_its_course() -> void:
 			PgLobby.CIRCUIT_TRACK,
 			PgLobby.STONES_TRACK,
 			PgLobby.LAUNCH_TRACK,
+			PgLobby.RELAY_TRACK,
 		],
-		"the game can see all six tracks without being told about them",
+		"the game can see all seven tracks without being told about them",
 		str(tracks)
 	)
 
@@ -6302,6 +6308,196 @@ func _test_the_launch() -> void:
 	_done()
 
 
+# --- The relay ----------------------------------------------------------------
+
+## A relay drive's pace floor, as a fraction of `MOVE_SPEED`; see `_check_pace`. Measured
+## 6.36 m/s (91%, the stops at the gates included), so the floor sits just under it.
+const RELAY_PACE_FLOOR := 0.88
+
+
+## `pg_lobby`'s bonus 6, driven start to finish.
+##
+## [b]Three legs joined by nothing but two gates[/b], dot-timer TELEPORT zones hanging past
+## the end of a leg that put the player on the next one, stopped and turned round. So the
+## checks are what makes that true: no jump joins two legs; each gate's destination is
+## over the next pad, facing along a leg that runs the other way; a walk-off falls under a
+## gate's sill and a jump goes through it; and a bot that faces the next box and jumps is
+## put through both gates, both splits and the finish, counted teleport by teleport.
+func _test_the_relay() -> void:
+	print("")
+	_section("the relay — pg_lobby's bonus 6, three legs joined only by two gates")
+
+	var loaded: DotResult = await playground.change_map(&"pg_lobby")
+	_check(loaded.ok, "the sandbox loads",
+		loaded.error.message if not loaded.ok else "")
+
+	var track := PgLobby.RELAY_TRACK
+	var zones := PgLobby.build_zones()
+	var kinds := {
+		"start": zones.of_kind(DotTimerZone.Kind.START, track).size(),
+		"end": zones.of_kind(DotTimerZone.Kind.END, track).size(),
+		"spawn": zones.of_kind(DotTimerZone.Kind.SPAWN, track).size(),
+		"respawn": zones.of_kind(DotTimerZone.Kind.RESPAWN, track).size(),
+		"stage": zones.of_kind(DotTimerZone.Kind.STAGE, track).size(),
+		"teleport": zones.of_kind(DotTimerZone.Kind.TELEPORT, track).size(),
+	}
+	_check(
+		kinds == {"start": 1, "end": 1, "spawn": 1, "respawn": 1, "stage": 2, "teleport": 2}
+			and zones.route_tracks().has(track) and zones.route_problems().is_empty(),
+		"bonus 6 has a start, a finish, a spawn, a respawn, two splits and two gates, on its own track",
+		"%s %s" % [str(kinds), ", ".join(zones.route_problems())]
+	)
+
+	# Every jump inside a leg (the jump into a gate included: a gate is a column level with
+	# the deck before it) is inside the climbing reach. The step from a gate to the next
+	# pad is skipped: it is not a jump, and the next check says it cannot be one.
+	var route := PgLobby.relay_route()
+	var gates := PgLobby.relay_gates()
+	_check_route_reach(route, "the relay", gates)
+
+	# What makes it this route: no deck of one leg can be jumped to from any deck of the
+	# leg before it, so the gate is the only way on.
+	var joined := PackedStringArray()
+	var closest := INF
+	for leg in range(1, PgLobby.RELAY_Z.size()):
+		for a in PgLobby.relay_leg(leg - 1):
+			for b in PgLobby.relay_leg(leg):
+				var gap := PgLobby.gap_between(a, b)
+				var rise := b.end.y - a.end.y
+				closest = minf(closest, gap)
+				if rise <= PgLobby.climb_limit() and gap <= PgLobby.jump_reach(rise):
+					joined.append("leg %d to leg %d: %.2f m, %.2f m up" % [leg - 1, leg, gap, rise])
+	print("    the relay: the legs are %.2f m of air apart at their closest, %.1f m up a leg; a jump reaches %.2f m on the level" % [
+		closest, PgLobby.RELAY_BASE_Y[1] - PgLobby.RELAY_BASE_Y[0], PgLobby.jump_reach(0.0)])
+	_check(joined.is_empty(), "no jump joins one leg to the next: only the gate does", ", ".join(joined))
+
+	# Each gate: its zone fills the opening past the leg's last deck, and puts the player
+	# over the next pad facing along a leg that runs the other way.
+	var teleports := zones.of_kind(DotTimerZone.Kind.TELEPORT, track)
+	var aimed := PackedStringArray()
+	for i in range(teleports.size()):
+		var zone: DotTimerZone = teleports[i]
+		var leg_before := PgLobby.relay_leg(i)
+		var opening := PgLobby.relay_gate_zone(leg_before[leg_before.size() - 1])
+		var pad: AABB = PgLobby.relay_leg(i + 1)[0]
+		var yaw := deg_to_rad(zone.destination_yaw)
+		var facing := Vector3(-sin(yaw), 0.0, -cos(yaw))
+		var along := Vector3(PgLobby.relay_direction(i + 1), 0.0, 0.0)
+		if (
+			not zone.from.is_equal_approx(opening.position) or not zone.to.is_equal_approx(opening.end)
+			or not _over(zone.destination, pad) or zone.destination.y <= pad.end.y
+			or facing.dot(along) < 0.99
+			or PgLobby.relay_direction(i + 1) == PgLobby.relay_direction(i)
+		):
+			aimed.append("gate %d: %s..%s to %s facing %.0f" % [
+				i, str(zone.from), str(zone.to), str(zone.destination), zone.destination_yaw])
+	_check(aimed.is_empty(),
+		"each gate fills its opening and lands on the next pad, turned round to face along it",
+		"; ".join(aimed))
+
+	# A gate is jumped into: walking off the deck at full speed falls under the sill
+	# before the gate, and a running jump is inside the opening there.
+	var g := PgLobby.MOVE_GRAVITY
+	var air := PgLobby.RELAY_GATE_GAP / PgLobby.MOVE_SPEED
+	var walked_off := 0.5 * g * air * air
+	var up := sqrt(2.0 * g * PgLobby.JUMP_HEIGHT)
+	var jumped := up * air - 0.5 * g * air * air
+	var far := (PgLobby.RELAY_GATE_GAP + PgLobby.RELAY_GATE_DEPTH) / PgLobby.MOVE_SPEED
+	var jumped_far := up * far - 0.5 * g * far * far
+	print("    the relay: at a gate a walk-off is %.2f m down (sill %.2f); a running jump %.2f m up, %.2f m at its far side (opening %.1f)" % [
+		walked_off, PgLobby.RELAY_GATE_SILL, jumped, jumped_far, PgLobby.RELAY_GATE_HEIGHT])
+	_check(
+		walked_off > PgLobby.RELAY_GATE_SILL
+			and jumped > -PgLobby.RELAY_GATE_SILL and jumped < PgLobby.RELAY_GATE_HEIGHT
+			and jumped_far > -PgLobby.RELAY_GATE_SILL,
+		"a gate is missed by walking off the deck and made by jumping at it",
+		"walk-off %.2f m down; jump %.2f m, %.2f m" % [walked_off, jumped, jumped_far]
+	)
+
+	var reset := zones.first_of_kind(DotTimerZone.Kind.RESPAWN, track)
+	var covered := true
+	for box in route:
+		if reset.to.y > PgLobby.RELAY_BASE_Y[0] - 0.5 or reset.from.x > box.position.x \
+				or reset.to.x < box.end.x or reset.from.z > box.position.z \
+				or reset.to.z < box.end.z:
+			covered = false
+	_check(covered, "and its reset is the air on the plate under all three legs, below every deck",
+		"reset %s..%s" % [str(reset.from), str(reset.to)])
+
+	var player := playground.add_player(&"bot", "Bot")
+	_check(player.timer.set_track(track), "the relay's track switches")
+	playground.spawn_player(&"bot")
+	await get_tree().physics_frame
+
+	var spawn := zones.first_of_kind(DotTimerZone.Kind.SPAWN, track)
+	_check(
+		player.global_position.distance_to(spawn.destination) < 0.5,
+		"and puts the bot on its pad",
+		"%.2f m away" % player.global_position.distance_to(spawn.destination)
+	)
+
+	await _the_spawn_yaw_survives_a_tick(player, spawn)
+
+	# The route's length is the three legs' own, from where the bot is put on each.
+	var length := 0.0
+	for leg in range(PgLobby.RELAY_Z.size()):
+		var from := player.global_position if leg == 0 else PgLobby.relay_arrival(leg)
+		length += _route_length(from, PgLobby.relay_leg(leg))
+
+	# A gate is part of the route: the run goes through it. Every other teleport here
+	# stops the run (`PlaygroundPlayer.teleport`), which this route found.
+	var stops: Array[String] = []
+	var on_stop := func(_run: DotTimerRun, reason: StringName) -> void:
+		stops.append("%s at %s" % [reason, str(player.global_position)])
+	player.timer.run_stopped.connect(on_stop)
+	var drive: Dictionary = await _drive_route(player, route, 4000, 0.3)
+	player.timer.run_stopped.disconnect(on_stop)
+
+	print("    the relay: box %d of %d, splits %s, finish %s, %d ticks, %d teleports, %d respawns" % [
+		int(drive["reached"]), route.size() - 1, str(drive["splits"]),
+		str(drive["finished"]), int(drive["ticks"]), int(drive["teleports"]),
+		int(drive["respawns"]),
+	])
+	var pace := _print_pace(
+		"the relay", float(drive["distance"]), length, int(drive["ticks"]),
+		PgLobby.MOVE_SPEED, float(drive["top_speed"])
+	)
+	_check_pace("the relay", float(drive["distance"]), length, pace, PgLobby.MOVE_SPEED, RELAY_PACE_FLOOR)
+	_print_where("the relay", "decks", drive["tally"],
+		route[route.size() - 1].end.y - route[0].end.y)
+	_check_where("the relay", "decks", drive["tally"])
+
+	_check(drive["started"], "leaving the pad starts a run on bonus 6")
+	_check(stops.is_empty(), "and nothing stops it on the way, the gates included", ", ".join(stops))
+	_check(
+		int(drive["teleports"]) == 2,
+		"both gates put it on the next leg, and nothing else moved it",
+		"%d teleports" % int(drive["teleports"])
+	)
+	_check(
+		drive["splits"] == [1, 2],
+		"it reaches both splits, each on the pad a gate lands on, in order",
+		str(drive["splits"])
+	)
+	_check(
+		drive["finished"],
+		"and the finish: the relay runs end to end, through both gates",
+		"got to box %d of %d at (%.1f, %.1f, %.1f) in %d ticks"
+			% [int(drive["reached"]), route.size() - 1,
+				player.global_position.x, player.global_position.y,
+				player.global_position.z, int(drive["ticks"])]
+	)
+	_check(
+		int(drive["respawns"]) == 0,
+		"without once being put back on the pad",
+		"%d respawns" % int(drive["respawns"])
+	)
+	_check(not player.timer.run.is_active(), "and the run is over rather than still running")
+
+	playground.remove_player(&"bot")
+	_done()
+
+
 # --- The ladder ---------------------------------------------------------------
 
 ## `pg_bhop_intro`'s bonus 4, driven start to finish.
@@ -6795,7 +6991,10 @@ func _test_the_maps_are_surveyed() -> void:
 		var zones: DotTimerZoneSet = script.build_zones()
 		var spawns: Array[Vector3] = [map.fallback_spawn]
 		for zone in zones.zones:
-			if zone.kind == DotTimerZone.Kind.SPAWN:
+			# A TELEPORT's destination is a place a player is put, like a spawn: pg_lobby's
+			# relay legs are joined by nothing else, which the survey (walks, drops, slides,
+			# jumps) does not model.
+			if zone.kind in [DotTimerZone.Kind.SPAWN, DotTimerZone.Kind.TELEPORT]:
 				spawns.append(zone.destination)
 
 		var declared: Array = map.survey_declared()

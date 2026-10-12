@@ -470,6 +470,15 @@ func _shots_for(id: String) -> Array[Dictionary]:
 		# pad, where the boosters read as the way on.
 		{"name": "pg_lobby_launch", "from": Vector3(-24, 11.0, 23), "at": Vector3(-50, 5.0, 23)},
 		{"name": "pg_lobby_launch_start", "from": Vector3(-40, 13.0, -8), "at": Vector3(-50, 4.0, 22)},
+
+		# Bonus 6, the relay: three legs at z 46, 56 and 66 between x 10 and 38, pads at 2,
+		# 6 and 10 m, the first two ending in a violet gate hanging in the air. From the
+		# south-east and above, so the three tiers and both gates are in one frame; and from
+		# behind the first pad and north of the line at a little over head height, looking up
+		# the first leg at its gate, which is what a player sees before the first teleport
+		# (from the south the movement corner's steep ramp fills half the frame).
+		{"name": "pg_lobby_relay", "from": Vector3(52, 22.0, 24), "at": Vector3(24, 6.0, 56)},
+		{"name": "pg_lobby_relay_start", "from": Vector3(5, 7.0, 51), "at": Vector3(32, 3.0, 45)},
 	]
 
 
