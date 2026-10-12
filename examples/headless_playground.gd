@@ -59,7 +59,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 907
+const CHECKS := 909
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -4686,6 +4686,23 @@ func _test_vehicles() -> void:
 	_check(foot > 7.0 and foot < 14.0, "the brake stops the buggy from 50 km/h in metres, not on the spot",
 		"%.2f m" % foot)
 	_check(hand > 6.8 and hand < 16.0, "and so does the handbrake", "%.2f m" % hand)
+	# S: the brake while the buggy still rolls forward, reverse once it has stopped
+	# (dot-vehicle's `brake_then_reverse`). On reverse thrust alone it was the engine's 35 %
+	# against a brake several times that.
+	var back := await _stopping(vehicle, at, &"bot", BACK_KEY)
+	var reverse := DotFpsCommand.new()
+	reverse.move = Vector2(0.0, -1.0)
+	var stopped_at := vehicle.position()
+	await _drive(&"bot", reverse, 192)
+	var heading := -(vehicle.node as Node3D).global_transform.basis.z
+	var backed := -(vehicle.position() - stopped_at).dot(heading)
+	print("  ..    the buggy from 50 km/h on S: %.2f m to a stop, then %.2f m back at %.2f m/s after 1.5 s more" % [back, backed, vehicle.forward_speed()])
+	_check(back < foot + 1.5, "S stops the buggy like the brake while it rolls forward, not on reverse thrust",
+		"%.2f m against the brake's %.2f m" % [back, foot])
+	_check(vehicle.forward_speed() < -1.0 and backed > 1.0, "and once it has stopped, S held reverses it",
+		"%.2f m/s, %.2f m back" % [vehicle.forward_speed(), backed])
+	# Stood still again, or it rolls away from the passenger put down beside it below.
+	await _drive(&"bot", stop, 128)
 	# Back beside the car, which those runs drove 60 m from where the passenger got out.
 	passenger.teleport(vehicle.position() + Vector3(2.5, 0.0, 0.0))
 
@@ -4738,8 +4755,13 @@ func _test_vehicles() -> void:
 
 
 
+## [method _stopping]'s stand-in for a button: S held rather than a button pressed.
+const BACK_KEY := -1
+
+
 ## Metres [param vehicle] takes from 50 km/h to a standstill, put back at [param at] facing
-## +Z first, with [param button] held by [param id] (crouch the brake, jump the handbrake).
+## +Z first, with [param button] held by [param id] (crouch the brake, jump the handbrake,
+## [constant BACK_KEY] for S, which stops at the moment it stops rolling forward).
 func _stopping(vehicle: DotVehicleInstance, at: Vector3, id: StringName, button: int) -> float:
 	# Facing +Z, into the plate: -Z from here meets the plate's edge at about z = -72, which
 	# a buggy reaching 50 km/h gets to first.
@@ -4758,12 +4780,15 @@ func _stopping(vehicle: DotVehicleInstance, at: Vector3, id: StringName, button:
 		await get_tree().physics_frame
 		guard -= 1
 
-	print("  ..    %s: %.1f m/s after %d ticks of throttle" % ["brake" if button == DotFpsCommand.BUTTON_CROUCH else "handbrake", vehicle.forward_speed(), 1200 - guard])
+	print("  ..    %s: %.1f m/s after %d ticks of throttle" % [{DotFpsCommand.BUTTON_CROUCH: "brake", BACK_KEY: "S"}.get(button, "handbrake"), vehicle.forward_speed(), 1200 - guard])
 	var start := vehicle.position()
 	var stop := DotFpsCommand.new()
-	stop.set_button(button, true)
+	if button == BACK_KEY:
+		stop.move = Vector2(0.0, -1.0)
+	else:
+		stop.set_button(button, true)
 	guard = 1200
-	while vehicle.speed() > 0.3 and guard > 0:
+	while (vehicle.forward_speed() > 0.0 if button == BACK_KEY else vehicle.speed() > 0.3) and guard > 0:
 		player.controller.apply_command(stop.duplicate_command())
 		await get_tree().physics_frame
 		guard -= 1

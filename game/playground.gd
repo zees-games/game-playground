@@ -2725,7 +2725,12 @@ func _drive_vehicles() -> void:
 			# what that hole would give them.
 			continue
 
-		vehicles.set_command(vehicle.instance_id, id, drive_command(player.pending_command()))
+		# S brakes while the car still rolls forward and reverses once it has stopped
+		# (dot-vehicle's `brake_then_reverse`), the convention every driving game here
+		# keeps; on reverse thrust alone it took about three times the brake's distance.
+		# Here and not in `drive_command`, which has no vehicle to read a speed from.
+		var cmd := drive_command(player.pending_command())
+		vehicles.set_command(vehicle.instance_id, id, cmd.brake_then_reverse(vehicle.forward_speed()))
 
 
 ## One tick of driving, from one tick of movement input.
