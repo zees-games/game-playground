@@ -98,11 +98,6 @@ func _process(_delta: float) -> bool:
 		camera.current = true
 		_player.add_child(camera)
 
-		var view := DotFpsView.new()
-		view.name = "View"
-		_player.add_child(view)
-		_player.view = view
-
 		if not _player.build_view_switch():
 			push_error("no view switch was built; there is nothing to photograph")
 			_done = true

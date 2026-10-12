@@ -62,7 +62,22 @@ var character: PlaygroundCharacter = null
 
 ## The locomotion state machine over that body.
 var anim: DotPlayerAnimDriver = null
-var view: DotFpsView = null
+
+## The camera's motion cues on the local player: the landing dip and nod, the strafe lean and
+## the widening past a run, from dot-player-controller's [DotFpsViewMotion] applied where the
+## camera is written ([method present_camera]). Null on everybody else.
+##
+## [b]Not a [DotFpsView], and one stood here doing nothing until 2026-10-11.[/b] The client
+## added a `DotFpsView` after the controller had looked for one, so `controller.view` was null
+## and the view never ran: no dip, no lean, no widening, and the recoil `_present_zee` handed
+## it went nowhere. The client writes the camera itself (the interpolated eye, below), which
+## is game-arena's arrangement, so the arithmetic comes here instead of a node that would
+## write the same camera.
+var camera_motion: DotFpsViewMotion = null
+
+## A landing the drawn eye has not reached yet: its impact (0 for none) and its tick.
+var _landing_impact: float = 0.0
+var _landing_tick: int = -1
 
 ## Turns devices into commands, for a locally controlled player only.
 var sampler: DotFpsSampler = null
@@ -539,6 +554,11 @@ func teleport(to: Vector3, yaw: float = INF) -> void:
 	# state for a tick at a height with no ground under it.
 	controller.teleport(to, yaw)
 
+	# A teleport is not a landing, a strafe or a burst of speed.
+	if camera_motion != null:
+		camera_motion.snap()
+		_landing_impact = 0.0
+
 	if sampler != null:
 		sampler.look_at_angles(controller.state.yaw, controller.state.pitch)
 	else:
@@ -582,6 +602,111 @@ func eye_position() -> Vector3:
 ## wherever the player got in, and a blend toward it drags the view backwards every frame —
 ## the lurch mg-buses-from-hell measured at 137.9 m/s when its blend read a tick nothing had
 ## simulated. A teleport resets the blend itself (`DotFpsController.teleport`).
+## The camera motion this game picks for a bunny-hop and surf sandbox (scale 1 of each
+## setting). Its numbers are about [method movement_tunables]:
+##
+## - A hop lands at about 6.8 m/s (1.15 m at 20 m/s²), under [code]landing_min_speed[/code], so
+##   a chain of hops never bobs the view; a drop off a ledge does, fully from 16 m/s (6.4 m).
+## - The widening starts past the 7 m/s run and is all there at 25 m/s, where a good bhop or
+##   any surf ramp is; a player walking about building never sees the lens move.
+## - The lean is a degree at a sideways run, bounded, because a surfer looks across the ramp
+##   for whole seconds at a time.
+static func camera_motion_picks() -> DotFpsViewMotion:
+	var m := DotFpsViewMotion.new()
+	m.landing_dip = 0.06
+	m.landing_reference_speed = 16.0
+	m.landing_min_speed = 8.0
+	m.landing_recovery = 0.25
+	m.landing_pitch = 1.0
+	m.strafe_roll = 1.0
+	m.strafe_roll_reference = 9.0
+	m.strafe_roll_response = 8.0
+	m.slide_roll = 0.0
+	m.wall_run_roll = 0.0
+	m.roll_limit = 2.0
+	m.fov_speed_gain = 5.0
+	m.fov_speed_floor = 8.0
+	m.fov_speed_reference = 25.0
+	m.fov_response = 4.0
+	m.slide_fov_gain = 0.0
+	m.wall_run_fov_gain = 0.0
+	return m
+
+
+## Gives this player [member camera_motion] at the picks. The client calls it on its own
+## player once that player has a camera.
+func enable_camera_motion() -> void:
+	if camera_motion != null or controller == null:
+		return
+	camera_motion = camera_motion_picks()
+	if not controller.landed.is_connected(_on_landed):
+		controller.landed.connect(_on_landed)
+
+
+## Scales the camera motion from [method camera_motion_picks]: each 0 (off) to 2, 1 the pick.
+## The player's `camera_*` settings, through `PlaygroundPresentation`; each goes to 0 on its
+## own, because a player whom the lean makes sick may still want the dip.
+func set_camera_motion_scales(landing: float, strafe: float, widen: float) -> void:
+	if camera_motion == null:
+		return
+	var picks := camera_motion_picks()
+	camera_motion.landing_dip = picks.landing_dip * maxf(landing, 0.0)
+	camera_motion.landing_pitch = picks.landing_pitch * maxf(landing, 0.0)
+	camera_motion.strafe_roll = picks.strafe_roll * maxf(strafe, 0.0)
+	camera_motion.roll_limit = picks.roll_limit * maxf(strafe, 0.0)
+	camera_motion.fov_speed_gain = picks.fov_speed_gain * maxf(widen, 0.0)
+
+
+## Writes [param camera] for this frame: the interpolated eye, the view's angles, and the
+## motion cues on top, plus [param shake] (metres) and [param punch] (degrees, x pitch y yaw:
+## the recoil's camera half). [param base_fov] is the lens before the widening. The one place
+## the first-person camera is written, so a render tool draws exactly what the client does.
+func present_camera(camera: Camera3D, delta: float, base_fov: float, shake: Vector3 = Vector3.ZERO, punch: Vector2 = Vector2.ZERO) -> void:
+	var dip := 0.0
+	var nod := 0.0
+	var lean := 0.0
+	var widen := 0.0
+
+	if camera_motion != null:
+		if riding:
+			camera_motion.snap()
+		else:
+			var drawn := controller.render_state()
+			_kick_landing(drawn)
+			camera_motion.advance(drawn, delta)
+			dip = camera_motion.eye_drop()
+			nod = camera_motion.pitch()
+			lean = camera_motion.roll()
+			widen = camera_motion.fov_added()
+
+	camera.global_position = render_eye_position() + Vector3(0.0, dip, 0.0) + shake
+	camera.global_rotation = Vector3(
+		deg_to_rad(controller.state.pitch + nod + punch.x),
+		deg_to_rad(controller.state.yaw + punch.y),
+		deg_to_rad(lean)
+	)
+	camera.fov = base_fov + widen
+
+
+## Holds a landing until the drawn eye reaches the floor ([method _kick_landing]): the signal
+## comes from the tick that lands, and the frames after it still draw part of the fall, so a
+## kick here would add the dip to the last of the fall (game-arena measured the jump).
+func _on_landed(impact: float) -> void:
+	if camera_motion == null:
+		return
+	_landing_impact = maxf(_landing_impact, impact)
+	_landing_tick = controller.state.tick
+
+
+func _kick_landing(drawn: DotFpsState) -> void:
+	if _landing_impact <= 0.0:
+		return
+	if drawn.position.y > controller.state.position.y + 0.005 and controller.state.tick <= _landing_tick + 1:
+		return
+	camera_motion.note_landing(_landing_impact)
+	_landing_impact = 0.0
+
+
 func render_eye_position() -> Vector3:
 	if riding or controller == null or controller.motor == null:
 		return eye_position()

@@ -608,11 +608,11 @@ func _build_view() -> void:
 	camera.current = true
 	player.add_child(camera)
 
-	var view := DotFpsView.new()
-	view.name = "View"
-	player.add_child(view)
-
-	player.view = view
+	# The landing dip, the strafe lean and the widening, applied where `_process` writes the
+	# camera (`PlaygroundPlayer.present_camera`), at the player's camera motion settings.
+	player.enable_camera_motion()
+	if presentation != null:
+		presentation.bind_camera_motion(player)
 
 
 
@@ -922,11 +922,7 @@ func _build_pause() -> void:
 	if presentation != null:
 		presentation.build_console(game_menu)
 
-	var general := game_menu.page(&"general")
-	if general != null:
-		general.section("Playground") \
-			.add(DotMenuRow.toggle(&"hold_to_open_menu", "Hold Q for the spawn menu", "Off: Q opens and closes it.")) \
-			.add(DotMenuRow.toggle(&"prop_sounds", "Prop sounds", "Crates, barrels and everything else you knock about."))
+	add_general_rows(game_menu)
 	game_menu.screen.actions.insert(0, {"id": &"servers", "text": "Servers"})
 	game_menu.screen.restyle(game_menu.kit)
 
@@ -944,6 +940,28 @@ func _build_pause() -> void:
 		var _applied := applier.setup()
 
 	_wire_board()
+
+
+## This game's rows on dot-menu's General page: the sandbox's own, and the camera motion.
+## Static so `tools/screenshot_menus` draws the page the client builds rather than a copy.
+static func add_general_rows(game_menu: DotMenu) -> void:
+	var settings := game_menu.settings
+	var general := game_menu.page(&"general")
+	if general != null:
+		general.section("Playground") \
+			.add(DotMenuRow.toggle(&"hold_to_open_menu", "Hold Q for the spawn menu", "Off: Q opens and closes it.")) \
+			.add(DotMenuRow.toggle(&"prop_sounds", "Prop sounds", "Crates, barrels and everything else you knock about."))
+		# Camera motion beside the sandbox's own rows: the dip, the lean and the widening, each a
+		# slider to Off for a player whom motion makes sick. The words are the settings' own.
+		var motion := general.section("Camera motion")
+		for row: Array in [
+			[&"camera_landing_dip", "Landing dip"],
+			[&"camera_strafe_roll", "Strafe lean"],
+			[&"camera_speed_fov", "Speed widening"],
+		]:
+			var def: DotSettingsDef = settings.schema.find(row[0]) if settings != null else null
+			var _added := motion.add(DotMenuRow.slider(row[0], row[1], def.description if def != null else "")
+				.formatted(func(v: float) -> String: return "Off" if v <= 0.0 else "%d%%" % roundi(v * 100.0)))
 
 
 func _on_menu_action_chosen(id: StringName) -> void:
@@ -1022,7 +1040,7 @@ func _process(_delta: float) -> void:
 	if not player.is_inside_tree():
 		return
 
-	_present_zee()
+	var punch := _present_zee()
 
 	# The camera follows the SIMULATED eye position rather than being parented to
 	# something the movement drives. Parenting works and hides a real difference: the
@@ -1034,14 +1052,12 @@ func _process(_delta: float) -> void:
 	# player who turned `shake_scale` to zero gets an offset of exactly zero.
 	var shake := presentation.camera_shake() \
 		if presentation != null and presentation.fx != null else Vector3.ZERO
-	# `render_eye_position`, not `eye_position`: the blend of the last two ticks, because the
-	# simulation moves once a tick and the screen does not (see PlaygroundPlayer).
-	camera.global_position = player.render_eye_position() + shake
-	camera.global_rotation = Vector3(
-		deg_to_rad(player.controller.state.pitch),
-		deg_to_rad(player.controller.state.yaw),
-		0.0
-	)
+	# `render_eye_position` inside, not `eye_position`: the blend of the last two ticks,
+	# because the simulation moves once a tick and the screen does not (see PlaygroundPlayer).
+	# The camera motion, the recoil's punch and the player's field of view on top.
+	var fov := float(presentation.settings.get_int(&"field_of_view", 100)) \
+		if presentation != null and presentation.settings != null else 100.0
+	player.present_camera(camera, _delta, fov, shake, punch)
 
 
 ## What a frame draws that a tick does not: the netcode's interpolation, then every
@@ -2371,27 +2387,20 @@ func _set_reload(down: bool) -> void:
 		_net_buttons &= ~DotFpsCommand.BUTTON_USER_2
 
 
-## Sway, bob and the hands hidden in third person, once a frame.
-func _present_zee() -> void:
+## Sway, bob and the hands hidden in third person, once a frame. Returns the camera's half
+## of the recoil (degrees, x pitch y yaw), which the camera write adds: presentation only, the
+## command's angles and so the shot are untouched. It went to a `DotFpsView` that nothing ran
+## until 2026-10-11, so no zee gun ever kicked the view here.
+func _present_zee() -> Vector2:
 	var rig := _zee_rig()
-	var view: DotFpsView = player.controller.view \
-		if player != null and is_instance_valid(player) and player.controller != null else null
 
 	if rig == null or zee_view == null:
-		if view != null:
-			view.external_angles = Vector3.ZERO
-		return
+		return Vector2.ZERO
 
 	zee_view.visible = player.view_mode() != &"tp"
 	var state := player.controller.state
 	rig.drive_view(Vector2.ZERO, player.speed(), state.is_grounded(), state.is_crouched())
-
-	# The camera's half of the recoil, through the view's own offset: the view writes the
-	# camera's angles from scratch each frame, so nothing set on the camera would survive.
-	# Presentation only — the command's angles, and so the shot, are untouched.
-	if view != null:
-		var punch := rig.view_punch()
-		view.external_angles = Vector3(punch.x, punch.y, 0.0)
+	return rig.view_punch()
 
 
 func _exit_tree() -> void:

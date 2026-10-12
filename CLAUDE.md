@@ -41,7 +41,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | `game/playground_map.gd`, `playground_geometry.gd`, `playground_lighting.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building and the palette, each map's dot-lighting, the survey, materials, the generator |
 | `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (builds a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
 | `examples/` | the five suites |
-| `tools/` | `export_zones.gd`, `map_props.gd`, `screenshot*.sh`, `audio_probe.sh` |
+| `tools/` | `export_zones.gd`, `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh` |
 | `assets/` | vendored CC0 art: zee weapons and arms, the character kit, Kenney's prototype grid |
 | `scenes/fx/` | the two effect scenes |
 | `game.yml` | the descriptor that travels in the published pack |
@@ -122,6 +122,7 @@ Short forms; the reasoning is in the linked file.
 - Escape releases then opens dot-menu; only a click captures. This client owns the pointer. [client](docs/client.md#escape-the-pointer-and-the-menu)
 - The character body goes under the rig, not the visual; `auto_drive` off. [client](docs/client.md#third-person-and-the-body)
 - Chat lines go to the chat box, and to the HUD notice line only when there is no box (a ballot was drawn twice). [client](docs/client.md#the-chat-box)
+- The first-person camera is written in one place, `PlaygroundPlayer.present_camera` (motion, shake, recoil, field of view); there is no `DotFpsView`. [client](docs/client.md#the-first-person-camera)
 - The hit marker and damage numbers come from the server's `Kind.HIT` (`Playground.confirm_hit`, fed by all four damage paths), never the local rig; the glance pieces need a shell with dot-ui 4. [client](docs/client.md#the-hud)
 - Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`build_console(menu)`). [client](docs/client.md#the-chat-box)
 

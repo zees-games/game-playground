@@ -1,5 +1,6 @@
 extends SceneTree
 
+const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
@@ -69,6 +70,7 @@ func _initialize() -> void:
 	var _set := _game_menu.setup()
 	# As the client does: the console after the menu, so it is one of the menu's overlays.
 	_presentation.build_console(_game_menu)
+	PlaygroundClient.add_general_rows(_game_menu)
 	_game_menu.scoreboard.source = func() -> Dictionary:
 		return {
 			"server": {"name": "Playground  |  build anything", "map": "pg_lobby", "players": 4, "max": 24},
@@ -98,6 +100,8 @@ func _initialize() -> void:
 			{"name": "go_kart", "props": 9, "custom": true},
 		]},
 		{"id": &"game_menu", "file": "menu_general.png", "page": &"general"},
+		# The same page scrolled to its end: the sandbox's rows and the camera motion sliders.
+		{"id": &"game_menu", "file": "menu_general_end.png", "page": &"general", "scroll_end": true},
 		{"id": &"game_menu", "file": "menu_video.png", "page": &"video"},
 		{"id": &"game_menu", "file": "menu_audio.png", "page": &"audio"},
 		{"id": &"board", "file": "menu_scoreboard.png"},
@@ -158,6 +162,12 @@ func _process(_delta: float) -> bool:
 			# the last frame would stay lit.
 			_menu.call("_rebuild_grid")
 			_menu.call("_rebuild_settings")
+
+	if _wait == 1 and bool(shot.get("scroll_end", false)):
+		for found in _game_menu.find_children("*", "ScrollContainer", true, false):
+			var scroll := found as ScrollContainer
+			if scroll.is_visible_in_tree():
+				scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
 
 	if _wait > 0:
 		_wait -= 1

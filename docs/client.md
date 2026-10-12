@@ -14,6 +14,20 @@
 - **Tab is dot-menu's scoreboard, held** (fed by dot-server's roster while held); the movement style moved from Tab to N.
 - **The check that matters is the settings round trip**: `DotSettingsManager.to_config()` hands out a snapshot, so a screen calling only the panel's apply reports success and changes nothing. `headless_presentation` edits the volume, presses Apply, and reads the manager **and** the mixer.
 
+## The first-person camera
+
+**`PlaygroundPlayer.present_camera` is the one place the camera is written**, once a frame from `PlaygroundClient._process`: the interpolated eye (`render_eye_position`), the view's angles, then the camera motion, the effects' shake, the zee recoil's punch and the player's `field_of_view` on top. There is no `DotFpsView` (one stood here unrun; [history](history.md#the-client)).
+
+**Camera motion is dot-player-controller's `DotFpsViewMotion`** at `PlaygroundPlayer.camera_motion_picks()`, chosen for a bunny-hop and surf movement (1.15 m jumps at 20 m/s², a 7 m/s run):
+
+| Cue | Pick | Why |
+| --- | --- | --- |
+| Landing dip | 6 cm and a 1° nod, from 8 m/s, full at 16 m/s | a hop lands at 6.8 m/s and must never bob the view; a drop off a ledge does |
+| Strafe lean | 1° at 9 m/s sideways, bounded at 2° | a surfer looks across the ramp for seconds at a time |
+| Speed widening | up to 5°, from 8 to 25 m/s | a player walking about building never sees the lens move; a bhop or a ramp does |
+
+The landing is kicked when the drawn eye reaches the floor, not on the `landed` tick (game-arena's finding: the dip otherwise adds to the last of the fall). A teleport and a seat snap everything. Three ACCOUNT settings scale the picks 0 to 2 (`camera_landing_dip`, `camera_strafe_roll`, `camera_speed_fov`; no wall lean, nothing here wall-runs), on General > Camera motion and at the console. `tools/render_feel.sh` renders a drop, a run of hops, a strafe and flight at 22 m/s at 144 frames a second (`--off` is the control); judged 2026-10-11 as gentle and right, with no change to the picks.
+
 ## Third person and the body
 
 **F5 hands the player between two controllers** (`DotPlayerControllerSwitch`, carrying position, velocity and look, deliberately dropping motor state: a first-person air-strafe has no third-person counterpart). This is the only game where the switch runs: nothing here is ranked and nothing is rewound, where the timer game must keep runs comparable (camera only) and the arena game's lag compensation needs one motor.
@@ -77,7 +91,8 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | Tool | Renders |
 | --- | --- |
 | `tools/screenshot.sh <map>` | a map and its routes (`--fx` for the effects) |
-| `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, the edit panel), dot-menu's pages, the Tab board, the console open |
+| `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, the edit panel), dot-menu's pages (General twice, the second scrolled to the camera motion), the Tab board, the console open |
 | `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline, a weapon's ammunition and two confirmed hits (`hud_hits`), a map ballot's chat line beside the drawn panel |
+| `tools/render_feel.sh` | the first-person camera's motion: a drop, hops, a strafe, flight at speed; frames, a per-frame CSV and contact sheets in `screenshots/feel/` |
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |
 | `tools/audio_probe.sh` | whether the client makes a sound |

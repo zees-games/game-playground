@@ -58,13 +58,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 881
+const CHECKS := 887
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 47
+const SECTIONS := 48
 
 var _passed := 0
 var _failed := 0
@@ -165,6 +165,7 @@ func _run() -> void:
 	await _test_glass()
 	await _test_water()
 	await _test_ice_slime_foliage()
+	await _test_camera_motion()
 	await _test_the_client_boots()
 
 	print("")
@@ -192,6 +193,83 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+## The first-person camera's motion, through the client's own `PlaygroundPlayer.present_camera`
+## once a physics tick: a drop dips and comes back, a hop does not, a strafe leans each way,
+## speed widens the lens, a teleport drops it all, and with every setting at 0 nothing moves.
+## Before 2026-10-11 none of it reached the screen (the DotFpsView nothing ran).
+func _test_camera_motion() -> void:
+	_section("the camera dips, leans and widens, and only when it should")
+
+	var _lobby: DotResult = await playground.change_map(&"pg_lobby")
+	var feel := playground.add_player(&"feel", "Feel")
+	var camera := Camera3D.new()
+	feel.add_child(camera)
+	feel.enable_camera_motion()
+	for i in 40:
+		await get_tree().physics_frame
+	var home := feel.controller.state.position
+	var yaw := feel.controller.state.yaw
+	var dt := 1.0 / float(Engine.physics_ticks_per_second)
+
+	var run := func(command: DotFpsCommand, ticks: int, column: StringName) -> Array:
+		feel.controller.apply_command(command)
+		var out: Array = []
+		for i in ticks:
+			await get_tree().physics_frame
+			feel.present_camera(camera, dt, 100.0)
+			match column:
+				&"dip": out.append(feel.camera_motion.eye_drop())
+				&"roll": out.append(feel.camera_motion.roll())
+				&"fov": out.append(camera.fov)
+		return out
+
+	var still := DotFpsCommand.new()
+	still.yaw = yaw
+
+	feel.teleport(home + Vector3(0.0, 7.0, 0.0), yaw)
+	var drop: Array = await run.call(still, int(1.6 / dt), &"dip")
+	_check(drop.min() < -0.04 and absf(float(drop.back())) < 0.005,
+		"a 7 m drop dips the eye and it comes back",
+		"deepest %.3f m, last %.4f" % [drop.min(), drop.back()])
+
+	var hop := still.duplicate_command()
+	hop.set_button(DotFpsCommand.BUTTON_JUMP, true)
+	var hops: Array = await run.call(hop, int(1.5 / dt), &"dip")
+	_check(hops.min() == 0.0, "a chain of hops (6.8 m/s each) never bobs the view", "deepest %.3f" % hops.min())
+
+	var right := still.duplicate_command()
+	right.move = Vector2(1.0, 0.0)
+	var left := still.duplicate_command()
+	left.move = Vector2(-1.0, 0.0)
+	var lean_r: Array = await run.call(right, int(0.8 / dt), &"roll")
+	var lean_l: Array = await run.call(left, int(0.8 / dt), &"roll")
+	_check(absf(float(lean_r.back())) > 0.4 and absf(float(lean_r.back())) <= 2.0
+		and signf(float(lean_r.back())) == -signf(float(lean_l.back())),
+		"a strafe leans the view about a degree, each way",
+		"right %.2f, left %.2f deg" % [lean_r.back(), lean_l.back()])
+
+	feel.teleport(home + Vector3(0.0, 40.0, 0.0), yaw)
+	feel.controller.state.velocity = DotFpsMotor.forward_for(yaw) * 22.0
+	var lens: Array = await run.call(still, int(0.8 / dt), &"fov")
+	_check(float(lens.back()) > 103.0 and float(lens.back()) < 106.0,
+		"at 22 m/s the lens widens a few degrees", "%.2f" % lens.back())
+	feel.teleport(home, yaw)
+	feel.present_camera(camera, dt, 100.0)
+	_check(feel.camera_motion.eye_drop() == 0.0 and feel.camera_motion.roll() == 0.0 and camera.fov == 100.0,
+		"and a teleport drops all of it", "fov %.2f" % camera.fov)
+
+	# The control: every setting at 0 and the same drop and strafe move nothing.
+	feel.set_camera_motion_scales(0.0, 0.0, 0.0)
+	feel.teleport(home + Vector3(0.0, 7.0, 0.0), yaw)
+	var flat: Array = await run.call(still, int(1.6 / dt), &"dip")
+	var level: Array = await run.call(right, int(0.8 / dt), &"roll")
+	_check(flat.min() == 0.0 and level.min() == 0.0 and level.max() == 0.0,
+		"with every camera motion setting at 0 nothing moves", "dip %.3f, roll %.2f" % [flat.min(), level.max()])
+
+	playground.remove_player(&"feel")
+	_done()
 
 
 func _section(title: String) -> void:

@@ -37,6 +37,8 @@ One line each; the detail is in [bugs-found.md](../../../docs/bugs-found.md) or 
 
 **Edit mode's outline was a translucent fill**, which showed a red crate as pink in the one mode whose sliders include colour.
 
+**A first-person view that was built and never ran** (found 2026-10-11, looking at dot-player-controller's new landing dip in this game). `_build_view` added a `DotFpsView` after the controller had looked for one, so `controller.view` was null: no landing dip, no strafe lean, no widening, no step smoothing, and the zee recoil handed to `view.external_angles` went nowhere, for as long as the client had existed. Every check passed, because the client writes the camera itself and nothing asked what the view did. The `field_of_view` setting was applied by nothing either. Camera motion is now `DotFpsViewMotion` in `PlaygroundPlayer.present_camera`, the one place the camera is written; `headless_playground` drops, hops, strafes and flies a player through it.
+
 ## Netcode
 
 ### A connected client predicted nobody

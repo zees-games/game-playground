@@ -26,7 +26,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 122
+const CHECKS := 124
 
 var _passed := 0
 var _failed := 0
@@ -1027,6 +1027,26 @@ func _test_glance_pieces() -> void:
 	hud.ammo.refresh_cover()
 	_check(hud.ammo.covered and hud.ammo.self_modulate.a < 1.0, "and one over it dims it",
 		"ballot %s" % str(ballot.get_global_rect()))
+
+	# The camera motion settings reach the player they are bound to, live.
+	var stub := GDScript.new()
+	stub.source_code = "extends Node\nvar got: Array = []\nfunc set_camera_motion_scales(a: float, b: float, c: float) -> void:\n\tgot = [a, b, c]\n"
+	var _compiled := stub.reload()
+	var holder := Node.new()
+	holder.set_script(stub)
+	add_child(holder)
+	p.bind_camera_motion(holder)
+	var bound: Array = holder.get(&"got")
+	p.settings.set_value(&"camera_strafe_roll", 0.0)
+	p.settings.set_value(&"camera_speed_fov", 1.5)
+	var moved: Array = holder.get(&"got")
+	_check(bound == [1.0, 1.0, 1.0] and moved == [1.0, 0.0, 1.5],
+		"the camera motion settings reach the camera: bound at the picks, then each slider on its own",
+		"%s then %s" % [str(bound), str(moved)])
+	_check(p.settings.schema.find(&"camera_landing_dip") != null
+		and p.settings.schema.find(&"camera_landing_dip").scope == DotSettingsDef.Scope.ACCOUNT,
+		"and they belong to the person, not the machine")
+	holder.queue_free()
 
 	# A pack naming these classes does not parse on a shell whose dot-ui predates them, so the
 	# requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.

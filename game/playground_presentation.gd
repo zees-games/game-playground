@@ -55,6 +55,9 @@ var _beams: Dictionary = {}
 ## The in-game chat box. See [method _build_chat].
 var chat_window: DotChatWindow = null
 
+## The player whose camera the motion settings move. See [method bind_camera_motion].
+var _camera_player: Node = null
+
 var client: Node = null
 
 var _chat_layer: CanvasLayer = null
@@ -139,6 +142,15 @@ static func schema() -> DotSettingsSchema:
 		.with_description("Zero turns camera shake off entirely."))
 	s.add(DotSettingsDef.boolean(&"allow_flashes", true, &"accessibility"))
 
+	# Camera motion, each 0 (off) to 2, 1 being the game's pick
+	# (`PlaygroundPlayer.camera_motion_picks`). ACCOUNT: whether motion makes somebody sick is
+	# about the person, not the machine. One each, because a player who cannot take the lean
+	# may still want the dip.
+	for key: StringName in CAMERA_MOTION_KEYS:
+		s.add(DotSettingsDef.number(key, 1.0, 0.0, 2.0, &"accessibility", 0.05).with_scope(
+			DotSettingsDef.Scope.ACCOUNT
+		).with_description(CAMERA_MOTION_KEYS[key]))
+
 	# Chat. ACCOUNT scope for all three: which key opens chat and whether a player wants
 	# the box at all is about the person, not about this machine.
 	s.add(DotSettingsDef.choice(
@@ -166,6 +178,15 @@ static func schema() -> DotSettingsSchema:
 	# are also stock (volumes, field of view, effects, shake) stay as declared here.
 	DotMenuStock.declare(s, [DotMenuStock.GROUP_VIDEO, DotMenuStock.GROUP_INTERFACE] as Array[StringName])
 	return s
+
+
+## The camera motion settings, in [method PlaygroundPlayer.set_camera_motion_scales]' order,
+## with what each moves. No wall-run lean: no movement style here runs on walls.
+const CAMERA_MOTION_KEYS := {
+	&"camera_landing_dip": "How far the view dips when you land from a height. All the way left is off.",
+	&"camera_strafe_roll": "How far the view leans into a strafe. All the way left is off.",
+	&"camera_speed_fov": "How much the view widens when you go faster than a run. All the way left is off.",
+}
 
 
 ## Points every [PlaygroundPresentation] made after this at a fresh, empty settings
@@ -223,12 +244,32 @@ func _on_setting_changed(key: StringName, value: Variant, _why: StringName) -> v
 			fx.config.quality = int(value)
 		&"chat_window":
 			_apply_chat_visibility()
+		&"camera_landing_dip", &"camera_strafe_roll", &"camera_speed_fov":
+			_apply_camera_motion()
 		&"chat_open_key":
 			_bind_chat(chat_window.open_action if chat_window != null else &"", str(value))
 		&"chat_near_key":
 			_bind_chat(chat_window.team_action if chat_window != null else &"", str(value))
 		_:
 			pass
+
+
+## Points the camera motion settings at [param player]'s camera, and applies them. Called by
+## the client when its player gets a camera: a setting nobody applies is a slider that moves
+## nothing.
+func bind_camera_motion(player: Node) -> void:
+	_camera_player = player
+	_apply_camera_motion()
+
+
+func _apply_camera_motion() -> void:
+	if settings == null or _camera_player == null or not is_instance_valid(_camera_player):
+		return
+	_camera_player.call(&"set_camera_motion_scales",
+		settings.get_float(&"camera_landing_dip", 1.0),
+		settings.get_float(&"camera_strafe_roll", 1.0),
+		settings.get_float(&"camera_speed_fov", 1.0)
+	)
 
 
 # --- Audio ------------------------------------------------------------------
