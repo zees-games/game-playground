@@ -59,7 +59,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 909
+const CHECKS := 910
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7596,6 +7596,9 @@ func _test_the_client_boots() -> void:
 	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
 		"the map menu is on M, and nothing else in the table is",
 		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# B is the family's loadout key: nothing here may default to it (Clear checkpoints was B).
+	_check(keys.defaults_on("B").is_empty(), "nothing in the table defaults to B, the family's loadout key",
+		str(keys.defaults_on("B").map(func(r: Dictionary) -> String: return str(r["label"]))))
 	# Closed right before the key: an offline client with no captured pointer (headless) may
 	# have put its menu back up, and while anything is open every key is the menu's.
 	menu.close_all()

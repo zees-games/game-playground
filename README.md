@@ -61,7 +61,7 @@ There are four maps:
 | **Tab** (hold) | Scoreboard: who is on, their score, time connected and ping |
 | **N** | Change movement style |
 | **C** / **V** | Save a checkpoint / go back to it |
-| **X** / **B** | Pick a checkpoint / forget them all |
+| **X** / **G** | Pick a checkpoint / forget them all |
 | **Y** / **U** | Chat / chat with nearby players |
 | **M** | Next map |
 | **K** | Push to talk |

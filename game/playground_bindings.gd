@@ -60,7 +60,9 @@ static func make() -> DotMenuBindings:
 	keys.add(CHECKPOINT_SAVE, &"bind_checkpoint_save", "Save a checkpoint", "C", "Running")
 	keys.add(CHECKPOINT_LOAD, &"bind_checkpoint_load", "Go to the checkpoint", "V", "Running")
 	keys.add(CHECKPOINT_NEXT, &"bind_checkpoint_next", "Next checkpoint", "X", "Running")
-	keys.add(CHECKPOINT_CLEAR, &"bind_checkpoint_clear", "Clear checkpoints", "B", "Running")
+	# G, not B: B is the family's loadout key (dot-menu's DotMenuLoadout), kept free for the day
+	# this game has a loadout.
+	keys.add(CHECKPOINT_CLEAR, &"bind_checkpoint_clear", "Clear checkpoints", "G", "Running")
 	keys.add(STYLE, &"bind_style", "Next movement style", "N", "Running")
 	keys.add(TRACK, &"bind_track", "Next timed track on this map", "T", "Running")
 
