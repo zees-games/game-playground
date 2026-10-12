@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 887
+const CHECKS := 890
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7317,6 +7317,43 @@ func _test_the_client_boots() -> void:
 		client.player != null and client.player.samples_input
 		and client.player.sampler != null,
 		"and the player samples input, with a sampler actually built"
+	)
+
+	# [b]The sensitivity slider reaches the sampler.[/b] It was declared, shown and saved,
+	# and nothing called `bind_look`, so the view turned at DotFpsTunables' default (0.25
+	# degrees per count) whatever the player chose. Read off the tunables the sampler turns
+	# the view with, offline and for the connected client's own sampler, which `_adopt`
+	# hands a fresh tunables object. Armed: without `_bind_look` all three fail.
+	var look_settings: DotSettingsManager = (
+		client.presentation.settings if client.presentation != null else null
+	)
+	var look: DotFpsTunables = (
+		client.player.sampler.tunables
+		if client.player != null and client.player.sampler != null else null
+	)
+	_check(
+		look != null and look_settings != null and is_equal_approx(look.mouse_sensitivity,
+			look_settings.get_float(&"sensitivity") * DotMenuApplier.DEGREES_PER_COUNT),
+		"the saved sensitivity reaches the offline sampler, at dot-menu's degrees per count",
+		"%.4f" % (look.mouse_sensitivity if look != null else -1.0)
+	)
+	if look_settings != null:
+		look_settings.set_value(&"sensitivity", 4.0)
+	_check(
+		look != null and is_equal_approx(look.mouse_sensitivity, 4.0 * DotMenuApplier.DEGREES_PER_COUNT),
+		"and moving the slider changes the turning speed",
+		"%.4f" % (look.mouse_sensitivity if look != null else -1.0)
+	)
+	var net_sampler := DotFpsSampler.new(DotFpsTunables.new())
+	client._sampler = net_sampler
+	client._bind_look()
+	if look_settings != null:
+		look_settings.set_value(&"sensitivity", 3.0)
+	client._sampler = null
+	_check(
+		is_equal_approx(net_sampler.tunables.mouse_sensitivity, 3.0 * DotMenuApplier.DEGREES_PER_COUNT),
+		"and the connected client's sampler, rebound when it adopts its player, follows it too",
+		"%.4f" % net_sampler.tunables.mouse_sensitivity
 	)
 
 	# [b]The mouse, end to end.[/b] Nothing in this family had ever delivered an

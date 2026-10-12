@@ -555,6 +555,8 @@ func _adopt() -> void:
 
 	if _sampler != null:
 		_sampler.tunables = player.controller.tunables
+		# A different tunables object, carrying the addon's default sensitivity again.
+		_bind_look()
 
 	_sync_hud()
 
@@ -938,6 +940,7 @@ func _build_pause() -> void:
 		applier.settings = settings
 		add_child(applier)
 		var _applied := applier.setup()
+		_bind_look()
 
 	_wire_board()
 
@@ -1195,6 +1198,24 @@ func _set_captured(on: bool) -> void:
 
 	if mouse_capture_override != null:
 		mouse_capture_override = on
+
+
+## Points the applier's look settings (`sensitivity`, at dot-menu's degrees per count) at
+## the tunables every sampler this client turns the view with reads, and applies them now.
+##
+## [b]The slider moved nothing until 2026-10-11.[/b] `sensitivity` was declared, shown on
+## dot-menu's page and saved, and nothing ever called `bind_look`, so the view turned at
+## `DotFpsTunables`' default whatever the player chose. Called once the applier exists (the
+## offline player's sampler is built before it) and again in [method _adopt], because the
+## connected sampler is handed the player's tunables there: a new object, at the default.
+## Only look fields are written, and `DotFpsTunables.fingerprint` leaves those out, so a
+## client writing them cannot disagree with its server.
+func _bind_look() -> void:
+	if applier == null:
+		return
+	for sampler: DotFpsSampler in [_sampler, player.sampler if player != null else null]:
+		if sampler != null and sampler.tunables != null:
+			applier.bind_look(sampler.tunables)
 
 
 func active_sampler() -> DotFpsSampler:
