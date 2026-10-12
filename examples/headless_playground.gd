@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 896
+const CHECKS := 899
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7486,6 +7486,45 @@ func _test_the_client_boots() -> void:
 		and leave_button != null and leave_button.visible, "the Escape menu has Help & commands and Leave")
 	if kept_menu != null:
 		kept_menu.close_all()
+
+	var menu: DotMenu = kept_menu
+
+	# M, the family's rule since the first play test: the map list, and solo a choice
+	# changes it now. The server's half (the owner's flag, the vote) is in `dedicated`.
+	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
+		"the map menu is on M, and nothing else in the table is",
+		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# Closed right before the key: an offline client with no captured pointer (headless) may
+	# have put its menu back up, and while anything is open every key is the menu's.
+	menu.close_all()
+	var map_before: StringName = client.playground.maps.current.id
+	var m_key := InputEventKey.new()
+	m_key.physical_keycode = KEY_M
+	m_key.keycode = KEY_M
+	m_key.pressed = true
+	_check(menu.handle_event(m_key) and menu.picker.is_open() and menu.picker.items.size() > 1,
+		"M opens the map list, more than one to choose", str(menu.picker.items.size()))
+	var wanted_map: StringName = &""
+	var map_key := KEY_NONE
+	for row in range(1, DotMenuPicker.PAGE_SIZE + 1):
+		var it: Variant = menu.picker.at_row(row)
+		if it is Dictionary and not bool((it as Dictionary)["current"]):
+			wanted_map = StringName(str((it as Dictionary)["id"]))
+			map_key = KEY_0 + row
+			break
+	var digit_key := InputEventKey.new()
+	digit_key.physical_keycode = map_key
+	digit_key.keycode = map_key
+	digit_key.pressed = true
+	var _picked := menu.handle_event(digit_key)
+	for _i in 60:
+		await get_tree().physics_frame
+	_check(wanted_map != &"" and client.playground.maps.current.id == wanted_map and not menu.picker.is_open(),
+		"choosing one changes the map now", "%s, now %s" % [wanted_map, client.playground.maps.current.id])
+	# Back where it was, for the checks after this one.
+	var _back_map: Variant = await menu.maps.change_fn.call(map_before)
+	for _i in 60:
+		await get_tree().physics_frame
 	var spawn_row := keys.row_for_action(&"pg_spawn") if keys != null else {}
 	var rebound: DotResult = keys.rebind(spawn_row, "J", client.presentation.settings) if not spawn_row.is_empty() else DotResult.fail(DotError.CODE_STATE, "no row")
 	var j := InputEventKey.new()

@@ -819,6 +819,14 @@ func _build_extras() -> DotResult:
 	var commanded := vote.install_commands(self)
 	DotLog.result(CHANNEL, "the vote's commands", commanded)
 
+	# The map menu (M), dot-vote's: a player holding the owner's `sv_map_menu_flag` changes the
+	# map now through the game's own change (props, NPCs and course reset with it, as for the
+	# vote and `pg_map`), anybody else gets a vote. Read by name, because a server on a dot-vote
+	# older than the menu has no `map_menu`.
+	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
+	if menu_half is Object:
+		(menu_half as Object).set(&"change_fn", game.change_map)
+
 	# [b]The one signal that fires for every change however it happened.[/b] An operator
 	# typing `pg_map`, the time limit expiring and the vote applying all end at
 	# `DotMapSession.changed` — which is why the director does not announce its own change

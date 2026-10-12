@@ -945,6 +945,12 @@ func _build_pause() -> void:
 	game_menu.screen.actions.insert(0, {"id": &"servers", "text": "Servers"})
 	game_menu.screen.restyle(game_menu.kit)
 
+	# M: the maps (dot-menu's map menu, on the table's MAP row). Solo a choice changes the map
+	# here at once; connected the server decides, by the owner's `sv_map_menu_flag`, and
+	# anybody without it gets a vote instead (dot-vote's map menu, over this game's map vote).
+	# By name, so a client shell older than the map menu still runs the game without it.
+	if game_menu.has_method(&"use_maps"):
+		var _maps: Variant = game_menu.call(&"use_maps", map_menu_rows, change_from_menu)
 	game_menu.action_requested.connect(_on_menu_action_chosen)
 	game_menu.overlays_changed.connect(func(open: bool) -> void:
 		# Back onto the view the instant it closes, as the screen stack does for its own.
@@ -1363,8 +1369,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif key.is_action(PlaygroundBindings.STYLE):
 		# Tab is the scoreboard, held, as in every game here; the style moved to N.
 		_cycle_style()
-	elif key.is_action(PlaygroundBindings.MAP):
-		_next_map()
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_SAVE):
 		_save_checkpoint()
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_LOAD):
@@ -2366,20 +2370,26 @@ func _cycle_track() -> void:
 		hud.notice("Track: %s" % DotTimerTrack.name_of(next))
 
 
-func _next_map() -> void:
-	# A client does not change the map; it rocks the vote and the server decides. One
-	# client loading a different world from everybody else is not a map change, it is a
-	# client playing alone in a world nobody else is in.
+## What M lists solo: every map in the catalogue, the kind as the mode and the tier under it.
+## Connected the server's own list is drawn instead (dot-vote's map menu).
+func map_menu_rows() -> Array:
+	var out: Array = []
+	if playground == null or playground.maps == null or playground.maps.catalogue == null:
+		return out
+	var here := playground.maps.current.id if playground.maps.current != null else &""
+	for def in playground.maps.catalogue.available():
+		out.append({"id": String(def.id), "name": def.name_or_id(), "mode": String(def.kind).capitalize(),
+			"detail": "tier %d" % def.tier if def.tier > 0 else "", "current": def.id == here})
+	return out
+
+
+## Solo: [param id] now. A client does not change the map when connected: one client loading
+## a different world from everybody else is not a map change, it is a client playing alone in
+## a world nobody else is in; the server's map menu decides there.
+func change_from_menu(id: StringName) -> DotResult:
 	if bridge != null:
-		bridge.ask_rtv()
-		return
-
-	var next := playground.maps.rotation.choose(playground.players.size())
-
-	if next == null:
-		return
-
-	await playground.change_map(next.id)
+		return DotResult.fail(DotError.CODE_STATE, "The server changes the map.")
+	return await playground.change_map(id)
 
 
 # --- zee-dot-weapons --------------------------------------------------------

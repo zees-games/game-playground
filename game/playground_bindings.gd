@@ -27,7 +27,10 @@ const GRAV_GUN := &"pg_grav_gun"
 const WEAPONS := &"pg_weapons"
 const TRACK := &"pg_track"
 const STYLE := &"pg_style"
-const MAP := &"pg_map"
+## M is dot-menu's map menu (`dot_menu_maps`): the map list solo, the server's (a change or a
+## vote) online. Kept on `bind_map`, the setting it was stored under, so a key a player moved
+## stays moved.
+const MAP := &"dot_menu_maps"
 const CHECKPOINT_SAVE := &"pg_checkpoint_save"
 const CHECKPOINT_LOAD := &"pg_checkpoint_load"
 const CHECKPOINT_NEXT := &"pg_checkpoint_next"
@@ -62,7 +65,7 @@ static func make() -> DotMenuBindings:
 	keys.add(TRACK, &"bind_track", "Next timed track on this map", "T", "Running")
 
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
-	keys.add(MAP, &"bind_map", "Vote for another map", "M", "General")
+	keys.add(MAP, &"bind_map", "Change map", "M", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# The chat keys keep the settings they were stored under before this table existed
 	# (declared in `PlaygroundPresentation.schema`, per ACCOUNT, applied there as well).
