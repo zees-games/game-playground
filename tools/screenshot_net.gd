@@ -184,6 +184,13 @@ func _build() -> void:
 
 	_server_net = _make_manager(true, &"server", 1, server_side, _server_game.tick_rate)
 	_client_net = _make_manager(false, &"client", CLIENT_PEER, client_side, _client_game.tick_rate)
+	# This tool stamps every command itself (`_tick + INPUT_LEAD`), not from the client's
+	# clock, so the client must not ask for dot-net's input-lead report: steered by reports
+	# about commands it never stamped, the clock runs away from them and the other player is
+	# drawn in uneven steps, which is the thing this tool is for looking at (headless_net,
+	# c903760). By the constant map, so this parses against a dot-net from before the report.
+	var lead_bit := int((DotNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
+	_client_net.messages.features &= ~lead_bit
 
 	_server_bridge = PlaygroundNetBridge.new()
 	_server_bridge.name = "Bridge"
