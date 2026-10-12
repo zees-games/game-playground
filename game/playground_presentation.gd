@@ -485,11 +485,11 @@ func _build_audio() -> DotResult:
 	audio.mixer = DotAudioMixer.new()
 	audio.mixer.master = settings.get_float(&"master_volume", 0.8)
 	audio.voices = 24
-	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in walk
-	# round the lobby read -28.9 LUFS with the bed and the steps in (digital silence before),
-	# -24.6 at +6. The stand-in builds nothing, so that is the room with nobody playing in it;
-	# the trim is held at +6 until a run with props falling sets it.
-	audio.loudness_trim_db = 6.0
+	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md) with the local player
+	# driven by tools/loudness_pilot.gd: walking the lobby, spawning crates, barrels and balls
+	# and punting them with the gravity gun. At +6 that read -22.5 LUFS; at +12 two runs read
+	# -17.5. The +6 before came from a stand-in that built nothing (-24.6, the empty room).
+	audio.loudness_trim_db = 12.0
 	# Deterministic: the pitch of a crate landing comes out of the session's own seed, so
 	# two people watching the same sandbox hear the same thing. It costs nothing and it is
 	# what makes an audio bug reproducible.
