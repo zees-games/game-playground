@@ -811,6 +811,23 @@ func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
 	if hud != null:
 		hud.confirm_hit(victim, amount, point, killed, headshot)
+	_draw_body_hit(_zee_rig(), point)
+
+
+## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a
+## body the client's presentation ray never meets (a target hit through the server's hitboxes). The rig's effects skip a second drawing
+## of a hit the ray already drew. Through `has_method`: an older shell's zee has no
+## `play_body_hit`.
+func _draw_body_hit(rig: Object, point: Vector3) -> void:
+	if rig == null or not is_instance_valid(rig) or not rig.has_method(&"shot_fx"):
+		return
+	var fx: Object = rig.call(&"shot_fx")
+	if fx == null or not fx.has_method(&"play_body_hit"):
+		return
+	var from: Vector3 = point + Vector3.UP
+	if player != null and is_instance_valid(player):
+		from = player.global_position + Vector3(0.0, 1.6, 0.0)
+	fx.call(&"play_body_hit", point, point - from)
 
 
 ## Somebody's health changed, or they died. Drawn, never decided.
