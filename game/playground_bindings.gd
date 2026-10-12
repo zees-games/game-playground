@@ -76,4 +76,6 @@ static func make() -> DotMenuBindings:
 	# dot-voice's talk action (DotVoiceManager.TALK_ACTION), on K because V is the checkpoint.
 	keys.add_voice("General", "K")
 	keys.add_help("General")
-	return keys
+	# Clear checkpoints' default moved from B under saved documents: a player who never touched
+	# it follows to G, a key they chose stays.
+	return keys.renamed(&"bind_checkpoint_clear", ["B"])
