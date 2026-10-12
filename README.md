@@ -174,7 +174,7 @@ With `pg_shop 1`, spawning costs money. A player's bag is a 10 x 6 grid with a 4
 [`CLAUDE.md`](CLAUDE.md) has the design decisions and the reasoning behind them.
 
 ## Credits
-The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons), which credits its own art. The props and the menu icons are drawn from their definitions. People and NPCs are drawn with [Kenney's Blocky Characters](https://kenney.nl/assets/blocky-characters) (CC0), in `assets/kenney/characters/` with its licence beside it. The maps are drawn over [Kenney's Prototype Textures](https://kenney.nl/assets/prototype-textures) (CC0), in `assets/kenney/prototype/` with its licence.
+The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons), which credits its own art. The props and the menu icons are drawn from their definitions. People and NPCs are the family's animated people from Quaternius' [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html) (CC0 1.0, credited in dot-player-char), coloured from [Kenney's Blocky Characters](https://kenney.nl/assets/blocky-characters) skins (CC0) the site's avatar uses. The maps are drawn over [Kenney's Prototype Textures](https://kenney.nl/assets/prototype-textures) (CC0), in `assets/kenney/prototype/` with its licence.
 
 ## License
 MIT. See [LICENSE](LICENSE).

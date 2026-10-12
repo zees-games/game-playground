@@ -205,6 +205,28 @@ func body() -> Node3D:
 	return _parts if _parts != null and is_instance_valid(_parts) else null
 
 
+## Tells the person how the player moves this frame and advances its clip: `speed`,
+## `vertical`, `on_floor`, `crouched` (a seated player is drawn crouched). Once a frame, from the
+## client, for every player; a capsule ignores it.
+func move_person(motion: Dictionary) -> void:
+	var person := _parts.get_node_or_null(^"Figure") as DotHumanoidFigure if _parts != null else null
+	if person == null:
+		return
+	var now := Time.get_ticks_usec()
+	var delta := 0.0 if _moved_usec < 0 else clampf((now - _moved_usec) / 1e6, 0.0, 0.1)
+	_moved_usec = now
+	var wanted := motion.duplicate()
+	if _seated_pose:
+		wanted["crouched"] = true
+		wanted["on_floor"] = true
+		wanted["speed"] = 0.0
+	person.set_motion(wanted)
+	person.animate(float(wanted.get("speed", 0.0)), delta)
+
+
+var _moved_usec: int = -1
+
+
 func is_seated_pose() -> bool:
 	return _seated_pose
 
@@ -226,11 +248,9 @@ func _apply_pose() -> void:
 		var standing_y := float(node.get_meta(&"standing_y"))
 
 		if node.name == &"Figure":
-			# The kit's legs swing forward from the hip, a quarter turn about X in the
-			# model's own space (whose forward is +Z before the figure's half turn).
-			for leg in PlaygroundFigure.legs(node):
-				leg.rotation = Vector3(-PI * 0.5 if _seated_pose else 0.0, 0.0, 0.0)
-			node.position.y = standing_y - drop
+			# Seated is drawn as the person's crouch (the kit has no sitting clip), lowered
+			# onto the seat; see [method move_person].
+			node.position.y = standing_y - drop * 0.5
 		elif node.name == &"Legs":
 			if _seated_pose:
 				# Laid forward (-Z) along the seat, at the height of a thigh on a cushion.

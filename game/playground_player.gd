@@ -385,6 +385,13 @@ func refresh_body() -> void:
 func face_body() -> void:
 	if character != null and controller != null:
 		_face(controller.state.yaw)
+		var state := controller.state
+		character.move_person({
+			"speed": Vector2(state.velocity.x, state.velocity.z).length(),
+			"vertical": state.velocity.y,
+			"on_floor": state.is_grounded(),
+			"crouched": state.crouch_fraction > 0.5,
+		})
 
 
 ## A rider's body faces the vehicle, whoever is looking where. Everybody else's faces where

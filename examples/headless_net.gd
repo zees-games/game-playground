@@ -1230,10 +1230,11 @@ func _test_avatars_over_the_wire() -> void:
 	_check(mine != null and mine.skins == dressed, "the client has them",
 		str(mine.skins) if mine != null else "no player")
 	var figure: Node = mine.character.rig.find_child("Figure", true, false) if mine != null and mine.character != null else null
-	var head := figure.find_child("head", true, false) as MeshInstance3D if figure != null else null
-	var head_texture := ((head.material_override as StandardMaterial3D).albedo_texture as Texture2D) if head != null and head.material_override is StandardMaterial3D else null
-	_check(head_texture != null and head_texture.resource_path.ends_with("texture-%s.png" % PlaygroundAvatars.LETTERS[face]),
-		"and draws the member's face on the figure", head_texture.resource_path if head_texture != null else "no head")
+	# The figure is one of the family's people: the face's skin is its skin colour.
+	var person := figure as DotHumanoidFigure
+	var wanted_skin := Color(DotHumanoidLook.SITE_SKINS[PlaygroundAvatars.LETTERS[face]][0])
+	_check(person != null and person.look != null and person.look.skin.is_equal_approx(wanted_skin),
+		"and draws the member's face on the figure", str(person.look.to_dict()) if person != null and person.look != null else "no person")
 	_server_bridge.skin_fn = Callable()
 	_done()
 
@@ -4021,6 +4022,10 @@ func _test_zee_over_the_wire() -> void:
 	# A body drawn as the character kit's figure has no capsule: its torso is the kit's own
 	# `torso` mesh, and "outside the body" is past half its widest horizontal extent.
 	var kit_torso: Variant = mirror.character.rig.find_child("torso", true, false) if mirror != null and mirror.character != null else null
+	# One of the family's people: half its chest, measured off the people at 1.8 m.
+	if torso_radius <= 0.0 and mirror != null and mirror.character != null \
+			and mirror.character.rig.find_child("Figure", true, false) is DotHumanoidFigure:
+		torso_radius = 0.2
 	if torso_radius <= 0.0 and kit_torso is MeshInstance3D:
 		var box := (kit_torso as MeshInstance3D).global_transform * (kit_torso as MeshInstance3D).get_aabb()
 		torso_radius = maxf(box.size.x, box.size.z) * 0.5

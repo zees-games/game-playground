@@ -1,77 +1,47 @@
 extends RefCounted
-## A person drawn from the character kit: one model, its face, top and legs each painted
-## with one of the kit's eighteen atlases.
+## A person: one of the family's animated people (dot-player-char's `DotHumanoidFigure`, the
+## style every game's players, bots and NPCs share), dressed from the site's three choices.
 ##
 ## [b]Why a figure at all.[/b] Players and NPCs here were capsules, and a member who dressed
-## on the site walked into the sandbox as a coloured pill. The kit is CC0, the same art the
-## site's avatar editor draws, so a face picked on the site is the face drawn here.
+## on the site walked into the sandbox as a coloured pill.
 ##
-## [b]Per part, not per figure.[/b] Every character in the kit is byte-identical geometry
-## and UVs over a different atlas, and each limb is its own mesh, so the head can take one
-## atlas and the torso another. The minigames paint one atlas over the whole figure; this
-## game draws the site's three choices as three.
+## [b]Per part, still.[/b] The site's avatar is Kenney's blocky kit, a face, a top and legs each
+## one of its eighteen skins; the person takes its skin and hair from the face's skin (which
+## also picks which of the four bodies), its top from the top's and its trousers from the legs'
+## (`DotHumanoidLook.SITE_SKINS`), so a member is recognisable as what they chose.
 ##
-## [b]Turned half a turn.[/b] The kit is glTF, which faces +Z; everything here looks down -Z.
-## Unturned, every face is on the back of its head -- game-g2gfast and game-arena shipped
-## that and it took a render with a marker on the look direction to see it.
-##
-## [b]By path, rebased.[/b] Delivered, this game is mounted under `res://dot_cloud/...`, and
-## a model or an atlas named by its built path is the one file not there.
+## [b]Facing -Z, feet at the origin[/b], like every figure here; the person turns itself.
 
 const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundAvatars := preload("playground_avatars.gd")
 
 const CHANNEL := "playground.figure"
 
-static var MODEL := PlaygroundPaths.rebase("res://assets/kenney/characters/character-a.glb")
-static var TEXTURES := PlaygroundPaths.rebase("res://assets/kenney/characters/Textures/texture-%s.png")
-
-## Which of [face, top, legs] paints each mesh of the kit, by the mesh's name.
-const PART_SLOT := {
-	&"head": 0,
-	&"torso": 1, &"arm-left": 1, &"arm-right": 1,
-	&"leg-left": 2, &"leg-right": 2,
-}
-
-## The figure, [param height] metres tall with its feet at the origin and facing -Z, or null
-## when the kit's model is not in this build. [param skins] is [face, top, legs] as kit
+## The person, [param height] metres tall with its feet at the origin and facing -Z, or null
+## when the people's art is not in this build. [param skins] is [face, top, legs] as kit
 ## indices; a negative one takes the next slot's, and all negative takes [param fallback_key]
 ## hashed, so a guest is dressed the same on every machine.
 static func build(height: float, skins: PackedInt32Array, fallback_key: String = "") -> Node3D:
-	var scene: Variant = load(MODEL)
-
-	if not (scene is PackedScene):
-		DotLog.warn(CHANNEL, "no character model; drawing the capsule", {"path": MODEL})
-		return null
-
-	var model := (scene as PackedScene).instantiate() as Node3D
-
-	if model == null:
-		return null
-
 	var resolved := resolve(skins, fallback_key)
-	var bounds := _bounds(model, Transform3D.IDENTITY)
-	var scale_by := height / maxf(bounds.size.y, 0.01)
+	var face := PlaygroundAvatars.LETTERS[resolved[0]]
+	var look := DotHumanoidLook.from_letter(face)
+	if look == null:
+		look = DotHumanoidLook.stock(hash(fallback_key))
+	var top: DotHumanoidLook = DotHumanoidLook.from_letter(PlaygroundAvatars.LETTERS[resolved[1]])
+	var legs: DotHumanoidLook = DotHumanoidLook.from_letter(PlaygroundAvatars.LETTERS[resolved[2]])
+	if top != null:
+		look.top = top.top
+	if legs != null:
+		look.bottom = legs.bottom
 
-	model.name = "Figure"
-	model.basis = Basis(Vector3.UP, PI).scaled(Vector3.ONE * scale_by)
-	model.position = Vector3(0.0, -bounds.position.y * scale_by, 0.0)
-
-	for mesh in _meshes(model):
-		var slot: int = PART_SLOT.get(StringName(mesh.name), 1)
-		var material := _material(resolved[slot])
-		if material != null:
-			mesh.material_override = material
-
-	# The kit's own AnimationPlayer would pose the figure on a clock this game does not run;
-	# the body here is posed by the character, so the player is stopped rather than left to
-	# play whatever its default is.
-	var anim := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	if anim != null:
-		anim.stop()
-		anim.active = false
-
-	return model
+	var person := DotHumanoidFigure.new()
+	person.name = "Figure"
+	person.build(look, height)
+	if not person.from_art:
+		DotLog.warn(CHANNEL, "no people art; drawing the capsule", {})
+		person.free()
+		return null
+	return person
 
 
 ## [face, top, legs] with every slot filled: a missing one borrows the top's, then the
@@ -92,64 +62,9 @@ static func resolve(skins: PackedInt32Array, fallback_key: String) -> PackedInt3
 	return out
 
 
-## The kit's leg meshes, for a pose that moves them. Empty for a capsule.
-static func legs(figure: Node) -> Array[Node3D]:
-	var out: Array[Node3D] = []
-	if figure == null:
-		return out
-	for leg_name in ["leg-left", "leg-right"]:
-		var leg := figure.find_child(leg_name, true, false) as Node3D
-		if leg != null:
-			out.append(leg)
-	return out
-
-
-## Not cached here: the texture is the engine's resource cache's, and a static dictionary of
-## materials would outlive the game at exit, which `dedicated` asserts nothing does.
-static func _material(index: int) -> StandardMaterial3D:
-	var texture: Variant = load(TEXTURES % PlaygroundAvatars.LETTERS[index])
-
-	if not (texture is Texture2D):
-		DotLog.warn(CHANNEL, "a character atlas is missing", {"index": index})
-		return null
-
-	# Unshaded, as the kit's own material is, and nearest-filtered because it is pixel art.
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = texture
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	return m
-
-
-static func _bounds(node: Node, to_root: Transform3D) -> AABB:
-	var out := AABB()
-	var seeded := false
-	var mesh := node as MeshInstance3D
-
-	if mesh != null and mesh.mesh != null:
-		out = to_root * mesh.mesh.get_aabb()
-		seeded = true
-
-	for child in node.get_children():
-		var child_to_root := to_root
-		if child is Node3D:
-			child_to_root = to_root * (child as Node3D).transform
-		var inner := _bounds(child, child_to_root)
-		if inner.size == Vector3.ZERO and inner.position == Vector3.ZERO:
-			continue
-		out = inner if not seeded else out.merge(inner)
-		seeded = true
-
-	return out
-
-
-static func _meshes(node: Node) -> Array[MeshInstance3D]:
-	var out: Array[MeshInstance3D] = []
-	if node is MeshInstance3D:
-		out.append(node as MeshInstance3D)
-	for child in node.get_children():
-		out.append_array(_meshes(child))
-	return out
+## The person in [param figure], or null for a capsule.
+static func person_of(figure: Node) -> DotHumanoidFigure:
+	return figure as DotHumanoidFigure
 
 
 ## Swaps a body's primitive `Mesh` child for a figure [param height] tall, standing on the
@@ -166,6 +81,8 @@ static func dress_body(body: Node3D, height: float, key: String) -> bool:
 		return false
 
 	figure.position.y -= height * 0.5
+	# Nothing here knows how fast an NPC or a prop moves: the person measures it.
+	(figure as DotHumanoidFigure).auto_animate = true
 	body.add_child(figure)
 
 	var mesh := body.get_node_or_null(^"Mesh") as MeshInstance3D
