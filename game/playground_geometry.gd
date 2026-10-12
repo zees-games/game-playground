@@ -20,13 +20,17 @@ const PlaygroundPaths := preload("playground_paths.gd")
 ## The palette: what each kind of surface a movement map is made of is drawn in.
 ##
 ## [b]Pastels over a light grid, so a surface says what it is and the map reads as a sunny
-## place[/b] rather than a grey test level: a near-white floor, sky-blue ramps, a mint start,
+## place[/b] rather than a grey test level: a mid-grey floor, sky-blue ramps, a mint start,
 ## a pink end, lavender platforms, a saturated yellow for anything that throws you. Every
 ## built-in map and every custom document that names a colour ("ramp", "start") takes these,
 ## so a repaint is here and nowhere else; a document's own hex colours stay its own. They
 ## are albedo, sRGB, chosen bright because the grid texture under them is about 0.82 grey.
 ## Start and end keep their old meanings (green-ish and red-ish) so a route still reads.
-const COLOUR_FLOOR := Color(0.90, 0.91, 0.97)
+## The floor is the exception to "bright": a mid cool grey, because it fills half of every
+## frame, and near white (0.90, 0.91, 0.97) it rendered as a fifth of the lobby's pixels at
+## pure white under Compatibility; the pastels on it now read against it (game-arena's
+## ground is the same shade, for the same reason).
+const COLOUR_FLOOR := Color(0.66, 0.68, 0.76)
 const COLOUR_RAMP := Color(0.60, 0.82, 1.00)
 const COLOUR_START := Color(0.58, 0.96, 0.78)
 const COLOUR_END := Color(1.00, 0.62, 0.72)

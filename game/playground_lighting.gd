@@ -74,24 +74,22 @@ static func _paint_sky_top(parent: Node3D, lighting: Dictionary) -> void:
 				material.ground_bottom_color = material.sky_top_color
 
 
-## What this machine draws of a map's lighting.
+## What this machine draws of a map's lighting: dot-lighting's `painted()`.
+##
+## [b]`painted()` is the family's profile for flat-painted worlds[/b] (dot-lighting API 3):
+## a longer filmic shoulder and a lower exposure, a contrast and saturation grade, ambient
+## occlusion where Forward+ has it, and a shadowless fill from the side the sun is not on, so
+## a ramp's two shaded faces are two shades under Compatibility, which has no occlusion. Its
+## light numbers are per renderer, because Compatibility (the project's and the client
+## shell's) clips before it tone maps. Under the hand-set numbers it replaced (sun / 700, a
+## fill of 0.62) the lobby from a player's eye was still a fifth pure white.
 ##
 ## [b]The sky continues under the horizon[/b]: the sandbox and the surf maps float in the
 ## air, and from a ramp or a tower the default dark ground half is a brown void under the
 ## world. [b]A browser keeps dot-lighting's `web()`, shadows off[/b]: these maps are large
 ## (the sandbox alone is 200 m with a hundred boxes and whatever the players spawn) and
 ## the shadow pass draws all of it again.
-##
-## [b]The Compatibility renderer has no headroom above white, so the same light is turned
-## down for it.[/b] Forward+ lights into an HDR buffer and the filmic curve rolls a sunlit
-## pastel back under white; Compatibility clips it to flat white. The project and the
-## client shell are Compatibility, so that is the look most players get. The two numbers
-## are game-arena's, rendered side by side here too.
 static func profile() -> DotLightProfile:
-	var p := DotLightProfile.web() if OS.has_feature("web") else DotLightProfile.high()
+	var p := DotLightProfile.painted()
 	p.sky_below_horizon = true
-	p.ambient_energy = 1.0
-	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
-		p.brightness_reference = 700.0
-		p.ambient_energy = 0.62
 	return p
