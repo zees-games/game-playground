@@ -62,6 +62,7 @@ Short forms; the reasoning is in the linked file.
 
 **Simulation**
 
+- **Footsteps and a bed per map are dot-audio's stock** (`PlaygroundPresentation.keep_walkers`; a step's surface is the box's `dot_fps_surface`, the one the movement reads; `bed_for` by map prefix). Levels are measured with `addons/dot_audio/tools/loudness.sh` (−17 LUFS band, `loudness_trim_db`); stock ids have files, so the stand-in check skips them.
 - `Drive.EXTERNAL` always; the game ticks the controllers and **feeds the timer after the move**. [simulation](docs/simulation.md#the-game-owns-the-tick-loop)
 - Leave the controller's `body_ref` unset; `of_self()` is the controller, a plain `Node`, and the player never moves. [simulation](docs/simulation.md#body_ref-must-not-be-of_self)
 - Apply the movement style and the timer style together (`PlaygroundPlayer.set_style`); never write the live tunables (a style rebuild drops it). [simulation](docs/simulation.md#a-style-has-two-halves-and-they-move-together)

@@ -44,6 +44,12 @@ const BEAM_OFFSET := Vector3(0.14, -0.16, -0.35)
 var settings: DotSettingsManager = null
 var rng: DotRandomManager = null
 var audio: DotAudioManager = null
+
+## Everybody's footsteps by the box's material and a bed per map: dot-audio's stock (Kenney's
+## footsteps and generated beds, CC0; the addon's stock/CREDITS.md). A box's `dot_fps_surface`
+## meta, which the movement already reads, is what a step on it sounds like.
+var steps: DotAudioFootsteps = null
+var ambience: DotAudioAmbience = null
 var fx: DotFxManager = null
 ## The player's console, built by [method build_console] once the client has a menu.
 var console: DotConsoleController = null
@@ -284,6 +290,7 @@ func _apply_camera_motion() -> void:
 ## What a sandbox makes a noise about, which is mostly other people building.
 static func sound_catalogue() -> DotAudioCatalogue:
 	var c := DotAudioCatalogue.new()
+	DotAudioStock.add_to(c)
 
 	var spawn := DotAudioDef.new()
 	spawn.id = &"prop_spawn"
@@ -478,6 +485,11 @@ func _build_audio() -> DotResult:
 	audio.mixer = DotAudioMixer.new()
 	audio.mixer.master = settings.get_float(&"master_volume", 0.8)
 	audio.voices = 24
+	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in walk
+	# round the lobby read -28.9 LUFS with the bed and the steps in (digital silence before),
+	# -24.6 at +6. The stand-in builds nothing, so that is the room with nobody playing in it;
+	# the trim is held at +6 until a run with props falling sets it.
+	audio.loudness_trim_db = 6.0
 	# Deterministic: the pitch of a crate landing comes out of the session's own seed, so
 	# two people watching the same sandbox hear the same thing. It costs nothing and it is
 	# what makes an audio bug reproducible.
@@ -487,6 +499,19 @@ func _build_audio() -> DotResult:
 	var res := audio.setup()
 	if not res.ok:
 		return res.wrap("the playground's audio")
+
+	steps = DotAudioFootsteps.new()
+	steps.name = "Footsteps"
+	steps.manager = audio
+	add_child(steps)
+	ambience = DotAudioAmbience.new()
+	ambience.name = "Ambience"
+	ambience.manager = audio
+	# Held back under the trim: a sandbox is mostly somebody building, and the bed is the
+	# room it happens in, not the thing to listen to.
+	ambience.level = 0.8
+	add_child(ambience)
+	ambience.set_map_bed(bed_for(&""))
 
 	# Only on a real sink, and only after setup: the manager decides whether there is a
 	# device, and on a headless server there is nothing to bake for. Building the bank
@@ -856,8 +881,28 @@ func on_wave_incoming() -> void:
 	fx.flash(&"wave_flash")
 
 
-func on_map_changed() -> void:
+func on_map_changed(map_id: StringName = &"") -> void:
 	fx.clear()
+	if ambience != null:
+		ambience.set_map_bed(bed_for(map_id))
+
+
+## A map's bed, from its name: a surf map is ramps in the air (wind), a climb map is rock, the
+## sandbox and everything else is outdoors. By prefix (after this game's `pg_`), because an
+## imported or custom map is named by its author.
+static func bed_for(map_id: StringName) -> StringName:
+	var id := String(map_id).to_lower().trim_prefix("pg_")
+	if id.begins_with("surf_"):
+		return &"amb_wind"
+	if id.begins_with("kz_") or id.begins_with("climb_"):
+		return &"amb_cave"
+	return &"amb_outdoor"
+
+
+## Everybody on the map steps, once a frame: players and bots alike.
+func keep_walkers(bodies: Array) -> void:
+	if steps != null:
+		steps.keep(bodies)
 
 
 func on_server_clamps(request: Dictionary) -> PackedStringArray:

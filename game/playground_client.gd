@@ -377,7 +377,7 @@ func _wire_presentation() -> void:
 
 	# Both ends: a map change frees the world the live effects are parented into.
 	playground.maps.changed.connect(
-		func(_map: DotMapDef, _loaded: Node) -> void: presentation.on_map_changed()
+		func(map: DotMapDef, _loaded: Node) -> void: presentation.on_map_changed(map.id if map != null else &"")
 	)
 	# Glass breaking is heard on both ends: offline the game breaks it, connected the server's
 	# PANE event does, and either way the signal is this end's.
@@ -1160,6 +1160,7 @@ func _process(_delta: float) -> void:
 		var forward := -camera.global_transform.basis.z \
 			if camera != null and camera.is_inside_tree() else Vector3.FORWARD
 		presentation.present(_delta, eye, forward)
+		presentation.keep_walkers(playground.players.values())
 		_present_tool_beam(eye, forward)
 
 	var _bodies := present_frame(net, playground)

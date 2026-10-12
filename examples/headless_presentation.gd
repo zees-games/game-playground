@@ -1183,7 +1183,8 @@ func _test_every_sound_has_a_voice() -> void:
 
 	var uncovered: Array[String] = []
 	for id in cat.ids():
-		if not recipes.has(id):
+		# dot-audio's stock footsteps and beds are files the addon ships: no stand-in needed.
+		if not recipes.has(id) and not DotAudioStock.ids().has(id):
 			uncovered.append(String(id))
 	_check(
 		uncovered.is_empty(),
