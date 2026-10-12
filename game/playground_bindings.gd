@@ -34,6 +34,9 @@ const CHECKPOINT_NEXT := &"pg_checkpoint_next"
 const CHECKPOINT_CLEAR := &"pg_checkpoint_clear"
 const VIEW := &"pg_view"
 const SCOREBOARD := &"pg_scoreboard"
+## The chat box's own actions (`PlaygroundPresentation`'s `DotChatWindow`).
+const CHAT := &"playground_chat"
+const CHAT_NEAR := &"playground_chat_near"
 
 
 static func make() -> DotMenuBindings:
@@ -61,6 +64,10 @@ static func make() -> DotMenuBindings:
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(MAP, &"bind_map", "Vote for another map", "M", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
+	# The chat keys keep the settings they were stored under before this table existed
+	# (declared in `PlaygroundPresentation.schema`, per ACCOUNT, applied there as well).
+	keys.add(CHAT, &"chat_open_key", "Chat", "Y", "General", DotSettingsDef.Scope.ACCOUNT)
+	keys.add(CHAT_NEAR, &"chat_near_key", "Chat with nearby players", "U", "General", DotSettingsDef.Scope.ACCOUNT)
 	# dot-voice's talk action (DotVoiceManager.TALK_ACTION), on K because V is the checkpoint.
 	keys.add_voice("General", "K")
 	keys.add_help("General")
