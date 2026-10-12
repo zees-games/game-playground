@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 890
+const CHECKS := 891
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7323,7 +7323,7 @@ func _test_the_client_boots() -> void:
 	# and nothing called `bind_look`, so the view turned at DotFpsTunables' default (0.25
 	# degrees per count) whatever the player chose. Read off the tunables the sampler turns
 	# the view with, offline and for the connected client's own sampler, which `_adopt`
-	# hands a fresh tunables object. Armed: without `_bind_look` all three fail.
+	# hands a fresh tunables object. Armed: without `_bind_look` all four fail.
 	var look_settings: DotSettingsManager = (
 		client.presentation.settings if client.presentation != null else null
 	)
@@ -7355,6 +7355,14 @@ func _test_the_client_boots() -> void:
 		"and the connected client's sampler, rebound when it adopts its player, follows it too",
 		"%.4f" % net_sampler.tunables.mouse_sensitivity
 	)
+	if look_settings != null:
+		look_settings.set_value(&"invert_mouse", true)
+	_check(
+		look != null and look.invert_look_y and net_sampler.tunables.invert_look_y,
+		"and inverting the vertical look inverts both"
+	)
+	if look_settings != null:
+		look_settings.set_value(&"invert_mouse", false)
 
 	# [b]The mouse, end to end.[/b] Nothing in this family had ever delivered an
 	# `InputEventMouseMotion` to a client and looked at what happened, which is how a

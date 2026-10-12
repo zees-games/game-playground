@@ -104,6 +104,7 @@ func _initialize() -> void:
 		{"id": &"game_menu", "file": "menu_general_end.png", "page": &"general", "scroll_end": true},
 		{"id": &"game_menu", "file": "menu_video.png", "page": &"video"},
 		{"id": &"game_menu", "file": "menu_audio.png", "page": &"audio"},
+		{"id": &"game_menu", "file": "menu_controls.png", "page": &"controls"},
 		{"id": &"board", "file": "menu_scoreboard.png"},
 		# The console, open: DotConsoleKit's panel, on the layer it puts it on.
 		{"id": &"console", "file": "console.png"},

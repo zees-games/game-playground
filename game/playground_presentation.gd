@@ -176,7 +176,10 @@ static func schema() -> DotSettingsSchema:
 	# The window, the frame rate, the theme and the frame-rate counter: dot-menu's stock
 	# settings, applied by the client's DotMenuApplier and its DotMenu. The keys above that
 	# are also stock (volumes, field of view, effects, shake) stay as declared here.
-	DotMenuStock.declare(s, [DotMenuStock.GROUP_VIDEO, DotMenuStock.GROUP_INTERFACE] as Array[StringName])
+	# GROUP_CONTROLS for `invert_mouse` (sensitivity is declared above, so it is skipped):
+	# the Controls page drew its row only once the key existed, and the applier inverts the
+	# sampler's look with it.
+	DotMenuStock.declare(s, [DotMenuStock.GROUP_VIDEO, DotMenuStock.GROUP_INTERFACE, DotMenuStock.GROUP_CONTROLS] as Array[StringName])
 	return s
 
 
