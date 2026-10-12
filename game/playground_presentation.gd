@@ -414,6 +414,24 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	wave.priority = 100
 	c.add(wave)
 
+	# A body landing: dot-player-char's stock death sounds (Kenney, CC0), shipped in the addon.
+	for row: Dictionary in DotPlayerDeathSounds.rows():
+		var fall := DotAudioDef.new()
+		fall.id = row["id"]
+		fall.path = row["path"]
+		fall.variants = row["variants"]
+		fall.kind = DotAudioDef.Kind.POSITIONAL_3D
+		fall.bus = &"SFX"
+		fall.unit_size = 8.0
+		fall.max_distance = 45.0
+		fall.max_concurrent = 3
+		fall.priority = 50
+		fall.gain_db = float(row["gain_db"])
+		fall.pitch_min = float(row["pitch_min"])
+		fall.pitch_max = float(row["pitch_max"])
+		fall.cooldown_ms = int(row["cooldown_ms"])
+		c.add(fall)
+
 	return c
 
 
@@ -445,6 +463,11 @@ static func sound_recipes() -> Dictionary:
 		PlaygroundVote.CUE_WARNING: DotAudioSynth.Voice.BLIP,
 		PlaygroundVote.CUE_COUNT: DotAudioSynth.Voice.STEP,
 		BEACON_SOUND: DotAudioSynth.Voice.BLIP,
+		# Stand-ins only for a build without dot-player-char's files.
+		DotPlayerDeathReactions.SOUND_THUD: DotAudioSynth.Voice.IMPACT,
+		DotPlayerDeathReactions.SOUND_FACE_PLANT: DotAudioSynth.Voice.IMPACT,
+		DotPlayerDeathReactions.SOUND_SLUMP: DotAudioSynth.Voice.STEP,
+		DotPlayerDeathReactions.SOUND_WHOOSH: DotAudioSynth.Voice.SPAWN,
 	}
 
 
@@ -808,6 +831,14 @@ func on_vote_cue(id: StringName) -> int:
 		return 0
 
 	return audio.play(id)
+
+
+## A dead body's sound (dot-player-char's ragdolls), where it landed. Returns the voice.
+func on_body(id: StringName, at: Vector3, volume: float) -> int:
+	if audio == null:
+		return 0
+
+	return audio.play_at(id, at, clampf(volume, 0.3, 1.0))
 
 
 ## A beacon's ripple went out from [param at]. From `PlaygroundClient._process`, on every

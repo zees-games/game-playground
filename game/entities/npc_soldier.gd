@@ -206,6 +206,8 @@ func _die(by: StringName) -> void:
 	if brain != null:
 		brain.call("died", by)
 
+	# How the body falls on every screen; the bridge sends it with the PROP_GONE.
+	var _fall := game.decide_npc_death(self, by)
 	game.props.remove(instance.instance_id, &"killed")
 
 

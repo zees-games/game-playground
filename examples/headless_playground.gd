@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 899
+const CHECKS := 903
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7318,6 +7318,35 @@ func _test_the_client_boots() -> void:
 		and client.player.sampler != null,
 		"and the player samples input, with a sampler actually built"
 	)
+
+	# [b]A death draws the server's fall from the body this client draws.[/b] Connected the
+	# reaction comes on COMBAT; here it is handed over, which is the half no wire check sees.
+	# Armed by spawning from the character node instead of its body (the parts check fails:
+	# the capsule-and-marker node is not the figure) and by ignoring the rules (the topple).
+	client._build_ragdolls()
+	var other := client.playground.add_player(&"u66", "Fallen")
+	other.teleport(client.player.controller.state.position + Vector3(0.0, 0.0, -4.0))
+	await get_tree().process_frame
+	var crumple := DotPlayerDeath.new()
+	crumple.reaction = DotPlayerDeathReactions.CRUMPLE
+	var body := client.fall(&"u66", crumple)
+	_check(body != null and body.reaction.id == DotPlayerDeathReactions.CRUMPLE and body.part_count() > 1
+			and not other.character.body().visible,
+		"a death falls as the server's reaction, copied from the drawn figure, which is hidden",
+		str(body.describe()) if body != null else "no body")
+	client.rise(&"u66")
+	_check(other.character.body().visible, "and a return draws the figure again")
+	client.ragdolls.clear()
+	var _off := client.playground.ragdoll_rules.set_cvar("sv_ragdoll", "0")
+	var toppled := client.fall(&"u66", crumple)
+	_check(toppled != null and toppled.style == DotPlayerRagdollRules.Style.TOPPLE,
+		"the server's sv_ragdoll 0 is the topple fallback")
+	var _on := client.playground.ragdoll_rules.set_cvar("sv_ragdoll", "1")
+	client.ragdolls.clear()
+	client.rise(&"u66")
+	_check(client.fall(client.player.player_id, crumple) == null,
+		"no ragdoll of your own body in first person")
+	client.playground.remove_player(&"u66")
 
 	# [b]The sensitivity slider reaches the sampler.[/b] It was declared, shown and saved,
 	# and nothing called `bind_look`, so the view turned at DotFpsTunables' default (0.25

@@ -122,6 +122,10 @@ signal peer_admitted(peer_id: int)
 signal chat_received(wire: Dictionary)
 signal voice_arrived(payload: PackedByteArray)
 signal combat_received(state: Dictionary)
+
+## A killed NPC's drawn figure and how it falls (the server's pick), just before its mirror
+## goes. Client side; the client copies a ragdoll from it.
+signal body_fell(figure: Node3D, death: DotPlayerDeath)
 signal match_received(state: Dictionary)
 signal progress_received(state: Dictionary)
 ## The map vote's cue and countdown second, from [method PlaygroundEvents.read_vote_cue].
@@ -637,6 +641,9 @@ func watch_npc_spawner(spawner: DotNpcSpawner, catalogue: DotNpcCatalogue) -> vo
 
 	spawner.spawned.connect(_on_npc_spawned)
 	spawner.removed.connect(_on_npc_removed)
+	# Before `removed`, while the body is there: how it falls, sent with the PROP_GONE.
+	spawner.died.connect(func(npc: DotNpcInstance, by: StringName) -> void:
+		var _fall := game.decide_npc_death(npc.node as Node3D, by, npc.def.max_health if npc.def != null else 0.0))
 
 
 func _on_npc_spawned(npc: DotNpcInstance) -> void:
@@ -682,7 +689,16 @@ func _on_npc_removed(npc: DotNpcInstance, reason: StringName) -> void:
 
 	var net_id := behaviour.identity.net_id
 	net.registry.unregister(net_id)
-	_broadcast(PlaygroundEvents.Kind.PROP_GONE, PlaygroundEvents.write_prop_gone(net_id, reason))
+	_broadcast(PlaygroundEvents.Kind.PROP_GONE, PlaygroundEvents.write_prop_gone(
+		net_id, reason, _death_of(npc.node, reason)))
+
+
+## The fall [method Playground.decide_npc_death] left on a killed body, or null.
+static func _death_of(node: Object, reason: StringName) -> DotPlayerDeath:
+	if reason != DotNpcSpawner.REASON_KILLED or node == null or not is_instance_valid(node):
+		return null
+	var death: Variant = node.get_meta(&"pg_death") if node.has_meta(&"pg_death") else null
+	return death as DotPlayerDeath
 
 
 func _on_prop_removed(prop: DotPropInstance, reason: StringName) -> void:
@@ -698,7 +714,8 @@ func _on_prop_removed(prop: DotPropInstance, reason: StringName) -> void:
 	var net_id := behaviour.identity.net_id
 	net.registry.unregister(net_id)
 
-	_broadcast(PlaygroundEvents.Kind.PROP_GONE, PlaygroundEvents.write_prop_gone(net_id, reason))
+	_broadcast(PlaygroundEvents.Kind.PROP_GONE, PlaygroundEvents.write_prop_gone(
+		net_id, reason, _death_of(prop.node, reason)))
 
 
 ## A refusal goes to the one player who asked, not to everybody. A budget message is
@@ -2230,6 +2247,11 @@ func _apply_prop_gone(reader: DotNetReader) -> void:
 		net.registry.unregister(net_id)
 
 	if behaviour.prop != null and is_instance_valid(behaviour.prop):
+		# A killed NPC goes down the way the server picked, copied from its drawn figure
+		# before the mirror goes.
+		var figure := behaviour.prop.get_node_or_null(^"Figure") as Node3D
+		if info.has("death") and figure != null:
+			body_fell.emit(figure, info["death"])
 		behaviour.prop.queue_free()
 
 	props_changed.emit()
@@ -2299,11 +2321,12 @@ func send_chat(peer_id: int, wire: Dictionary) -> void:
 
 ## Somebody's health changed, or they died. Server side.
 func broadcast_combat(
-	player_id: int, health: int, armour: int, attacker_id: int, died: bool
+	player_id: int, health: int, armour: int, attacker_id: int, died: bool,
+	death: DotPlayerDeath = null
 ) -> void:
 	_broadcast(
 		PlaygroundEvents.Kind.COMBAT,
-		PlaygroundEvents.write_combat(player_id, health, armour, attacker_id, died)
+		PlaygroundEvents.write_combat(player_id, health, armour, attacker_id, died, death)
 	)
 
 

@@ -199,6 +199,12 @@ func set_seated(seated: bool) -> void:
 	_apply_pose()
 
 
+## The drawn body (the kit's figure or the capsules): what a death copies into a ragdoll and
+## hides until the player is back. Null before [method build_for].
+func body() -> Node3D:
+	return _parts if _parts != null and is_instance_valid(_parts) else null
+
+
 func is_seated_pose() -> bool:
 	return _seated_pose
 

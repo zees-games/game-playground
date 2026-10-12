@@ -60,6 +60,10 @@ var player_node: DotPlayer = null
 ## The body other people see. Null until [method build_character] is called.
 var character: PlaygroundCharacter = null
 
+## How this player's body fell on their last death: the server's pick
+## ([method PlaygroundArena.decide_death]), carried on COMBAT. Null before one.
+var death: DotPlayerDeath = null
+
 ## The locomotion state machine over that body.
 var anim: DotPlayerAnimDriver = null
 

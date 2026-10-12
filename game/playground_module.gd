@@ -372,6 +372,12 @@ func _module_load() -> DotResult:
 	# NOTIFY, because players should know the NPCs just got harder.
 	game.npc_skill.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
 
+	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's
+	# reaction from them; REPLICATED, because the clients draw the bodies.
+	var _ragdolls := game.ragdoll_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	_bind_limits()
 	_bind_pickup()
 	_bind_creative()
@@ -721,6 +727,12 @@ func _build_extras() -> DotResult:
 	downs.died.connect(func(player_id: StringName, _reason: StringName) -> void:
 		if arena.enabled and player_id != &"":
 			arena.match_node.report_kill("", String(player_id), &"bleed_out", game.current_tick())
+			# A death like any other from here on, which it was not: nothing told a client a
+			# downed player had bled out. They crumple where they lay.
+			var fallen: PlaygroundPlayer = game.players.get(player_id, null)
+			if fallen != null:
+				fallen.death = arena.decide_death(player_id, null, DotPlayerDeathReactions.CRUMPLE)
+			arena.player_killed.emit(player_id, &"")
 	)
 
 	downs.revived.connect(func(player_id: StringName, _by: StringName, health: float) -> void:
@@ -994,7 +1006,11 @@ func _on_health_changed(
 
 
 func _on_player_killed(victim: StringName, killer: StringName) -> void:
-	bridge.broadcast_combat(_session_of(victim), 0, 0, _session_of(killer), true)
+	var fallen: PlaygroundPlayer = game.players.get(victim, null)
+	bridge.broadcast_combat(
+		_session_of(victim), 0, 0, _session_of(killer), true,
+		fallen.death if fallen != null else null
+	)
 
 	if progress != null:
 		progress.note(victim, &"deaths", 1.0)

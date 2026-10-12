@@ -92,6 +92,9 @@ var _health: Dictionary = {}
 
 var _tick: int = 0
 
+## The zee weapon definitions by id, for the death reaction a weapon asks for. Built on first use.
+var _weapon_defs: Dictionary = {}
+
 
 # --- The catalogue ---------------------------------------------------------
 
@@ -661,8 +664,39 @@ func _on_killed(entity_id: int, damage: DotDamage) -> void:
 	# queue all agree.[/b] A game that scored a kill itself and then queued a respawn
 	# separately would have two counts of the same event, and the one that is wrong is
 	# whichever nobody prints.
+	# How the body falls, picked once, here, and carried on COMBAT to every client.
+	var fallen: PlaygroundPlayer = game.players.get(victim, null)
+	if fallen != null:
+		fallen.death = decide_death(victim, damage)
+
 	match_node.report_kill(String(killer), String(victim), DAMAGE_ID, _tick)
 	player_killed.emit(victim, killer)
+
+
+## The fall a death gets: dot-player-char's reaction rule over the server's
+## `sv_ragdoll_reactions`, seeded from the victim's entity and the tick, with the killing zee
+## weapon's def (the sniper and the launcher always throw the body). The push is the shot's,
+## or away from the killer. [param named] is a reaction asked for outright, for a death that is
+## not a weapon's: a downed player bleeding out crumples where they lay.
+func decide_death(victim: StringName, damage: DotDamage, named: StringName = &"") -> DotPlayerDeath:
+	if _weapon_defs.is_empty():
+		_weapon_defs = ZeeWeaponPack.table()
+	var player: PlaygroundPlayer = game.players.get(victim, null)
+	var direction := damage.direction if damage != null else Vector3.ZERO
+	if direction.length_squared() < 0.0001 and damage != null and player != null:
+		var attacker: PlaygroundPlayer = game.players.get(game.entity_table.key_for_id(damage.attacker), null)
+		if attacker != null and attacker != player:
+			direction = player.controller.state.position - attacker.controller.state.position
+	direction.y = 0.0
+	return DotPlayerDeath.decide(
+		game.ragdoll_rules.reactions(),
+		damage != null and damage.hit_group == DotHitGroup.HEAD,
+		damage.amount if damage != null else 0.0,
+		direction,
+		DotPlayerDeath.seed_of(entity_id_of(victim), _tick),
+		_weapon_defs.get(damage.weapon_id) if damage != null else null,
+		-1.0, named
+	)
 
 
 func _on_state_changed(_from: DotMatch.State, _to: DotMatch.State) -> void:

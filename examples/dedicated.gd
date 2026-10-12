@@ -46,7 +46,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 27
-const CHECKS := 253
+const CHECKS := 256
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -1090,6 +1090,41 @@ func _test_arena() -> void:
 		"self damage lands and is scaled down (%.1f)"
 			% (own.amount if own != null else -1.0)
 	)
+
+	# --- How a dead body falls: picked here, from the server's own weights ---
+	#
+	# Armed by deciding nothing in `_on_killed` (null) and by leaving the cvars unbound in
+	# the module (the replicated check fails and the pick is a draw over the stock weights).
+	var weights := server.console.find_cvar("sv_ragdoll_reactions")
+	_check(weights != null and weights.has_flag(DotConVar.FLAG_REPLICATED),
+		"the sv_ragdoll* set is bound, replicated, because the clients draw the bodies")
+	var carol := game.add_player(&"u902", "Carol")
+	arena.admit(&"u902", "Carol")
+	var start := arena._tick
+	for step in range(game.tick_rate * 5):
+		arena.tick(start + step + 1, 1.0 / float(game.tick_rate))
+	var _only := _run_command("sv_ragdoll_reactions limp=0,crumple=0,face_plant=1")
+	var killed: Array = []
+	var on_killed := func(victim: StringName, _killer: StringName) -> void: killed.append(victim)
+	arena.player_killed.connect(on_killed)
+	var fatal := arena.hurt(&"u901", &"u902", 500.0, 2.0)
+	_check(fatal != null and fatal.lethal and carol != null and carol.death != null
+			and carol.death.reaction == DotPlayerDeathReactions.FACE_PLANT,
+		"a kill picks the body's fall on the server, from sv_ragdoll_reactions",
+		str(carol.death.describe()) if carol != null and carol.death != null else "no death")
+	# A downed player bleeding out is a death too, which nothing told a client before: it
+	# crumples where it lay, and the arena announces it like any other.
+	var _stock := _run_command("sv_ragdoll_reactions limp=4,headshot_launch=6,power_launch=8,face_plant=1.5,crumple=2.5")
+	var downs: Object = _module().get("downs")
+	killed.clear()
+	if downs != null:
+		downs.died.emit(&"u902", &"bleed_out")
+	arena.player_killed.disconnect(on_killed)
+	_check(killed == [&"u902"] and carol.death != null
+			and carol.death.reaction == DotPlayerDeathReactions.CRUMPLE,
+		"and a bleed-out crumples, announced like any death", str(killed))
+	arena.release(&"u902")
+	game.remove_player(&"u902")
 
 	arena.release(&"u900")
 	arena.release(&"u901")

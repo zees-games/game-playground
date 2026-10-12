@@ -329,6 +329,11 @@ var player_stack: PlaygroundPlayerStack = null
 ## IS a world object with an id -- is the day this one takes the name.
 var entity_table := DotEntityTable.new()
 
+## What a dead body does, and which death reactions the server allows: dot-player-char's
+## `sv_ragdoll*` cvars, bound by the module (REPLICATED) and followed by a client through its
+## link, because the client draws the bodies. Decided with by [method PlaygroundArena.decide_death].
+var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
+
 var players: Dictionary = {}
 
 ## The movement half of each style, by id. The ranking half lives on the manager.
@@ -1661,6 +1666,25 @@ func candidate_position(id: StringName, fallback: Vector3 = Vector3.ZERO) -> Vec
 
 	var npc := armed_npc(id)
 	return npc.global_position + Vector3.UP * 0.4 if npc != null else fallback
+
+
+## How a dead NPC's body falls (a sandbox soldier, a wave): the reaction rule over the
+## server's `sv_ragdoll_reactions`, pushed away from [param by] when that is a player, from
+## [method next_seed]. Kept on the node as `pg_death` for the bridge, which sends it with the
+## PROP_GONE that takes the body away; every client copies a ragdoll from the figure it drew.
+func decide_npc_death(body: Node3D, by: StringName, damage: float = 0.0) -> DotPlayerDeath:
+	if body == null:
+		return null
+	var direction := Vector3.ZERO
+	var killer: PlaygroundPlayer = players.get(by, null)
+	if killer != null and killer.controller != null:
+		direction = body.global_position - killer.controller.state.position
+		direction.y = 0.0
+	var death := DotPlayerDeath.decide(
+		ragdoll_rules.reactions(), false, damage, direction, next_seed(&"npc_death")
+	)
+	body.set_meta(&"pg_death", death)
+	return death
 
 
 ## The combat entity id an armed NPC shoots as. Its candidate id's number: unique, stable

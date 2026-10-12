@@ -32,7 +32,7 @@ Some of what you can do:
 - **Save what you built** with `pg_save <name>` and load it again later with `pg_load <name>`.
 - **Break things** when the server has `pg_destruction 1`: crates and planks break apart and barrels explode.
 - **Creative mode.** Type `!creative` and nobody can touch you or your props, and you can't hurt anybody.
-- **Fight.** `pg_arena 1` turns on damage between players, and `pg_waves` sends waves of armed NPCs.
+- **Fight.** `pg_arena 1` turns on damage between players, and `pg_waves` sends waves of armed NPCs. The dead fall as ragdolls ([dot-player-char](https://github.com/modcommunity/dot-player-char)), players and NPCs alike; the server picks how each goes down and everybody sees the same fall (`sv_ragdoll 0` for a quick fall with no physics, `sv_ragdoll_reactions` to weight the falls).
 
 There are four maps:
 

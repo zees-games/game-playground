@@ -28,6 +28,16 @@ At zero health you go **down**, bleed out over ninety seconds, and picking you u
 - **`begin_revive` refuses unless both rescuer and casualty are real players.** `PlaygroundDowns._position_of` answers unknown ids with a far sentinel, so two unknown ids sit at the same point and pass every distance check.
 - **One player, one entity id: `Playground.entity_table`** (a `DotEntityTable`). The game opens a player's entity on join, before any layer wants one; arena and downs both ask the table. A fallback hash once gave a player two ids depending on which modes were on. `admit` still opens one for an id the game never saw (an operator adding somebody by hand) and closes it on release; whose entity it is is decided by which **node** it holds, before `_forget` frees anything. It is `entity_table` only because `Playground.entities` is already the sandbox's spawned-entity list; when those concepts merge it takes the name.
 
+### The dead fall
+
+A player killed in the arena, a downed player who bleeds out, and a killed NPC (a wave, a sandbox soldier) fall as dot-player-char's ragdolls (its `docs/ragdolls.md` has the reasoning).
+
+- **Both player paths carry the fall.** `PlaygroundArena.decide_death` runs in `_on_killed` (the shot's direction or away from the killer, the zee weapon's def) and for a bleed-out (named `crumple`), and the death rides COMBAT last and optional. Going down is not a death and draws nothing yet: the downed state has no look on a client at all (not converted yet).
+- **A bleed-out is announced like any death.** It only reached dot-match before: no COMBAT, no kill-feed line, nothing a client could draw. The module's `downs.died` handler now emits `arena.player_killed` as well.
+- **A killed NPC's fall rides its PROP_GONE** (`Playground.decide_npc_death` leaves it on the body as `pg_death`; the bridge sends it when the reason is `killed`), and the client copies the mirror's `Figure` before freeing it (`body_fell`).
+- **Connected only.** A solo sandbox has no arena and nobody dies; the client's `fall` and `rise` are what a COMBAT drives (`rise` on the respawn's COMBAT with health). Bodies land on `world`, `prop` and `frozen_prop`, never on a player. No ragdoll of your own body in first person.
+- The `sv_ragdoll*` cvars are the module's, REPLICATED, followed by the client.
+
 ## `pg_shop`: a sandbox with prices
 
 A free spawn menu has no pacing; a price list makes the wave mode worth playing (a wave pays, a jeep costs) without a new mechanic.

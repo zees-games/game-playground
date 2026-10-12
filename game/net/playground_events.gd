@@ -274,17 +274,25 @@ static func read_prop(r: DotNetReader) -> Dictionary:
 	}
 
 
-static func write_prop_gone(net_id: int, reason: StringName) -> PackedByteArray:
+## [param death] is how a killed NPC's body falls (the server's pick), last and optional.
+static func write_prop_gone(net_id: int, reason: StringName, death: DotPlayerDeath = null) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(net_id)
 	w.write_string(String(reason), ID_BYTES)
+	if death != null:
+		death.write_to(w)
 	return w.to_bytes()
 
 
 static func read_prop_gone(r: DotNetReader) -> Dictionary:
 	var net_id := r.read_varint()
 	var reason := r.read_string(ID_BYTES)
-	return {"net_id": net_id, "reason": StringName(reason), "ok": r.ok()}
+	var out := {"net_id": net_id, "reason": StringName(reason)}
+	# A byte or more left is the fall; less is the padding to the last byte.
+	if r.bits_remaining() >= 8:
+		out["death"] = DotPlayerDeath.read_from(r)
+	out["ok"] = r.ok()
+	return out
 
 
 ## What a player's physics gun is holding, or 0 for nothing. The beam is drawn from
@@ -583,8 +591,12 @@ const HEALTH_BITS := 8
 ## hit and not on a tick, so a per-tick field would send an unchanged byte at the snapshot
 ## rate for every player — and dot-net's delta encoding would still have to look at it.
 ## What matters about health is the moment it moves.
+##
+## A death carries how the body falls (dot-player-char's [DotPlayerDeath], the server's pick),
+## last and optional, so a client that reads only the fields above reads the rest.
 static func write_combat(
-	player_id: int, health: int, armour: int, attacker_id: int, died: bool
+	player_id: int, health: int, armour: int, attacker_id: int, died: bool,
+	death: DotPlayerDeath = null
 ) -> PackedByteArray:
 	var writer := DotNetWriter.new()
 	writer.write_varint(player_id)
@@ -592,6 +604,8 @@ static func write_combat(
 	writer.write_uint(clampi(armour, 0, 255), HEALTH_BITS)
 	writer.write_varint(maxi(0, attacker_id))
 	writer.write_bool(died)
+	if died and death != null:
+		death.write_to(writer)
 	return writer.to_bytes()
 
 
@@ -603,6 +617,9 @@ static func read_combat(reader: DotNetReader) -> Dictionary:
 		"attacker_id": reader.read_varint(),
 		"died": reader.read_bool(),
 	}
+	# A byte or more left is the fall; less is the padding to the last byte.
+	if bool(out["died"]) and reader.bits_remaining() >= 8:
+		out["death"] = DotPlayerDeath.read_from(reader)
 	out["ok"] = reader.ok()
 	return out
 

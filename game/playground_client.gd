@@ -465,6 +465,15 @@ func _build_netcode() -> DotResult:
 			state["settings"], str(state["refused"]))
 	)
 	bridge.combat_received.connect(_on_combat)
+	# The server's sv_ragdoll* set: this end draws the bodies. An older shell's link cannot say.
+	if link != null:
+		var _bodies := playground.ragdoll_rules.follow_cvars(link)
+	_build_ragdolls()
+	bridge.body_fell.connect(func(figure: Node3D, death: DotPlayerDeath) -> void:
+		if ragdolls != null and figure.is_inside_tree():
+			_land_on_the_world()
+			var _fell := ragdolls.spawn(figure, death)
+	)
 	bridge.hit_received.connect(_on_hit)
 	bridge.match_received.connect(_on_match)
 	bridge.progress_received.connect(_on_progress)
@@ -791,6 +800,13 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 
 ## Somebody's health changed, or they died. Drawn, never decided.
 func _on_combat(state: Dictionary) -> void:
+	# Anybody's body: down the way the server picked, up again with their health.
+	var key := PlaygroundNetBridge._player_key(int(state["player_id"]))
+	if bool(state["died"]):
+		var _fell := fall(key, state.get("death"))
+	elif int(state["health"]) > 0:
+		rise(key)
+
 	if int(state["player_id"]) != bridge.local_player_id:
 		return
 
@@ -799,6 +815,62 @@ func _on_combat(state: Dictionary) -> void:
 
 	if bool(state["died"]) and hud != null:
 		hud.notice("You were killed.")
+
+
+# --- Dead bodies -------------------------------------------------------------
+
+## Where the dead lie: dot-player-char's ragdolls under the server's rules. Connected only:
+## a solo sandbox has no arena and nobody dies.
+var ragdolls: DotPlayerRagdolls = null
+
+
+func _build_ragdolls() -> void:
+	if ragdolls != null:
+		return
+	ragdolls = DotPlayerRagdolls.new()
+	ragdolls.name = "Ragdolls"
+	ragdolls.rules = playground.ragdoll_rules
+	ragdolls.sound_fn = func(id: StringName, at: Vector3, volume: float) -> void:
+		if presentation != null:
+			var _played := presentation.on_body(id, at, volume)
+	add_child(ragdolls)
+	# A body on the old map's floor would hang in the new one's air.
+	playground.map_ready.connect(func(_map: DotMapDef) -> void:
+		ragdolls.clear()
+		for id: Variant in playground.players.keys():
+			rise(StringName(id))
+	)
+
+
+## [param id]'s body falls the way the server picked ([param death]; null is a plain drop),
+## copied from the body this client draws, which stays hidden until [method rise]. Null when
+## the style hides bodies or nobody here draws that body: your own in first person.
+func fall(id: StringName, death: DotPlayerDeath) -> DotPlayerRagdoll:
+	var who: PlaygroundPlayer = playground.players.get(id, null) if playground != null else null
+	if who == null or ragdolls == null or who.character == null:
+		return null
+	var body := who.character.body()
+	if body == null or not body.is_inside_tree() or not who.body_shown():
+		return null
+	_land_on_the_world()
+	var velocity := who.controller.state.velocity if who.controller != null else Vector3.ZERO
+	return ragdolls.spawn(body, death if death != null else DotPlayerDeath.new(), velocity)
+
+
+## The level is on `world` and props on their two layers; a body lands on those and on no
+## player, so nobody trips on a corpse.
+func _land_on_the_world() -> void:
+	var stack := playground.player_stack
+	if stack != null and stack.physics != null and stack.physics.layout != null:
+		playground.ragdoll_rules.collision_mask = stack.physics.layout.mask_of(
+			[&"world", &"prop", &"frozen_prop"] as Array[StringName])
+
+
+## [param id] is alive again: the body a fall hid is drawn again where they now stand.
+func rise(id: StringName) -> void:
+	var who: PlaygroundPlayer = playground.players.get(id, null) if playground != null else null
+	if who != null and who.character != null and who.character.body() != null:
+		who.character.body().visible = true
 
 
 ## The match clock.

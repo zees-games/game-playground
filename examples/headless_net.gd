@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 369
+const CHECKS := 371
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -297,7 +297,18 @@ func _test_event_wire() -> void:
 	var gone := PlaygroundEvents.read_prop_gone(
 		DotNetReader.new(PlaygroundEvents.write_prop_gone(77, &"undo"))
 	)
-	_check(int(gone["net_id"]) == 77 and gone["reason"] == &"undo", "prop_gone: id and reason")
+	_check(int(gone["net_id"]) == 77 and gone["reason"] == &"undo" and not gone.has("death"),
+		"prop_gone: id and reason, and no fall for a prop that was not killed")
+	var npc_fall := DotPlayerDeath.new()
+	npc_fall.reaction = DotPlayerDeathReactions.CRUMPLE
+	npc_fall.roll_seed = 31
+	var killed_npc := PlaygroundEvents.read_prop_gone(
+		DotNetReader.new(PlaygroundEvents.write_prop_gone(78, &"killed", npc_fall))
+	)
+	_check(bool(killed_npc["ok"]) and killed_npc.get("death") != null
+			and (killed_npc["death"] as DotPlayerDeath).reaction == DotPlayerDeathReactions.CRUMPLE
+			and (killed_npc["death"] as DotPlayerDeath).roll_seed == 31,
+		"prop_gone: a killed NPC carries how it falls", str(killed_npc))
 
 	var notice := PlaygroundEvents.read_notice(
 		DotNetReader.new(PlaygroundEvents.write_notice(9, "Budget reached."))
@@ -370,6 +381,20 @@ func _test_event_wire() -> void:
 		bool(hit["ok"]) and int(hit["health"]) == 63 and int(hit["armour"]) == 25
 			and int(hit["attacker_id"]) == 12 and not bool(hit["died"]),
 		"combat: health, armour, who did it and whether it was fatal"
+	)
+	var player_fall := DotPlayerDeath.new()
+	player_fall.reaction = DotPlayerDeathReactions.HEADSHOT_LAUNCH
+	player_fall.headshot = true
+	player_fall.direction = Vector3(0.0, 0.0, 1.0)
+	var died := PlaygroundEvents.read_combat(
+		DotNetReader.new(PlaygroundEvents.write_combat(9, 0, 0, 12, true, player_fall))
+	)
+	var carried: DotPlayerDeath = died.get("death")
+	_check(
+		bool(died["ok"]) and bool(died["died"]) and carried != null
+			and carried.reaction == DotPlayerDeathReactions.HEADSHOT_LAUNCH and carried.headshot
+			and carried.direction.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05,
+		"combat: a death carries the server's fall", str(died)
 	)
 
 	var clock := PlaygroundEvents.read_match(

@@ -111,6 +111,7 @@ Short forms; the reasoning is in the linked file.
 **Modes and services**
 
 - Every mode is off by default and a cvar. Stamp every `DotDamage` with a tick. [modes](docs/modes.md)
+- A death's fall is the server's pick (`PlaygroundArena.decide_death`, `Playground.decide_npc_death`), riding COMBAT or PROP_GONE last and optional; a bleed-out emits `arena.player_killed` too. [modes](docs/modes.md#the-dead-fall)
 - A spawn is asked, placed, then charged. [modes](docs/modes.md#pg_shop-a-sandbox-with-prices)
 - One entity id per player, from `Playground.entity_table`. [modes](docs/modes.md#downed-not-dead-shares-pg_waves)
 - One chat path (dot-server's cancelled in `hook_pre`); the chat key is the session id. [services](docs/services.md#chat-dot-chats-and-exactly-one-path)
