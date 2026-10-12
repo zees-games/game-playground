@@ -16,21 +16,32 @@ const PlaygroundPlayer := preload("playground_player.gd")
 ## How long a notice stays up, in seconds.
 const NOTICE_SECONDS := 4.0
 
-## The glance pieces (dot-ui API level 4) in this game's colours: the timer's translucent
-## black plate, so the corner block and the ammunition read as one HUD, the boost pads'
-## amber for a kill and a head, the start pads' green, and the timer's "behind" red for a
-## low magazine. Set on the HUD, so every piece under it inherits it.
+## This game's accent over whichever theme the player picked in the menu: the boost pads'
+## amber for a kill and a head, the start pads' green. The plate, the words and their outline
+## are the theme's (dark by default; the client hands this HUD to dot-menu's `follow_hud`), so
+## a light or high-contrast theme can change them. Set on the HUD too, so a HUD with no menu
+## (a suite, a render) has the accent over dot-ui's defaults.
 static func piece_theme() -> Theme:
 	var t := Theme.new()
 	var type := DotHudPiece.THEME_TYPE
-	t.set_color(&"plate", type, Color(0.0, 0.0, 0.0, 0.45))
-	t.set_color(&"plate_edge", type, Color(1.0, 1.0, 1.0, 0.10))
-	t.set_color(&"text", type, Color(0.97, 0.98, 1.0))
-	t.set_color(&"dim", type, Color(0.80, 0.84, 0.92))
 	t.set_color(&"highlight", type, PlaygroundGeometry.COLOUR_BOOST)
 	t.set_color(&"good", type, PlaygroundGeometry.COLOUR_START)
-	t.set_color(&"low", type, Color(0.95, 0.4, 0.35))
 	return t
+
+
+## The theme's HUD colours onto dot-timer's block (the time, the speed, the strafes), which is
+## not a dot-ui piece and so does not read the theme the menu sets on this HUD. What
+## game-g2gfast's HUD does with the same block. [param palette] is the menu's; null is the
+## default theme.
+func apply_theme(palette: DotMenuPalette = null) -> void:
+	var p := palette if palette != null else DotMenuPalette.new()
+	if timer_hud != null:
+		timer_hud.panel_colour = p.hud_plate
+		timer_hud.neutral_colour = p.hud_text
+		timer_hud.detail_colour = p.hud_detail
+		timer_hud.ahead_colour = p.hud_ahead
+		timer_hud.behind_colour = p.hud_behind
+		timer_hud.queue_redraw()
 
 
 ## What is in hand and how much is in it: a zee weapon's magazine and reserve, bottom right.

@@ -129,6 +129,7 @@ Short forms; the reasoning is in the linked file.
 - Chat lines go to the chat box, and to the HUD notice line only when there is no box (a ballot was drawn twice). [client](docs/client.md#the-chat-box)
 - The first-person camera is written in one place, `PlaygroundPlayer.present_camera` (motion, shake, recoil, field of view); there is no `DotFpsView`. [client](docs/client.md#the-first-person-camera)
 - The hit marker and damage numbers come from the server's `Kind.HIT` (`Playground.confirm_hit`, fed by all four damage paths), never the local rig; the glance pieces need a shell with dot-ui 4. [client](docs/client.md#the-hud)
+- The HUD follows the menu's theme and HUD size (`PlaygroundClient._follow_hud`: dot-menu's `follow_hud` by name, plus `PlaygroundHud.apply_theme` on `theme_changed` for dot-timer's block); `PlaygroundHud.piece_theme()` is the accent only (boost amber, start green), never plate, text or ink. `headless_playground` checks a theme change reaches the pieces and the timer. [client](docs/client.md#the-hud)
 - Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`build_console(menu)`). [client](docs/client.md#the-chat-box)
 
 ## Not here yet

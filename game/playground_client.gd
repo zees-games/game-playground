@@ -330,6 +330,7 @@ func _ready() -> void:
 	hud.name = "Hud"
 	hud.key_fn = key_for
 	add_child(hud)
+	_follow_hud()
 	if link == null:
 		hud.bind(playground, player_id)
 	# The vote's clock, handed over HERE rather than where the bridge is built: the netcode
@@ -1028,6 +1029,7 @@ func _build_pause() -> void:
 
 	add_general_rows(game_menu)
 	fill_help(game_menu.help)
+	_follow_hud()
 	game_menu.screen.actions.insert(0, {"id": &"servers", "text": "Servers"})
 	game_menu.screen.restyle(game_menu.kit)
 
@@ -1053,6 +1055,20 @@ func _build_pause() -> void:
 		_bind_look()
 
 	_wire_board()
+
+
+## The HUD in the menu's theme and at the player's HUD size, live (dot-menu's `follow_hud`,
+## by name for a client shell older than it): Christian's first play test asked for a darker
+## HUD a player can restyle in the menu. Whichever of the HUD and the menu comes second calls it.
+func _follow_hud() -> void:
+	if hud == null or game_menu == null:
+		return
+	if game_menu.has_method(&"follow_hud"):
+		game_menu.call(&"follow_hud", hud, PlaygroundHud.piece_theme())
+	# dot-timer's block is not a dot-ui piece: it takes the palette on every theme change.
+	hud.apply_theme(game_menu.palette())
+	if not game_menu.theme_changed.is_connected(hud.apply_theme):
+		game_menu.theme_changed.connect(hud.apply_theme)
 
 
 ## This game's rows on dot-menu's General page: the sandbox's own, and the camera motion.

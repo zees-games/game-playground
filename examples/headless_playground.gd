@@ -3,6 +3,7 @@ extends Node
 const Playground := preload("../game/playground.gd")
 const PlaygroundBrowser := preload("../game/client/playground_browser.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
+const PlaygroundGeometry := preload("../game/playground_geometry.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundEntity := preload("../game/entities/playground_entity.gd")
 const PlaygroundIcons := preload("../game/playground_icons.gd")
@@ -58,7 +59,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 903
+const CHECKS := 905
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7591,6 +7592,19 @@ func _test_the_client_boots() -> void:
 		client.active_sampler() == client.player.sampler,
 		"a local client's mouse feeds the player's own sampler"
 	)
+
+	# Christian's first play test: a darker HUD by default, restyled live by the menu's theme.
+	var plate := client.hud.ammo.colour(&"plate")
+	_check(client.game_menu.followed_huds().has(client.hud) and plate.get_luminance() < 0.1 and plate.a >= 0.7
+		and client.hud.ammo.colour(&"highlight") == PlaygroundGeometry.COLOUR_BOOST,
+		"the HUD is dark by default, in the menu's theme, with the boost amber as its accent", str(plate))
+	var _themed: Variant = client.game_menu.settings.set_value(&"ui_theme", &"contrast")
+	_check(client.hud.ammo.colour(&"plate") == client.game_menu.palette().hud_plate
+		and client.hud.hit_marker.colour(&"text") == client.game_menu.palette().hud_text
+		and client.hud.ammo.colour(&"highlight") == PlaygroundGeometry.COLOUR_BOOST
+		and client.hud.timer_hud.panel_colour == client.game_menu.palette().hud_plate,
+		"a theme picked in the menu reaches the pieces and the timer's block at once, the accent kept")
+	_themed = client.game_menu.settings.set_value(&"ui_theme", &"midnight")
 
 	# [b]Typing at the console must not walk the player.[/b] The sampler polls the keys
 	# every tick and a focused line edit does not stop `Input.is_action_pressed`; the
