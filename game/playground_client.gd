@@ -468,6 +468,10 @@ func _build_netcode() -> DotResult:
 	# The server's sv_ragdoll* set: this end draws the bodies. An older shell's link cannot say.
 	if link != null:
 		var _bodies := playground.ragdoll_rules.follow_cvars(link)
+		# The server's mp_forceview and mp_solidplayers: this end places its own camera and
+		# predicts its own player.
+		var _view := playground.view_rules.follow_cvars(link)
+		var _solid := playground.body_rules.follow_cvars(link)
 	_build_ragdolls()
 	bridge.body_fell.connect(func(figure: Node3D, death: DotPlayerDeath) -> void:
 		if ragdolls != null and figure.is_inside_tree():
@@ -624,6 +628,13 @@ func _build_view() -> void:
 	camera.current = true
 	player.add_child(camera)
 
+	# Somebody walking into the first-person camera is hidden at the lens. The third-person
+	# camera is dot-player-controller's rig, which has a fade of its own (`_build_view_switch`).
+	var fade := DotCameraFade.new()
+	fade.name = "Fade"
+	fade.bodies_fn = _other_players
+	camera.add_child(fade)
+
 	# The landing dip, the strafe lean and the widening, applied where `_process` writes the
 	# camera (`PlaygroundPlayer.present_camera`), at the player's camera motion settings.
 	player.enable_camera_motion()
@@ -644,6 +655,9 @@ func _build_view_switch() -> void:
 		return
 
 	player.samples_input = true
+
+	if not playground.view_rules.changed.is_connected(_on_view_rules_changed):
+		playground.view_rules.changed.connect(_on_view_rules_changed)
 
 	if not player.build_view_switch():
 		DotLog.warn(CHANNEL, "no view switch for the local player", {
@@ -2411,9 +2425,56 @@ func _toggle_view() -> void:
 	if player == null or player.controller_switch == null:
 		return
 
-	var now := player.set_view_mode(player.view_mode() == &"fp")
+	# Where the server's `mp_forceview` allows: the other view, or a line saying why not.
+	var third := player.view_mode() == &"tp"
+	var wanted := playground.view_rules.toggled(third)
+	if wanted == third:
+		if hud != null and playground.view_rules.refusal() != "":
+			hud.notice(playground.view_rules.refusal())
+		return
+
+	var now := player.set_view_mode(wanted)
+	_guard_rig()
 	if hud != null:
 		hud.notice("View: %s" % ("third person" if now == &"tp" else "first person"))
+
+
+## The server changed `mp_forceview`: the view it allows now.
+func _on_view_rules_changed() -> void:
+	if player == null or player.controller_switch == null:
+		return
+	var third := player.view_mode() == &"tp"
+	var allowed := playground.view_rules.resolve(third)
+	if allowed != third:
+		var _now := player.set_view_mode(allowed)
+		_guard_rig()
+
+
+## The third-person rig's boom stops at the level and props, never people, and its fade is
+## handed the other players (they have no collider the fade's query would find while
+## mp_solidplayers is 0).
+func _guard_rig() -> void:
+	var rig: DotTpsCameraRig = player.tps.rig if player != null and player.tps != null else null
+	if rig == null or rig.arm == null:
+		return
+	var layout: DotPhysicsLayout = playground.player_stack.physics.layout \
+		if playground.player_stack != null and playground.player_stack.physics != null else null
+	if layout != null:
+		rig.arm.collision_mask = layout.mask_of([&"world", &"prop"])
+	if rig.fade != null:
+		rig.fade.bodies_fn = _other_players
+
+
+## Everybody but this player, for the camera fades.
+func _other_players() -> Array:
+	var out: Array = []
+	if playground == null:
+		return out
+	for id in playground.players:
+		var other: Node3D = playground.players[id]
+		if other != player and is_instance_valid(other):
+			out.append(other)
+	return out
 
 
 func _cycle_track() -> void:

@@ -44,6 +44,9 @@ The landing is kicked when the drawn eye reaches the floor, not on the `landed` 
 - **`DotPlayerAnimDriver.auto_drive` is off**: it differentiates the body's transform, a second opinion about speed that disagrees with the controller exactly when a correction lands.
 - After `view_third_person`, make the first-person camera current again when switching back (the render tool once kept rendering from the third-person rig).
 - Who is shown and how remote bodies are placed and turned: [netcode.md](netcode.md#somebody-elses-body).
+- **The server decides whether F5 may** (`mp_forceview`, dot-player-controller's `DotPlayerViewRules`: 0 the player's choice, 1 first person only, 2 third person only), bound REPLICATED by the module and followed through the link; `_toggle_view` asks it and `_on_view_rules_changed` moves a player the server no longer allows.
+- **The rig's arm is dot-core's `DotCameraBoom`** (it was a spring arm): `_guard_rig` sets it to stop at the `world` and `prop` layers, never people, and hands its fade the other players; a `DotCameraFade` on the first-person camera hides somebody at the lens. `tools/camera_check.gd` flies the rig round the walls of the lobby (armed) and walks two players into each other.
+- **Players are solid to each other** (`mp_solidplayers` 1): `Playground._apply_body_mask` puts the player layer in the motor mask through `DotPlayerBodyRules.apply_to` and gives each body a standing `SolidHull`; set 0 for the genre's pass-through.
 
 ## People are drawn as people
 

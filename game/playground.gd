@@ -334,6 +334,12 @@ var entity_table := DotEntityTable.new()
 ## link, because the client draws the bodies. Decided with by [method PlaygroundArena.decide_death].
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
+## dot-player-controller's `mp_forceview` (may a player switch to third person) and
+## `mp_solidplayers` (do players block each other). Bound by the module (REPLICATED) and
+## followed by a client through its link.
+var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
+var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+
 var players: Dictionary = {}
 
 ## The movement half of each style, by id. The ranking half lives on the manager.
@@ -356,6 +362,9 @@ var external_tick: bool = false
 func _ready() -> void:
 	if config == null:
 		config = PlaygroundConfig.new()
+
+	if not body_rules.changed.is_connected(_on_body_rules_changed):
+		body_rules.changed.connect(_on_body_rules_changed)
 
 	# Layered before anything reads it: a file, then the environment, then argv.
 	var loaded := config.load_layered(config_file)
@@ -2078,7 +2087,7 @@ func add_player(id: StringName, display_name: String) -> PlaygroundPlayer:
 	# The layout's player mask rather than the magic 1. With props, entities and
 	# vehicles on their own layers, a mask of 1 is a player who walks through all three.
 	if player_stack != null:
-		player.use_collision_mask(player_stack.player_collision_mask())
+		_apply_body_mask(player)
 		# And a body other people can see. Built for every player, local or not: the one
 		# who does not need it is the LOCAL player in first person, and that is a
 		# `set_shown(false)` rather than a missing model.
@@ -3072,3 +3081,25 @@ func _track_is_driven(track: int) -> bool:
 	var map := current_map_node()
 
 	return map != null and map.track_is_driven(track)
+
+
+## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at
+## (a player's body has no shape of its own): with the rule on, somebody walking into you
+## stops at your shoulder instead of filling your screen. Through `apply_to`, which goes
+## through `set_collision_mask` (a style does not undo it) and makes the players' layer one a
+## player may walk out of.
+func _apply_body_mask(player: PlaygroundPlayer) -> void:
+	if player_stack == null or player == null or player.controller == null:
+		return
+	var layout: DotPhysicsLayout = player_stack.physics.layout if player_stack.physics != null else null
+	var players_layer := layout.layer_mask(&"player") if layout != null else 0
+	body_rules.apply_to(player.controller, player_stack.player_collision_mask(), players_layer)
+	var tunables := player.controller.tunables
+	body_rules.apply_hull(player, tunables.stand_height, tunables.radius)
+
+
+## `mp_solidplayers` changed: every player's mask and hull now.
+func _on_body_rules_changed() -> void:
+	for id in players:
+		_apply_body_mask(players[id] as PlaygroundPlayer)
+
