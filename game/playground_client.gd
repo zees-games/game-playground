@@ -1,6 +1,7 @@
 extends Node
 
 const Playground := preload("playground.gd")
+const PlaygroundBindings := preload("playground_bindings.gd")
 const PlaygroundBrowser := preload("client/playground_browser.gd")
 const PlaygroundConfig := preload("playground_config.gd")
 const PlaygroundHud := preload("playground_hud.gd")
@@ -130,6 +131,8 @@ var game_menu: DotMenu = null
 ## What pushes the window, frame-rate and theme settings at the engine. The presentation
 ## applies its own (volumes, view, effects) as it always did.
 var applier: DotMenuApplier = null
+## Every key this client reads ([PlaygroundBindings]), as the player has it bound.
+var keys: DotMenuBindings = null
 var menu: PlaygroundSpawnMenu = null
 
 ## The server list, on the same stack as the spawn menu.
@@ -325,6 +328,7 @@ func _ready() -> void:
 
 	hud = PlaygroundHud.new()
 	hud.name = "Hud"
+	hud.key_fn = key_for
 	add_child(hud)
 	if link == null:
 		hud.bind(playground, player_id)
@@ -856,6 +860,7 @@ func _build_screens() -> void:
 	menu.weapons = playground.weapons
 	menu.selected = selected_prop
 	menu.tool = tool
+	menu.key_fn = key_for
 	menu.prop_chosen.connect(_on_prop_chosen)
 	menu.weapon_chosen.connect(_on_weapon_chosen)
 	menu.tool_chosen.connect(_on_tool_chosen)
@@ -907,16 +912,26 @@ func _refresh_suspended() -> void:
 func _build_pause() -> void:
 	var settings: DotSettingsManager = presentation.settings if presentation != null else null
 
+	# The keys on the InputMap before anything reads them: the menu's help key, the sampler's
+	# movement and this client's own all come from the table now.
+	keys = PlaygroundBindings.make()
+	if settings != null:
+		keys.apply_all(settings)
+
 	game_menu = DotMenu.new()
 	game_menu.name = "GameMenu"
 	game_menu.settings = settings
+	game_menu.bindings = keys
 	var config := DotMenuConfig.new()
 	config.brand_name = "Playground"
-	config.show_help = false
 	var _layered := config.load_layered()
 	game_menu.config = config
 	game_menu.open_on_escape = false
 	game_menu.manage_pointer = false
+	# Leave is dot-menu's: off the server when connected (the shell takes the player back to
+	# its own menu), a quit solo on a desktop. `leave_requested` is still emitted for an
+	# embedder; until 2026-10-11 it was all Leave did, and nothing listened.
+	game_menu.leave_on_its_own = true
 	add_child(game_menu)
 	var _set := game_menu.setup()
 	# The console after the menu, so DotConsoleKit registers it as one of the menu's
@@ -925,6 +940,7 @@ func _build_pause() -> void:
 		presentation.build_console(game_menu)
 
 	add_general_rows(game_menu)
+	fill_help(game_menu.help)
 	game_menu.screen.actions.insert(0, {"id": &"servers", "text": "Servers"})
 	game_menu.screen.restyle(game_menu.kit)
 
@@ -938,6 +954,7 @@ func _build_pause() -> void:
 		applier = DotMenuApplier.new()
 		applier.name = "Applier"
 		applier.settings = settings
+		applier.bindings = keys
 		add_child(applier)
 		var _applied := applier.setup()
 		_bind_look()
@@ -952,7 +969,7 @@ static func add_general_rows(game_menu: DotMenu) -> void:
 	var general := game_menu.page(&"general")
 	if general != null:
 		general.section("Playground") \
-			.add(DotMenuRow.toggle(&"hold_to_open_menu", "Hold Q for the spawn menu", "Off: Q opens and closes it.")) \
+			.add(DotMenuRow.toggle(&"hold_to_open_menu", "Hold the spawn-menu key", "Off: pressing it opens the spawn menu and pressing it again closes it.")) \
 			.add(DotMenuRow.toggle(&"prop_sounds", "Prop sounds", "Crates, barrels and everything else you knock about."))
 		# Camera motion beside the sandbox's own rows: the dip, the lean and the widening, each a
 		# slider to Off for a player whom motion makes sick. The words are the settings' own.
@@ -965,6 +982,17 @@ static func add_general_rows(game_menu: DotMenu) -> void:
 			var def: DotSettingsDef = settings.schema.find(row[0]) if settings != null else null
 			var _added := motion.add(DotMenuRow.slider(row[0], row[1], def.description if def != null else "")
 				.formatted(func(v: float) -> String: return "Off" if v <= 0.0 else "%d%%" % roundi(v * 100.0)))
+
+
+## The help screen's goal and modes; the keys come from [PlaygroundBindings]. Static so
+## `tools/screenshot_menus` draws what the client builds.
+static func fill_help(help: DotMenuHelp) -> void:
+	if help == null:
+		return
+	help.about = "A sandbox: hold Q, pick a prop, an NPC, a vehicle or a weapon, and click it into the world. Pick things up with the physics gun, freeze them, throw them, weld and wire them, and undo what you made. Timed courses run in the corners, and on the surf and hop maps."
+	help.add_text("Building", "With the physics gun, hold the left mouse button on a prop to carry it, roll the wheel to push it away or pull it close, and press the right button to freeze it where it is. Hold the rotate key to turn what you carry with the mouse. The tool gun's tools are on the spawn menu's Tools tab.")
+	help.add_text("Running", "Leave a course's start zone and the timer runs until its end zone. Checkpoints are practice: a run that used one is not a record.")
+	help.add_text("Modes", "A server may turn on the arena (players can hurt each other), waves of NPCs with downs and revives, and a shop where everything has a price. Each is a server setting, so the menu tells you what this one has on.")
 
 
 func _on_menu_action_chosen(id: StringName) -> void:
@@ -1280,18 +1308,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	var key := event as InputEventKey
 
-	if key.physical_keycode == KEY_SHIFT:
+	# Every key below is a row of [PlaygroundBindings], matched by its action so a key moved
+	# on the Controls page moves what it does here. Escape alone is a keycode: no row has it.
+	if key.is_action(PlaygroundBindings.ROTATE):
 		# Held, not toggled, and read on both edges: a rotate that stayed on after
 		# the key came up would turn the prop every time the player looked around.
 		_rotating = key.pressed
 		return
 
-	if key.physical_keycode == KEY_Q:
+	if key.is_action(PlaygroundBindings.SPAWN_MENU):
 		_on_menu_key(key)
 		return
 
 	# The Tab board, held: shown while the key is down, released when it comes up.
-	if key.physical_keycode == KEY_TAB and not key.is_echo():
+	if key.is_action(PlaygroundBindings.SCOREBOARD) and not key.is_echo():
 		if game_menu != null:
 			if key.pressed:
 				game_menu.scoreboard.open()
@@ -1303,53 +1333,54 @@ func _unhandled_input(event: InputEvent) -> void:
 	# everything otherwise. Held and read on both edges like a trigger. The tool gun counts
 	# as a gun here: its R is each tool's third button — reset a size, take paint off, cut
 	# a rope — and a player resetting a balloon's size must not thaw every crate they own.
-	if key.physical_keycode == KEY_R and (_zee_rig() != null or tool == TOOLGUN):
+	if key.is_action(PlaygroundBindings.RELOAD) and (_zee_rig() != null or tool == TOOLGUN):
 		_set_reload(key.pressed)
 		return
 
 	if not key.is_pressed() or key.is_echo():
 		return
 
+	if key.is_action(PlaygroundBindings.SPAWN):
+		_spawn()
+	elif key.is_action(PlaygroundBindings.UNDO):
+		if bridge != null:
+			bridge.ask_undo()
+		else:
+			playground.props.undo(player_id)
+	elif key.is_action(PlaygroundBindings.VEHICLE):
+		_use_vehicle()
+	elif key.is_action(PlaygroundBindings.RELOAD):
+		_unfreeze_all()
+	elif key.is_action(PlaygroundBindings.PHYS_GUN):
+		_set_tool(TOOL_PHYS)
+	elif key.is_action(PlaygroundBindings.GRAV_GUN):
+		_set_tool(TOOL_GRAV)
+	elif key.is_action(PlaygroundBindings.WEAPONS):
+		_cycle_weapon()
+	elif key.is_action(PlaygroundBindings.TRACK):
+		_cycle_track()
+	elif key.is_action(PlaygroundBindings.STYLE):
+		# Tab is the scoreboard, held, as in every game here; the style moved to N.
+		_cycle_style()
+	elif key.is_action(PlaygroundBindings.MAP):
+		_next_map()
+	elif key.is_action(PlaygroundBindings.CHECKPOINT_SAVE):
+		_save_checkpoint()
+	elif key.is_action(PlaygroundBindings.CHECKPOINT_LOAD):
+		_load_checkpoint()
+	elif key.is_action(PlaygroundBindings.CHECKPOINT_NEXT):
+		_cycle_checkpoint()
+	elif key.is_action(PlaygroundBindings.CHECKPOINT_CLEAR):
+		_clear_checkpoints()
+	elif key.is_action(PlaygroundBindings.VIEW):
+		# The key every third-person toggle in this genre is on, and the one
+		# game-g2gfast already uses for its own. This one hands the player to a
+		# different CONTROLLER rather than flipping a camera, which is why the
+		# handover carrying position, velocity and look matters: pressing it
+		# mid-jump must not stop you dead in the air.
+		_toggle_view()
+
 	match key.physical_keycode:
-		KEY_E:
-			_spawn()
-		KEY_Z:
-			if bridge != null:
-				bridge.ask_undo()
-			else:
-				playground.props.undo(player_id)
-		KEY_F:
-			_use_vehicle()
-		KEY_R:
-			_unfreeze_all()
-		KEY_1:
-			_set_tool(TOOL_PHYS)
-		KEY_2:
-			_set_tool(TOOL_GRAV)
-		KEY_3:
-			_cycle_weapon()
-		KEY_T:
-			_cycle_track()
-		KEY_N:
-			# Tab is the scoreboard, held, as in every game here; the style moved to N.
-			_cycle_style()
-		KEY_M:
-			_next_map()
-		KEY_C:
-			_save_checkpoint()
-		KEY_V:
-			_load_checkpoint()
-		KEY_X:
-			_cycle_checkpoint()
-		KEY_B:
-			_clear_checkpoints()
-		KEY_F5:
-			# The key every third-person toggle in this genre is on, and the one
-			# game-g2gfast already uses for its own. This one hands the player to a
-			# different CONTROLLER rather than flipping a camera, which is why the
-			# handover carrying position, velocity and look matters: pressing it
-			# mid-jump must not stop you dead in the air.
-			_toggle_view()
 		KEY_ESCAPE:
 			# Only when no screen is up. The stack's own back handling pops the menu,
 			# and a second handler here would pop it and open the pause menu in one
@@ -1373,11 +1404,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					game_menu.open()
 
 
-## Q is the one key that still means something while the menu is open.
+## The key [param action] is on, as the player has it bound: for a sentence on the HUD.
+func key_for(action: StringName) -> String:
+	if keys != null:
+		return keys.key_for(action)
+	return str(PlaygroundBindings.make().row_for_action(action).get("default", action))
+
+
+## The spawn-menu key (Q) is the one key that still means something while the menu is open.
 func _is_menu_key(event: InputEvent) -> bool:
-	return event is InputEventKey and (
-		(event as InputEventKey).physical_keycode == KEY_Q
-	)
+	return event is InputEventKey and event.is_action(PlaygroundBindings.SPAWN_MENU)
 
 
 func _on_mouse_motion(event: InputEventMouseMotion) -> void:
@@ -1768,7 +1804,7 @@ func _adopt_selection(node: Node3D, prop_name: String, settings: Dictionary, ref
 	if refused != "":
 		hud.notice(refused)
 	elif edit_target != null and edit_target != before:
-		hud.notice("Editing %s. Hold Q: its properties are on the Tools tab." % (prop_name if prop_name != "" else "a prop"))
+		hud.notice("Editing %s. Hold %s: its properties are on the Tools tab." % [prop_name if prop_name != "" else "a prop", key_for(PlaygroundBindings.SPAWN_MENU)])
 	elif edit_target == null and before != null:
 		hud.notice("Nothing selected.")
 
@@ -1958,7 +1994,7 @@ func _physics_process(delta: float) -> void:
 func _spawn() -> void:
 	if selected_prop == &"":
 		if hud != null:
-			hud.notice("Nothing armed. Hold Q and pick something.")
+			hud.notice("Nothing armed. Hold %s and pick something." % key_for(PlaygroundBindings.SPAWN_MENU))
 		return
 
 	# On a server the client asks and the server decides. The budget, the cooldown and

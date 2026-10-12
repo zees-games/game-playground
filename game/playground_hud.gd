@@ -40,6 +40,8 @@ var ammo: DotAmmoCounter = null
 ## Every hit the server confirmed ([method confirm_hit]): a mark round the crosshair, and
 ## the number on the body. Never the local prediction.
 var hit_marker: DotHitMarker = null
+## The key an action is on, as bound (`PlaygroundClient.key_for`), for the lines that name one.
+var key_fn: Callable = Callable()
 var damage_numbers: DotDamageNumbers = null
 
 var timer_hud: DotTimerHud = null
@@ -327,7 +329,7 @@ func _process(delta: float) -> void:
 			tool_name.capitalize() if tool_name != "" else "Nothing",
 			"%s armed" % _armed_name(),
 			_props_line(),
-			"hold Q to spawn",
+			"hold %s to spawn" % (str(key_fn.call(&"pg_spawn_menu")) if key_fn.is_valid() else "Q"),
 		]))
 
 

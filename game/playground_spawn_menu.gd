@@ -1,5 +1,7 @@
 extends DotScreen
 
+const PlaygroundBindings := preload("playground_bindings.gd")
+
 const PlaygroundIcons := preload("playground_icons.gd")
 const PlaygroundSpawnables := preload("playground_spawnables.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
@@ -121,6 +123,10 @@ var edit_target_name: String = ""
 var npc_weapon: StringName = &""
 
 ## One of each tool gun mode, for its name, description and settings schema.
+## The key an action is on, as the player has it bound (`PlaygroundClient.key_for`). Unset,
+## the footer says the defaults.
+var key_fn: Callable = Callable()
+
 var _tool_modes: Array = []
 
 var _settings_box: VBoxContainer = null
@@ -1041,10 +1047,10 @@ func _rebuild_footer() -> void:
 
 	_footer.text = "   ·   ".join(PackedStringArray([
 		verb,
-		"E spawns %s again" % _armed_name(),
+		"%s spawns %s again" % [_key(PlaygroundBindings.SPAWN, "E"), _armed_name()],
 		"%s in hand" % name_of_tool(tool),
 		"/ to search",
-		"release Q to close, tap Q to pin",
+		"release %s to close, tap %s to pin" % [_key(PlaygroundBindings.SPAWN_MENU, "Q"), _key(PlaygroundBindings.SPAWN_MENU, "Q")],
 	]))
 
 
@@ -1083,3 +1089,7 @@ func describe() -> Dictionary:
 	out["tool_mode"] = String(tool_mode)
 	out["npc_weapon"] = String(npc_weapon)
 	return out
+
+
+func _key(action: StringName, fallback: String) -> String:
+	return str(key_fn.call(action)) if key_fn.is_valid() else fallback

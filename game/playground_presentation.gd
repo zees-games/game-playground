@@ -1,5 +1,6 @@
 extends Node
 
+const PlaygroundBindings := preload("playground_bindings.gd")
 const PlaygroundPaths := preload("playground_paths.gd")
 
 const PlaygroundServices := preload("playground_services.gd")
@@ -130,7 +131,7 @@ static func schema() -> DotSettingsSchema:
 		DotSettingsDef.Scope.ACCOUNT
 	))
 	s.add(DotSettingsDef.boolean(&"hold_to_open_menu", true, &"controls").with_description(
-		"Hold Q for the spawn menu, or press it to pin it open."
+		"Hold the spawn-menu key for the spawn menu, or press it to pin it open."
 	).with_scope(DotSettingsDef.Scope.ACCOUNT))
 
 	s.add(DotSettingsDef.integer(&"field_of_view", 100, 70, 130, &"video").with_scope(
@@ -180,6 +181,9 @@ static func schema() -> DotSettingsSchema:
 	# the Controls page drew its row only once the key existed, and the applier inverts the
 	# sampler's look with it.
 	DotMenuStock.declare(s, [DotMenuStock.GROUP_VIDEO, DotMenuStock.GROUP_INTERFACE, DotMenuStock.GROUP_CONTROLS] as Array[StringName])
+	# One binding setting per key the client reads ([PlaygroundBindings]), so the Controls page
+	# can move every one and the help screen shows where each is now.
+	PlaygroundBindings.make().add_to_schema(s)
 	return s
 
 

@@ -1,10 +1,16 @@
 # The client
 
-`game/playground.tscn` / `PlaygroundClient`: one local player, a camera, a HUD, the keys. Not headless. Keys: Q spawn menu (hold or tap), 1 and 2 the two prop guns, F use / vehicle, R reload or unfreeze, N movement style, F5 first/third person, Y and U chat (all and near), Tab scoreboard (held), Escape release then menu.
+`game/playground.tscn` / `PlaygroundClient`: one local player, a camera, a HUD, the keys. Not headless. Keys: `PlaygroundBindings` (see [keys, help and Leave](#keys-help-and-leave)); Escape releases, then opens the menu.
 
 ## Booting
 
 **Wait on a state, not a signal**: `if not playground.booted: await playground.ready_for_players`. `Playground.change_map` can complete without suspending (a built-in map is already in the build), so the playground can finish booting inside `add_child` before the client reaches its `await`, and the client then waits for ever: a black screen with no error. No test drives the client's boot that way; a screenshot caught it.
+
+## Keys, help and Leave
+
+- **Every key the client reads is a row of `PlaygroundBindings`**, matched by its action (`event.is_action`), never a keycode; Escape alone is a keycode, because no row may hold it. The table is declared into the settings schema (`PlaygroundPresentation.schema`), applied before the menu is built, and drawn on the Controls page and the help screen. Until 2026-10-11 every key was a keycode and the Controls page could move none of them. A sentence that names a key asks `PlaygroundClient.key_for` (the HUD's line, the spawn menu's footer, the notices).
+- **H opens help** (dot-menu's stock key; `PlaygroundClient.fill_help` writes the goal, building, running and modes), so nothing in the table may default to H. `headless_playground`'s client section checks it, the buttons, and that a rebound key moves what the client reads.
+- **Leave is dot-menu's stock one** (`leave_on_its_own`): it disconnects when connected and quits solo on a desktop. `leave_requested` is still emitted; until 2026-10-11 it was all Leave did and nothing listened.
 
 ## Escape, the pointer and the menu
 

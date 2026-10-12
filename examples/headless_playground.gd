@@ -58,7 +58,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 891
+const CHECKS := 896
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7465,6 +7465,39 @@ func _test_the_client_boots() -> void:
 	if kept_menu != null:
 		kept_menu.config.escape_grace_ms = grace
 	_check(opened and shut, "the second Escape opens the menu, and Escape closes it")
+
+	# [b]H is help, in every game of the family[/b], every key is a row of the table, and the
+	# Escape menu has Help & commands and Leave (the first play test found Help hidden here).
+	var keys: DotMenuBindings = client.keys
+	_check(keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H" and keys.defaults_on("H").size() == 1,
+		"help is on H, and nothing else in the key table is")
+	var h := InputEventKey.new()
+	h.physical_keycode = KEY_H
+	h.keycode = KEY_H
+	h.pressed = true
+	var helped := kept_menu != null and kept_menu.handle_event(h) and kept_menu.help.is_open()
+	_check(helped and kept_menu.help.about != "" and kept_menu.help.heading() == "How to play Playground",
+		"H opens the help screen, which says what the game is before the keys")
+	if kept_menu != null:
+		kept_menu.close_all()
+		kept_menu.open()
+	var leave_button := kept_menu.screen.find_child("Action_leave", true, false) as Button if kept_menu != null else null
+	_check(kept_menu != null and kept_menu.screen.find_child("Action_help", true, false) != null
+		and leave_button != null and leave_button.visible, "the Escape menu has Help & commands and Leave")
+	if kept_menu != null:
+		kept_menu.close_all()
+	var spawn_row := keys.row_for_action(&"pg_spawn") if keys != null else {}
+	var rebound: DotResult = keys.rebind(spawn_row, "J", client.presentation.settings) if not spawn_row.is_empty() else DotResult.fail(DotError.CODE_STATE, "no row")
+	var j := InputEventKey.new()
+	j.physical_keycode = KEY_J
+	var e := InputEventKey.new()
+	e.physical_keycode = KEY_E
+	_check(rebound.ok and j.is_action(&"pg_spawn") and not e.is_action(&"pg_spawn"),
+		"a key rebound in the menu moves what the client reads (spawn on J, E free)")
+	if keys != null:
+		keys.reset_all(client.presentation.settings)
+	_check(e.is_action(&"pg_spawn"), "and Reset puts it back on E")
+	client.mouse_capture_override = true
 
 	# From released, whatever the line above left, so this check stands on its own.
 	client.mouse_capture_override = false

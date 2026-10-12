@@ -64,7 +64,9 @@ There are four maps:
 | **X** / **B** | Pick a checkpoint / forget them all |
 | **Y** / **U** | Chat / chat with nearby players |
 | **M** | Next map |
-| **Esc** | Release the mouse; press again for the menu (settings, servers, leave) |
+| **K** | Push to talk |
+| **H** | Help: what the game is and every key as you have it bound |
+| **Esc** | Release the mouse; press again for the menu (settings, servers, help, leave). Every key above can be rebound under Controls |
 
 ## Getting started
 You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/modcommunity/dot-bootstrap). It clones every project and links the addons into each one:

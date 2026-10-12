@@ -1,0 +1,67 @@
+extends RefCounted
+
+## Every key this game reads, as one dot-menu [DotMenuBindings] table: the action, the setting
+## that stores it, the words a player sees, the default, and the card it goes on.
+##
+## [b]A table, because four things read it and they must never disagree:[/b] the client
+## matches events against the actions, the settings document stores one binding per row
+## ([method DotMenuBindings.add_to_schema], from [method PlaygroundPresentation.schema]), the
+## Escape menu's Controls page draws a key button per row, and the help screen (H) lists
+## them with the key each is on now. Until 2026-10-11 every one of these was a keycode in
+## `PlaygroundClient._unhandled_input`, which no page could show or move.
+##
+## [b]R is two things on purpose, so it is one row.[/b] With a gun in hand (the tool gun
+## counts) it reloads, otherwise it unfreezes everything you own; two rows on one default
+## would be a conflict the table's swap cannot finish.
+##
+## [b]Escape is in no row[/b]: it is the menu, and how a browser lets go of the pointer.
+
+const SPAWN := &"pg_spawn"
+const SPAWN_MENU := &"pg_spawn_menu"
+const UNDO := &"pg_undo"
+const ROTATE := &"pg_rotate"
+const RELOAD := &"pg_reload"
+const VEHICLE := &"pg_vehicle"
+const PHYS_GUN := &"pg_phys_gun"
+const GRAV_GUN := &"pg_grav_gun"
+const WEAPONS := &"pg_weapons"
+const TRACK := &"pg_track"
+const STYLE := &"pg_style"
+const MAP := &"pg_map"
+const CHECKPOINT_SAVE := &"pg_checkpoint_save"
+const CHECKPOINT_LOAD := &"pg_checkpoint_load"
+const CHECKPOINT_NEXT := &"pg_checkpoint_next"
+const CHECKPOINT_CLEAR := &"pg_checkpoint_clear"
+const VIEW := &"pg_view"
+const SCOREBOARD := &"pg_scoreboard"
+
+
+static func make() -> DotMenuBindings:
+	var keys := DotMenuBindings.new()
+	keys.add_movement()
+
+	keys.add(SPAWN_MENU, &"bind_spawn_menu", "Spawn menu (hold, or press to pin it open)", "Q", "Building")
+	keys.add(SPAWN, &"bind_spawn", "Spawn what is armed", "E", "Building")
+	keys.add(UNDO, &"bind_undo", "Undo your last spawn", "Z", "Building")
+	keys.add(ROTATE, &"bind_rotate", "Turn the held prop with the mouse (hold)", "Shift", "Building")
+	keys.add(RELOAD, &"bind_reload", "Reload a gun; with none, unfreeze everything yours", "R", "Building")
+
+	keys.add(PHYS_GUN, &"bind_phys_gun", "Physics gun", "1", "Tools")
+	keys.add(GRAV_GUN, &"bind_grav_gun", "Gravity gun", "2", "Tools")
+	keys.add(WEAPONS, &"bind_weapons", "Next weapon", "3", "Tools")
+	keys.add(VEHICLE, &"bind_vehicle", "Use what you look at, or get in or out of a vehicle", "F", "Tools")
+
+	keys.add(CHECKPOINT_SAVE, &"bind_checkpoint_save", "Save a checkpoint", "C", "Running")
+	keys.add(CHECKPOINT_LOAD, &"bind_checkpoint_load", "Go to the checkpoint", "V", "Running")
+	keys.add(CHECKPOINT_NEXT, &"bind_checkpoint_next", "Next checkpoint", "X", "Running")
+	keys.add(CHECKPOINT_CLEAR, &"bind_checkpoint_clear", "Clear checkpoints", "B", "Running")
+	keys.add(STYLE, &"bind_style", "Next movement style", "N", "Running")
+	keys.add(TRACK, &"bind_track", "Next timed track on this map", "T", "Running")
+
+	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
+	keys.add(MAP, &"bind_map", "Vote for another map", "M", "General")
+	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
+	# dot-voice's talk action (DotVoiceManager.TALK_ACTION), on K because V is the checkpoint.
+	keys.add_voice("General", "K")
+	keys.add_help("General")
+	return keys
