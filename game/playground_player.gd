@@ -391,6 +391,8 @@ func face_body() -> void:
 			"vertical": state.velocity.y,
 			"on_floor": state.is_grounded(),
 			"crouched": state.crouch_fraction > 0.5,
+			# The view's pitch: the upper body, the head and a held gun follow it.
+			"aim": deg_to_rad(state.pitch),
 		})
 
 

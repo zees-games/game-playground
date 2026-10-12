@@ -206,8 +206,8 @@ func body() -> Node3D:
 
 
 ## Tells the person how the player moves this frame and advances its clip: `speed`,
-## `vertical`, `on_floor`, `crouched` (a seated player is drawn crouched). Once a frame, from the
-## client, for every player; a capsule ignores it.
+## `vertical`, `on_floor`, `crouched`, `aim` (a seated player is drawn `seated`). Once a frame,
+## from the client, for every player; a capsule ignores it.
 func move_person(motion: Dictionary) -> void:
 	var person := _parts.get_node_or_null(^"Figure") as DotHumanoidFigure if _parts != null else null
 	if person == null:
@@ -217,9 +217,13 @@ func move_person(motion: Dictionary) -> void:
 	_moved_usec = now
 	var wanted := motion.duplicate()
 	if _seated_pose:
-		wanted["crouched"] = true
+		# The made sitting pose: thighs along the cushion, shins hanging, whatever the car's speed.
+		wanted["seated"] = true
+		wanted["crouched"] = false
 		wanted["on_floor"] = true
 		wanted["speed"] = 0.0
+	else:
+		wanted["seated"] = false
 	person.set_motion(wanted)
 	person.animate(float(wanted.get("speed", 0.0)), delta)
 
@@ -248,9 +252,12 @@ func _apply_pose() -> void:
 		var standing_y := float(node.get_meta(&"standing_y"))
 
 		if node.name == &"Figure":
-			# Seated is drawn as the person's crouch (the kit has no sitting clip), lowered
-			# onto the seat; see [method move_person].
-			node.position.y = standing_y - drop * 0.5
+			# Seated plays the person's made sitting pose (`seated`, [method move_person]), whose
+			# thighs are `seat_height()` over its origin: this node's origin is the seat, so the
+			# figure goes that far under it. Drawn as a crouch lowered by half the legs before,
+			# a rider was somebody squatting over the cushion.
+			var person := node as DotHumanoidFigure
+			node.position.y = standing_y - (person.seat_height() if _seated_pose and person != null else 0.0)
 		elif node.name == &"Legs":
 			if _seated_pose:
 				# Laid forward (-Z) along the seat, at the height of a thigh on a cushion.

@@ -18,7 +18,7 @@ dot-vehicle is installed for the half this game would get wrong, and **not** for
 - **A riding client stops predicting**: `PlaygroundPlayerNet` does no `simulate_tick` while riding and writes the server's position onto the node even on a predicted entity. The render-eye blend is skipped while riding (a blend toward a tick nothing simulated lurches backwards).
 - **A car parked on the road cannot be got out of above walking pace** (`max_exit_speed`); a test that coasts is not stopped.
 - **F gets in and out**, after F's use on a button or door ([sandbox.md](sandbox.md#the-tools)).
-- A rider sits: `PlaygroundCharacter.set_seated` drops the body by its leg height and swings the legs forward.
+- A rider sits: `PlaygroundCharacter.set_seated` puts the person in its made sitting pose (`seated`) with its origin `seat_height()` under the seat; the capsule body drops by its leg height and swings the legs forward.
 
 ## The circuit
 
