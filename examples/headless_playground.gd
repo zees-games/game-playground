@@ -59,7 +59,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 905
+const CHECKS := 907
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -4676,6 +4676,19 @@ func _test_vehicles() -> void:
 		"and handed back to whoever had them before"
 	)
 
+	# How far it takes to stop, which "the brake stops it" never said. dot-vehicle handed
+	# Godot's wheels the brake in newtons where Godot reads an impulse per physics step, so
+	# the buggy stopped from 50 km/h within a couple of metres on either brake, at this
+	# project's 128 ticks as at 60. Since dot-vehicle 4f4afaf they are forces.
+	var foot := await _stopping(vehicle, at, &"bot", DotFpsCommand.BUTTON_CROUCH)
+	var hand := await _stopping(vehicle, at, &"bot", DotFpsCommand.BUTTON_JUMP)
+	print("  ..    the buggy from 50 km/h: brake (crouch) %.2f m, handbrake (jump) %.2f m" % [foot, hand])
+	_check(foot > 7.0 and foot < 14.0, "the brake stops the buggy from 50 km/h in metres, not on the spot",
+		"%.2f m" % foot)
+	_check(hand > 6.8 and hand < 16.0, "and so does the handbrake", "%.2f m" % hand)
+	# Back beside the car, which those runs drove 60 m from where the passenger got out.
+	passenger.teleport(vehicle.position() + Vector3(2.5, 0.0, 0.0))
+
 	# The hovercraft, which is the only thing proving the chassis is a subclass point
 	# rather than a promise.
 	var skiff_prop := playground.props.spawn(&"skiff", &"bot", Vector3(-24.0, 1.5, 24.0))
@@ -4723,6 +4736,40 @@ func _test_vehicles() -> void:
 	playground.remove_player(&"rider")
 	_done()
 
+
+
+## Metres [param vehicle] takes from 50 km/h to a standstill, put back at [param at] facing
+## +Z first, with [param button] held by [param id] (crouch the brake, jump the handbrake).
+func _stopping(vehicle: DotVehicleInstance, at: Vector3, id: StringName, button: int) -> float:
+	# Facing +Z, into the plate: -Z from here meets the plate's edge at about z = -72, which
+	# a buggy reaching 50 km/h gets to first.
+	(vehicle.node as Node3D).global_transform = Transform3D(Basis(Vector3.UP, PI), at)
+	vehicle.body().linear_velocity = Vector3.ZERO
+	vehicle.body().angular_velocity = Vector3.ZERO
+	for _i in range(30):
+		await get_tree().physics_frame
+
+	var player: PlaygroundPlayer = playground.players[id]
+	var go := DotFpsCommand.new()
+	go.move = Vector2(0.0, 1.0)
+	var guard := 1200
+	while vehicle.forward_speed() < 13.89 and guard > 0:
+		player.controller.apply_command(go.duplicate_command())
+		await get_tree().physics_frame
+		guard -= 1
+
+	print("  ..    %s: %.1f m/s after %d ticks of throttle" % ["brake" if button == DotFpsCommand.BUTTON_CROUCH else "handbrake", vehicle.forward_speed(), 1200 - guard])
+	var start := vehicle.position()
+	var stop := DotFpsCommand.new()
+	stop.set_button(button, true)
+	guard = 1200
+	while vehicle.speed() > 0.3 and guard > 0:
+		player.controller.apply_command(stop.duplicate_command())
+		await get_tree().physics_frame
+		guard -= 1
+
+	var end := vehicle.position()
+	return Vector2(end.x - start.x, end.z - start.z).length()
 
 
 # --- The jump course -------------------------------------------------------

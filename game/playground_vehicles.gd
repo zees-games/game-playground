@@ -69,6 +69,8 @@ static func _buggy() -> DotVehicleDef:
 	t.mass = 620.0
 	t.engine_force = 3600.0
 	t.top_speed = 24.0
+	# Newtons (dot-vehicle 4f4afaf): 10.5 m from 50 km/h on the brake, 7.2 m on the handbrake,
+	# measured by headless_playground. Kept from when they were an impulse and stopped it dead.
 	t.brake_force = 5200.0
 	t.handbrake_force = 9000.0
 	t.steering_limit_deg = 34.0
