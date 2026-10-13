@@ -256,9 +256,9 @@ const CIRCUIT_KERB_WIDTH := 1.5
 ## How many boxes the lap is cut into.
 ##
 ## The corners are arcs and a box is straight, so this is the chord count: 64 segments
-## over a 387 m lap is a 6 m chord, and on a 26 m corner radius that leaves under 9 cm
-## of scallop between the chord and the true arc. Under a wheel radius, so a car does
-## not feel it.
+## over the ~611 m lap ([method circuit_length]) is a ~9.6 m chord, and on a 26 m corner
+## radius that leaves ~0.44 m of scallop between the chord and the true arc: more than a
+## wheel radius, so the corners read as facets. Whether to cut more is an open call.
 const CIRCUIT_SEGMENTS := 64
 
 ## Where the timing line sits, measured backwards along the lap from the grid.
