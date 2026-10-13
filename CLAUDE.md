@@ -28,22 +28,11 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 
 | Path | What |
 | --- | --- |
-| `game/playground.gd` | the simulation: maps, timers, props, entities, players, liquids, panes; headless |
-| `game/playground_player.gd`, `playground_player_stack.gd`, `playground_character.gd`, `playground_figure.gd`, `playground_avatars.gd` | the player bridge (movement, timer, style, tools), its stack, its body and what it wears |
-| `game/playground_module.gd`, `playground_services.gd`, `playground_mod_tools.gd`, `playground_vote.gd`, `playground_platform.gd`, `playground_progress.gd` | the server: dot-server module and every console command, chat/voice/moderation, the vote, identity, stats |
-| `game/playground_prop.gd`, `playground_spawnables.gd`, `playground_limits.gd`, `playground_constraints.gd`, `playground_pickup.gd`, `playground_builds.gd`, `prop.tscn`, `entity.tscn`, `vehicle.tscn` | props: one scene for every prop, the catalogue, limits, constraints, picking players up, saved builds |
-| `game/entities/` | NPCs and other entities, each `extends` a path |
-| `game/weapons/`, `game/toolgun/`, `playground_weapons.gd`, `playground_zee.gd`, `playground_projectiles.gd` | the toys, the tool gun's modes, zee-dot-weapons, grenades and rockets |
-| `game/playground_arena.gd`, `playground_waves.gd`, `playground_downs.gd`, `playground_shop.gd`, `playground_spectate.gd`, `playground_party.gd`, `playground_npc_world.gd` | the modes |
-| `game/playground_inventory.gd` | the bag |
-| `game/playground_client.gd`, `playground_hud.gd`, `playground_spawn_menu.gd`, `playground_icons.gd`, `playground_presentation.gd`, `playground_beacon.gd`, `playground_rope_view.gd`, `game/client/` | the client: not headless |
-| `game/net/` | the dot-net bridge, link, per-kind net classes, events and requests, the bag's wire |
-| `game/playground_map.gd`, `playground_geometry.gd`, `playground_lighting.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building and the palette, each map's dot-lighting, the survey, materials, the generator |
-| `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (builds a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
+| `game/` | `playground.gd` (the simulation, headless), the player, the server module and services, props, `entities/`, `weapons/` and `toolgun/`, the modes, the bag, the client (not headless), `net/`, the maps' base, geometry and lighting. File by file: [docs](docs/README.md#where-the-code-is) |
+| `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
 | `examples/` | the five suites |
 | `tools/` | `export_zones.gd`, `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd` |
-| `assets/` | vendored CC0 art: zee weapons and arms, the character kit, Kenney's prototype grid |
-| `scenes/fx/` | the two effect scenes |
+| `assets/`, `scenes/fx/` | vendored CC0 art (zee weapons and arms, the character kit, Kenney's grid); the two effect scenes |
 | `game.yml` | the descriptor that travels in the published pack |
 
 ## Running and testing
@@ -62,7 +51,7 @@ Short forms; the reasoning is in the linked file.
 
 **Simulation**
 
-- **Footsteps and a bed per map are dot-audio's stock** (`PlaygroundPresentation.keep_walkers`; a step's surface is the box's `dot_fps_surface`, the one the movement reads; `bed_for` by map prefix). Levels are measured with `addons/dot_audio/tools/loudness.sh --warmup=6` (−17 LUFS band, `loudness_trim_db`), which drives the local player through `tools/loudness_pilot.gd` (walks, spawns props, punts them); a run whose `capture pilot:` line shows no walking or spawning measured an empty room. Stock ids have files, so the stand-in check skips them.
+- Footsteps and per-map beds are dot-audio's stock (a step's surface is the box's `dot_fps_surface`); measure levels with its `loudness.sh`, and check the pilot walked and spawned. [client](docs/client.md#footsteps-and-the-bed)
 - `Drive.EXTERNAL` always; the game ticks the controllers and **feeds the timer after the move**. [simulation](docs/simulation.md#the-game-owns-the-tick-loop)
 - Leave the controller's `body_ref` unset; `of_self()` is the controller, a plain `Node`, and the player never moves. [simulation](docs/simulation.md#body_ref-must-not-be-of_self)
 - Apply the movement style and the timer style together (`PlaygroundPlayer.set_style`); never write the live tunables (a style rebuild drops it). [simulation](docs/simulation.md#a-style-has-two-halves-and-they-move-together)
@@ -80,13 +69,13 @@ Short forms; the reasoning is in the linked file.
 - An entity is a prop first (budget, undo, liftable); a wave NPC is the server's and is not. [sandbox](docs/sandbox.md#perception-is-dot-npcs-being-a-prop-is-still-dot-props), [modes](docs/modes.md#waves-pg_waves)
 - An NPC brain and debris seed from `npc.seed` / `Playground.next_seed`, never `instance_id` (an object id moves with every allocation). dot-npc `docs/runtime.md`
 - Weapons are not `DotPropDef`s. The toys and zee guns run on the server; client arming is prediction. [sandbox](docs/sandbox.md#a-weapon-is-a-script-too-and-not-in-the-prop-catalogue)
-- Connected, the drawn zee gun takes the server's magazine and reserve only after `PlaygroundZee.SETTLE_SEC` quiet (`PlaygroundPlayerNet._correct_drawn`); the gun in hand picked again is a refill, not a fresh rig. [sandbox](docs/sandbox.md#zee-dot-weapons-beside-the-toys)
+- Connected, the drawn zee gun takes the server's count only after `SETTLE_SEC` quiet; the gun in hand picked again is a refill. [sandbox](docs/sandbox.md#zee-dot-weapons-beside-the-toys)
 - A zee shot hurts only with `pg_arena` on; NPC shots reach players only through `arena_hurt`. `PlaygroundPlayer.component()` is load-bearing. [sandbox](docs/sandbox.md#zee-dot-weapons-beside-the-toys)
 - One catalogue: icons, items, prices, the loadout and vehicle prop rows are all **derived**, never a second list. [sandbox](docs/sandbox.md#the-icons-are-drawn-from-the-definition)
 - The menu never spawns; it emits. The first card takes focus, not the search. `TabBar.clip_tabs` off. [sandbox](docs/sandbox.md#the-q-menu)
 - Switching tools or opening the menu lets go of everything. F is use, then vehicle. [sandbox](docs/sandbox.md#the-tools)
 - Creative mode is protection **both ways**, and lives in dot-props so no tool can forget it. [sandbox](docs/sandbox.md#creative-mode)
-- **Map toys** (dot-props' `toys/`) come from a map's `map_toys()` and are built on both ends in that order as a child of the playground, never of the map (classified onto `world`); a hit scan asks `shoot_toy` before any damage or shove; the bounce is after the move on every end; the roundabout rides through `DotPropCarry.toys`. [sandbox](docs/sandbox.md#the-maps-toys), [netcode](docs/netcode.md#the-maps-toys)
+- **Map toys** come from a map's `map_toys()`, built on both ends in that order under the playground, never the map; a hit scan asks `shoot_toy` first; the bounce is after the move on every end. [sandbox](docs/sandbox.md#the-maps-toys), [netcode](docs/netcode.md#the-maps-toys)
 - Saved builds are catalogue ids, whole or nothing. [sandbox](docs/sandbox.md#saved-builds)
 
 **Maps and routes**
@@ -126,14 +115,14 @@ Short forms; the reasoning is in the linked file.
 
 - Wait on `playground.booted`, not only the signal. [client](docs/client.md#booting)
 - Every key is a `PlaygroundBindings` row read through its action, never a keycode (Escape excepted); H is help, so no row may default to H. [client](docs/client.md#keys-help-and-leave)
-- M is dot-menu's map menu (`PlaygroundBindings.MAP`, `dot_menu_maps`): solo from the catalogue through `Playground.change_map`, on a server dot-vote's menu for the owner's `sv_map_menu_flag` and a vote for anybody else. No other row may default to M. [client](docs/client.md#m-the-map-menu)
+- M is dot-menu's map menu: solo through `Playground.change_map`, on a server dot-vote's menu (the owner's flag changes, anybody else votes). No other row may default to M. [client](docs/client.md#m-the-map-menu)
 - Escape releases then opens dot-menu; only a click captures. This client owns the pointer. [client](docs/client.md#escape-the-pointer-and-the-menu)
 - The character body goes under the rig, not the visual; `auto_drive` off. [client](docs/client.md#third-person-and-the-body)
 - Chat lines go to the chat box, and to the HUD notice line only when there is no box (a ballot was drawn twice). [client](docs/client.md#the-chat-box)
-- The first-person camera is written in one place, `PlaygroundPlayer.present_camera` (motion, shake, recoil, field of view, a zee gun's aim `zoom`); there is no `DotFpsView`. Right mouse aims a zee gun (`PlaygroundBindings.AIM`; a tool's secondary otherwise), its quick melee is Mouse 3. [client](docs/client.md#the-first-person-camera)
-- The hit marker, damage numbers and zee's red burst on the body (`PlaygroundClient._draw_body_hit`, `ZeeShotFx.play_body_hit` by `has_method`) come from the server's `Kind.HIT` (`Playground.confirm_hit`, fed by all four damage paths), never the local rig; the glance pieces need a shell with dot-ui 4. [client](docs/client.md#the-hud)
-- The HUD follows the menu's theme and HUD size (`PlaygroundClient._follow_hud`: dot-menu's `follow_hud` by name, plus `PlaygroundHud.apply_theme` on `theme_changed` for dot-timer's block); `PlaygroundHud.piece_theme()` is the accent only (boost amber, start green), never plate, text or ink. `headless_playground` checks a theme change reaches the pieces and the timer. [client](docs/client.md#the-hud)
-- B is the arena's loadout (dot-loadout's `DotLoadoutCommand` over `arena.loadouts`, bound by the module); enabled only while the replicated `pg_arena_on` says the arena is on, else B says "Loadouts are in the arena."; an arena spawn hands the weapon (`_arm_from_loadout`). [modes](docs/modes.md#b-the-arenas-loadout)
+- The first-person camera is written only in `PlaygroundPlayer.present_camera`; there is no `DotFpsView`. Right mouse aims a zee gun (a tool's secondary otherwise); its quick melee is Mouse 3. [client](docs/client.md#the-first-person-camera)
+- The hit marker, damage numbers and the red burst come from the server's `Kind.HIT`, never the local rig; the glance pieces need a shell with dot-ui 4. [client](docs/client.md#the-hud)
+- The HUD follows the menu's theme and HUD size; `PlaygroundHud.piece_theme()` is the accent only, never plate, text or ink. [client](docs/client.md#the-hud)
+- B is the arena's loadout (dot-loadout's, bound by the module), enabled only while the replicated `pg_arena_on` says so. [modes](docs/modes.md#b-the-arenas-loadout)
 - Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`build_console(menu)`). [client](docs/client.md#the-chat-box)
 
 ## Not here yet

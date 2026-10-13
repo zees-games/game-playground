@@ -79,6 +79,9 @@ The landing is kicked when the drawn eye reaches the floor, not on the `landed` 
 - **`DotHitMarker` and `DotDamageNumbers`**, from `confirm_hit`, which the client calls for each `Kind.HIT` the server sends it (offline, for its own world's `hit_landed`): never from the local prediction ([netcode.md](netcode.md#weapons-over-the-wire)).
 - `headless_presentation` checks the numbers, the counter against the chat box (here and at 854 wide) and under a ballot (armed), and that the pack asks a shell for dot-ui 4. `screenshot_views`' `hud_hits` frame shows them.
 
+- **The theme.** The HUD follows the menu's theme and HUD size (`PlaygroundClient._follow_hud`: dot-menu's `follow_hud` by name, plus `PlaygroundHud.apply_theme` on `theme_changed` for dot-timer's block); `PlaygroundHud.piece_theme()` is the accent only (boost amber, start green), never plate, text or ink. `headless_playground` checks a theme change reaches the pieces and the timer.
+- **What a hit draws.** The hit marker, damage numbers and zee's red burst on the body (`PlaygroundClient._draw_body_hit`, `ZeeShotFx.play_body_hit` by `has_method`) come from the server's `Kind.HIT` (`Playground.confirm_hit`, fed by all four damage paths), never the local rig; the glance pieces need a shell with dot-ui 4.
+
 **A pack naming these classes does not parse on a client shell whose dot-ui predates them**, and no `DotAddonApi` level check can guard a class name: a release of this game waits for a shell built with dot-ui 4.
 
 ## The chat box
@@ -95,6 +98,10 @@ dot-ui's `DotChatWindow` beside the console. **The channels come from `Playgroun
 - **dot-server's `chat_received` is connected and its lines are ignored**: this game routes every line through its own wire, so the handler takes only the `{kind: "state"}` notice saying what is carrying chat.
 - **`swallows_input()` covers the box as well as the console, and `DotFpsSampler.suspended` is set beside it**: movement is polled, so typing "sw" otherwise walks the player backwards through their build.
 - **The console is dot-console's `DotConsoleKit`, built by `PlaygroundPresentation.build_console(menu)` after the client's `DotMenu`**, so it is one of the menu's overlays; `_refresh_suspended` runs on `overlays_changed` and on the chat box, and suspends while the box, the console or the menu is open (`headless_playground`'s boot section holds W to prove it).
+
+## Footsteps and the bed
+
+- **Footsteps and a bed per map are dot-audio's stock** (`PlaygroundPresentation.keep_walkers`; a step's surface is the box's `dot_fps_surface`, the one the movement reads; `bed_for` by map prefix). Levels are measured with `addons/dot_audio/tools/loudness.sh --warmup=6` (−17 LUFS band, `loudness_trim_db`), which drives the local player through `tools/loudness_pilot.gd` (walks, spawns props, punts them); a run whose `capture pilot:` line shows no walking or spawning measured an empty room. Stock ids have files, so the stand-in check skips them.
 
 ## Looking at it
 

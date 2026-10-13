@@ -17,3 +17,27 @@ The detail behind [CLAUDE.md](../CLAUDE.md). One subject per file; open the one 
 | [testing.md](testing.md) | adding a check, or believing a green run |
 | [not-yet.md](not-yet.md) | planning: what is not built yet, and why each is open |
 | [history.md](history.md) | a bug that "cannot be happening"; what this game found and how it looked |
+
+## Where the code is
+
+The files of [CLAUDE.md](../CLAUDE.md)'s layout, one by one.
+
+| Path | What |
+| --- | --- |
+| `game/playground.gd` | the simulation: maps, timers, props, entities, players, liquids, panes; headless |
+| `game/playground_player.gd`, `playground_player_stack.gd`, `playground_character.gd`, `playground_figure.gd`, `playground_avatars.gd` | the player bridge (movement, timer, style, tools), its stack, its body and what it wears |
+| `game/playground_module.gd`, `playground_services.gd`, `playground_mod_tools.gd`, `playground_vote.gd`, `playground_platform.gd`, `playground_progress.gd` | the server: dot-server module and every console command, chat/voice/moderation, the vote, identity, stats |
+| `game/playground_prop.gd`, `playground_spawnables.gd`, `playground_limits.gd`, `playground_constraints.gd`, `playground_pickup.gd`, `playground_builds.gd`, `prop.tscn`, `entity.tscn`, `vehicle.tscn` | props: one scene for every prop, the catalogue, limits, constraints, picking players up, saved builds |
+| `game/entities/` | NPCs and other entities, each `extends` a path |
+| `game/weapons/`, `game/toolgun/`, `playground_weapons.gd`, `playground_zee.gd`, `playground_projectiles.gd` | the toys, the tool gun's modes, zee-dot-weapons, grenades and rockets |
+| `game/playground_arena.gd`, `playground_waves.gd`, `playground_downs.gd`, `playground_shop.gd`, `playground_spectate.gd`, `playground_party.gd`, `playground_npc_world.gd` | the modes |
+| `game/playground_inventory.gd` | the bag |
+| `game/playground_client.gd`, `playground_hud.gd`, `playground_spawn_menu.gd`, `playground_icons.gd`, `playground_presentation.gd`, `playground_beacon.gd`, `playground_rope_view.gd`, `game/client/` | the client: not headless |
+| `game/net/` | the dot-net bridge, link, per-kind net classes, events and requests, the bag's wire |
+| `game/playground_map.gd`, `playground_geometry.gd`, `playground_lighting.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building and the palette, each map's dot-lighting, the survey, materials, the generator |
+| `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (builds a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
+| `examples/` | the five suites |
+| `tools/` | `export_zones.gd`, `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd` |
+| `assets/` | vendored CC0 art: zee weapons and arms, the character kit, Kenney's prototype grid |
+| `scenes/fx/` | the two effect scenes |
+| `game.yml` | the descriptor that travels in the published pack |
