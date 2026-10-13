@@ -165,6 +165,10 @@ var beacon: bool = false
 ## Replicated, so everybody's picture can say who is building.
 var creative: bool = false
 
+## Down and waiting to be picked up (`PlaygroundDowns`, server-side), replicated so every
+## client draws them crawling on the floor rather than standing for the ninety seconds.
+var downed: bool = false
+
 ## The marker [member beacon] draws, while it does. Client side; built and freed by
 ## [method present_beacon], and never built on a server, which calls nothing that draws.
 var beacon_marker: PlaygroundBeacon = null
@@ -399,6 +403,7 @@ func face_body() -> void:
 			"vertical": state.velocity.y,
 			"on_floor": state.is_grounded(),
 			"crouched": state.crouch_fraction > 0.5,
+			"downed": downed,
 			# The view's pitch: the upper body, the head and a held gun follow it.
 			"aim": deg_to_rad(state.pitch),
 		})

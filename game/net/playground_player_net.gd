@@ -40,6 +40,8 @@ var net_beacon: bool = false
 ## `PlaygroundPlayer.creative`. Everybody's: a watcher sees who is building, and the client's
 ## own tools refuse a creative player's props before asking.
 var net_creative: bool = false
+## `PlaygroundPlayer.downed`. Everybody's: the figure crawls on every client.
+var net_downed: bool = false
 
 # --- A zee weapon, from `ZeeWeaponNet.all_specs()` ---
 #
@@ -100,6 +102,9 @@ func _register_net_vars() -> void:
 		if bool(spec["owner_only"]):
 			var _owner := weapon.to_owner_only()
 
+	# Last, so the fields before it keep their places in the schema.
+	replicate(&"net_downed", DotNetVar.Type.BOOL)
+
 
 func _net_apply_input(input: DotNetInput, _tick: int) -> void:
 	var command := input as PlaygroundNetCommand
@@ -141,6 +146,7 @@ func pull() -> void:
 		net_blind = player.blinded
 		net_beacon = player.beacon
 		net_creative = player.creative
+		net_downed = player.downed
 		# A rig that has gone leaves the last values: the counter stops, so nothing fires.
 		if player.zee_rig != null:
 			ZeeWeaponNet.pull(player.zee_rig, self)
@@ -156,6 +162,7 @@ func _net_state_applied(tick: int) -> void:
 	player.blinded = net_blind
 	player.beacon = net_beacon
 	player.creative = net_creative
+	player.downed = net_downed
 	_apply_weapon()
 	_correct_drawn()
 	# NOT the node, on a predicted entity: receive_snapshot calls this before the

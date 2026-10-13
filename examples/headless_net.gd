@@ -58,13 +58,13 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 380
+const CHECKS := 383
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 45
+const SECTIONS := 46
 
 var _passed := 0
 var _failed := 0
@@ -181,6 +181,8 @@ func _run() -> void:
 		await _test_avatars_over_the_wire()
 		# Arms a gun and puts it away again; adds no body.
 		await _test_drawn_ammo_corrected()
+		# Lays the player down and stands them up again; adds no body.
+		await _test_downed_over_the_wire()
 		# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
 		# the leave, because a ball it kicks would be in the way of whatever came after.
 		await _test_map_toys_over_the_wire()
@@ -4438,6 +4440,43 @@ func _test_grenade_over_the_wire() -> void:
 ## fires shots the server never hears (a refused shot), and then both fire and the gun in hand
 ## is asked for again (a refill). Armed: without `PlaygroundPlayerNet._correct_drawn` the
 ## "takes the server's count" and "the refill reaches the drawn gun" checks fail.
+## A downed player is the server's (`PlaygroundDowns` sets `PlaygroundPlayer.downed` every
+## tick); the client draws them crawling. Before `net_downed` they stood for the ninety seconds.
+func _test_downed_over_the_wire() -> void:
+	_section("a downed player is drawn down on the client, and up again")
+
+	var theirs := _server_player()
+	var mirror := _client_player()
+	if theirs == null or mirror == null:
+		_check(false, "both ends have the player")
+		_done()
+		return
+
+	theirs.downed = true
+	_exchange()
+	await _steps(4)
+	_exchange()
+	await _steps(2)
+	mirror.face_body()
+	var body := mirror.character.body() if mirror.character != null else null
+	var figure := body.get_node_or_null(^"Figure") as DotHumanoidFigure if body != null else null
+	_check(mirror.downed, "the client hears they are down")
+	_check(
+		figure != null and figure.downed,
+		"and the person crawls",
+		"figure %s" % ("missing" if figure == null else str(figure.describe().get("clip", "")))
+	)
+
+	theirs.downed = false
+	_exchange()
+	await _steps(4)
+	_exchange()
+	await _steps(2)
+	mirror.face_body()
+	_check(not mirror.downed and figure != null and not figure.downed, "and stands when picked up")
+	_done()
+
+
 func _test_drawn_ammo_corrected() -> void:
 	_section("the drawn gun takes the server's ammunition count")
 

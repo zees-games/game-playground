@@ -17,6 +17,7 @@ const PlaygroundPlayerNet := preload("../game/net/playground_player_net.gd")
 ## tools/screenshot_net.sh                # four consecutive frames, screenshots/net_0..3.png
 ## tools/screenshot_net.sh --no-interp    # the same with the client's interpolation off
 ## tools/screenshot_net.sh --walk         # THIS client strafes its own player: is it predicted?
+## tools/screenshot_net.sh --downed       # the other player is down (the server's flag): crawling?
 ## [/codeblock]
 ##
 ## A server and a client in one process, joined by the loopback `headless_net` uses: the
@@ -101,6 +102,8 @@ var _zee: StringName = &""
 ## tools as a connected player would, so the frames show the beam a client draws for somebody
 ## else from what `Kind.HELD` told it (`PlaygroundClient.present_beams`).
 var _hold := false
+## The other player stands in front, downed on the server, instead of running.
+var _downed := false
 var _presentation: PlaygroundPresentation = null
 
 
@@ -131,6 +134,8 @@ func _run() -> void:
 			_zee = StringName("zee_" + arg.substr(6))
 		elif arg == "--hold":
 			_hold = true
+		elif arg == "--downed":
+			_downed = true
 
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://screenshots"))
 	await _build()
@@ -357,7 +362,7 @@ func _drive_other() -> void:
 	if not _placed:
 		_home = ada.controller.state.position
 		ada.teleport(_home, 0.0)
-		bea.teleport(_home + Vector3(-SWING, 0.0, -AHEAD), -90.0)
+		bea.teleport(_home + (Vector3(0.0, 0.0, -AHEAD * 0.5) if _downed else Vector3(-SWING, 0.0, -AHEAD)), -90.0)
 		_placed = true
 		_settle = 30
 		if _zee != &"":
@@ -365,6 +370,12 @@ func _drive_other() -> void:
 		if _hold:
 			# A crate in front of her eye, for the press below to take hold of.
 			var _crate := _server_game.props.spawn(&"crate", bea.player_id, bea.eye_position() + bea.aim_direction() * 2.5)
+
+	if _downed:
+		# What `PlaygroundDowns.tick` sets every tick on the server; still, as a downed player is.
+		bea.downed = true
+		(bea.get_node("Net") as PlaygroundPlayerNet).last_move = DotFpsCommand.new()
+		return
 
 	var offset := bea.controller.state.position.x - _home.x
 	if offset > SWING:

@@ -177,6 +177,14 @@ func tick(_delta: float) -> void:
 
 	effects.advance(game.current_tick())
 
+	# Who is down, on every player, so it reaches the drawing: `PlaygroundPlayerNet`
+	# replicates it and the figure crawls. Every tick rather than at each transition, so a
+	# revive, a bleed-out, a stand-up and the mode switched off all clear it the same way.
+	for id: Variant in game.players.keys():
+		var each: PlaygroundPlayer = game.players[id]
+		if each != null:
+			each.downed = is_down(StringName(id))
+
 	if not enabled:
 		return
 
