@@ -65,6 +65,7 @@ func configure(p_seed: int, p_source: Object = null) -> void:
 	seed_source = p_source
 	_built = true
 	_build()
+	add_contact_shade()
 
 
 func _build() -> void:

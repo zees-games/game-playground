@@ -113,6 +113,7 @@ func configure_doc(path: String) -> DotResult:
 
 	doc = read.value
 	_liquids = build_into(self, doc)
+	add_contact_shade()
 	fallback_spawn = _vec(doc.get("spawn", [0, 1, 0]))
 	_declared = declared_of(doc)
 	return DotResult.success(self)

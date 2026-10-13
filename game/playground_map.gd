@@ -104,6 +104,58 @@ static func standable(centre: Vector3, size: Vector3) -> AABB:
 
 func _ready() -> void:
 	_build()
+	add_contact_shade()
+
+
+## dot-lighting's contact shade, loaded by path (API 4): see [method add_contact_shade].
+const CONTACT_SHADE_SCRIPT := "res://addons/dot_lighting/runtime/dot_contact_shade.gd"
+
+
+## Adds dot-lighting's contact shade (API 4) where this map's boxes meet: a wall's foot, a
+## block on the floor, every step of a stair. The Compatibility renderer the client draws has
+## no ambient occlusion, and every box stood on the floor with no shade at its foot. Called
+## once the geometry is built ([method _ready], and the maps that build later on their own).
+##
+## Only what `PlaygroundGeometry.box` made, read off the built map (a [StaticBody3D] holding
+## a [BoxMesh]): a panel or a liquid has no body, so a gate's pane and water neither cast nor
+## take a shade; a see-through material is skipped; so is a box turned off upright (a surf
+## ramp), whose creases the helper does not follow. Nothing a map builds moves, and props are
+## the server's, put down later and not under this node. By path, behind the level, so a
+## shell older than the helper draws the map without it.
+func add_contact_shade() -> void:
+	if DotAddonApi.build_level("dot_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
+		return
+	var old := get_node_or_null(^"ContactShade")
+	if old != null:
+		remove_child(old)
+		old.queue_free()
+	var boxes: Array = []
+	_gather_shade_boxes(self, Transform3D.IDENTITY, boxes)
+	if boxes.is_empty():
+		return
+	var shade: Variant = (load(CONTACT_SHADE_SCRIPT) as GDScript).call(&"node", boxes)
+	if shade is MeshInstance3D and (shade as MeshInstance3D).mesh != null:
+		(shade as Node).name = "ContactShade"
+		add_child(shade)
+	elif shade is Node:
+		(shade as Node).free()
+
+
+## Every solid, opaque, upright box under [param node], in this map's frame ([param frame] is
+## [param node]'s), into [param into]. By transform chain, not `global_transform`: a map built by
+## `configure_doc` may not be in the tree yet.
+func _gather_shade_boxes(node: Node, frame: Transform3D, into: Array) -> void:
+	for child in node.get_children():
+		if not (child is Node3D):
+			continue
+		var at := frame * (child as Node3D).transform
+		if child is MeshInstance3D and node is StaticBody3D and (child as MeshInstance3D).mesh is BoxMesh:
+			var mesh := child as MeshInstance3D
+			var material := mesh.material_override as BaseMaterial3D
+			var upright := absf(at.basis.y.normalized().dot(Vector3.UP)) > 0.999
+			if upright and mesh.visible and (material == null or material.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED):
+				into.append({"transform": at.orthonormalized(), "size": (mesh.mesh as BoxMesh).size * at.basis.get_scale()})
+		_gather_shade_boxes(child, at, into)
 
 
 ## Builds the geometry. Called once, from [method Node._ready].

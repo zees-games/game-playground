@@ -84,7 +84,7 @@ Short forms; the reasoning is in the linked file.
 - Unreached ground is allowed only where `survey_declared()` says why. [maps](docs/maps.md#every-hand-built-map-is-surveyed)
 - Custom maps are JSON documents, never scripts; a map prop's missing id is skipped, not the map. [maps](docs/maps.md#custom-maps-are-documents)
 - Material numbers are dot-physics'; liquids and foliage have no collider. [maps](docs/maps.md#map-materials)
-- The palette is `PlaygroundGeometry.COLOUR_*`; a map's light is its dot-lighting document, a child of the map node, never a second `WorldEnvironment`. Render a look change with `RENDERER=forward_plus` too. [maps](docs/maps.md#the-look)
+- The palette is `PlaygroundGeometry.COLOUR_*`; a map's light is its dot-lighting document, a child of the map node, never a second `WorldEnvironment`; its boxes get dot-lighting's `DotContactShade` (`PlaygroundMap.add_contact_shade`, called by every map once built). Render a look change with `RENDERER=forward_plus` too. [maps](docs/maps.md#the-look)
 - A split must be one nobody can skip; a tilted slab drops along its normal; "it finished" is never the only check. [routes](docs/routes.md#rules-every-route-follows)
 
 **Vehicles**
