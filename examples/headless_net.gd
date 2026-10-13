@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 378
+const CHECKS := 379
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -108,6 +108,9 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	var errors := EngineErrors.new()
+	OS.add_logger(errors)
+
 	print("game-playground — headless netcode")
 	print("")
 
@@ -182,6 +185,13 @@ func _run() -> void:
 		# the leave, because a ball it kicks would be in the way of whatever came after.
 		await _test_map_toys_over_the_wire()
 		await _test_leave()
+
+	OS.remove_logger(errors)
+	# Engine errors go to stderr and change no exit code: a toy pulled out of the tree after a
+	# mid-tick rebuild (dot-net history #30) printed `!is_inside_tree()` on green runs elsewhere.
+	var seen := errors.seen()
+	_check(seen.is_empty(), "the engine reported no error over the whole run",
+		"%d: %s" % [seen.size(), ", ".join(seen.slice(0, 3))])
 
 	_report()
 
@@ -4518,3 +4528,27 @@ func _test_leave() -> void:
 	_check(int(_server_bridge.describe()["players"]) == 0, "and their entity")
 	_check(_client_player() == null, "and the client is told")
 	_done()
+
+
+## Counts the engine's own errors while installed (mg-smash-copter's dedicated suite has the
+## same class): they go to stderr and change no exit code, so only this makes one fail a run.
+class EngineErrors extends Logger:
+	var _lock := Mutex.new()
+	var _seen := PackedStringArray()
+
+	func _log_error(
+		function: String, _file: String, _line: int, code: String, _rationale: String,
+		_editor_notify: bool, _error_type: int, _script_backtraces: Array[ScriptBacktrace]
+	) -> void:
+		_lock.lock()
+		_seen.append("%s (%s)" % [code, function])
+		_lock.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
+
+	func seen() -> PackedStringArray:
+		_lock.lock()
+		var out := _seen.duplicate()
+		_lock.unlock()
+		return out
