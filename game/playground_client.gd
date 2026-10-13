@@ -1192,7 +1192,7 @@ func _process(_delta: float) -> void:
 		presentation.keep_walkers(playground.players.values())
 		_present_tool_beam(eye, forward)
 
-	var _bodies := present_frame(net, playground)
+	var _bodies := present_frame(net, playground, -1.0, player)
 	_present_splashes()
 	_fit_selection_box()
 
@@ -1252,10 +1252,24 @@ func _process(_delta: float) -> void:
 ## client every other person in the sandbox was a beacon with nobody under it.
 ##
 ## [param alpha] is how far through the current tick the frame is; -1 asks the engine,
-## which is what a real frame wants and what a suite's frames cannot.
-static func present_frame(p_net: DotNetManager, p_game: Playground, alpha: float = -1.0) -> int:
-	if p_net != null and p_net.is_running():
+## which is what a real frame wants and what a suite's frames cannot. [param own] is this
+## client's own player, drawn at the netcode clock's render alpha.
+static func present_frame(
+	p_net: DotNetManager, p_game: Playground, alpha: float = -1.0, own: PlaygroundPlayer = null
+) -> int:
+	var networked := p_net != null and p_net.is_running()
+
+	if networked:
 		p_net.interpolate_frame(alpha)
+
+	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the
+	# clock stretches and shrinks its ticks while it settles on the server, so a physics frame
+	# now and then runs no tick or two, and drawn at the engine's fraction the eye stood still
+	# on one frame and moved double on the next. `DotFpsController.render_state` reads it from
+	# `render_clock` (dot-player-controller); by name both ways, so a shell older than either
+	# draws as before. Null offline, where every physics frame is one tick.
+	if own != null and is_instance_valid(own) and own.controller != null:
+		own.controller.set(&"render_clock", p_net.clock if networked else null)
 
 	if p_game == null:
 		return 0

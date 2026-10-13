@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 379
+const CHECKS := 380
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2993,7 +2993,14 @@ func _test_somebody_else_is_drawn() -> void:
 	mine.samples_input = true
 	var _switch := mine.build_view_switch()
 
-	var shown := PlaygroundClient.present_frame(_client_net, _client_game, 0.0)
+	var shown := PlaygroundClient.present_frame(_client_net, _client_game, 0.0, mine)
+
+	# Your own player is drawn at the clock's render alpha (dot-player-controller's
+	# `render_clock`), so a clock slip does not stall or double the eye.
+	_check(
+		mine.controller != null and mine.controller.get(&"render_clock") == _client_net.clock,
+		"your own player is drawn on the client clock's render alpha"
+	)
 
 	_check(
 		theirs.character != null and theirs.character.is_body_visible()
