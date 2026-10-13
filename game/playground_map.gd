@@ -155,6 +155,14 @@ func survey_declared() -> Array:
 	return []
 
 
+## The toys this map puts down (dot-props' placements, `{toy, at, yaw, links?, on?}`), which
+## [Playground] builds on both ends in this order, so the order is how a client pairs each with
+## the server's entity. None by default: a course map has nothing to play with in a runner's
+## way, and nothing a run could bounce off.
+func map_toys() -> Array:
+	return []
+
+
 ## Whether [param track] is meant to be driven rather than run.
 ##
 ## [b]Default false, which is every map that existed before there were cars.[/b]

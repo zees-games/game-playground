@@ -73,6 +73,10 @@ enum Kind {
 	## ever to the shooter's peer, for the hit marker and the damage numbers, which are drawn
 	## from this and never from the local prediction. Last, for the same reason.
 	HIT,
+	## The map's toys' net ids in toy order, and which map they are for (both ends build the
+	## toys in the same order from the map). After MAP, and to a joiner after HELLO. Last, for
+	## the same reason.
+	TOYS,
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
@@ -1103,6 +1107,29 @@ static func write_pane(index: int) -> PackedByteArray:
 static func read_pane(r: DotNetReader) -> Dictionary:
 	var index := r.read_varint()
 	return {"index": index, "ok": r.ok()}
+
+
+# --- TOYS ----------------------------------------------------------------------
+
+## The toys of [param map_id], by their net ids in toy order.
+static func write_toys(map_id: StringName, net_ids: PackedInt64Array) -> PackedByteArray:
+	var w := _w()
+	w.write_string(String(map_id), ID_BYTES)
+	w.write_varint(net_ids.size())
+	for id in net_ids:
+		w.write_varint(maxi(int(id), 0))
+	return w.to_bytes()
+
+
+static func read_toys(r: DotNetReader) -> Dictionary:
+	var map_id := StringName(r.read_string(ID_BYTES))
+	var count := r.read_varint()
+	var ids := PackedInt64Array()
+	if count < 0 or count > 256:
+		return {"map_id": map_id, "ids": ids, "ok": false}
+	for i in count:
+		ids.append(r.read_varint())
+	return {"map_id": map_id, "ids": ids, "ok": r.ok()}
 
 
 # --- HIT -----------------------------------------------------------------------

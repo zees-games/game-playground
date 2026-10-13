@@ -334,6 +334,24 @@ var entity_table := DotEntityTable.new()
 ## link, because the client draws the bodies. Decided with by [method PlaygroundArena.decide_death].
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
+## The current map's toys (dot-props' [DotPropToyBox]): balls, barrels, swings, see-saws, a
+## roundabout, trampolines, switches. Built from the map's `map_toys()` on both ends in the same
+## order, simulated here where [member authoritative] and posed from snapshots on a client
+## (PlaygroundToyNet). A child of this node, not of the map: the map's tree is classified onto
+## the `world` layer when it is ready, which would take every toy with it. Null before a map.
+var toys: DotPropToyBox = null
+
+## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
+## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
+var toy_rules: DotPropToyRules = DotPropToyRules.new()
+
+## The map's toys are about to go (a map change), on both ends. What the bridge releases their
+## entities on, before the nodes are freed.
+signal toys_clearing()
+
+## The map's toys are built, on both ends. What a client's bridge pairs them on.
+signal toys_built()
+
 ## dot-player-controller's `mp_forceview` (may a player switch to third person) and
 ## `mp_solidplayers` (do players block each other). Bound by the module (REPLICATED) and
 ## followed by a client through its link.
@@ -531,6 +549,9 @@ func _simulate_tick(step: float) -> void:
 
 	for id in players:
 		(players[id] as PlaygroundPlayer).simulate(_tick, step)
+
+	# The toys after everybody moved: a walk into a ball pushes it, weight tips a see-saw.
+	_advance_toys(step)
 
 	# Held players after every holder has moved and aimed, so the beam ends where the
 	# holder is looking THIS tick, and before the timers, which read where they were put.
@@ -1769,6 +1790,11 @@ func player_shots_fired(player_id: StringName, outcome: DotWeaponOutcome) -> voi
 	for hit in PlaygroundZee.trace_outcome(shooter.get_world_3d().direct_space_state, outcome, exclude):
 		var collider: Variant = hit["collider"]
 
+		# A toy first: a shot beach ball bounces away, a shot bell rings. The toy box's push,
+		# never the prop shove below, whose damage-sized impulse sends a ball off at 40 m/s.
+		if shoot_toy(collider, hit):
+			continue
+
 		if collider is Node and (collider as Node).has_method("take_damage"):
 			(collider as Node).call("take_damage", float(hit["damage"]), player_id)
 		elif collider is Node and hurt_pane(collider as Node, float(hit["damage"]), player_id):
@@ -1799,6 +1825,9 @@ func npc_shots_fired(entity: Node3D, outcome: DotWeaponOutcome) -> void:
 	for hit in PlaygroundZee.trace_outcome(entity.get_world_3d().direct_space_state, outcome, exclude):
 		var collider: Variant = hit["collider"]
 		var damage := float(hit["damage"])
+
+		if shoot_toy(collider, hit):
+			continue
 
 		if collider is Node and (collider as Node).has_method("take_damage"):
 			(collider as Node).call("take_damage", damage, shooter_id)
@@ -2051,6 +2080,10 @@ func add_player(id: StringName, display_name: String) -> PlaygroundPlayer:
 	player.timer = timers.timer_for(id)
 	player.carry = carry
 	player.carry_enabled_fn = func() -> bool: return config == null or config.prop_surfing
+	# The map's toys: the trampolines and pads that throw them, the roundabout that carries
+	# them. Both ends; the box is the current map's (see [method _build_toys]).
+	player.toys = toys
+	player.bounced_fn = _on_bounced
 
 	player.set_style(
 		movement_styles[&"normal"], timers.style_for(&"normal")
@@ -2458,6 +2491,8 @@ func _on_prop_exploded(at: Vector3, radius: float, damage: float, _force: float,
 
 	_blast_depth += 1
 
+	var _thrown := blast_toys(at, radius)
+
 	if props != null:
 		for other in props.all_props():
 			if other == null or not other.is_alive() or other.node == null or _breaking.has(other.instance_id):
@@ -2474,6 +2509,127 @@ func _on_prop_exploded(at: Vector3, radius: float, damage: float, _force: float,
 
 	if _blast_depth == 0:
 		_breaking.clear()
+
+
+# --- Toys ----------------------------------------------------------------------
+
+## What a person weighs on a see-saw, kg.
+const PERSON_MASS := 70.0
+
+## How far the use key reaches a toy: a ball at your feet, a switch at arm's length.
+const TOY_REACH := 2.6
+
+## A grenade's or a barrel's blast at its centre, m/s to a toy of up to 3 kg.
+const TOY_BLAST_SPEED := 12.0
+
+
+## The map's toys from its `map_toys()` (dot-props placements), on both ends, in the order the
+## map lists them: that order is how a client pairs each with the server's entity. Every player
+## is handed the box for the trampolines and the roundabout.
+func _build_toys(loaded: Node) -> void:
+	_clear_toys()
+	var placements: Array = loaded.call("map_toys") if loaded != null and loaded.has_method("map_toys") else []
+	var layout: DotPhysicsLayout = player_stack.physics.layout if player_stack != null and player_stack.physics != null else null
+
+	toys = DotPropToyBox.new()
+	toys.name = "Toys"
+	toys.authoritative = authoritative
+	toys.rules = toy_rules
+	toys.gravity = PlaygroundMap.MOVE_GRAVITY
+	toys.kill_y = -60.0
+	if layout != null:
+		toys.loose_layer = layout.layer_mask(&"toy")
+		toys.loose_mask = layout.collision_mask(&"toy")
+		toys.solid_layer = layout.layer_mask(&"frozen_prop")
+		toys.solid_mask = layout.collision_mask(&"frozen_prop")
+		toys.footprint_layer = layout.layer_mask(&"footprint")
+		toys.aim_mask = layout.mask_of([&"world", &"prop", &"frozen_prop", &"toy"] as Array[StringName])
+	add_child(toys)
+
+	var built := toys.build(placements)
+	if not built.ok:
+		DotLog.warn(CHANNEL, "a map's toys would not build", {"why": built.error.message})
+
+	var _sounds := toys.sound.connect(func(id: StringName, at: Vector3, strength: float) -> void: toy_sound.emit(id, at, strength))
+
+	if carry != null:
+		carry.toys = toys
+	for id in players:
+		(players[id] as PlaygroundPlayer).toys = toys
+
+	toys_built.emit()
+
+
+func _clear_toys() -> void:
+	if toys == null:
+		return
+	toys_clearing.emit()
+	if carry != null:
+		carry.toys = null
+	for id in players:
+		(players[id] as PlaygroundPlayer).toys = null
+	remove_child(toys)
+	toys.queue_free()
+	toys = null
+
+
+## A toy made a sound (a bounce, a knock, a switch, a honk), on whichever end drew it: what the
+## presentation plays.
+signal toy_sound(id: StringName, at: Vector3, strength: float)
+
+
+## The toy [param player] is looking at within reach, or -1. Both ends.
+func toy_aimed(player: PlaygroundPlayer) -> int:
+	if toys == null or player == null or not player.is_inside_tree():
+		return -1
+	return toys.aimed(player.eye_position(), player.aim_direction(), TOY_REACH)
+
+
+## A hit scan's hit on a toy: dot-props pushes it by the damage (a shot bell rings). True when
+## the collider was a toy's, so the caller does not also hurt or shove it. Server side.
+func shoot_toy(collider: Variant, hit: Dictionary) -> bool:
+	if toys == null or not authoritative or not (collider is Object):
+		return false
+	return toys.shot(collider as Object, hit["point"], hit["direction"], float(hit["damage"])) >= 0 \
+		or DotPropToyBox.toy_of(collider) != null
+
+
+## A blast at [param at]: every moving toy within [param radius] thrown away from it. Server
+## side; a grenade's ([PlaygroundProjectiles]) and a breaking barrel's. How many it moved.
+func blast_toys(at: Vector3, radius: float) -> int:
+	if toys == null or not authoritative:
+		return 0
+	return toys.blast(at, radius, TOY_BLAST_SPEED)
+
+
+## Everybody against the toys this tick, after they moved: a walk into a ball pushes it, weight
+## on a see-saw tips it, then the box's own tick (the awake cap, the lost sent home). A person
+## is not a rigid body, so this is how one touches a toy at all. Server side.
+func _advance_toys(step: float) -> void:
+	if toys == null or not authoritative:
+		return
+
+	for id in players:
+		var player: PlaygroundPlayer = players[id]
+		if player.riding:
+			continue
+		var state := player.controller.state
+		if state == null:
+			continue
+		var tunables := player.controller.tunables
+		var radius := tunables.radius if tunables != null else 0.35
+		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
+		var _pushed := toys.push_from(state.position, state.velocity, radius, height)
+		if state.is_grounded():
+			var _bore := toys.stand_on(state.position, PERSON_MASS)
+
+	toys.advance(step)
+
+
+## A player thrown by a toy: its count goes up, which every client hears. Server side.
+func _on_bounced(index: int) -> void:
+	if authoritative and toys != null:
+		toys.launched(index)
 
 
 func _expire_debris() -> void:
@@ -2595,6 +2751,8 @@ func _on_map_changing(_from: DotMapDef, _to: DotMapDef) -> void:
 	if projectiles != null:
 		projectiles.clear()
 
+	_clear_toys()
+
 
 func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
 	var playground_map := loaded as PlaygroundMap
@@ -2620,6 +2778,8 @@ func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
 	_index_panes(loaded)
 	if config != null:
 		panes_break = config.breakable_glass
+
+	_build_toys(loaded)
 
 	# Its props, once the boxes they stand on exist. The server's only: a client gets them
 	# through the prop path like anything else anybody spawned.
@@ -2814,6 +2974,12 @@ func use_prop(player_id: StringName) -> DotResult:
 
 	if player == null or io == null or not authoritative or player.grav_gun == null or not player.is_inside_tree():
 		return DotResult.fail(DotError.CODE_STATE, "Nothing to use.")
+
+	# A toy looked at, before any prop: a kick, a push, a switch, a honk.
+	var toy := toy_aimed(player)
+
+	if toy >= 0 and toys.use(toy, player.eye_position(), player.aim_direction()):
+		return DotResult.success(toys.toy(toy))
 
 	var gun := player.grav_gun
 	var reach := gun.reach

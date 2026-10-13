@@ -64,3 +64,11 @@ On a networked client only your own props make a spawn noise (`PlaygroundNetBrid
 ## Interpolation
 
 dot-net's interpolator converts its delay from snapshots to ticks; it once subtracted a buffer counted in snapshots from a tick timeline, so every remote entity in the family was extrapolated. `tools/screenshot_net.sh` (a connected client watching another player, with a per-frame movement probe) is what found it; `--walk` probes the local player's key-to-motion and eye speed, `--hold` and `--zee=<id>` render a carried crate and a held gun.
+
+## The map's toys
+
+Each toy is an entity (`PlaygroundToyNet`: `state_transform`, `on`, `count`), registered by the server when the map is ready and named in a TOYS event (the map's id, then the net ids in toy order), which a joiner is told after HELLO. Both ends build the toys in the same order from the map, so a client pairs them by index alone. A client's map change takes frames and TOYS usually arrives first, so the bridge keeps it until `Playground.toys_built` says that map's toys exist. Released entities are taken out of the tree at once, not at the frame's end: a new identity on the same toy collects every behaviour under it in its `_ready`, and found the old one freed in the middle of the next snapshot. A client's toys are frozen and posed; the roundabout's spin is measured from the poses (dot-props), which is what carries the client's own predicted player standing on it.
+
+## A READY before the seat
+
+**A READY before the player is seated is kept** (`_ready_unseated` in the bridge; `_on_request` hands READY to `_admit` before its seat check) and answered by `add_player`: over ENet with loss it overtakes the link's `loaded`, and a dropped READY left the client waiting for ever. `headless_net` sends it first (armed). [history](history.md)

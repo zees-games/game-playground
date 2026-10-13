@@ -146,6 +146,11 @@ func map_wires() -> Array:
 	return doc.get("wires", [])
 
 
+## The toys this map puts down (dot-props' placements), from the document's `toys`.
+func map_toys() -> Array:
+	return doc.get("toys", [])
+
+
 func _build_fallback() -> void:
 	PlaygroundGeometry.light(self)
 	PlaygroundGeometry.box(self, Vector3(0.0, -0.5, 0.0), Vector3(40.0, 1.0, 40.0))

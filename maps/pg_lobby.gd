@@ -850,6 +850,46 @@ static func stones_route() -> Array[AABB]:
 	return route
 
 
+## The sandbox's toys (dot-props'): balls and barrels round the spawn, a bowling lane north of
+## it, and a park to the south-west with a roundabout, a see-saw, a swing, trampolines, a
+## fountain, lamps on a switch, a bell and a horn. Everything clear of the movement corner, the
+## courses and the circuit. Indices matter: the switch names the lamps by theirs.
+func map_toys() -> Array:
+	var out: Array = [
+		# Round the spawn: what somebody shoots at first.
+		{"toy": "beach_ball", "at": [3.0, 0.0, -5.0]},
+		{"toy": "beach_ball", "at": [-3.5, 0.0, -7.0]},
+		{"toy": "football", "at": [5.0, 0.0, -9.0]},
+		{"toy": "barrel", "at": [9.0, 0.0, 3.0]},
+		{"toy": "barrel", "at": [9.8, 0.0, 3.6], "yaw": 40.0},
+		{"toy": "barrel", "at": [9.2, 0.0, 4.4], "yaw": 75.0},
+		{"toy": "tyre", "at": [7.0, 0.0, 8.0], "yaw": 20.0},
+		# A bowling lane, ball at the near end and six pins at the far.
+		{"toy": "bowling_ball", "at": [5.0, 0.0, 13.0]},
+	]
+	for row in range(3):
+		for i in range(row + 1):
+			out.append({"toy": "bowling_pin", "at": [5.0 + (float(i) - float(row) * 0.5) * 0.45, 0.0, 22.0 + float(row) * 0.4]})
+	var lamps := out.size()
+	out.append_array([
+		# The park, in three rows of three, four metres apart and more.
+		{"toy": "lamp_post", "at": [-21.0, 0.0, 6.0]},
+		{"toy": "lamp_post", "at": [-3.0, 0.0, 25.0]},
+		{"toy": "light_switch", "at": [-3.0, 0.0, 6.0], "links": [lamps, lamps + 1]},
+		{"toy": "seesaw", "at": [-18.0, 0.0, 10.0]},
+		{"toy": "merry_go_round", "at": [-12.0, 0.0, 10.0]},
+		{"toy": "wobbly_platform", "at": [-6.5, 0.0, 10.0]},
+		{"toy": "swing", "at": [-18.0, 0.0, 16.0]},
+		{"toy": "fountain", "at": [-12.0, 0.0, 16.0]},
+		{"toy": "trampoline", "at": [-6.5, 0.0, 16.0]},
+		{"toy": "punching_bag", "at": [-18.0, 0.0, 22.0]},
+		{"toy": "bell", "at": [-12.0, 0.0, 22.5]},
+		{"toy": "bounce_pad", "at": [-6.5, 0.0, 22.0]},
+		{"toy": "horn", "at": [-21.0, 0.0, 25.0]},
+	])
+	return out
+
+
 func timer_zones() -> DotTimerZoneSet:
 	return build_zones()
 

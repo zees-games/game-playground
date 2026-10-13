@@ -96,6 +96,14 @@ var timer: DotTimer = null
 var carry: DotPropCarry = null
 var carry_enabled_fn: Callable = Callable()
 
+## The map's toys (dot-props' [DotPropToyBox]), for the trampolines and pads that throw this
+## player and the roundabout that carries them. Set by the game on every map, both ends.
+var toys: DotPropToyBox = null
+
+## `func(index: int) -> void`: this player was thrown by toy [param index]. The game's, which
+## counts the bounce on the server only (that is what a client hears).
+var bounced_fn: Callable = Callable()
+
 ## What a player weighs to a prop they stand on (DotPropCarry takes a share of it).
 const MASS_KG := 80.0
 
@@ -876,7 +884,25 @@ func _on_simulated(_tick: int, state: DotFpsState) -> void:
 		state.velocity.y += controller.tunables.gravity * (1.0 - gravity_zone.number) \
 			/ float(maxi(1, controller.tick_rate))
 
+	_launch_from_toy(state)
 	_ride_prop(state)
+
+
+## A trampoline or a bounce pad under the feet throws them, after the move, on every end that
+## simulates this player (a predicting client's replays included): dot-props' `launch_for` is a
+## pure function of where the toys stand, so the client is thrown on the tick the server is.
+## AIR at once, as a jump leaves the ground, or the motor's ground snap holds them down.
+func _launch_from_toy(state: DotFpsState) -> void:
+	if toys == null or riding or not state.is_grounded():
+		return
+	var thrown := toys.launch_for(state.position, state.velocity)
+	if thrown.is_empty():
+		return
+	state.velocity = thrown["velocity"]
+	state.mode = DotFpsState.Mode.AIR
+	state.time_since_grounded = 1000.0
+	if bounced_fn.is_valid():
+		bounced_fn.call(int(thrown["index"]))
 
 
 ## Carried by the prop underfoot, after the move (mg-buses-from-hell's shape).
@@ -889,15 +915,21 @@ func _ride_prop(state: DotFpsState) -> void:
 	if carry == null or not state.is_grounded() or riding:
 		return
 
-	if carry_enabled_fn.is_valid() and not bool(carry_enabled_fn.call()):
-		return
-
 	var step := 1.0 / float(maxi(1, controller.tick_rate))
-	var lift := carry.ride(state.ground_id, state.position, MASS_KG, step)
+	var surfing := not carry_enabled_fn.is_valid() or bool(carry_enabled_fn.call())
+	var lift := Vector3.ZERO
+
+	# A prop underfoot (prop surfing), and a turning roundabout through the same call
+	# (`DotPropCarry.toys`). With prop surfing off, the roundabout still carries: it is a toy
+	# on the map, not a prop somebody spawned to ride.
+	if surfing:
+		lift = carry.ride(state.ground_id, state.position, MASS_KG, step)
+	elif carry.toys != null:
+		lift = carry.toys.carry_for(state.position, step, state.ground_id).get("offset", Vector3.ZERO)
 
 	# A connected client's ground is a mirror, which its spawner does not know and whose body
 	# is frozen: its velocity is the one its net behaviour measured (PlaygroundPropNet).
-	if lift == Vector3.ZERO and state.ground_id != 0:
+	if surfing and lift == Vector3.ZERO and state.ground_id != 0:
 		var ground: Object = instance_from_id(state.ground_id)
 		if ground is Node and (ground as Node).has_meta(&"mirror_velocity"):
 			lift = ((ground as Node).get_meta(&"mirror_velocity") as Vector3) * step

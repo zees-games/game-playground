@@ -362,6 +362,10 @@ func _detonate(f: Flying, at: Vector3) -> void:
 		# Map panes too (glass), which the blast's shape query does not return: they are world.
 		if game != null and game.has_method("hurt_panes_in"):
 			game.call("hurt_panes_in", at, radius, f.spawn.splash_damage, f.owner_id)
+		# And the map's toys, by dot-props' own blast: a damage-sized impulse sends a beach
+		# ball off at a hundred metres a second (see [method _blast], which skips them).
+		if game != null and game.has_method("blast_toys"):
+			var _thrown: int = game.call("blast_toys", at, radius)
 
 	_hear(DotNpcAiSounds.Kind.COMBAT, at, BLAST_HEARD, 0.5, f.owner_id)
 	_undraw(f)
@@ -389,6 +393,10 @@ func _in_blast(space: PhysicsDirectSpaceState3D, at: Vector3, radius: float) -> 
 
 
 func _blast(space: PhysicsDirectSpaceState3D, f: Flying, at: Vector3, radius: float, collider: Node3D) -> void:
+	# A toy is the toy box's to push ([method _detonate]), never this impulse.
+	if DotPropToyBox.toy_of(collider) != null:
+		return
+
 	var target := collider.global_position
 
 	if collider is PlaygroundPlayer:

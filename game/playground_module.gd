@@ -377,6 +377,11 @@ func _module_load() -> DotResult:
 	var _ragdolls := game.ragdoll_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
+	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
+	# server took away and draws the rest.
+	var _toys := game.toy_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
 
 	# dot-player-controller's mp_forceview (first or third person: the player's choice, or one
 	# held) and mp_solidplayers (players block each other, 1 by default). REPLICATED: the

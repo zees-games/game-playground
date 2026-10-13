@@ -86,6 +86,7 @@ Short forms; the reasoning is in the linked file.
 - The menu never spawns; it emits. The first card takes focus, not the search. `TabBar.clip_tabs` off. [sandbox](docs/sandbox.md#the-q-menu)
 - Switching tools or opening the menu lets go of everything. F is use, then vehicle. [sandbox](docs/sandbox.md#the-tools)
 - Creative mode is protection **both ways**, and lives in dot-props so no tool can forget it. [sandbox](docs/sandbox.md#creative-mode)
+- **Map toys** (dot-props' `toys/`) come from a map's `map_toys()` and are built on both ends in that order as a child of the playground, never of the map (classified onto `world`); a hit scan asks `shoot_toy` before any damage or shove; the bounce is after the move on every end; the roundabout rides through `DotPropCarry.toys`. [sandbox](docs/sandbox.md#the-maps-toys), [netcode](docs/netcode.md#the-maps-toys)
 - Saved builds are catalogue ids, whole or nothing. [sandbox](docs/sandbox.md#saved-builds)
 
 **Maps and routes**
@@ -106,7 +107,7 @@ Short forms; the reasoning is in the linked file.
 
 - A client predicts only its own player (owned by `local_peer_id`, claimed on HELLO). [netcode](docs/netcode.md#a-client-predicts-its-own-player-and-nobody-else)
 - Nothing goes to a peer before READY: `_broadcast` is peer by peer, greet from `peer_admitted`, voice is held. `remove_player` asks `net.peers()`. [netcode](docs/netcode.md#a-broadcast-reaches-ready-peers-only-pg-rpc-before-scene)
-- **A READY before the player is seated is kept** (`_ready_unseated` in the bridge; `_on_request` hands READY to `_admit` before its seat check) and answered by `add_player`: over ENet with loss it overtakes the link's `loaded`, and a dropped READY left the client waiting for ever. `headless_net` sends it first (armed). [history](docs/history.md)
+- **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; a dropped one left the client waiting for ever. [netcode](docs/netcode.md#a-ready-before-the-seat)
 - `Ask` is full: new requests are ARM_PROP sub-kinds. New event kinds and message fields are appended. [netcode](docs/netcode.md#the-request-enum-is-full)
 - No message script preloads itself. [netcode](docs/netcode.md#no-message-preloads-itself)
 - A bag goes only to its owner, as ops up and whole documents down. [inventory](docs/inventory.md#over-the-wire-playgroundinventorynet)
@@ -125,7 +126,7 @@ Short forms; the reasoning is in the linked file.
 
 - Wait on `playground.booted`, not only the signal. [client](docs/client.md#booting)
 - Every key is a `PlaygroundBindings` row read through its action, never a keycode (Escape excepted); H is help, so no row may default to H. [client](docs/client.md#keys-help-and-leave)
-- M is dot-menu's map menu (`PlaygroundBindings.MAP` is `dot_menu_maps`, still stored as `bind_map`): solo `PlaygroundClient.map_menu_rows()` lists the catalogue (custom and delivered maps included) and `change_from_menu()` changes through `Playground.change_map`; on a server dot-vote's map menu changes through `game.change_map` for the owner's `sv_map_menu_flag` and gives anybody else a vote. No other row may default to M; `headless_playground` and `dedicated` check it.
+- M is dot-menu's map menu (`PlaygroundBindings.MAP`, `dot_menu_maps`): solo from the catalogue through `Playground.change_map`, on a server dot-vote's menu for the owner's `sv_map_menu_flag` and a vote for anybody else. No other row may default to M. [client](docs/client.md#m-the-map-menu)
 - Escape releases then opens dot-menu; only a click captures. This client owns the pointer. [client](docs/client.md#escape-the-pointer-and-the-menu)
 - The character body goes under the rig, not the visual; `auto_drive` off. [client](docs/client.md#third-person-and-the-body)
 - Chat lines go to the chat box, and to the HUD notice line only when there is no box (a ballot was drawn twice). [client](docs/client.md#the-chat-box)
@@ -137,10 +138,4 @@ Short forms; the reasoning is in the linked file.
 
 ## Not here yet
 
-- **The module is a `DotModule`, not a `DotGameModule`**, deliberately for now: converting is its own piece of work (typed fields, build order, its own roster). Because of it the module wires identity and hibernation itself. [simulation](docs/simulation.md#the-server-module)
-- **`ask_restart` and `ask_checkpoint`** are on the bridge and handled by the server, and no key or menu calls them, so a networked client cannot restart a run or use a practice checkpoint. Each is a decision about bindings, not a deliberate omission. (`publish_loadout` is unused too: B goes through `/loadout`.)
-- **A bag screen and buying into the bag; saving a bag.** [inventory](docs/inventory.md#not-here-yet)
-- **A wardrobe.** [client](docs/client.md#people-are-drawn-as-people)
-- **Grenades already in the air are not sent to a joiner**, and the thrower's own grenade is not predicted. [sandbox](docs/sandbox.md#grenades-and-rockets)
-- **The PROP event carries no frozen state**, so a mirror frozen later is not reclassified on a client. [netcode](docs/netcode.md#a-prop-mirror-is-on-the-props-layer)
-- **Replay playback.** dot-timer records and stores replays; drawing a ghost is a game's own decision. Deliberate for now.
+The unbuilt pieces (the `DotGameModule` conversion, restart and checkpoint keys, the bag screen, a wardrobe, grenades for joiners, frozen state on PROP, replay playback) are listed with their reasons in [docs/not-yet.md](docs/not-yet.md).

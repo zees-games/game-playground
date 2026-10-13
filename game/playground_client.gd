@@ -251,6 +251,10 @@ func _ready() -> void:
 
 	playground.config = config
 	playground.config_file = config_file
+	# The map's toys are heard: a bounce, a knock, a switch, a honk. Before the first map.
+	var _toys := playground.toy_sound.connect(func(id: StringName, at: Vector3, strength: float) -> void:
+		if presentation != null:
+			var _played := presentation.on_toy(id, at, strength))
 	add_child(playground)
 
 	# Custom maps the server's game names as dependencies (game-playground-maps): fetched in
@@ -473,6 +477,8 @@ func _build_netcode() -> DotResult:
 	# The server's sv_ragdoll* set: this end draws the bodies. An older shell's link cannot say.
 	if link != null:
 		var _bodies := playground.ragdoll_rules.follow_cvars(link)
+		# And sv_toys*: a client hides the toys a server took away.
+		var _toy_rules := playground.toy_rules.follow_cvars(link)
 		# The server's mp_forceview and mp_solidplayers: this end places its own camera and
 		# predicts its own player.
 		var _view := playground.view_rules.follow_cvars(link)

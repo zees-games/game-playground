@@ -109,3 +109,7 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |
 | `xvfb-run -a godot --path . --resolution 1280x720 res://tools/render_loadout.tscn` | a zee gun hip and aimed (carbine, bullpup's scope), solo B outside the arena, and the arena's B menu, into `screenshots/loadout/` with a line per frame |
 | `tools/audio_probe.sh` | whether the client makes a sound |
+
+## M, the map menu
+
+M is dot-menu's map menu (`PlaygroundBindings.MAP` is `dot_menu_maps`, still stored as `bind_map`): solo `PlaygroundClient.map_menu_rows()` lists the catalogue (custom and delivered maps included) and `change_from_menu()` changes through `Playground.change_map`; on a server dot-vote's map menu changes through `game.change_map` for the owner's `sv_map_menu_flag` and gives anybody else a vote. No other row may default to M; `headless_playground` and `dedicated` check it.

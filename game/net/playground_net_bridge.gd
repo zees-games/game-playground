@@ -14,6 +14,7 @@ const PlaygroundNpcNet := preload("playground_npc_net.gd")
 const PlaygroundRequest := preload("playground_request.gd")
 const PlaygroundSpawnables := preload("../playground_spawnables.gd")
 const PlaygroundVehicleNet := preload("playground_vehicle_net.gd")
+const PlaygroundToyNet := preload("playground_toy_net.gd")
 const PlaygroundWeapon := preload("../weapons/playground_weapon.gd")
 const PlaygroundWeapons := preload("../playground_weapons.gd")
 const PlaygroundZee := preload("../playground_zee.gd")
@@ -292,6 +293,13 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 	# dead-reckon every remote one from stale state.
 	game.external_tick = true
 
+	# Both ends: the old map's toys leave the registry before their nodes go, and a client
+	# pairs the new ones once both its own are built and the server has named them.
+	game.toys_clearing.connect(_release_toys)
+
+	if not net.is_server:
+		game.toys_built.connect(_pair_pending_toys)
+
 	if net.is_server:
 		game.player_added.connect(_on_player_added)
 		game.player_removed.connect(_on_player_removed)
@@ -316,6 +324,10 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 		if game.projectiles != null:
 			game.projectiles.launched.connect(_on_projectile_launched)
 			game.projectiles.detonated.connect(_on_projectile_detonated)
+
+		# A map loaded before the bridge was attached has its toys already.
+		if game.toys != null:
+			_register_toys()
 
 	return DotResult.success(true)
 
@@ -1147,6 +1159,10 @@ func _admit(peer_id: int) -> void:
 	for holder in held_props.keys():
 		_tell(peer_id, PlaygroundEvents.Kind.HELD, PlaygroundEvents.write_held(int(holder), int(held_props[holder]), false))
 
+	# The map's toys, by net id in toy order: the joiner's own copies are paired with them.
+	if not _toys_body.is_empty():
+		_tell(peer_id, PlaygroundEvents.Kind.TOYS, _toys_body)
+
 	# The time left now, rather than at the clock's next change — which on a quiet map is
 	# never, and a joiner would count down nothing until it came.
 	if clock_fn.is_valid():
@@ -1205,10 +1221,107 @@ func _join_body(session_id: int) -> PackedByteArray:
 
 func _on_map_ready(map: DotMapDef) -> void:
 	_broadcast(PlaygroundEvents.Kind.MAP, PlaygroundEvents.write_map(map.id))
+	_register_toys()
 	# Re-announced after a map change: a client rebuilt its world and needs to be told
 	# who is in it again. dot-map's own sync replaces the world and nothing else.
 	for session_id in _behaviours.keys():
 		_broadcast(PlaygroundEvents.Kind.JOIN, _join_body(int(session_id)))
+
+
+# --- Both ends: the map's toys ---------------------------------------------------
+
+## The map's toys on the wire, one behaviour per toy in toy order, and the TOYS event that names
+## their net ids (kept for a joiner).
+var _toy_nets: Array = []
+var _toys_body: PackedByteArray = PackedByteArray()
+
+## Client: the last TOYS, until this end's own toys for that map are built. The server names
+## them right after MAP, and a client's map change takes frames, so they usually arrive first.
+var _pending_toys: Dictionary = {}
+
+
+## Server: an entity for each of the map's toys, and TOYS naming them, after MAP.
+func _register_toys() -> void:
+	if net == null or not net.is_server:
+		return
+	_release_toys()
+	var ids := PackedInt64Array()
+	if game.toys != null:
+		for toy in game.toys.toys:
+			var behaviour := _toy_entity(toy, 0)
+			if behaviour == null:
+				break
+			ids.append(behaviour.identity.net_id)
+	var map_id: StringName = game.maps.current.id if game.maps.current != null else &""
+	_toys_body = PlaygroundEvents.write_toys(map_id, ids)
+	_broadcast(PlaygroundEvents.Kind.TOYS, _toys_body)
+
+
+## A toy's behaviour and identity, registered under [param net_id] (0 allocates one: the
+## server). Null when the registry refused it. The behaviour before the identity, which
+## collects behaviours in its `_ready`.
+func _toy_entity(toy: DotPropToy, net_id: int) -> PlaygroundToyNet:
+	var behaviour := PlaygroundToyNet.new()
+	behaviour.name = "Net"
+	behaviour.toy = toy
+	toy.add_child(behaviour)
+	if net.is_server:
+		behaviour.pull()
+
+	var identity := DotNetIdentity.new()
+	identity.name = "Identity"
+	identity.owner_peer_id = 0
+	identity.authority = DotNetIdentity.Authority.SERVER
+	toy.add_child(identity)
+
+	var registered := net.registry.register(identity, net_id, net.clock.tick, net.config)
+	if not registered.ok:
+		DotLog.warn(CHANNEL, "could not replicate a toy", {"toy": toy.index, "error": str(registered.error)})
+		behaviour.queue_free()
+		identity.queue_free()
+		return null
+	_toy_nets.append(behaviour)
+	return behaviour
+
+
+## Every toy entity out of the registry: a map change, or a new TOYS.
+func _release_toys() -> void:
+	for behaviour: PlaygroundToyNet in _toy_nets:
+		if is_instance_valid(behaviour) and behaviour.identity != null and net != null:
+			var net_id := behaviour.identity.net_id
+			if net.registry.has(net_id):
+				net.registry.unregister(net_id)
+			# Out of the tree now, not at the frame's end: a new identity on the same toy
+			# collects every behaviour under it in its `_ready`, and found the old one, freed a
+			# frame later, in the middle of its next snapshot.
+			for node: Node in [behaviour.identity, behaviour]:
+				if node.get_parent() != null:
+					node.get_parent().remove_child(node)
+				node.queue_free()
+	_toy_nets.clear()
+
+
+## Client: the server's TOYS onto this end's own toys, once both are here and for one map. A
+## mirror for each toy, under the server's ids, in toy order.
+func _pair_pending_toys() -> void:
+	if _pending_toys.is_empty() or net == null or net.is_server or game == null or game.toys == null:
+		return
+	var current: StringName = game.maps.current.id if game.maps.current != null else &""
+	if current != _pending_toys["map_id"]:
+		return
+	var ids: PackedInt64Array = _pending_toys["ids"]
+	_pending_toys = {}
+	_release_toys()
+	var box := game.toys
+	if ids.size() != box.count():
+		DotLog.warn(CHANNEL, "the server's map has a different number of toys", {"server": ids.size(), "here": box.count()})
+	for i in mini(ids.size(), box.count()):
+		var _mirror := _toy_entity(box.toy(i), int(ids[i]))
+
+
+## How many toys this end replicates. For a check.
+func toy_count() -> int:
+	return _toy_nets.size()
 
 
 func _on_run_changed(id: StringName, _run: DotTimerRun) -> void:
@@ -1785,6 +1898,11 @@ func _on_event(message: DotNetMessage) -> void:
 			var map_id := PlaygroundEvents.read_map(reader)
 			if game.maps.current == null or game.maps.current.id != map_id:
 				game.change_map(map_id)
+		PlaygroundEvents.Kind.TOYS:
+			var told := PlaygroundEvents.read_toys(reader)
+			if bool(told["ok"]):
+				_pending_toys = told
+				_pair_pending_toys()
 		PlaygroundEvents.Kind.PROP:
 			_apply_prop(reader)
 		PlaygroundEvents.Kind.PROP_GONE:

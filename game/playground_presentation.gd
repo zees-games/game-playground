@@ -439,6 +439,25 @@ static func sound_catalogue() -> DotAudioCatalogue:
 		fall.cooldown_ms = int(row["cooldown_ms"])
 		c.add(fall)
 
+	# The map's toys: dot-props' stock toy sounds (Kenney, CC0, and a horn made for it), shipped
+	# in the addon, each carrying as far as its row says.
+	for row: Dictionary in DotPropToySounds.rows():
+		var toy := DotAudioDef.new()
+		toy.id = row["id"]
+		toy.path = row["path"]
+		toy.variants = row["variants"]
+		toy.kind = DotAudioDef.Kind.POSITIONAL_3D
+		toy.bus = &"SFX"
+		toy.unit_size = 6.0
+		toy.max_distance = float(row["distance"])
+		toy.max_concurrent = 4
+		toy.priority = 40
+		toy.gain_db = float(row["gain_db"])
+		toy.pitch_min = float(row["pitch_min"])
+		toy.pitch_max = float(row["pitch_max"])
+		toy.cooldown_ms = int(row["cooldown_ms"])
+		c.add(toy)
+
 	return c
 
 
@@ -470,6 +489,20 @@ static func sound_recipes() -> Dictionary:
 		PlaygroundVote.CUE_WARNING: DotAudioSynth.Voice.BLIP,
 		PlaygroundVote.CUE_COUNT: DotAudioSynth.Voice.STEP,
 		BEACON_SOUND: DotAudioSynth.Voice.BLIP,
+		# Stand-ins only for a build without dot-props' toy files.
+		DotPropToySounds.BOUNCE: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.THUMP: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.KNOCK: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.PIN: DotAudioSynth.Voice.CLICK,
+		DotPropToySounds.WOOD: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.RUBBER: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.PUNCH: DotAudioSynth.Voice.HURT,
+		DotPropToySounds.METAL: DotAudioSynth.Voice.CLICK,
+		DotPropToySounds.BELL: DotAudioSynth.Voice.PICKUP,
+		DotPropToySounds.CLICK: DotAudioSynth.Voice.CLICK,
+		DotPropToySounds.WATER: DotAudioSynth.Voice.STEP,
+		DotPropToySounds.BOING: DotAudioSynth.Voice.SPAWN,
+		DotPropToySounds.HORN: DotAudioSynth.Voice.BLIP,
 		# Stand-ins only for a build without dot-player-char's files.
 		DotPlayerDeathReactions.SOUND_THUD: DotAudioSynth.Voice.IMPACT,
 		DotPlayerDeathReactions.SOUND_FACE_PLANT: DotAudioSynth.Voice.IMPACT,
@@ -864,6 +897,14 @@ func on_body(id: StringName, at: Vector3, volume: float) -> int:
 		return 0
 
 	return audio.play_at(id, at, clampf(volume, 0.3, 1.0))
+
+
+## A toy's sound (dot-props' toys): a bounce, a knock, a switch, a honk, where it happened.
+func on_toy(id: StringName, at: Vector3, strength: float) -> int:
+	if audio == null:
+		return 0
+
+	return audio.play_at(id, at, clampf(strength, 0.25, 1.0))
 
 
 ## A beacon's ripple went out from [param at]. From `PlaygroundClient._process`, on every

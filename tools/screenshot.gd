@@ -64,6 +64,8 @@ func _initialize() -> void:
 	root.add_child(map_node)
 	if map_node.has_method("map_props"):
 		_draw_props(map_node.call("map_props"))
+	if map_node.has_method("map_toys"):
+		_draw_toys(map_node.call("map_toys"))
 
 	# The map brings its own sun, sky and fill light (`PlaygroundGeometry.light`), the same
 	# ones the client draws, so a second environment here would be the one ignored.
@@ -107,6 +109,22 @@ func _draw_props(entries: Array) -> void:
 			var _s: float = body.call("set_size_scale", float(entry["scale"]))
 		if Color.html_is_valid(str(entry.get("tint", ""))) and body.has_method("set_tint"):
 			body.call("set_tint", Color.html(str(entry["tint"])))
+
+
+## The map's toys (dot-props'), as a client draws them: frozen where the map puts them.
+func _draw_toys(placements: Array) -> void:
+	if placements.is_empty():
+		return
+	var box := DotPropToyBox.new()
+	box.name = "Toys"
+	box.authoritative = false
+	root.add_child(box)
+	_toy_box = box
+	_toy_placements = placements
+
+
+var _toy_box: DotPropToyBox = null
+var _toy_placements: Array = []
 
 
 ## Angles per map, because a 200 m sandbox with two courses in opposite corners has
@@ -429,6 +447,9 @@ func _shots_for(id: String) -> Array[Dictionary]:
 		{"name": "pg_lobby_overview", "from": Vector3(-150, 130, 150), "at": Vector3(0, 4, 0)},
 		# Eye level in the middle, which is where a player actually stands.
 		{"name": "pg_lobby_eye", "from": Vector3(-10, 2.0, 20), "at": Vector3(20, 6, -10)},
+		# The toys: the park in the south-west, and the balls, barrels and lane by the spawn.
+		{"name": "pg_lobby_park", "from": Vector3(-2.0, 5.0, 31.0), "at": Vector3(-13.0, 0.5, 14.0)},
+		{"name": "pg_lobby_toys_spawn", "from": Vector3(-4.0, 3.0, 6.0), "at": Vector3(6.0, 0.3, 4.0)},
 		# Bonus 1: the jump course, along its length.
 		{"name": "pg_lobby_course", "from": Vector3(86, 26, 72), "at": course},
 		# Bonus 2: the tower, from above its top and well out from it.
@@ -550,6 +571,12 @@ func _stage_fx() -> Array[Dictionary]:
 ## truthy, so the tree quits on the first frame and writes nothing. That is what
 ## game-arena's first version of this file did and the reason its comment says so.
 func _process(_delta: float) -> bool:
+	# The toys build in the tree, which the root's children are not during `_initialize`.
+	if _toy_box != null and _toy_box.count() == 0 and not _toy_placements.is_empty():
+		var _built := _toy_box.build(_toy_placements)
+		_toy_placements = []
+		_wait = maxi(_wait, 2)
+
 	if _fx_pending:
 		_fx_pending = false
 		_shots = _stage_fx()

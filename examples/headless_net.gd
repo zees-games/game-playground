@@ -58,13 +58,13 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 372
+const CHECKS := 378
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 44
+const SECTIONS := 45
 
 var _passed := 0
 var _failed := 0
@@ -178,6 +178,9 @@ func _run() -> void:
 		await _test_avatars_over_the_wire()
 		# Arms a gun and puts it away again; adds no body.
 		await _test_drawn_ammo_corrected()
+		# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
+		# the leave, because a ball it kicks would be in the way of whatever came after.
+		await _test_map_toys_over_the_wire()
 		await _test_leave()
 
 	_report()
@@ -1098,6 +1101,94 @@ func _test_glass_over_the_wire() -> void:
 		if _client_game.maps.current != null and _client_game.maps.current.id == before:
 			break
 	await _exchange_steps(16)
+	_done()
+
+
+func _toy_of(game: Playground, id: String) -> DotPropToy:
+	if game.toys == null:
+		return null
+	for t in game.toys.toys:
+		if String(t.def["id"]) == id:
+			return t
+	return null
+
+
+## dot-props' toys on the lobby, over the wire: an entity per toy on both ends paired by index
+## (TOYS), the client's frozen and posed from the server's state, a kicked ball followed, a
+## switch's lamps lit on the client, a roundabout's spin measured there so a rider is carried,
+## and a map change and back re-pairing them all.
+func _test_map_toys_over_the_wire() -> void:
+	_section("the map's toys over the wire")
+
+	var on_lobby := _server_game.maps.current != null and _server_game.maps.current.id == &"pg_lobby"
+	if not on_lobby:
+		var _changed: DotResult = await _server_game.change_map(&"pg_lobby")
+	for i in 240:
+		_exchange()
+		await _steps(1)
+		if _client_game.maps.current != null and _client_game.maps.current.id == &"pg_lobby" and _client_bridge.toy_count() > 0:
+			break
+	await _exchange_steps(8)
+
+	var count := _server_game.toys.count() if _server_game.toys != null else 0
+	_check(count >= 25 and _server_bridge.toy_count() == count and _client_bridge.toy_count() == count,
+		"every toy is an entity on both ends, paired by index", "%d toys, %d and %d replicated" % [count, _server_bridge.toy_count(), _client_bridge.toy_count()])
+
+	var server_ball := _toy_of(_server_game, "beach_ball")
+	var client_ball := _toy_of(_client_game, "beach_ball")
+	_check(client_ball != null and client_ball.body.freeze and not client_ball.authoritative and server_ball.authoritative,
+		"the client's toys are frozen copies; the server's simulate")
+
+	# Kicked on the server: the client's copy follows it there.
+	var _kicked := _server_game.toys.use(server_ball.index, server_ball.body.global_position + Vector3(0, 1.4, 1.2), Vector3(0, -0.3, -1))
+	var furthest := 0.0
+	for i in 30:
+		await _exchange_steps(1)
+		furthest = maxf(furthest, client_ball.body.global_position.distance_to(client_ball.rest.origin))
+	await _exchange_steps(30)
+	var apart := client_ball.body.global_position.distance_to(server_ball.body.global_position)
+	_check(furthest > 1.0 and apart < 0.6, "a ball kicked on the server rolls off on the client, and comes to rest where the server's did",
+		"%.2f m out, %.2f m apart at rest" % [furthest, apart])
+
+	# The switch on the server lights its lamps on the client.
+	var server_switch := _toy_of(_server_game, "light_switch")
+	var client_lamp := _client_game.toys.toy(int(server_switch.links[0]))
+	var was := client_lamp.on
+	var _pressed := _server_game.toys.use(server_switch.index, server_switch.global_position + Vector3(0, 1.4, 1), Vector3(0, -0.3, -1))
+	await _exchange_steps(12)
+	_check(client_lamp.on != was and client_lamp.on == _server_game.toys.toy(client_lamp.index).on, "the switch pressed on the server lights the lamp on the client")
+
+	# A roundabout spun on the server turns on the client, which measures the spin from the poses
+	# it is shown: what carries the client's own player standing on it, predicted.
+	var server_spinner := _toy_of(_server_game, "merry_go_round")
+	var client_spinner := _toy_of(_client_game, "merry_go_round")
+	var hub := server_spinner.body.global_position
+	var _spun := _server_game.toys.use(server_spinner.index, hub + Vector3(1.6, 1.0, 0), Vector3(0, 0, 1))
+	await _exchange_steps(16)
+	var ride := _client_game.toys.carry_for(hub + Vector3(1.0, 0.05, 0), 1.0 / 60.0)
+	var server_ride := _server_game.toys.carry_for(hub + Vector3(1.0, 0.05, 0), 1.0 / 60.0)
+	_check(not ride.is_empty() and not server_ride.is_empty() and signf(float(ride["yaw"])) == signf(float(server_ride["yaw"]))
+		and absf(float(ride["yaw"]) - float(server_ride["yaw"])) < absf(float(server_ride["yaw"])) * 0.5,
+		"a roundabout spun on the server turns on the client, and carries a rider there at nearly its rate",
+		"client %s, server %s" % [str(ride.get("yaw")), str(server_ride.get("yaw"))])
+
+	# A map change and back: the old entities go on both ends, the new ones are paired again.
+	var _away: DotResult = await _server_game.change_map(&"pgc_plots")
+	for i in 240:
+		_exchange()
+		await _steps(1)
+		if _client_game.maps.current != null and _client_game.maps.current.id == &"pgc_plots" and _client_bridge.toy_count() == _server_game.toys.count():
+			break
+	var plots := _server_game.toys.count()
+	_check(plots > 0 and _client_bridge.toy_count() == plots and _client_game.toys.count() == plots,
+		"a map change replaces them on both ends", "%d on the server, %d paired on the client" % [plots, _client_bridge.toy_count()])
+	var _back: DotResult = await _server_game.change_map(&"pg_lobby")
+	for i in 240:
+		_exchange()
+		await _steps(1)
+		if _client_game.maps.current != null and _client_game.maps.current.id == &"pg_lobby" and _client_bridge.toy_count() == _server_game.toys.count():
+			break
+	await _exchange_steps(8)
 	_done()
 
 

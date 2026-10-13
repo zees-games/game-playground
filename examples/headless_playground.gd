@@ -60,13 +60,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 934
+const CHECKS := 944
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 49
+const SECTIONS := 51
 
 var _passed := 0
 var _failed := 0
@@ -164,6 +164,8 @@ func _run() -> void:
 	await _test_the_drop()
 	await _test_the_maps_are_surveyed()
 	await _test_a_maps_own_props()
+	await _test_toys()
+	await _test_every_maps_toys_stand_clear()
 	await _test_map_materials()
 	await _test_glass()
 	await _test_water()
@@ -7095,6 +7097,228 @@ func _test_a_maps_own_props() -> void:
 	var back: DotResult = await playground.change_map(&"pg_lobby")
 	_check(back.ok and playground.props.props_of(playground.MAP_OWNER).is_empty(), "a map change takes its props with it")
 	_done()
+
+
+# --- Toys ------------------------------------------------------------------------
+
+func _toy_index(id: String) -> int:
+	if playground.toys == null:
+		return -1
+	for t in playground.toys.toys:
+		if String(t.def["id"]) == id:
+			return t.index
+	return -1
+
+
+## dot-props' toys on the sandbox, through the game's own paths: a walk pushes a ball, a shot
+## from the hit scan sends one off, the use key kicks, a trampoline throws a player, the
+## roundabout carries one standing on it, a grenade's blast throws a barrel, sv_toys 0 takes
+## them away and a map change takes them with it.
+func _test_toys() -> void:
+	_section("the sandbox's toys")
+
+	var on_lobby: DotResult = await playground.change_map(&"pg_lobby")
+	if not on_lobby.ok or playground.toys == null:
+		_check(false, "the sandbox loads with its toys", on_lobby.error.message if not on_lobby.ok else "no box")
+		_done()
+		return
+	var box := playground.toys
+	var lobby := playground.current_map_node()
+	_check(box.count() == (lobby.call("map_toys") as Array).size() and box.count() >= 25 and box.missing.is_empty(),
+		"the lobby builds every toy it lists", "%d toys" % box.count())
+
+	var player := playground.add_player(&"toyer", "Toyer")
+	await get_tree().physics_frame
+
+	# Walked into: the beach ball goes on ahead of the player.
+	var ball := box.toy(_toy_index("beach_ball"))
+	var b0 := ball.body.global_position
+	player.teleport(Vector3(b0.x - 1.2, 0.05, b0.z), -90.0)
+	await get_tree().physics_frame
+	for _i in range(16):
+		player.controller.state.velocity = Vector3(6.0, 0.0, 0.0)
+		await get_tree().physics_frame
+	for _i in range(30):
+		await get_tree().physics_frame
+	_check(ball.body.global_position.x > b0.x + 0.5, "a player walking into the beach ball sends it on ahead",
+		"moved %.2f m" % (ball.body.global_position.x - b0.x))
+
+	# Shot through the game's own hit scan (player_shots_fired → PlaygroundZee.trace_outcome):
+	# the second ball flies off, and nobody's prop shove sent it at forty metres a second.
+	var other := box.toy(_toy_index("beach_ball") + 1)
+	var o0 := other.body.global_position
+	player.teleport(o0 + Vector3(0, 0, 5.0), 0.0)
+	await get_tree().physics_frame
+	var outcome := DotWeaponOutcome.new()
+	outcome.used = true
+	var shot := DotShot.new()
+	shot.origin = o0 + Vector3(0, 0.1, 4.0)
+	shot.direction = Vector3(0, 0, -1)
+	shot.damage = 25.0
+	shot.max_range = 50.0
+	outcome.shots.append(shot)
+	playground.player_shots_fired(&"toyer", outcome)
+	var fastest := other.body.linear_velocity.length()
+	for _i in range(20):
+		await get_tree().physics_frame
+		fastest = maxf(fastest, other.body.linear_velocity.length())
+	_check(other.body.global_position.z < o0.z - 0.5 and fastest < 12.0, "a shot beach ball bounces away along the shot, at a ball's speed",
+		"moved %.2f m, at most %.1f m/s" % [o0.z - other.body.global_position.z, fastest])
+
+	# The use key on the football (the game's F, `use_prop`): kicked along the look.
+	var football := box.toy(_toy_index("football"))
+	var f0 := football.body.global_position
+	player.teleport(f0 + Vector3(0, 0.05, 1.3), 0.0)
+	# Down at the ball at the feet: the sign of pitch read off the aim, as the lever's is.
+	await _look(&"toyer", 45.0, 4)
+	var at_ball := rad_to_deg(atan2(player.eye_position().y - f0.y, player.eye_position().z - f0.z))
+	await _look(&"toyer", -at_ball if player.aim_direction().y > 0.0 else at_ball, 4)
+	var aimed := playground.toy_aimed(player)
+	var used := playground.use_prop(&"toyer")
+	for _i in range(20):
+		await get_tree().physics_frame
+	_check(aimed == football.index and used.ok and football.body.global_position.z < f0.z - 1.0,
+		"the use key kicks the football the player looks at", "aimed %d, moved %.2f m; eye %s aim %s ball %s" % [aimed, f0.z - football.body.global_position.z, player.eye_position(), player.aim_direction(), f0])
+
+	# A trampoline under a falling player throws them back up.
+	var tramp := box.toy(_toy_index("trampoline"))
+	player.teleport(tramp.global_position + Vector3(0.2, 1.4, 0.0), 0.0)
+	var top := 0.0
+	var bounced_before := tramp.count
+	for _i in range(90):
+		await get_tree().physics_frame
+		top = maxf(top, player.controller.state.position.y - tramp.global_position.y)
+	_check(top > 2.0 and tramp.count != bounced_before, "landing on the trampoline throws a player up, and counts the bounce",
+		"%.2f m above it, count %d" % [top, tramp.count])
+
+	# Somebody standing on the turning roundabout goes round with it.
+	var spinner := box.toy(_toy_index("merry_go_round"))
+	var hub := spinner.body.global_position
+	var _spun := box.use(spinner.index, hub + Vector3(1.6, 1.0, 0), Vector3(0, 0, 1))
+	player.teleport(hub + Vector3(1.0, 0.1, 0.0), 0.0)
+	for _i in range(6):
+		await get_tree().physics_frame
+	var start := player.controller.state.position - hub
+	var start_angle := atan2(start.z, start.x)
+	for _i in range(40):
+		await get_tree().physics_frame
+	var now := player.controller.state.position - hub
+	var turned := absf(wrapf(atan2(now.z, now.x) - start_angle, -PI, PI))
+	var out := Vector2(now.x, now.z).length()
+	_check(turned > 0.3 and absf(out - Vector2(start.x, start.z).length()) < 0.3 and player.controller.state.is_grounded(),
+		"a player standing on the turning roundabout is carried round with it, still on the deck",
+		"turned %.2f rad, %.2f m out" % [turned, out])
+
+	# A grenade's blast (through the projectiles' own detonation, which hands toys to the box).
+	var barrel := box.toy(_toy_index("barrel"))
+	var r0 := barrel.body.global_position
+	var thrown := playground.blast_toys(r0 + Vector3(-1.5, 0.2, 0.0), 5.0)
+	for _i in range(20):
+		await get_tree().physics_frame
+	_check(thrown >= 1 and barrel.body.global_position.distance_to(r0) > 0.2, "a blast throws the barrels beside it",
+		"%d thrown, %.2f m" % [thrown, barrel.body.global_position.distance_to(r0)])
+
+	# sv_toys 0: nothing to hit, kick or stand on; 1 brings them back.
+	var _off := playground.toy_rules.set_cvar(DotPropToyRules.CVAR_ENABLED, "0")
+	await get_tree().physics_frame
+	var hidden := not ball.visible and playground.toy_aimed(player) == -1
+	var _on := playground.toy_rules.set_cvar(DotPropToyRules.CVAR_ENABLED, "1")
+	_check(hidden and ball.visible, "sv_toys 0 takes the toys away and 1 puts them back")
+
+	playground.remove_player(&"toyer")
+	var away: DotResult = await playground.change_map(&"pg_surf_intro")
+	await get_tree().process_frame
+	_check(away.ok and playground.toys != null and playground.toys.count() == 0 and not is_instance_valid(ball),
+		"a map with no toys has none, and the lobby's went with it",
+		"%s, %s, ball %s" % [str(away.ok), str(playground.toys.describe()) if playground.toys != null else "no box", str(is_instance_valid(ball))])
+	var _back: DotResult = await playground.change_map(&"pg_lobby")
+	_done()
+
+
+## Every map with toys, built: each toy one dot-props has, none inside the map's geometry or
+## another toy's footprint, and two seconds of physics later every loose one still where the
+## map put it (not through a floor, not flung off an overlap the solver pushed apart).
+func _test_every_maps_toys_stand_clear() -> void:
+	_section("every map's toys stand clear")
+	var ids: Array[StringName] = []
+	for def: DotMapDef in playground.maps.catalogue.maps:
+		ids.append(def.id)
+	var with_toys := 0
+	var bad: Array = []
+	for id: StringName in ids:
+		if String(id).begins_with("pg_generated"):
+			continue
+		var changed: DotResult = await playground.change_map(id)
+		if not changed.ok or playground.toys == null:
+			continue
+		var box := playground.toys
+		var listed := playground.current_map_node().call("map_toys") as Array if playground.current_map_node().has_method("map_toys") else []
+		if listed.is_empty():
+			continue
+		with_toys += 1
+		if box.count() != listed.size() or not box.missing.is_empty():
+			bad.append("%s: %d of %d built, missing %s" % [id, box.count(), listed.size(), ", ".join(box.missing)])
+		var own: Array[RID] = []
+		for toy in box.toys:
+			for part: CollisionObject3D in [toy.fixed, toy.body]:
+				if part != null:
+					own.append(part.get_rid())
+		var layout := playground.player_stack.physics.layout
+		var space := playground.get_world_3d().direct_space_state
+		for toy in box.toys:
+			var hit := _toy_inside(space, toy, own, layout.mask_of([&"world", &"frozen_prop", &"prop"] as Array[StringName]))
+			if hit != "":
+				bad.append("%s: %s %d at %s inside %s" % [id, toy.def["id"], toy.index, toy.global_position.snapped(Vector3.ONE * 0.1), hit])
+		# Footprints against each other, seen from above.
+		for a in box.toys:
+			for b in box.toys:
+				if a.index >= b.index:
+					continue
+				var fa := _flat(a)
+				var fb := _flat(b)
+				if fa.size != Vector3.ZERO and fb.size != Vector3.ZERO and fa.grow(-0.05).intersects(fb.grow(-0.05)):
+					bad.append("%s: %s %d and %s %d overlap" % [id, a.def["id"], a.index, b.def["id"], b.index])
+		for _i in range(240):
+			await get_tree().physics_frame
+		for toy in box.toys:
+			if toy.body != null and toy.body.global_position.distance_to(toy.rest.origin) > 0.6:
+				bad.append("%s: %s %d strayed %s to %s" % [id, toy.def["id"], toy.index, toy.rest.origin.snapped(Vector3.ONE * 0.1), toy.body.global_position.snapped(Vector3.ONE * 0.1)])
+	_check(with_toys >= 1 and bad.is_empty(), "every map's toys are dot-props', stand clear and stay put",
+		"%d maps with toys; %s" % [with_toys, "; ".join(bad.slice(0, 8))])
+	var _back: DotResult = await playground.change_map(&"pg_lobby")
+	_done()
+
+
+## [param toy]'s footprint in world space, flattened to the floor, or empty for a loose one.
+static func _flat(toy: DotPropToy) -> AABB:
+	var f := toy.footprint()
+	if f.size == Vector3.ZERO:
+		return AABB()
+	var world := toy.global_transform * f
+	world.position.y = 0.0
+	world.size.y = 1.0
+	return world
+
+
+## What [param toy]'s own shapes, lifted five centimetres off their floor, are inside of, or "".
+func _toy_inside(space: PhysicsDirectSpaceState3D, toy: DotPropToy, own: Array[RID], mask: int) -> String:
+	for part: CollisionObject3D in [toy.fixed, toy.body]:
+		if part == null:
+			continue
+		for child in part.get_children():
+			var shape := child as CollisionShape3D
+			if shape == null or shape.shape == null:
+				continue
+			var query := PhysicsShapeQueryParameters3D.new()
+			query.shape = shape.shape
+			query.transform = shape.global_transform.translated(Vector3(0, 0.05, 0))
+			query.collision_mask = mask
+			query.exclude = own
+			var hits := space.intersect_shape(query, 1)
+			if not hits.is_empty():
+				var other: Object = hits[0].get("collider")
+				return str(other.name) if other is Node else "something"
+	return ""
 
 
 ## What a map box is made of, on the real game (pgc_nature): ice keeps a player sliding,

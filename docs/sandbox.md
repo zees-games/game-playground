@@ -153,3 +153,15 @@ Standing on a moving prop carries a player (`prop_surfing`, on; `pg_prop_surf`):
 - **Whole or not at all**: per-kind limits asked first; a mid-way spawner refusal takes back what this load placed. At most 200 props.
 - Kept as JSON in `user://builds/<statistics key>/<name>.json`; a name is letters, digits, `-`, `_`, up to 32; the key is made folder-safe.
 - **A custom prop** (`is_custom_prop`) is two or more props all welded into one piece (union-find) and nothing welded to the world; its own category on the Builds tab.
+
+## The map's toys
+
+Separate from props: a toy is part of the map, placed by its author, from dot-props' `toys/` catalogue (a beach ball, a football, a bowling set, barrels, tyres, a punching bag, a swing, a see-saw, a roundabout, a wobbly platform, trampolines, a bounce pad, lamps on a switch, a fountain, a horn, a bell). A map lists them in `map_toys()` (a built-in map's code, or a document's `toys`), and `Playground._build_toys` builds a `DotPropToyBox` from that list on both ends in the same order, as a child of the playground rather than the map: the map's tree is put on the `world` layer when it is ready, which would take the toys with it. The lobby has 27: balls and barrels round its spawn, a bowling lane and a park in its south-west; each of game-playground-maps' twelve has a themed set the builder settles onto clear floor; the two course maps and the generated map have none, so nothing a run could bounce off is on a course.
+
+- **Layers**: a loose toy is on `toy` (added to `sandbox_3d` in `PlaygroundPlayerStack`), which the world, props, vehicles, grenades and other toys stop and a person never does; a toy somebody stands on is on `frozen_prop`; the footprints are on `footprint`. A person is not a rigid body, so `_advance_toys` pushes what each player walks into and puts their weight on a see-saw after everybody moved, on the server.
+- **Shots and blasts**: `player_shots_fired` and `npc_shots_fired` ask `shoot_toy` first (dot-props' `shot`, a push reckoned from the damage), and a toy is never also given the prop shove, whose damage-sized impulse sent a beach ball off at 40 m/s. A grenade's detonation and a breaking barrel's blast call `blast_toys`; `PlaygroundProjectiles._blast` skips toys for the same reason.
+- **F** takes a toy looked at (2.6 m) before any prop: a kick, a push, a switch, a honk.
+- **The trampolines and pads** are `PlaygroundPlayer._launch_from_toy`, after the move, on every end that simulates the player, so a predicting client is thrown on the tick the server is; the server counts the bounce. **The roundabout** carries whoever stands on it through `_ride_prop`: `DotPropCarry.toys` is the box, so prop surfing's own call does it, and with `pg_prop_surfing` off the box is asked directly, because the roundabout is part of the map and not a prop somebody spawned to ride.
+- `sv_toys`, `sv_toys_awake` and `sv_toys_push` are dot-props' cvars, bound by the module REPLICATED and followed by the client. The awake cap is 24, or 8 in a browser build.
+- Toys stay where they are kicked for the life of the map; a map change builds them again. A toy below -60 m goes home.
+

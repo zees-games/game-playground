@@ -144,6 +144,19 @@ func _build_physics() -> DotResult:
 	physics.profile.tick_rate = game.tick_rate
 
 	physics.layout = DotPhysicsLayout.sandbox_3d()
+	# The map's toys (dot-props'): a loose one (a ball, a barrel) on `toy`, which the world,
+	# the props, vehicles, grenades and the other toys stop and a person never does: they walk
+	# through it and push it (`Playground._advance_toys`), because a character motor slides
+	# along a rigid body and never moves it. A toy somebody stands on (a see-saw, a roundabout)
+	# goes on `frozen_prop`, solid to everyone like a frozen crate. And the footprints a bot's
+	# walkable mesh is baked round, which nothing collides with.
+	physics.layout.layers.append(DotPhysicsLayer.make(
+		&"toy", [&"world", &"prop", &"frozen_prop", &"held_prop", &"vehicle", &"projectile", &"toy"],
+		"A map's loose toy: a ball, a pin, a barrel, a tyre. People walk through it and push it."
+	))
+	physics.layout.layers.append(DotPhysicsLayer.make(
+		&"footprint", [], "Where a fixed toy stands, for a walkable mesh's bake only."
+	))
 	physics.surfaces = DotPhysicsSurfaceSet.standard()
 	physics.register_service = false
 	physics.write_layer_names = false

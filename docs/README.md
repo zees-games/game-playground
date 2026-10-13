@@ -15,4 +15,5 @@ The detail behind [CLAUDE.md](../CLAUDE.md). One subject per file; open the one 
 | [services.md](services.md) | touching chat, voice, the moderator's tools, stats and achievements, the vote and its clock, hibernation, identity, or the browser listing |
 | [client.md](client.md) | touching the client: boot, Escape and the menu, third person and bodies, the people figure, presentation, sound and effects, the chat box, or the render tools |
 | [testing.md](testing.md) | adding a check, or believing a green run |
+| [not-yet.md](not-yet.md) | planning: what is not built yet, and why each is open |
 | [history.md](history.md) | a bug that "cannot be happening"; what this game found and how it looked |
