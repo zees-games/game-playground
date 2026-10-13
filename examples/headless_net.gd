@@ -58,13 +58,13 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 383
+const CHECKS := 388
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 46
+const SECTIONS := 47
 
 var _passed := 0
 var _failed := 0
@@ -183,6 +183,8 @@ func _run() -> void:
 		await _test_drawn_ammo_corrected()
 		# Lays the player down and stands them up again; adds no body.
 		await _test_downed_over_the_wire()
+		# Walks through the relay's first gate and back to the track it was on; adds no body.
+		await _test_relay_gate_over_the_wire()
 		# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
 		# the leave, because a ball it kicks would be in the way of whatever came after.
 		await _test_map_toys_over_the_wire()
@@ -4474,6 +4476,95 @@ func _test_downed_over_the_wire() -> void:
 	await _steps(2)
 	mirror.face_body()
 	_check(not mirror.downed and figure != null and not figure.downed, "and stands when picked up")
+	_done()
+
+
+## A connected client walks through pg_lobby's first relay gate (bonus 6, the first
+## TELEPORT zones in the game), and its run goes through with it.
+##
+## [b]The gate is the timer's ask and the game's act on both ends[/b]
+## (`Playground._on_effect_requested` -> `PlaygroundPlayer.teleport(..., keep_run)`): the
+## server's timer is fed inside `tick_once`, the client's by `tick_timers_only` after its
+## predicted player moves, and a replay after a correction reads the zone in force now. A tick
+## out between them is a client drawn on the wrong leg until the snapshot pulls it across.
+func _test_relay_gate_over_the_wire() -> void:
+	_section("a connected client walks through a relay gate with the server")
+
+	var mine := _client_player()
+	var theirs := _server_player()
+	if mine == null or theirs == null:
+		_check(false, "a connected player to walk the relay")
+		_done()
+		return
+
+	var track_before := theirs.timer.track
+	var yaw := PgLobby.relay_yaw(0)
+	var dir := PgLobby.relay_direction(0)
+	var leg := PgLobby.relay_leg(0)
+	var gate: AABB = PgLobby.relay_gate_zone(leg[leg.size() - 1])
+	_check(
+		theirs.timer.set_track(PgLobby.RELAY_TRACK) and mine.timer.set_track(PgLobby.RELAY_TRACK),
+		"both ends' timers are on the relay's track"
+	)
+	# On leg 1's pad, where the track's spawn puts a player, so leaving it starts a run.
+	var pad: AABB = leg[0]
+	theirs.teleport(Vector3(pad.position.x + 1.0 if dir > 0.0 else pad.end.x - 1.0, pad.end.y + 0.05, PgLobby.RELAY_Z[0]), yaw)
+	await _steps(48)
+
+	var stops: Array[StringName] = []
+	var on_stop := func(_run: DotTimerRun, reason: StringName) -> void: stops.append(reason)
+	theirs.timer.run_stopped.connect(on_stop)
+	var arrival := PgLobby.relay_arrival(1)
+	var c := _forward()
+	c.yaw = yaw
+	var corrections_before := _corrections_and_snaps()
+	var through_at := -1
+	var gate_from := -1
+	var running_before := [false, false]
+	for i in range(600):
+		# Jump from the far edge of whatever deck they stand on, as a player does: the decks
+		# and the gate are a jump apart.
+		var at := theirs.controller.state.position
+		var near_edge := false
+		for box: AABB in leg:
+			var far := box.end.x if dir > 0.0 else box.position.x
+			if at.x > box.position.x - 0.1 and at.x < box.end.x + 0.1 and absf(at.x - far) < 0.6:
+				near_edge = true
+		c.set_button(DotFpsCommand.BUTTON_JUMP, near_edge and theirs.controller.state.is_grounded())
+		await _step(c)
+		# From a metre short of the gate: the jump onto its sill is the walk's, not the gate's.
+		if gate_from < 0 and absf(theirs.controller.state.position.x - gate.get_center().x) < gate.size.x * 0.5 + 1.0:
+			gate_from = _corrections_and_snaps()
+			running_before = [theirs.timer.run.is_active(), mine.timer.run.is_active()]
+		if theirs.controller.state.position.distance_to(arrival) < 3.0:
+			through_at = i
+			break
+	var corrections := _corrections_and_snaps() - corrections_before
+	await _steps(32, DotFpsCommand.new())
+	var at_gate := _corrections_and_snaps() - gate_from if gate_from >= 0 else -1
+	theirs.timer.run_stopped.disconnect(on_stop)
+	var gap := mine.controller.state.position.distance_to(theirs.controller.state.position)
+	print("    the relay gate over the wire: through after %d ticks, %d corrections on the way (the jumps), %d from a metre short of the gate to settled; client ends %.3f m from the server; runs before the gate %s, after %s; stops %s" % [
+		through_at, corrections, at_gate, gap, str(running_before),
+		str([theirs.timer.run.is_active(), mine.timer.run.is_active()]), str(stops)])
+
+	_check(through_at >= 0, "the server puts them on leg 2's pad", "server at %s" % str(theirs.controller.state.position))
+	_check(
+		mine.controller.state.position.distance_to(arrival) < 3.0 and gap < 0.1,
+		"and the client has them there too",
+		"%.3f m apart" % gap
+	)
+	_check(at_gate == 0, "and the gate costs the prediction nothing", "%d corrections and snaps" % at_gate)
+	_check(
+		running_before == [true, true] and theirs.timer.run.is_active() and mine.timer.run.is_active()
+			and stops.is_empty(),
+		"a run on both ends goes through the gate and keeps running",
+		"before %s, after %s, stops %s" % [str(running_before),
+			str([theirs.timer.run.is_active(), mine.timer.run.is_active()]), str(stops)]
+	)
+
+	var _back := theirs.timer.set_track(track_before)
+	_back = mine.timer.set_track(track_before)
 	_done()
 
 
