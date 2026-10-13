@@ -61,6 +61,10 @@ var _notice: Label = null
 var _status: Label = null
 var _tools: Label = null
 var _crosshair: DotCrosshair = null
+## Through a scoped zee gun at full aim: zee's circle and reticle (the gun is not drawn then).
+var scope: ZeeScopeOverlay = null
+## Whether the host's DotCrosshair fades while aiming (dot-ui API 5).
+var _crosshair_fades: bool = DotAddonApi.build_level("dot_ui") >= 5
 var _notice_until: float = 0.0
 
 var playground: Playground = null
@@ -177,6 +181,13 @@ func _ready() -> void:
 	# A crosshair, because every tool here is aimed. A physics gun with nothing to
 	# aim by is one that picks up whatever happens to be near the middle of the
 	# screen, and "why did it grab that one" is the commonest complaint in a sandbox.
+	# Under the crosshair and the pieces: the scope is the view, the HUD reads over it.
+	scope = ZeeScopeOverlay.new()
+	scope.name = "Scope"
+	add_child(scope)
+	# First child, so drawn first: the run timer and the tool lines read over the black.
+	move_child(scope, 0)
+
 	_crosshair = DotCrosshair.new()
 	_crosshair.name = "Crosshair"
 	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -483,3 +494,14 @@ static func time_left_text(view: DotVoteClockView, local: String, now: float) ->
 		return view.formatted_at(now)
 
 	return local
+
+
+## A zee gun's aim this frame, from the client: dot-ui's DotCrosshair fades as the gun comes up
+## (`set_aim`, API 5, as game-arena's), and a scope replaces it for its own reticle.
+func set_aim(fraction: float, scoped: bool) -> void:
+	if scope != null:
+		scope.fraction = fraction if scoped else 0.0
+	if _crosshair != null:
+		_crosshair.visible = not scoped
+		if _crosshair_fades:
+			_crosshair.call(&"set_aim", 0.0 if scoped else fraction)

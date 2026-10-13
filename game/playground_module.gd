@@ -646,6 +646,7 @@ func _build_extras() -> DotResult:
 		spectate.on_death(victim, at, killer)
 	)
 	arena.clock_changed.connect(bridge.broadcast_match)
+	_build_loadout_command()
 
 	_build_mod_tools()
 
@@ -999,7 +1000,7 @@ func _on_loadout_requested(peer_id: int, pairs: Array) -> void:
 	# this line depends on anything else, so suspending here costs nothing — which is the
 	# only reason it is safe to do it inside a signal handler.
 	var published: DotResult = await arena.loadouts.publish(
-		"u%d" % session_id, loadout, 0
+		loadout_key(session_id), loadout, 0
 	)
 
 	if not published.ok and services != null:
@@ -2260,24 +2261,110 @@ func _cmd_services(ctx: DotCmdContext) -> void:
 func _cmd_arena(ctx: DotCmdContext) -> void:
 	match ctx.arg(0):
 		"on":
-			arena.set_enabled(true)
-			# A living player watching a living one while they are shooting at each
-			# other is a wallhack, and this is the moment it stops being a sandbox.
-			spectate.set_fighting(true)
-
-			# Everybody already here joins the fight. A match that only admitted people
-			# who connected *after* it started would be a match the server's existing
-			# players are spectators in, with nothing saying so.
-			for id in game.players.keys():
-				arena.admit(id, String(id))
-
+			set_arena(true)
 			ctx.reply("The arena is on: %d fighting." % game.players.size())
 		"off":
-			arena.set_enabled(false)
-			spectate.set_fighting(false)
+			set_arena(false)
 			ctx.reply("The arena is off. This is a sandbox again.")
 		_:
 			ctx.reply_lines(arena.describe_lines())
+
+
+## Turns the arena on or off, and says so to every client through `pg_arena_on`.
+func set_arena(on: bool) -> void:
+	if arena == null:
+		return
+	if arena.enabled != on:
+		arena.set_enabled(on)
+		# A living player watching a living one while they are shooting at each other is a
+		# wallhack, and this is the moment it stops being a sandbox.
+		spectate.set_fighting(on)
+		if on:
+			# Everybody already here joins the fight. A match that only admitted people who
+			# connected *after* it started would be a match the server's existing players are
+			# spectators in, with nothing saying so.
+			for id in game.players.keys():
+				arena.admit(id, String(id))
+	if _arena_on != null and _arena_on.get_bool() != on:
+		_arena_on.force_set("1" if on else "0")
+
+
+# --- The loadout (B) ----------------------------------------------------------
+
+const LOADOUT_COMMAND_SCRIPT := "res://addons/dot_loadout/integrations/dot_loadout_command.gd"
+
+## The B menu's server half (dot-loadout's `DotLoadoutCommand` over the arena's manager), or
+## null on a host whose dot-loadout predates it (API 2).
+var loadout_command: Object = null
+
+## `pg_arena_on`: whether the arena is on, REPLICATED so a client's B knows whether there is a
+## loadout to open (the lead's call: B opens it only in the arena, and says so outside). Also a
+## switch: setting it is `pg_arena on/off`.
+var _arena_on: DotConVar = null
+
+
+## The loadout key of session [param session_id]: dot-loadout keys are at least eight long, so
+## the player key ("u7") is not one.
+static func loadout_key(session_id: int) -> String:
+	return "pg-player-%08d" % session_id
+
+
+func _build_loadout_command() -> void:
+	_arena_on = add_cvar("pg_arena_on", "1" if arena.enabled else "0",
+		"Whether the arena is on (pg_arena); clients read it to know B has a loadout to open",
+		DotConVar.FLAG_REPLICATED)
+	if _arena_on != null:
+		# A method, never a lambda: a lambda captures this module and the cvar would keep it alive.
+		_arena_on.changed.connect(_on_arena_on_changed)
+	arena.respawned.connect(func(id: StringName) -> void:
+		var _armed: Variant = await _arm_from_loadout(PlaygroundNetBridge.session_of(id)))
+
+	if DotAddonApi.build_level("dot_loadout") < 2 or not ResourceLoader.exists(LOADOUT_COMMAND_SCRIPT) \
+			or arena.loadouts == null:
+		return
+	loadout_command = (load(LOADOUT_COMMAND_SCRIPT) as GDScript).new()
+	loadout_command.set(&"manager", arena.loadouts)
+	loadout_command.set(&"key_fn", func(ctx: Object) -> String:
+		var session: Variant = ctx.get(&"session") if ctx != null else null
+		return loadout_key(int((session as Object).get(&"userid"))) if session is Object else "")
+	loadout_command.set(&"closed_fn", func(_key: String) -> String:
+		return "" if arena.enabled else LOADOUT_ARENA_ONLY)
+	loadout_command.set(&"applied_fn", func(_ctx: Object, key: String) -> bool:
+		return await rearm_if_allowed(key.trim_prefix("pg-player-").to_int()))
+	loadout_command.call(&"bind", self)
+
+
+func _on_arena_on_changed(_old: String, value: String) -> void:
+	set_arena(value.strip_edges() == "1")
+
+
+## What B says outside the arena, on both ends.
+const LOADOUT_ARENA_ONLY := "Loadouts are in the arena."
+
+
+## Puts the loadout's weapon in [param session_id]'s hands now when they are inside their
+## arena spawn protection; otherwise it waits for their next arena spawn. True when it did.
+func rearm_if_allowed(session_id: int) -> bool:
+	if arena == null or not arena.is_protected(PlaygroundNetBridge._player_key(session_id)):
+		return false
+	return await _arm_from_loadout(session_id)
+
+
+## Hands [param session_id] the weapon their loadout names, through the bridge (the shop
+## charges as for any weapon; the client adopts it from the WEAPON event). False when there is
+## nothing to hand.
+func _arm_from_loadout(session_id: int) -> bool:
+	if arena == null or arena.loadouts == null or bridge == null or session_id <= 0:
+		return false
+	var res: DotResult = await arena.loadouts.active_for(loadout_key(session_id))
+	if not res.ok:
+		return false
+	var weapon := (res.value as DotLoadout).item_in(&"primary")
+	var id := PlaygroundNetBridge._player_key(session_id)
+	if weapon == &"" or not game.players.has(id):
+		return false
+	bridge._give_weapon(session_id, id, weapon)
+	return true
 
 
 func _cmd_waves(ctx: DotCmdContext) -> void:

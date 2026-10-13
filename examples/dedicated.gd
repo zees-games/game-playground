@@ -45,8 +45,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 27
-const CHECKS := 256
+const SECTIONS := 28
+const CHECKS := 262
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -119,6 +119,7 @@ func _run() -> void:
 		_test_services()
 		await _test_moderation()
 		_test_arena()
+		await _test_arena_loadout()
 		_test_waves()
 		_test_shop()
 		_test_spectating()
@@ -1130,6 +1131,55 @@ func _test_arena() -> void:
 	arena.release(&"u901")
 	_run_command("pg_arena off")
 	_check(not arena.enabled, "and the console turns it off again")
+	_section_done()
+
+
+## B, the arena's loadout: dot-loadout's command over the arena's manager, closed outside the
+## arena (the lead's call), `pg_arena_on` replicated so a client's B knows, and a choice made
+## inside spawn protection in the hands at once.
+func _test_arena_loadout() -> void:
+	print("")
+	print("the arena's loadout (B)")
+	var module := _module()
+	var arena: PlaygroundArena = module.get("arena")
+	var cmd: Object = module.get("loadout_command")
+	var on_cvar := server.console.find_cvar("pg_arena_on")
+	_check(cmd != null and server.console.find_command("loadout") != null and server.console.find_cvar("mp_loadout_menu") != null
+		and server.console.find_cvar("mp_loadout_allow") != null and server.console.find_cvar("mp_loadout_fixed") != null,
+		"the server has the loadout command and the owner's mp_loadout_* cvars")
+	_check(on_cvar != null and on_cvar.has_flag(DotConVar.FLAG_REPLICATED) and on_cvar.get_string() == "0"
+		and not arena.enabled, "pg_arena_on is replicated and says the arena is off")
+	if cmd == null or on_cvar == null:
+		_section_done()
+		return
+
+	var _carol := game.add_player(&"u903", "Dana")
+	var key: String = module.call(&"loadout_key", 903)
+	var shut: Dictionary = await cmd.call(&"offer", key)
+	var refused: Dictionary = await cmd.call(&"choose", null, key, {"primary": "impulse"})
+	_check(not bool(shut.get("choose", true)) and str(shut.get("note")) == "Loadouts are in the arena."
+		and not bool(refused.get("ok", true)), "outside the arena B is closed, and says the loadouts are in the arena", str(refused))
+
+	_run_command("pg_arena on")
+	_check(arena.enabled and on_cvar.get_string() == "1"
+		and server.console.replicated_values().get("pg_arena_on", "") == "1", "pg_arena on says so to every client")
+
+	var current := arena.loadouts.schema.slot(&"primary").default_item
+	var other := &""
+	for item in arena.loadouts.schema.choices_for(&"primary", DotLoadoutEntitlements.none()):
+		if item.id != current:
+			other = item.id
+			break
+	var chosen: Dictionary = await cmd.call(&"choose", null, key, {"primary": String(other)})
+	var bridge: Object = module.get("bridge")
+	var held: Variant = (bridge.get("_tool_of") as Dictionary).get(903, &"")
+	_check(bool(chosen.get("ok")) and bool(chosen.get("now")) and held == other,
+		"inside spawn protection a chosen weapon is in the hands at once (%s)" % other, "%s held %s" % [chosen, held])
+
+	var _off := _run_command("pg_arena_on 0")
+	_check(not arena.enabled, "and pg_arena_on is the switch as well: 0 turns the arena off")
+	arena.release(&"u903")
+	game.remove_player(&"u903")
 	_section_done()
 
 

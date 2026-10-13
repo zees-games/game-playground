@@ -8,6 +8,7 @@ const PlaygroundHud := preload("playground_hud.gd")
 const PlaygroundNetBridge := preload("net/playground_net_bridge.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
 const PlaygroundPresentation := preload("playground_presentation.gd")
+const PlaygroundIcons := preload("playground_icons.gd")
 const PlaygroundServices := preload("playground_services.gd")
 const PlaygroundSpawnMenu := preload("playground_spawn_menu.gd")
 const PlaygroundVoice := preload("client/playground_voice.gd")
@@ -172,6 +173,9 @@ var zee_view: Node3D = null
 ## Fire, alt and reload for a zee weapon offline, as command bits. A connected client sends
 ## the same bits in [member _net_buttons] instead, and the server runs the shot.
 var _zee_buttons: int = 0
+## The Aim key held with a zee gun in hand (`PlaygroundBindings.AIM`, right mouse): the hands
+## come up and the lens zooms. Presentation only.
+var _aiming: bool = false
 
 ## Where the style key is in the list.
 var _style_index: int = 0
@@ -473,6 +477,7 @@ func _build_netcode() -> DotResult:
 		# predicts its own player.
 		var _view := playground.view_rules.follow_cvars(link)
 		var _solid := playground.body_rules.follow_cvars(link)
+		_follow_arena(link)
 	_build_ragdolls()
 	bridge.body_fell.connect(func(figure: Node3D, death: DotPlayerDeath) -> void:
 		if ragdolls != null and figure.is_inside_tree():
@@ -1056,6 +1061,7 @@ func _build_pause() -> void:
 	# By name, so a client shell older than the map menu still runs the game without it.
 	if game_menu.has_method(&"use_maps"):
 		var _maps: Variant = game_menu.call(&"use_maps", map_menu_rows, change_from_menu)
+	_use_loadout_menu()
 	game_menu.action_requested.connect(_on_menu_action_chosen)
 	game_menu.overlays_changed.connect(func(open: bool) -> void:
 		# Back onto the view the instant it closes, as the screen stack does for its own.
@@ -1215,7 +1221,13 @@ func _process(_delta: float) -> void:
 	# The camera motion, the recoil's punch and the player's field of view on top.
 	var fov := float(presentation.settings.get_int(&"field_of_view", 100)) \
 		if presentation != null and presentation.settings != null else 100.0
-	player.present_camera(camera, _delta, fov, shake, punch)
+	# The aim's zoom multiplies the lens after the speed widening (`present_camera`), from the
+	# player's own field of view, so it never compounds.
+	var hands := zee_view as ZeeViewModel if zee_view != null and is_instance_valid(zee_view) and _zee_rig() != null else null
+	var zoom := hands.aim_fov_scale() if hands != null else 1.0
+	player.present_camera(camera, _delta, fov, shake, punch, zoom)
+	if hud != null:
+		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
 
 
 ## What a frame draws that a tick does not: the netcode's interpolation, then every
@@ -1350,6 +1362,9 @@ func mouse_drives_view() -> bool:
 ## Escape and click-to-capture checks read that.
 func _set_captured(on: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on else Input.MOUSE_MODE_VISIBLE
+	# The button's release goes to whatever took the pointer, so the aim is let go here.
+	if not on:
+		_aiming = false
 
 	if mouse_capture_override != null:
 		mouse_capture_override = on
@@ -1464,6 +1479,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		_set_reload(key.pressed)
 		return
 
+	# Aim and quick melee moved onto keys, held like the trigger, with a zee gun in hand.
+	if _zee_rig() != null and key.is_action(PlaygroundBindings.AIM):
+		_aiming = key.pressed
+		return
+	if _zee_rig() != null and key.is_action(PlaygroundBindings.BASH):
+		if key.pressed:
+			_secondary_down()
+		else:
+			_secondary_up()
+		return
+
 	if not key.is_pressed() or key.is_echo():
 		return
 
@@ -1497,6 +1523,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cycle_checkpoint()
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_CLEAR):
 		_clear_checkpoints()
+	elif key.is_action(DotMenuBindings.LOADOUT_ACTION) and loadout_menu != null and not arena_on:
+		# B opens the loadout only in the arena (the menu is disabled outside it, so the key
+		# reaches here): said, rather than a key that does nothing.
+		if hud != null:
+			hud.notice(LOADOUT_ARENA_ONLY)
 	elif key.is_action(PlaygroundBindings.VIEW):
 		# The key every third-person toggle in this genre is on, and the one
 		# game-g2gfast already uses for its own. This one hands the player to a
@@ -1567,6 +1598,19 @@ func _on_mouse_motion(event: InputEventMouseMotion) -> void:
 
 
 func _on_mouse_button(event: InputEventMouseButton) -> void:
+	# A zee gun's aim and quick melee are rows (right and middle by default); with a tool or a
+	# toy in hand the buttons below keep what they always did.
+	if _zee_rig() != null:
+		if event.is_action(PlaygroundBindings.AIM):
+			_aiming = event.pressed
+			return
+		if event.is_action(PlaygroundBindings.BASH):
+			if event.pressed:
+				_secondary_down()
+			else:
+				_secondary_up()
+			return
+
 	match event.button_index:
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -2559,6 +2603,80 @@ func change_from_menu(id: StringName) -> DotResult:
 	return await playground.change_map(id)
 
 
+# --- The loadout menu (B) -----------------------------------------------------
+
+## What B says outside the arena (the server's `closed_fn` says the same).
+const LOADOUT_ARENA_ONLY := "Loadouts are in the arena."
+
+## dot-menu's loadout menu, or null on a host whose dot-menu predates it (API 6).
+var loadout_menu: Object = null
+
+## Whether the server's arena is on (`pg_arena_on`, replicated). Never offline: the arena is a
+## server's mode, and the loadout manager lives in it.
+var arena_on: bool = false
+
+
+## B: the arena's loadout, which weapon an arena spawn puts in your hands. Connected the server
+## answers (dot-loadout's `/loadout`); the menu is enabled only while the arena is on, and
+## outside it B says "Loadouts are in the arena" (the lead's call, 2026-10-12). Guarded on the
+## host's dot-menu and dot-loadout levels.
+func _use_loadout_menu() -> void:
+	if DotAddonApi.build_level("dot_menu") < 6 or DotAddonApi.build_level("dot_loadout") < 2:
+		return
+	if game_menu == null or not game_menu.has_method(&"use_loadout"):
+		return
+	loadout_menu = game_menu.call(&"use_loadout",
+		func() -> Variant: return DotResult.fail(DotError.CODE_STATE, LOADOUT_ARENA_ONLY),
+		func(_picks: Dictionary) -> Variant: return DotResult.fail(DotError.CODE_STATE, LOADOUT_ARENA_ONLY),
+		decorate_loadout_choice)
+	if loadout_menu != null:
+		loadout_menu.set(&"title", "Arena loadout")
+		# Remembered on this device and sent again on the next join, never under a suite's or a
+		# render's scratch settings.
+		var scratch := PlaygroundPresentation.settings_directory.begins_with("user://scratch/")
+		loadout_menu.call(&"remember_as", "" if scratch else "playground", "local")
+		loadout_menu.set(&"enabled", arena_on)
+
+
+## Follows the server's `pg_arena_on` through [param source] (the client link).
+func _follow_arena(source: Object) -> void:
+	if source == null or not source.has_method(&"replicated_cvar") or not source.has_signal(&"replicated_cvar_changed"):
+		return
+	_set_arena_on(String(source.call(&"replicated_cvar", "pg_arena_on", "0")) == "1")
+	source.connect(&"replicated_cvar_changed", func(cvar_name: String, value: String) -> void:
+		if cvar_name == "pg_arena_on":
+			_set_arena_on(value.strip_edges() == "1"))
+
+
+func _set_arena_on(on: bool) -> void:
+	var was := arena_on
+	arena_on = on
+	if loadout_menu != null:
+		loadout_menu.set(&"enabled", on)
+		if on and not was:
+			# Into the arena: the choice made last time, sent again once.
+			var _sent: Variant = loadout_menu.call(&"restore")
+
+
+## A card's picture (the spawn menu's weapon icon) and, for a zee gun, zee's numbers.
+func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary:
+	var def := playground.weapon_def(StringName(str(choice.get("id", "")))) if playground != null else null
+	if def == null:
+		return {}
+	var out: Dictionary = {}
+	var icon := PlaygroundIcons.for_weapon(def)
+	if icon != null:
+		out["icon"] = icon
+	if PlaygroundZee.is_zee(def) and DotAddonApi.build_level("zee_weapons") >= 3:
+		var cards_path := "res://addons/zee_weapons/content/zee_weapon_cards.gd"
+		var zee_def: DotWeaponDef = PlaygroundZee.catalogue().get_def(PlaygroundZee.zee_id(def))
+		if zee_def != null and ResourceLoader.exists(cards_path):
+			var card: Variant = (load(cards_path) as Script).call(&"card", zee_def)
+			if card is Dictionary:
+				out.merge(card as Dictionary)
+	return out
+
+
 # --- zee-dot-weapons --------------------------------------------------------
 
 ## The rig in this client's own player's hands, or null.
@@ -2641,6 +2759,10 @@ func _present_zee() -> Vector2:
 		return Vector2.ZERO
 
 	zee_view.visible = player.view_mode() != &"tp"
+	# Down the sights: only first person, with the pointer on the view and no menu up.
+	var hands := zee_view as ZeeViewModel
+	if hands != null:
+		hands.aim(_aiming and mouse_drives_view() and not _menu_is_open() and player.view_mode() != &"tp")
 	var state := player.controller.state
 	rig.drive_view(Vector2.ZERO, player.speed(), state.is_grounded(), state.is_crouched())
 	return rig.view_punch()

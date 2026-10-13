@@ -47,7 +47,8 @@ There are four maps:
 | --- | --- |
 | **Q** | Spawn menu. Hold it to browse; tap it to pin it open |
 | **Mouse 1** | Primary: grab with the physics gun, punt with the gravity gun, fire a weapon |
-| **Mouse 2** | Secondary: freeze what you are holding, or pull with the gravity gun |
+| **Mouse 2** | Secondary: freeze what you are holding, or pull with the gravity gun; with a gun, aim down the sights |
+| **Mouse 3** | A gun's quick melee |
 | **Wheel** | Move a held prop nearer or further |
 | **Shift** + mouse | Turn a held prop |
 | **1** / **2** / **3** | Physics gun / gravity gun / your weapons |
@@ -64,6 +65,7 @@ There are four maps:
 | **X** / **G** | Pick a checkpoint / forget them all |
 | **Y** / **U** | Chat / chat with nearby players |
 | **M** | Next map |
+| **B** | Loadout: the weapon you spawn with in the arena (a server's mode) |
 | **K** | Push to talk |
 | **H** | Help: what the game is and every key as you have it bound |
 | **Esc** | Release the mouse; press again for the menu (settings, servers, help, leave). Every key above can be rebound under Controls |

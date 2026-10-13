@@ -65,6 +65,10 @@ var death_rule_fn: Callable = Callable()
 ## Somebody died. Server side.
 signal player_killed(victim: StringName, killer: StringName)
 
+## Somebody came back in the fight (dot-match's respawn). Server side: the module hands them
+## their loadout's weapon here.
+signal respawned(id: StringName)
+
 ## The match clock moved. Server side.
 signal clock_changed(state: int, seconds_left: float, round_number: int, label: String)
 
@@ -123,22 +127,16 @@ static func item_catalogue(weapons: Array[PlaygroundWeaponDef]) -> DotItemCatalo
 		item.entitlement_id = &"" if item.free else &"pg_launcher"
 		items.append(item)
 
-	# The two tools are items too, so a player can choose which one they hold. They are
-	# not weapons and go in their own slot: a schema that let a physics gun into the
-	# primary slot would be a schema that lets somebody bring nothing to a fight.
-	for pair in [[&"physgun", "Physics gun"], [&"gravgun", "Gravity gun"]]:
-		var tool_item := DotItem.make(pair[0], DotItem.KIND_EQUIPMENT, true)
-		tool_item.display_name = String(pair[1])
-		tool_item.slots = [&"tool"]
-		tool_item.free = true
-		items.append(tool_item)
+	# [b]No tools.[/b] The physics and gravity guns were a `tool` slot until 2026-10-12, when B
+	# made the loadout something a player chooses: a player holds one thing, the two tools are
+	# always on 1 and 2, and the slot was a choice nothing read.
 
 	out.items = items
 	out.reindex()
 	return out
 
 
-## Two slots, one decision each.
+## One slot: the weapon an arena spawn puts in the hands (B, `PlaygroundModule._arm_from_loadout`).
 static func loadout_schema(weapons: Array[PlaygroundWeaponDef]) -> DotLoadoutSchema:
 	# [b]Required, and therefore it must have a default.[/b] dot-loadout refuses a schema
 	# whose required slot has none, and the refusal is exactly right: a loadout missing a
@@ -152,16 +150,10 @@ static func loadout_schema(weapons: Array[PlaygroundWeaponDef]) -> DotLoadoutSch
 	primary.arsenal_slot = 1
 	primary.order = 0
 
-	var tool := DotLoadoutSlot.make(&"tool", false, &"physgun")
-	tool.display_name = "Tool"
-	tool.kinds = [DotItem.KIND_EQUIPMENT]
-	tool.arsenal_slot = 2
-	tool.order = 1
-
 	var schema := DotLoadoutSchema.new()
 	schema.id = &"pg_arena"
 	schema.display_name = "Sandbox arena"
-	schema.slots = [primary, tool]
+	schema.slots = [primary]
 	schema.catalogue = item_catalogue(weapons)
 	schema.allow_duplicates = false
 	schema.reindex()
@@ -737,6 +729,15 @@ func _on_respawn_due(key: String, spawn: DotSpawnPoint, _tick_value: int) -> voi
 
 		if player != null:
 			player.teleport(spawn.global_position, spawn.global_rotation.y)
+
+	respawned.emit(id)
+
+
+## Whether [param id] is inside their spawn protection: a loadout chosen now goes into their
+## hands at once (`PlaygroundModule.rearm_if_allowed`), as game-arena's does.
+func is_protected(id: StringName) -> bool:
+	var health := health_of(id)
+	return enabled and health != null and health.alive and health.is_protected(_tick)
 
 
 func describe_lines() -> PackedStringArray:

@@ -12,6 +12,16 @@ dot-combat (health, damage types, hitboxes; friendly fire, self damage, falloff,
 - The moderator's god/buddha/hp/slay act on the arena's `DotHealth` and say "the arena is off" when it is ([services.md](services.md#the-moderators-live-tools)).
 - A sandbox has no leading score, so nothing here calls the vote's `note_score`.
 
+### B, the arena's loadout
+
+**B opens the loadout only inside the arena** (the lead's call, 2026-10-12): the dot-loadout manager lives in `PlaygroundArena`, which is the server's and only while `pg_arena` is on, so outside it, and always solo, B says "Loadouts are in the arena." instead of doing nothing. The client knows from `pg_arena_on`, a REPLICATED cvar the module keeps in step with the arena (`PlaygroundModule.set_arena`; setting the cvar is also the switch), and turns dot-menu's loadout on and off with it (`PlaygroundClient._set_arena_on`); the server's `closed_fn` says the same words to anybody who asks anyway.
+
+- The server half is dot-loadout's `DotLoadoutCommand` over `arena.loadouts`, bound by the module (`/loadout`, the `loadout_menu` notice, the owner's `mp_loadout_menu`, `mp_loadout_allow`, `mp_loadout_fixed`), copied from game-arena. Keys are `PlaygroundModule.loadout_key` (`pg-player-%08d`): a player key such as `u7` is shorter than dot-loadout's eight.
+- **One slot, the weapon.** The schema had a `tool` slot (physics or gravity gun) until 2026-10-12; a player holds one thing and the two tools are always on 1 and 2, so it was a choice nothing read, and it went when B made the loadout something a player chooses.
+- **An arena spawn hands the weapon** (`PlaygroundArena.respawned` → `PlaygroundModule._arm_from_loadout` → the bridge's `_give_weapon`, which the shop charges as for any weapon and the client adopts from the WEAPON event). A choice made inside spawn protection is in the hands at once (`rearm_if_allowed`, `PlaygroundArena.is_protected`); later it waits for the next spawn, so no choice is a free reload mid-fight.
+- The choice is remembered on the device and sent again when the arena comes on (`DotMenuLoadout.restore`); never under scratch settings.
+- Cards are the spawn menu's weapon icons and, for a zee gun, zee's numbers. `tools/render_loadout.tscn` renders B outside and inside the arena (the latter on the arena's own `offer_for`, since solo there is no arena).
+
 ## Waves: `pg_waves`
 
 dot-npc-ai-director releases NPCs the **server** owns, deliberately not prop entities. "An NPC you cannot pick up is the first thing a sandbox player will try" is about NPCs a **player** put there; a wave was spawned by nobody, owned by nobody, and reclaimed when players walk away, none of which a prop budget expresses. Two populations, two owners, and `pg_waves 1` is the only thing that makes the second exist. Wave NPCs reach clients through the bridge's prop path (`watch_npc_spawner`) and wear the people figure (`PlaygroundWaves.dress`).

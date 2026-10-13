@@ -33,6 +33,8 @@
 | Strafe lean | 1° at 9 m/s sideways, bounded at 2° | a surfer looks across the ramp for seconds at a time |
 | Speed widening | up to 5°, from 8 to 25 m/s | a player walking about building never sees the lens move; a bhop or a ramp does |
 
+**Down a zee gun's sights** (`PlaygroundBindings.AIM`, right mouse, the family's Aim row): zee's `ZeeViewModel.aim` while held with the pointer on the view and in first person, the lens multiplied by `aim_fov_scale` in `present_camera` (`zoom`, after the speed widening, from the player's own field of view), dot-ui's `DotCrosshair.set_aim` fading the crosshair and zee's `ZeeScopeOverlay` (the HUD's first child, so the timer reads over it) through a scope. Presentation only, as in game-arena. With a tool or a toy in hand the right button is still its secondary (freeze, pull, a mode's second button); a zee gun's quick melee moved to the middle button (`PlaygroundBindings.BASH`). `tools/render_loadout.tscn` frames hip and aimed for an iron sight and a scope.
+
 The landing is kicked when the drawn eye reaches the floor, not on the `landed` tick (game-arena's finding: the dip otherwise adds to the last of the fall). A teleport and a seat snap everything. Three ACCOUNT settings scale the picks 0 to 2 (`camera_landing_dip`, `camera_strafe_roll`, `camera_speed_fov`; no wall lean, nothing here wall-runs), on General > Camera motion and at the console. `tools/render_feel.sh` renders a drop, a run of hops, a strafe and flight at 22 m/s at 144 frames a second (`--off` is the control); judged 2026-10-11 as gentle and right, with no change to the picks.
 
 ## Third person and the body
@@ -105,4 +107,5 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline, a weapon's ammunition and two confirmed hits (`hud_hits`), a map ballot's chat line beside the drawn panel |
 | `tools/render_feel.sh` | the first-person camera's motion: a drop, hops, a strafe, flight at speed; frames, a per-frame CSV and contact sheets in `screenshots/feel/` |
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |
+| `xvfb-run -a godot --path . --resolution 1280x720 res://tools/render_loadout.tscn` | a zee gun hip and aimed (carbine, bullpup's scope), solo B outside the arena, and the arena's B menu, into `screenshots/loadout/` with a line per frame |
 | `tools/audio_probe.sh` | whether the client makes a sound |

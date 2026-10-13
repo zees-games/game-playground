@@ -681,7 +681,7 @@ func set_camera_motion_scales(landing: float, strafe: float, widen: float) -> vo
 ## motion cues on top, plus [param shake] (metres) and [param punch] (degrees, x pitch y yaw:
 ## the recoil's camera half). [param base_fov] is the lens before the widening. The one place
 ## the first-person camera is written, so a render tool draws exactly what the client does.
-func present_camera(camera: Camera3D, delta: float, base_fov: float, shake: Vector3 = Vector3.ZERO, punch: Vector2 = Vector2.ZERO) -> void:
+func present_camera(camera: Camera3D, delta: float, base_fov: float, shake: Vector3 = Vector3.ZERO, punch: Vector2 = Vector2.ZERO, zoom: float = 1.0) -> void:
 	var dip := 0.0
 	var nod := 0.0
 	var lean := 0.0
@@ -705,7 +705,8 @@ func present_camera(camera: Camera3D, delta: float, base_fov: float, shake: Vect
 		deg_to_rad(controller.state.yaw + punch.y),
 		deg_to_rad(lean)
 	)
-	camera.fov = base_fov + widen
+	# [param zoom] is a zee gun's aim (1 at the hip), after the widening, as game-arena's lens.
+	camera.fov = (base_fov + widen) * (clampf(zoom, 0.01, 1.0) if is_finite(zoom) else 1.0)
 
 
 ## Holds a landing until the drawn eye reaches the floor ([method _kick_landing]): the signal

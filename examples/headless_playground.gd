@@ -1,5 +1,6 @@
 extends Node
 
+const PlaygroundBindings := preload("../game/playground_bindings.gd")
 const Playground := preload("../game/playground.gd")
 const PlaygroundBrowser := preload("../game/client/playground_browser.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
@@ -59,7 +60,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 931
+const CHECKS := 934
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -7796,9 +7797,34 @@ func _test_the_client_boots() -> void:
 	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
 		"the map menu is on M, and nothing else in the table is",
 		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
-	# B is the family's loadout key: nothing here may default to it (Clear checkpoints was B).
-	_check(keys.defaults_on("B").is_empty(), "nothing in the table defaults to B, the family's loadout key",
-		str(keys.defaults_on("B").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# B is the family's loadout key, the arena's loadout: nothing else here may default to it
+	# (Clear checkpoints was B). Solo there is no arena, and B says where the loadouts are.
+	var on_b := keys.defaults_on("B")
+	_check(on_b.size() <= 1 and on_b.all(func(r: Dictionary) -> bool: return StringName(str(r["action"])) == DotMenuBindings.LOADOUT_ACTION),
+		"only the loadout is on B, the family's loadout key",
+		str(on_b.map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# The right button aims a zee gun (the family's Aim row); its quick melee is the middle one.
+	_check(keys.key_for(PlaygroundBindings.AIM) == "Mouse 2" and keys.defaults_on("Mouse 2").size() == 1
+		and keys.key_for(PlaygroundBindings.BASH) == "Mouse 3", "a gun aims on the right button, quick melee on the middle",
+		"%s %s" % [keys.key_for(PlaygroundBindings.AIM), keys.key_for(PlaygroundBindings.BASH)])
+	if client.get("loadout_menu") != null:
+		menu.close_all()
+		var b_key := InputEventKey.new()
+		b_key.physical_keycode = KEY_B
+		b_key.keycode = KEY_B
+		b_key.pressed = true
+		var menu_took := menu.handle_event(b_key)
+		client.call("_unhandled_input", b_key)
+		var said := ((client.get("hud") as Node).get("_notice") as Label).text
+		_check(not menu_took and not bool(client.get("arena_on")) and said == "Loadouts are in the arena.",
+			"solo B opens nothing and says the loadouts are in the arena", said)
+	# Down a zee gun's sights the HUD hands dot-ui's crosshair the aim; a scope replaces it.
+	var pg_hud: Node = client.get("hud")
+	pg_hud.call("set_aim", 1.0, true)
+	var scoped_ok := float((pg_hud.get("scope") as Control).get("fraction")) == 1.0 and not (pg_hud.get("_crosshair") as Control).visible
+	pg_hud.call("set_aim", 0.0, false)
+	_check(scoped_ok and (pg_hud.get("_crosshair") as Control).visible and float((pg_hud.get("scope") as Control).get("fraction")) == 0.0,
+		"through a scope the HUD shows zee's scope instead of the crosshair, and puts it back at the hip")
 	# Closed right before the key: an offline client with no captured pointer (headless) may
 	# have put its menu back up, and while anything is open every key is the menu's.
 	menu.close_all()

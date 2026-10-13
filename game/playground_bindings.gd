@@ -27,6 +27,11 @@ const GRAV_GUN := &"pg_grav_gun"
 const WEAPONS := &"pg_weapons"
 const TRACK := &"pg_track"
 const STYLE := &"pg_style"
+## Down a zee gun's sights while held (right mouse, the family's Aim row). With a tool or a toy
+## in hand the right button is still its secondary (freeze, pull, a mode's second button).
+const AIM := &"pg_aim"
+## A zee gun's quick melee, which was its right button until the button aimed: the middle one.
+const BASH := &"pg_bash"
 ## M is dot-menu's map menu (`dot_menu_maps`): the map list solo, the server's (a change or a
 ## vote) online. Kept on `bind_map`, the setting it was stored under, so a key a player moved
 ## stays moved.
@@ -56,12 +61,13 @@ static func make() -> DotMenuBindings:
 	keys.add(GRAV_GUN, &"bind_grav_gun", "Gravity gun", "2", "Tools")
 	keys.add(WEAPONS, &"bind_weapons", "Next weapon", "3", "Tools")
 	keys.add(VEHICLE, &"bind_vehicle", "Use what you look at, or get in or out of a vehicle", "F", "Tools")
+	keys.add(AIM, &"bind_aim", "Aim down a gun's sights (hold)", "Mouse 2", "Tools")
+	keys.add(BASH, &"bind_bash", "A gun's quick melee", "Mouse 3", "Tools")
 
 	keys.add(CHECKPOINT_SAVE, &"bind_checkpoint_save", "Save a checkpoint", "C", "Running")
 	keys.add(CHECKPOINT_LOAD, &"bind_checkpoint_load", "Go to the checkpoint", "V", "Running")
 	keys.add(CHECKPOINT_NEXT, &"bind_checkpoint_next", "Next checkpoint", "X", "Running")
-	# G, not B: B is the family's loadout key (dot-menu's DotMenuLoadout), kept free for the day
-	# this game has a loadout.
+	# G, not B: B is the family's loadout key (dot-menu's DotMenuLoadout), the arena's loadout.
 	keys.add(CHECKPOINT_CLEAR, &"bind_checkpoint_clear", "Clear checkpoints", "G", "Running")
 	keys.add(STYLE, &"bind_style", "Next movement style", "N", "Running")
 	keys.add(TRACK, &"bind_track", "Next timed track on this map", "T", "Running")
@@ -76,6 +82,9 @@ static func make() -> DotMenuBindings:
 	# dot-voice's talk action (DotVoiceManager.TALK_ACTION), on K because V is the checkpoint.
 	keys.add_voice("General", "K")
 	keys.add_help("General")
+	# B is the arena's loadout (dot-menu's `dot_menu_loadout`), where the host has it (API 6).
+	if DotAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):
+		var _l: Variant = keys.call(&"add_loadout", "General")
 	# Clear checkpoints' default moved from B under saved documents: a player who never touched
 	# it follows to G, a key they chose stays.
 	return keys.renamed(&"bind_checkpoint_clear", ["B"])

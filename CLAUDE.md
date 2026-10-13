@@ -129,15 +129,16 @@ Short forms; the reasoning is in the linked file.
 - Escape releases then opens dot-menu; only a click captures. This client owns the pointer. [client](docs/client.md#escape-the-pointer-and-the-menu)
 - The character body goes under the rig, not the visual; `auto_drive` off. [client](docs/client.md#third-person-and-the-body)
 - Chat lines go to the chat box, and to the HUD notice line only when there is no box (a ballot was drawn twice). [client](docs/client.md#the-chat-box)
-- The first-person camera is written in one place, `PlaygroundPlayer.present_camera` (motion, shake, recoil, field of view); there is no `DotFpsView`. [client](docs/client.md#the-first-person-camera)
+- The first-person camera is written in one place, `PlaygroundPlayer.present_camera` (motion, shake, recoil, field of view, a zee gun's aim `zoom`); there is no `DotFpsView`. Right mouse aims a zee gun (`PlaygroundBindings.AIM`; a tool's secondary otherwise), its quick melee is Mouse 3. [client](docs/client.md#the-first-person-camera)
 - The hit marker, damage numbers and zee's red burst on the body (`PlaygroundClient._draw_body_hit`, `ZeeShotFx.play_body_hit` by `has_method`) come from the server's `Kind.HIT` (`Playground.confirm_hit`, fed by all four damage paths), never the local rig; the glance pieces need a shell with dot-ui 4. [client](docs/client.md#the-hud)
 - The HUD follows the menu's theme and HUD size (`PlaygroundClient._follow_hud`: dot-menu's `follow_hud` by name, plus `PlaygroundHud.apply_theme` on `theme_changed` for dot-timer's block); `PlaygroundHud.piece_theme()` is the accent only (boost amber, start green), never plate, text or ink. `headless_playground` checks a theme change reaches the pieces and the timer. [client](docs/client.md#the-hud)
+- B is the arena's loadout (dot-loadout's `DotLoadoutCommand` over `arena.loadouts`, bound by the module); enabled only while the replicated `pg_arena_on` says the arena is on, else B says "Loadouts are in the arena."; an arena spawn hands the weapon (`_arm_from_loadout`). [modes](docs/modes.md#b-the-arenas-loadout)
 - Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`build_console(menu)`). [client](docs/client.md#the-chat-box)
 
 ## Not here yet
 
 - **The module is a `DotModule`, not a `DotGameModule`**, deliberately for now: converting is its own piece of work (typed fields, build order, its own roster). Because of it the module wires identity and hibernation itself. [simulation](docs/simulation.md#the-server-module)
-- **`ask_restart`, `ask_checkpoint` and `publish_loadout`** are on the bridge and handled by the server, and no key or menu calls them, so a networked client cannot restart a run, use a practice checkpoint, or publish a loadout. Each is a decision about bindings, not a deliberate omission.
+- **`ask_restart` and `ask_checkpoint`** are on the bridge and handled by the server, and no key or menu calls them, so a networked client cannot restart a run or use a practice checkpoint. Each is a decision about bindings, not a deliberate omission. (`publish_loadout` is unused too: B goes through `/loadout`.)
 - **A bag screen and buying into the bag; saving a bag.** [inventory](docs/inventory.md#not-here-yet)
 - **A wardrobe.** [client](docs/client.md#people-are-drawn-as-people)
 - **Grenades already in the air are not sent to a joiner**, and the thrower's own grenade is not predicted. [sandbox](docs/sandbox.md#grenades-and-rockets)
