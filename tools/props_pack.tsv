@@ -1,0 +1,124 @@
+# kit	file	id	name	category	mass_kg	shape
+# One row per vendored model. Scale is per kit (props_pack.py); mass is a real-world guess in kg.
+furniture	chair	chair	Chair	furniture	6	convex
+furniture	chairDesk	chair_desk	Desk chair	furniture	8	convex
+furniture	chairCushion	chair_cushion	Cushioned chair	furniture	7	convex
+furniture	chairModernCushion	chair_modern	Modern chair	furniture	7	convex
+furniture	loungeChair	lounge_chair	Lounge chair	furniture	18	convex
+furniture	loungeSofa	sofa	Sofa	furniture	40	convex
+furniture	loungeSofaLong	sofa_long	Long sofa	furniture	60	convex
+furniture	loungeSofaOttoman	ottoman	Ottoman	furniture	10	convex
+furniture	bench	bench	Bench	furniture	12	convex
+furniture	benchCushion	bench_cushion	Cushioned bench	furniture	14	convex
+furniture	stoolBar	stool	Bar stool	furniture	5	convex
+furniture	table	table	Table	furniture	25	convex
+furniture	tableRound	table_round	Round table	furniture	22	convex
+furniture	tableCoffee	table_coffee	Coffee table	furniture	12	convex
+furniture	tableGlass	table_glass	Glass table	furniture	28	convex
+furniture	desk	desk	Desk	furniture	30	convex
+furniture	sideTable	side_table	Side table	furniture	8	convex
+furniture	sideTableDrawers	side_table_drawers	Drawers	furniture	14	convex
+furniture	bookcaseOpen	bookcase	Bookcase	furniture	35	convex
+furniture	bookcaseClosed	bookcase_closed	Closed bookcase	furniture	45	convex
+furniture	cabinetTelevision	tv_cabinet	TV cabinet	furniture	30	convex
+furniture	bedSingle	bed_single	Single bed	furniture	30	convex
+furniture	bedDouble	bed_double	Double bed	furniture	55	convex
+furniture	bedBunk	bed_bunk	Bunk bed	furniture	60	convex
+furniture	lampRoundFloor	lamp_floor	Floor lamp	furniture	4	convex
+furniture	lampSquareTable	lamp_table	Table lamp	furniture	1.2	convex
+furniture	coatRackStanding	coat_rack	Coat rack	furniture	4	convex
+furniture	trashcan	trashcan	Trash can	furniture	1.5	cylinder
+furniture	pottedPlant	potted_plant	Potted plant	furniture	6	convex
+furniture	pillow	pillow	Pillow	furniture	0.5	box
+furniture	cardboardBoxClosed	cardboard_box	Cardboard box	furniture	1.2	box
+furniture	cardboardBoxOpen	cardboard_box_open	Open cardboard box	furniture	1.2	box
+furniture	books	books	Books	furniture	1.5	box
+furniture	radio	radio	Radio	furniture	2	box
+furniture	speaker	speaker	Speaker	furniture	6	box
+furniture	televisionModern	tv_modern	Flat TV	furniture	8	convex
+furniture	televisionVintage	tv_vintage	Old TV	furniture	18	box
+furniture	computerScreen	monitor	Monitor	furniture	4	convex
+furniture	laptop	laptop	Laptop	furniture	2	convex
+furniture	computerKeyboard	keyboard	Keyboard	furniture	0.8	box
+furniture	toilet	toilet	Toilet	household	25	convex
+furniture	bathtub	bathtub	Bathtub	household	60	convex
+furniture	bathroomSink	bathroom_sink	Bathroom sink	household	15	convex
+furniture	kitchenFridge	fridge	Fridge	household	60	box
+furniture	kitchenFridgeSmall	fridge_small	Small fridge	household	30	box
+furniture	kitchenStove	stove	Stove	household	45	box
+furniture	kitchenSink	kitchen_sink	Kitchen sink	household	35	box
+furniture	kitchenMicrowave	microwave	Microwave	household	12	box
+furniture	kitchenCoffeeMachine	coffee_machine	Coffee machine	household	3	box
+furniture	kitchenBlender	blender	Blender	household	2	cylinder
+furniture	toaster	toaster	Toaster	household	1.2	box
+furniture	washer	washer	Washing machine	household	60	box
+furniture	dryer	dryer	Dryer	household	40	box
+food	apple	apple	Apple	food	0.2	sphere
+food	banana	banana	Banana	food	0.15	convex
+food	burger	burger	Burger	food	0.3	cylinder
+food	pizza	pizza	Pizza	food	0.5	box
+food	pizza-box	pizza_box	Pizza box	food	0.6	box
+food	loaf	loaf	Loaf of bread	food	0.5	convex
+food	cake	cake	Cake	food	1.2	cylinder
+food	donut	donut	Donut	food	0.1	cylinder
+food	watermelon	watermelon	Watermelon	food	4	sphere
+food	pumpkin	pumpkin	Pumpkin	food	5	convex
+food	soda-can	soda_can	Soda can	food	0.35	cylinder
+food	soda-bottle	soda_bottle	Soda bottle	food	0.6	cylinder
+food	bottle-ketchup	ketchup	Ketchup	food	0.5	convex
+food	cup-coffee	coffee_cup	Coffee cup	food	0.2	convex
+food	mug	mug	Mug	food	0.35	convex
+food	frying-pan	frying_pan	Frying pan	food	1.2	convex
+food	pot	pot	Cooking pot	food	1.5	convex
+food	bowl	bowl	Bowl	food	0.6	convex
+food	plate	plate	Plate	food	0.5	cylinder
+food	wine-red	wine_bottle	Wine bottle	food	1.3	cylinder
+food	cheese	cheese	Cheese wheel	food	1	cylinder
+food	egg	egg	Egg	food	0.06	sphere
+food	turkey	turkey	Roast turkey	food	5	convex
+food	ice-cream	ice_cream	Ice cream	food	0.3	convex
+food	cupcake	cupcake	Cupcake	food	0.1	convex
+food	hot-dog	hot_dog	Hot dog	food	0.2	convex
+food	fries	fries	Fries	food	0.2	convex
+food	sandwich	sandwich	Sandwich	food	0.25	box
+survival	barrel	barrel_wood	Wooden barrel	survival	40	cylinder
+survival	box	crate_small	Small crate	survival	12	box
+survival	box-large	crate_long	Long crate	survival	25	box
+survival	chest	chest	Chest	survival	30	box
+survival	bucket	bucket	Bucket	survival	3	cylinder
+survival	tent	tent	Tent	survival	12	convex
+survival	campfire-pit	campfire_pit	Campfire pit	survival	20	cylinder
+survival	workbench	workbench	Workbench	survival	45	convex
+survival	signpost	signpost	Signpost	survival	6	convex
+survival	tool-axe	axe	Axe	survival	2	convex
+survival	tool-hammer	hammer	Hammer	survival	1.5	convex
+survival	tool-pickaxe	pickaxe	Pickaxe	survival	3	convex
+survival	tool-shovel	shovel	Shovel	survival	2	convex
+survival	resource-wood	wood	Wood	survival	3	convex
+survival	resource-stone	stone	Stone	survival	8	convex
+survival	resource-planks	planks	Planks	survival	10	convex
+survival	rock-a	rock_a	Rock	survival	400	convex
+survival	rock-b	rock_b	Flat rock	survival	600	convex
+survival	tree-log	log_fallen	Fallen log	survival	60	convex
+survival	tree-trunk	stump	Stump	survival	25	cylinder
+survival	fence	fence_panel	Fence panel	survival	15	convex
+survival	bottle-large	bottle_large	Bottle	survival	0.4	cylinder
+nature	log	log	Log	nature	25	convex
+nature	log_stack	log_stack	Log stack	nature	90	convex
+nature	stone_largeA	stone_large	Large stone	nature	300	convex
+nature	rock_smallA	rock_small	Small rock	nature	60	convex
+nature	cactus_tall	cactus	Cactus	nature	15	convex
+nature	pot_large	flower_pot	Flower pot	nature	10	cylinder
+nature	statue_obelisk	obelisk	Obelisk	nature	500	convex
+nature	statue_head	statue_head	Statue head	nature	700	convex
+nature	plant_bush	bush	Bush	nature	5	convex
+nature	mushroom_red	mushroom	Mushroom	nature	0.5	convex
+nature	campfire_logs	campfire_logs	Campfire logs	nature	10	convex
+nature	canoe	canoe	Canoe	nature	35	convex
+nature	sign	sign	Sign	nature	6	convex
+nature	statue_column	column	Stone column	nature	600	convex
+market	shopping-cart	shopping_cart	Shopping cart	market	12	convex
+market	shopping-basket	shopping_basket	Shopping basket	market	1.5	convex
+market	shelf-boxes	shelf_boxes	Shelf of boxes	market	60	box
+market	cash-register	cash_register	Cash register	market	15	box
+market	freezer	freezer	Freezer	market	80	box

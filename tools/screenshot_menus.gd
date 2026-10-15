@@ -54,7 +54,7 @@ func _initialize() -> void:
 	# The real catalogues, because a picture of a hand-built list is a picture of a list.
 	var menu := PlaygroundSpawnMenu.new()
 	menu.name = "SpawnMenu"
-	menu.catalogue = PlaygroundSpawnables.catalogue()
+	menu.catalogue = PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), "")
 	menu.weapons = PlaygroundWeapons.built_in()
 	_stack.register(menu)
 	_menu = menu
@@ -85,6 +85,8 @@ func _initialize() -> void:
 
 	_shots = [
 		{"id": &"spawn_menu", "file": "menu_spawn.png"},
+		# The model props: a category chip picked, so the thumbnails and their names are on screen.
+		{"id": &"spawn_menu", "file": "menu_props_models.png", "tab": PlaygroundSpawnMenu.Tab.PROPS, "category": &"furniture"},
 		# The tools tab with a tool picked, so its settings panel is drawn: the balloon has
 		# all three kinds of control — two sliders and a row of colour swatches.
 		{"id": &"spawn_menu", "file": "menu_tools.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"balloon"},
@@ -171,6 +173,8 @@ func _process(_delta: float) -> bool:
 			if shot.has("builds"):
 				_menu.builds = shot["builds"]
 			_menu.show_tab(shot["tab"])
+			if shot.has("category"):
+				_menu.set("_category", shot["category"])
 			# The grid too: two frames on one tab do not change tab, and the card picked for
 			# the last frame would stay lit.
 			_menu.call("_rebuild_grid")

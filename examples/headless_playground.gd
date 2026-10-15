@@ -61,13 +61,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 978
+const CHECKS := 1003
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 52
+const SECTIONS := 53
 
 var _passed := 0
 var _failed := 0
@@ -133,6 +133,7 @@ func _run() -> void:
 	await _test_map_change()
 	await _test_map_time_limit()
 	await _test_props_are_built_from_their_definitions()
+	await _test_model_props()
 	await _test_entities_run_their_scripts()
 	await _test_weapons()
 	await _test_zee_weapons()
@@ -1578,6 +1579,135 @@ func _test_map_time_limit() -> void:
 
 	playground.maps.time_limit.duration = 0.0
 	playground.maps.time_limit.start()
+	_done()
+
+
+## The stock model props and a dropped-in model.
+func _test_model_props() -> void:
+	_section("model props and the drop-in folder")
+
+	var on_lobby: DotResult = await playground.change_map(&"pg_lobby")
+	if not on_lobby.ok:
+		_check(false, "the sandbox loads", on_lobby.error.message)
+		_done()
+		return
+
+	var catalogue := playground.props.catalogue
+	var models: Array[DotPropDef] = []
+	var uncredited := 0
+	var categories: Dictionary = {}
+
+	var everything: Array[DotPropDef] = []
+	for category in catalogue.categories():
+		everything.append_array(catalogue.in_category(StringName(category)))
+
+	for def in everything:
+		if PlaygroundProp.model_of(def) == "":
+			continue
+		models.append(def)
+		categories[def.category] = true
+		var credit: Variant = def.meta.get("credit", {})
+		if not (credit is Dictionary) or str((credit as Dictionary).get("author", "")) == "" \
+				or str((credit as Dictionary).get("licence", "")) == "":
+			uncredited += 1
+
+	_check(models.size() >= 50, "the menu has 50 or more model props", str(models.size()))
+	_check(uncredited == 0, "each names an author and a licence", "%d without" % uncredited)
+	_check(categories.size() >= 5, "across several categories", str(categories.keys()))
+
+	var player: PlaygroundPlayer = playground.players[&"bot"]
+	playground.props.limits.spawn_interval = 0.0
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	player.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
+
+	var shapeless := 0
+	var spawned: Array = []
+	var failed_spawns := 0
+	var origin := Vector3(-80.0, 1.5, -90.0)
+
+	for i in range(models.size()):
+		var at := origin + Vector3(float(i % 12) * 3.5, 0.0, float(i / 12) * 3.5)
+		var made := playground.props.spawn(models[i].id, &"bot", at)
+		if made == null or made.node == null:
+			failed_spawns += 1
+			continue
+		spawned.append([made, at.y])
+		var coll := made.node.get_node_or_null("Collision") as CollisionShape3D
+		if coll == null or coll.shape == null or coll.shape is ConcavePolygonShape3D:
+			shapeless += 1
+
+	_check(failed_spawns == 0, "every model prop spawns", "%d refused" % failed_spawns)
+	_check(shapeless == 0, "each with a collision shape, never a trimesh", "%d without" % shapeless)
+
+	for i in range(150):
+		await get_tree().physics_frame
+
+	var fallen := 0
+	for pair in spawned:
+		var body: Node3D = pair[0].node
+		if not is_instance_valid(body) or body.global_position.y < -0.5:
+			fallen += 1
+
+	_check(fallen == 0, "and every one stays above the floor", "%d fell through" % fallen)
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+
+	# The drop-in folder: a model with a sidecar, one without, and a hostile sidecar.
+	var dir := "user://pg_drop_fixture"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var src := FileAccess.get_file_as_bytes("res://assets/props/food/apple.glb")
+	for file in ["widget", "plain_thing"]:
+		var out := FileAccess.open("%s/%s.glb" % [dir, file], FileAccess.WRITE)
+		out.store_buffer(src)
+		out.close()
+	# The atlas a Kenney model names beside itself; a loose model without it logs a load error.
+	DirAccess.make_dir_recursive_absolute(dir + "/Textures")
+	var atlas := FileAccess.open(dir + "/Textures/colormap.png", FileAccess.WRITE)
+	atlas.store_buffer(FileAccess.get_file_as_bytes("res://assets/props/food/Textures/colormap.png"))
+	atlas.close()
+	var side := FileAccess.open("%s/widget.json" % dir, FileAccess.WRITE)
+	side.store_string(JSON.stringify({
+		"name": "My widget", "category": "Custom Stuff", "mass": 7.5, "scale": 2.0,
+		"icon": "../../etc/passwd"
+	}))
+	side.close()
+	var hostile := FileAccess.open("%s/../pg_drop_fixture/Bad Id!.glb" % dir, FileAccess.WRITE)
+	hostile.store_buffer(src)
+	hostile.close()
+
+	playground.config.props_dir = dir
+	var added := playground.rescan_props()
+	_check(added.has("widget") and added.has("plain_thing"), "a model dropped in a folder appears", str(added))
+
+	var widget := catalogue.get_prop(&"widget")
+	_check(widget != null and widget.display_name == "My widget", "with the name its sidecar gave")
+	_check(widget != null and is_equal_approx(widget.mass, 7.5), "and its mass")
+	_check(widget != null and widget.category == &"custom_stuff", "and a category cleaned to an id")
+	_check(widget != null and widget.icon_path == "", "a sidecar's icon cannot leave the folder")
+	_check(
+		catalogue.has(&"plain_thing")
+		and catalogue.get_prop(&"plain_thing").category == &"custom",
+		"a model with no sidecar lands in the custom category"
+	)
+	_check(not catalogue.has(&"Bad Id!"), "no id is taken raw from a file name")
+
+	var dropped := playground.props.spawn(&"widget", &"bot", Vector3(-70.0, 1.5, -70.0))
+	_check(dropped != null and dropped.node != null, "and it spawns")
+	for i in range(60):
+		await get_tree().physics_frame
+	_check(
+		dropped != null and is_instance_valid(dropped.node)
+		and (dropped.node as Node3D).global_position.y > -0.5,
+		"and rests on the floor"
+	)
+
+	var again := playground.rescan_props()
+	_check(again.is_empty(), "a second scan adds nothing twice")
+
+	_check(DotPropFolder.sanitize_id("Bad Id!") == "bad_id", "sanitised ids are lower-case words")
+	_check(DotPropFolder.sanitize_id("../../x") == "x", "and carry no path")
+	_check(not catalogue.has(&"res://assets/props/food/apple.glb"), "a path is not an id")
+
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	_done()
 
 

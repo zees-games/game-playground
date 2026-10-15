@@ -58,7 +58,7 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 388
+const CHECKS := 390
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1958,6 +1958,25 @@ func _test_prop_request() -> void:
 	_check(
 		int(_server_bridge.describe()["props"]) == after,
 		"an unknown prop id spawns nothing"
+	)
+
+	# A path is not an id: a client cannot name a model file, only a catalogue entry.
+	for hostile in [&"res://assets/props/food/apple.glb", &"../../etc/passwd", &"user://props/x.glb"]:
+		_client_bridge.ask_spawn_prop(hostile)
+	_exchange()
+	await _steps(2)
+	_check(
+		int(_server_bridge.describe()["props"]) == after,
+		"a model path named as an id spawns nothing"
+	)
+
+	# A stock model prop is an id like any other.
+	_client_bridge.ask_spawn_prop(&"sofa")
+	_exchange()
+	await _steps(4)
+	_check(
+		int(_server_bridge.describe()["props"]) == after + 1,
+		"a stock model prop spawns for a client by id"
 	)
 	_done()
 

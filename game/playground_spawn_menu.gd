@@ -702,6 +702,13 @@ func _prop_card(def: DotPropDef) -> Button:
 		]
 	)
 
+	# A model prop names who made it: a licence read off a README is not a credit in the game.
+	var credit: Variant = def.meta.get("credit", {})
+	if credit is Dictionary and not (credit as Dictionary).is_empty():
+		card.tooltip_text += "\nBy %s (%s)" % [
+			str((credit as Dictionary).get("author", "?")), str((credit as Dictionary).get("licence", "?"))
+		]
+
 	card.pressed.connect(_on_prop_pressed.bind(def.id))
 	# The id on the button, so `shown()` and `card_for()` read what is actually on
 	# screen rather than re-running the filter. A second copy of a filter is a second

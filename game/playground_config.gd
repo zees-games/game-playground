@@ -44,6 +44,14 @@ extends DotConfig
 ## would be no way to remove one. See [method Playground.built_in_props].
 @export var props_path: String = ""
 
+## A folder of loose models (.glb or .gltf, each with an optional same-named .json sidecar for
+## name, category, scale and mass) that become props with no code. Read at start and by
+## [method Playground.rescan_props]. A server sets it to its content directory
+## ([code]PLAYGROUND_PROPS_DIR[/code]); a missing folder is not an error. A connected client
+## needs the same model to draw a prop the server added, so drop-ins that should be seen by
+## everyone belong in the game's pack instead.
+@export var props_dir: String = "user://props"
+
 @export_group("Rules")
 
 ## Whether this instance times, ranks and spawns — the authority.

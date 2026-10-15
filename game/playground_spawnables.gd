@@ -126,6 +126,37 @@ static func load_script(def: DotPropDef) -> GDScript:
 const DENSE := {&"boulder": 2600.0, &"slab": 2400.0, &"pillar": 2400.0, &"die": 1200.0}
 
 
+## The stock model packs, one folder per kit under assets/props (each with a props.json that
+## carries the credit, the scale and a baked extent so nothing is measured at start).
+const STOCK_KITS: Array[String] = ["furniture", "food", "survival", "nature", "market"]
+
+
+## [param base] plus the stock model packs plus whatever is in [param drop_dir].
+static func with_models(base: DotPropCatalogue, drop_dir: String) -> DotPropCatalogue:
+	for kit in STOCK_KITS:
+		var dir := PlaygroundPaths.rebase("res://assets/props/%s" % kit)
+		var res := DotPropFolder.load_into(base, dir, SCENE_PROP, {"measure": false})
+		if not res.ok:
+			DotLog.warn(CHANNEL, "a stock prop pack was not read", {"kit": kit, "why": res.error.message})
+
+	add_drop_ins(base, drop_dir)
+	return base
+
+
+## Models in [param drop_dir] that are not in [param catalogue] yet. A dropped file never
+## replaces a built-in (the loader's default), so it cannot take over an id a client trusts.
+static func add_drop_ins(catalogue: DotPropCatalogue, drop_dir: String) -> PackedStringArray:
+	if drop_dir == "":
+		return PackedStringArray()
+
+	var res := DotPropFolder.load_into(catalogue, drop_dir, SCENE_PROP, {"category": "custom"})
+	if not res.ok:
+		DotLog.warn(CHANNEL, "the prop drop-in folder was not read", {"dir": drop_dir, "why": res.error.message})
+		return PackedStringArray()
+
+	return (res.value as Dictionary)["added"]
+
+
 static func catalogue() -> DotPropCatalogue:
 	var out := DotPropCatalogue.new()
 

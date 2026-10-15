@@ -1,0 +1,73 @@
+{
+ "credit": {
+  "author": "Kenney, Fleur Keijsers and Guus Vermeulen",
+  "licence": "CC0 1.0",
+  "source": "Kenney Mini Market",
+  "url": "https://kenney.nl/assets/mini-market"
+ },
+ "defaults": {
+  "scale": 1.6
+ },
+ "props": {
+  "cash-register": {
+   "category": "market",
+   "extent": [
+    1.36,
+    0.952,
+    1.36
+   ],
+   "id": "cash_register",
+   "mass": 15.0,
+   "name": "Cash register",
+   "shape": "box"
+  },
+  "freezer": {
+   "category": "market",
+   "extent": [
+    1.28,
+    0.56,
+    0.96
+   ],
+   "id": "freezer",
+   "mass": 80.0,
+   "name": "Freezer",
+   "shape": "box"
+  },
+  "shelf-boxes": {
+   "category": "market",
+   "extent": [
+    1.28,
+    1.36,
+    1.12
+   ],
+   "id": "shelf_boxes",
+   "mass": 60.0,
+   "name": "Shelf of boxes",
+   "shape": "box"
+  },
+  "shopping-basket": {
+   "category": "market",
+   "extent": [
+    0.56,
+    0.4,
+    0.56
+   ],
+   "id": "shopping_basket",
+   "mass": 1.5,
+   "name": "Shopping basket",
+   "shape": "convex"
+  },
+  "shopping-cart": {
+   "category": "market",
+   "extent": [
+    0.48,
+    0.625,
+    0.766
+   ],
+   "id": "shopping_cart",
+   "mass": 12.0,
+   "name": "Shopping cart",
+   "shape": "convex"
+  }
+ }
+}

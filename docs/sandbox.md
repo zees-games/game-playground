@@ -72,6 +72,17 @@ Twenty-seven pack weapons in the Weapons tab under five categories from the pack
 
 **Not an entity per grenade**: it lives three seconds and its path is a pure function of how it left. Over the wire it is one `Kind.PROJECTILE` event: LAUNCH (velocity and fuse as full floats) and DETONATE (where). A client's copy never goes off by itself, because its world holds interpolated mirrors, not the server's props. **Not yet**: a joiner is not told about grenades already in the air, and the thrower sees its own grenade a round trip late (nothing predicts it).
 
+## Model props and the drop-in folder
+
+Beside the fourteen built-in block props the catalogue carries 120-odd real objects (furniture, food, camping and nature pieces, a few shop fittings). They are the same `game/prop.tscn`: a definition whose `meta.model` names a `.glb` makes `PlaygroundProp._build_model` load it through dot-props' `DotPropModel`, scaled in metres on a holder node (never on the body) with one convex hull and a mass from the manifest. Resizing and tinting work on them like any prop; a tint is a material override on every mesh.
+
+- **Stock packs** are `assets/props/<kit>/` (`furniture`, `food`, `survival`, `nature`, `market`), each with a `props.json` that gives the credit, the scale to metres, and per prop an id, name, category, mass, shape and baked extent, plus `thumbs/<stem>.png` for the menu card. Ids avoid the built-in ones (`barrel_wood`, not `barrel`). The glb files and their `Textures/colormap.png` are vendored; `PlaygroundSpawnables.with_models` reads them through `PlaygroundPaths.rebase`, so they survive pack delivery.
+- **To change the pack**, edit `tools/props_pack.tsv` (kit, file stem, id, name, category, mass in kg, shape), run `python3 tools/build_props_pack.py <the Kenney 3D assets folder>` and then `xvfb-run -a godot --path . --script res://tools/bake_props_pack.gd`, which measures every model into `props.json` and renders the thumbnails.
+- **Drop-in**: any `.glb` or `.gltf` put in `user://props/` (or `props_dir` / `PLAYGROUND_PROPS_DIR`, which a server points at its content directory) is a prop in the next menu, with no code. An optional `name.json` beside it sets `name`, `category`, `mass`, `scale` or `size_m`; with none, the name comes from the file and the category is `custom`. A `props.json` in the folder does the same for many. `Playground.rescan_props()` reads it again at run time. A file can never replace a built-in id.
+- **The server validates by id only.** A client asks for a catalogue id; `_spawn_for` refuses anything not in the server's catalogue, so a path or `..` is never loaded on a client's say-so (the headless_net suite sends three).
+- **A client draws a prop from its own catalogue**, so a drop-in model that only the server has is invisible to a connected client. Models everyone should see belong in `assets/props/`.
+- The menu tooltip shows the credit (author and licence) for a model prop.
+
 ## The Q menu
 
 `PlaygroundSpawnMenu` is a `DotScreen` on a `DotScreenStack`. dot-props provides `categories()`, `in_category()` and `search()` without loading a scene; the menu is the game's.

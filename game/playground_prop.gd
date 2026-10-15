@@ -36,6 +36,12 @@ enum Shape {
 	CYLINDER,
 }
 
+## The model a definition wears, or empty for a drawn shape. A file under a folder the game
+## scanned (see [DotPropFolder]); never a path a client sent, because a definition only ever
+## comes from the catalogue.
+static func model_of(p_def: DotPropDef) -> String:
+	return str(p_def.meta.get("model", "")) if p_def != null else ""
+
 ## The definition this was built from. Kept so a tool or a HUD can name the prop
 ## without going back to the catalogue.
 var def: DotPropDef = null
@@ -123,6 +129,10 @@ func _build_body() -> void:
 	# physics step — and setting it twice would make it ambiguous which of the two
 	# an operator is editing.
 
+	if model_of(def) != "" and _build_model():
+		continuous_cd = true
+		return
+
 	var collision := CollisionShape3D.new()
 	collision.name = "Collision"
 	collision.shape = _make_shape(shape, extent)
@@ -159,6 +169,51 @@ func _build_body() -> void:
 	continuous_cd = true
 
 
+## A real model: its picture, and a hull or primitive fitted to it, scaled by the definition's
+## `model_scale` times [member size_scale]. Returns false when the file will not load, and the
+## caller then builds the drawn box so the prop still exists, is still solid, and is the
+## wrong shape where somebody can see it.
+##
+## The collision shape is [DotPropModel]'s cached one at this scale, so forty chairs are one
+## hull. A painted prop paints the model's own materials through a material override, which
+## flattens its colours: that is what the tool gun's paint is asked to do.
+func _build_model() -> bool:
+	var scale := float(def.meta.get("model_scale", 1.0)) * size_scale
+	var info := DotPropModel.measure(model_of(def), scale, str(def.meta.get("shape", "convex")))
+
+	if not info.ok:
+		DotLog.warn(CHANNEL, "a prop's model would not load", {
+			"prop": String(def.id), "why": info.error.message,
+		})
+		return false
+
+	var data := info.value as Dictionary
+	var visual := DotPropModel.visual(model_of(def), scale, data["offset"])
+
+	if visual == null:
+		return false
+
+	var collision := CollisionShape3D.new()
+	collision.name = "Collision"
+	collision.shape = data["shape"]
+	add_child(collision)
+
+	visual.name = "Mesh"
+	add_child(visual)
+
+	if tint.a > 0.0:
+		_apply_tint(visual, tint)
+
+	return true
+
+
+func _apply_tint(node: Node, colour: Color) -> void:
+	for found in node.find_children("*", "MeshInstance3D", true, false):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = colour
+		(found as MeshInstance3D).material_override = material
+
+
 ## Resizes to [param factor] of the definition, clamped to [constant MIN_SCALE] ..
 ## [constant MAX_SCALE]. Mass goes with the volume — a barrel twice the size weighs eight
 ## times as much — because a giant crate a physics gun lifts like a feather is the first
@@ -187,6 +242,13 @@ func refresh_mass() -> void:
 ## Paints the prop. A colour with no alpha takes the paint off.
 func set_tint(colour: Color) -> void:
 	tint = colour
+
+	if model_of(def) != "" and get_node_or_null("Mesh") != null:
+		if colour.a > 0.0:
+			_apply_tint(get_node("Mesh"), colour)
+		else:
+			_build_body()
+		return
 
 	var mesh := get_node_or_null("Mesh") as MeshInstance3D
 

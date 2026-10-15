@@ -1,0 +1,181 @@
+{
+ "credit": {
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "Kenney Nature Kit",
+  "url": "https://kenney.nl/assets/nature-kit"
+ },
+ "defaults": {
+  "scale": 2.5
+ },
+ "props": {
+  "cactus_tall": {
+   "category": "nature",
+   "extent": [
+    0.991,
+    1.875,
+    0.848
+   ],
+   "id": "cactus",
+   "mass": 15.0,
+   "name": "Cactus",
+   "shape": "convex"
+  },
+  "campfire_logs": {
+   "category": "nature",
+   "extent": [
+    0.73,
+    0.156,
+    0.73
+   ],
+   "id": "campfire_logs",
+   "mass": 10.0,
+   "name": "Campfire logs",
+   "shape": "convex"
+  },
+  "canoe": {
+   "category": "nature",
+   "extent": [
+    0.75,
+    0.456,
+    2.875
+   ],
+   "id": "canoe",
+   "mass": 35.0,
+   "name": "Canoe",
+   "shape": "convex"
+  },
+  "log": {
+   "category": "nature",
+   "extent": [
+    0.585,
+    0.433,
+    1.775
+   ],
+   "id": "log",
+   "mass": 25.0,
+   "name": "Log",
+   "shape": "convex"
+  },
+  "log_stack": {
+   "category": "nature",
+   "extent": [
+    1.062,
+    0.866,
+    1.775
+   ],
+   "id": "log_stack",
+   "mass": 90.0,
+   "name": "Log stack",
+   "shape": "convex"
+  },
+  "mushroom_red": {
+   "category": "nature",
+   "extent": [
+    0.435,
+    0.507,
+    0.502
+   ],
+   "id": "mushroom",
+   "mass": 0.5,
+   "name": "Mushroom",
+   "shape": "convex"
+  },
+  "plant_bush": {
+   "category": "nature",
+   "extent": [
+    0.99,
+    0.611,
+    0.99
+   ],
+   "id": "bush",
+   "mass": 5.0,
+   "name": "Bush",
+   "shape": "convex"
+  },
+  "pot_large": {
+   "category": "nature",
+   "extent": [
+    1.409,
+    0.5,
+    1.22
+   ],
+   "id": "flower_pot",
+   "mass": 10.0,
+   "name": "Flower pot",
+   "shape": "cylinder"
+  },
+  "rock_smallA": {
+   "category": "nature",
+   "extent": [
+    0.902,
+    0.478,
+    0.902
+   ],
+   "id": "rock_small",
+   "mass": 60.0,
+   "name": "Small rock",
+   "shape": "convex"
+  },
+  "sign": {
+   "category": "nature",
+   "extent": [
+    0.75,
+    1.022,
+    0.175
+   ],
+   "id": "sign",
+   "mass": 6.0,
+   "name": "Sign",
+   "shape": "convex"
+  },
+  "statue_column": {
+   "category": "nature",
+   "extent": [
+    0.75,
+    2.5,
+    0.75
+   ],
+   "id": "column",
+   "mass": 600.0,
+   "name": "Stone column",
+   "shape": "convex"
+  },
+  "statue_head": {
+   "category": "nature",
+   "extent": [
+    1.815,
+    2.5,
+    1.386
+   ],
+   "id": "statue_head",
+   "mass": 700.0,
+   "name": "Statue head",
+   "shape": "convex"
+  },
+  "statue_obelisk": {
+   "category": "nature",
+   "extent": [
+    0.768,
+    2.188,
+    0.768
+   ],
+   "id": "obelisk",
+   "mass": 500.0,
+   "name": "Obelisk",
+   "shape": "convex"
+  },
+  "stone_largeA": {
+   "category": "nature",
+   "extent": [
+    1.962,
+    0.649,
+    2.539
+   ],
+   "id": "stone_large",
+   "mass": 300.0,
+   "name": "Large stone",
+   "shape": "convex"
+  }
+ }
+}

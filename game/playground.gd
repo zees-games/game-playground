@@ -2123,7 +2123,18 @@ func _prop_catalogue() -> DotPropCatalogue:
 			"path": config.props_path, "why": loaded.error.message
 		})
 
-	return PlaygroundSpawnables.catalogue()
+	return PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), config.props_dir if config != null else "user://props")
+
+
+## Reads the prop folders again and adds what is new, so a model dropped in while the game
+## runs appears in the next menu. Returns the ids added.
+func rescan_props() -> PackedStringArray:
+	if props == null or props.catalogue == null:
+		return PackedStringArray()
+
+	return PlaygroundSpawnables.add_drop_ins(
+		props.catalogue, config.props_dir if config != null else "user://props"
+	)
 
 
 # --- Players ---------------------------------------------------------------

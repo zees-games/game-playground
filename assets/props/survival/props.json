@@ -1,0 +1,277 @@
+{
+ "credit": {
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "Kenney Survival Kit",
+  "url": "https://kenney.nl/assets/survival-kit"
+ },
+ "defaults": {
+  "scale": 3.0
+ },
+ "props": {
+  "barrel": {
+   "category": "survival",
+   "extent": [
+    0.709,
+    1.032,
+    0.709
+   ],
+   "id": "barrel_wood",
+   "mass": 40.0,
+   "name": "Wooden barrel",
+   "shape": "cylinder"
+  },
+  "bottle-large": {
+   "category": "survival",
+   "extent": [
+    0.217,
+    0.432,
+    0.251
+   ],
+   "id": "bottle_large",
+   "mass": 0.4,
+   "name": "Bottle",
+   "shape": "cylinder"
+  },
+  "box": {
+   "category": "survival",
+   "extent": [
+    0.75,
+    0.75,
+    0.75
+   ],
+   "id": "crate_small",
+   "mass": 12.0,
+   "name": "Small crate",
+   "shape": "box"
+  },
+  "box-large": {
+   "category": "survival",
+   "extent": [
+    0.75,
+    0.75,
+    1.5
+   ],
+   "id": "crate_long",
+   "mass": 25.0,
+   "name": "Long crate",
+   "shape": "box"
+  },
+  "bucket": {
+   "category": "survival",
+   "extent": [
+    0.432,
+    0.576,
+    0.432
+   ],
+   "id": "bucket",
+   "mass": 3.0,
+   "name": "Bucket",
+   "shape": "cylinder"
+  },
+  "campfire-pit": {
+   "category": "survival",
+   "extent": [
+    0.833,
+    0.327,
+    0.808
+   ],
+   "id": "campfire_pit",
+   "mass": 20.0,
+   "name": "Campfire pit",
+   "shape": "cylinder"
+  },
+  "chest": {
+   "category": "survival",
+   "extent": [
+    0.781,
+    0.772,
+    0.816
+   ],
+   "id": "chest",
+   "mass": 30.0,
+   "name": "Chest",
+   "shape": "box"
+  },
+  "fence": {
+   "category": "survival",
+   "extent": [
+    1.5,
+    1.552,
+    0.128
+   ],
+   "id": "fence_panel",
+   "mass": 15.0,
+   "name": "Fence panel",
+   "shape": "convex"
+  },
+  "resource-planks": {
+   "category": "survival",
+   "extent": [
+    1.119,
+    0.281,
+    1.878
+   ],
+   "id": "planks",
+   "mass": 10.0,
+   "name": "Planks",
+   "shape": "convex"
+  },
+  "resource-stone": {
+   "category": "survival",
+   "extent": [
+    0.496,
+    0.32,
+    0.427
+   ],
+   "id": "stone",
+   "mass": 8.0,
+   "name": "Stone",
+   "shape": "convex"
+  },
+  "resource-wood": {
+   "category": "survival",
+   "extent": [
+    0.615,
+    0.187,
+    0.261
+   ],
+   "id": "wood",
+   "mass": 3.0,
+   "name": "Wood",
+   "shape": "convex"
+  },
+  "rock-a": {
+   "category": "survival",
+   "extent": [
+    1.666,
+    1.178,
+    1.865
+   ],
+   "id": "rock_a",
+   "mass": 400.0,
+   "name": "Rock",
+   "shape": "convex"
+  },
+  "rock-b": {
+   "category": "survival",
+   "extent": [
+    2.504,
+    1.256,
+    2.174
+   ],
+   "id": "rock_b",
+   "mass": 600.0,
+   "name": "Flat rock",
+   "shape": "convex"
+  },
+  "signpost": {
+   "category": "survival",
+   "extent": [
+    0.642,
+    1.38,
+    0.129
+   ],
+   "id": "signpost",
+   "mass": 6.0,
+   "name": "Signpost",
+   "shape": "convex"
+  },
+  "tent": {
+   "category": "survival",
+   "extent": [
+    1.682,
+    1.474,
+    1.683
+   ],
+   "id": "tent",
+   "mass": 12.0,
+   "name": "Tent",
+   "shape": "convex"
+  },
+  "tool-axe": {
+   "category": "survival",
+   "extent": [
+    0.343,
+    0.768,
+    0.093
+   ],
+   "id": "axe",
+   "mass": 2.0,
+   "name": "Axe",
+   "shape": "convex"
+  },
+  "tool-hammer": {
+   "category": "survival",
+   "extent": [
+    0.27,
+    0.46,
+    0.12
+   ],
+   "id": "hammer",
+   "mass": 1.5,
+   "name": "Hammer",
+   "shape": "convex"
+  },
+  "tool-pickaxe": {
+   "category": "survival",
+   "extent": [
+    0.536,
+    0.72,
+    0.116
+   ],
+   "id": "pickaxe",
+   "mass": 3.0,
+   "name": "Pickaxe",
+   "shape": "convex"
+  },
+  "tool-shovel": {
+   "category": "survival",
+   "extent": [
+    0.213,
+    0.87,
+    0.093
+   ],
+   "id": "shovel",
+   "mass": 2.0,
+   "name": "Shovel",
+   "shape": "convex"
+  },
+  "tree-log": {
+   "category": "survival",
+   "extent": [
+    0.748,
+    0.831,
+    3.0
+   ],
+   "id": "log_fallen",
+   "mass": 60.0,
+   "name": "Fallen log",
+   "shape": "convex"
+  },
+  "tree-trunk": {
+   "category": "survival",
+   "extent": [
+    0.6,
+    0.782,
+    0.6
+   ],
+   "id": "stump",
+   "mass": 25.0,
+   "name": "Stump",
+   "shape": "cylinder"
+  },
+  "workbench": {
+   "category": "survival",
+   "extent": [
+    0.977,
+    0.86,
+    0.887
+   ],
+   "id": "workbench",
+   "mass": 45.0,
+   "name": "Workbench",
+   "shape": "convex"
+  }
+ }
+}

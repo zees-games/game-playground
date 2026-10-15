@@ -2,6 +2,7 @@ extends Node
 
 const Playground := preload("playground.gd")
 const PlaygroundBindings := preload("playground_bindings.gd")
+const PlaygroundProp := preload("playground_prop.gd")
 const PlaygroundBrowser := preload("client/playground_browser.gd")
 const PlaygroundConfig := preload("playground_config.gd")
 const PlaygroundHud := preload("playground_hud.gd")
@@ -2057,6 +2058,13 @@ func _fit_selection_box() -> void:
 ## render tool draws exactly what the game does.
 static func fit_selection_box(box: MeshInstance3D, target: Node3D) -> void:
 	var mesh := target.get_node_or_null("Mesh") as MeshInstance3D
+	if mesh == null and target is PlaygroundProp and (target as PlaygroundProp).def != null:
+		# A model prop's picture is a node tree, centred on the body: its catalogued extent
+		# (the box the hull was fitted to) is the box to draw.
+		var body := target as PlaygroundProp
+		(box.mesh as BoxMesh).size = PlaygroundProp.extent_of(body.def) * body.size_scale * 1.08 + Vector3.ONE * 0.08
+		box.transform = Transform3D()
+		return
 	if mesh == null or mesh.mesh == null:
 		return
 	var bounds := mesh.get_aabb()

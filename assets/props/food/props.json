@@ -1,0 +1,349 @@
+{
+ "credit": {
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "source": "Kenney Food Kit",
+  "url": "https://kenney.nl/assets/food-kit"
+ },
+ "defaults": {
+  "scale": 0.75
+ },
+ "props": {
+  "apple": {
+   "category": "food",
+   "extent": [
+    0.147,
+    0.143,
+    0.147
+   ],
+   "id": "apple",
+   "mass": 0.2,
+   "name": "Apple",
+   "shape": "sphere"
+  },
+  "banana": {
+   "category": "food",
+   "extent": [
+    0.103,
+    0.147,
+    0.472
+   ],
+   "id": "banana",
+   "mass": 0.15,
+   "name": "Banana",
+   "shape": "convex"
+  },
+  "bottle-ketchup": {
+   "category": "food",
+   "extent": [
+    0.108,
+    0.295,
+    0.125
+   ],
+   "id": "ketchup",
+   "mass": 0.5,
+   "name": "Ketchup",
+   "shape": "convex"
+  },
+  "bowl": {
+   "category": "food",
+   "extent": [
+    0.377,
+    0.16,
+    0.435
+   ],
+   "id": "bowl",
+   "mass": 0.6,
+   "name": "Bowl",
+   "shape": "convex"
+  },
+  "burger": {
+   "category": "food",
+   "extent": [
+    0.303,
+    0.218,
+    0.303
+   ],
+   "id": "burger",
+   "mass": 0.3,
+   "name": "Burger",
+   "shape": "cylinder"
+  },
+  "cake": {
+   "category": "food",
+   "extent": [
+    0.479,
+    0.205,
+    0.479
+   ],
+   "id": "cake",
+   "mass": 1.2,
+   "name": "Cake",
+   "shape": "cylinder"
+  },
+  "cheese": {
+   "category": "food",
+   "extent": [
+    0.51,
+    0.165,
+    0.51
+   ],
+   "id": "cheese",
+   "mass": 1.0,
+   "name": "Cheese wheel",
+   "shape": "cylinder"
+  },
+  "cup-coffee": {
+   "category": "food",
+   "extent": [
+    0.162,
+    0.105,
+    0.215
+   ],
+   "id": "coffee_cup",
+   "mass": 0.2,
+   "name": "Coffee cup",
+   "shape": "convex"
+  },
+  "cupcake": {
+   "category": "food",
+   "extent": [
+    0.266,
+    0.318,
+    0.231
+   ],
+   "id": "cupcake",
+   "mass": 0.1,
+   "name": "Cupcake",
+   "shape": "convex"
+  },
+  "donut": {
+   "category": "food",
+   "extent": [
+    0.184,
+    0.067,
+    0.212
+   ],
+   "id": "donut",
+   "mass": 0.1,
+   "name": "Donut",
+   "shape": "cylinder"
+  },
+  "egg": {
+   "category": "food",
+   "extent": [
+    0.087,
+    0.124,
+    0.101
+   ],
+   "id": "egg",
+   "mass": 0.06,
+   "name": "Egg",
+   "shape": "sphere"
+  },
+  "fries": {
+   "category": "food",
+   "extent": [
+    0.137,
+    0.298,
+    0.199
+   ],
+   "id": "fries",
+   "mass": 0.2,
+   "name": "Fries",
+   "shape": "convex"
+  },
+  "frying-pan": {
+   "category": "food",
+   "extent": [
+    0.493,
+    0.09,
+    0.767
+   ],
+   "id": "frying_pan",
+   "mass": 1.2,
+   "name": "Frying pan",
+   "shape": "convex"
+  },
+  "hot-dog": {
+   "category": "food",
+   "extent": [
+    0.439,
+    0.114,
+    0.152
+   ],
+   "id": "hot_dog",
+   "mass": 0.2,
+   "name": "Hot dog",
+   "shape": "convex"
+  },
+  "ice-cream": {
+   "category": "food",
+   "extent": [
+    0.176,
+    0.347,
+    0.204
+   ],
+   "id": "ice_cream",
+   "mass": 0.3,
+   "name": "Ice cream",
+   "shape": "convex"
+  },
+  "loaf": {
+   "category": "food",
+   "extent": [
+    0.435,
+    0.332,
+    0.274
+   ],
+   "id": "loaf",
+   "mass": 0.5,
+   "name": "Loaf of bread",
+   "shape": "convex"
+  },
+  "mug": {
+   "category": "food",
+   "extent": [
+    0.258,
+    0.205,
+    0.214
+   ],
+   "id": "mug",
+   "mass": 0.35,
+   "name": "Mug",
+   "shape": "convex"
+  },
+  "pizza": {
+   "category": "food",
+   "extent": [
+    0.631,
+    0.033,
+    0.631
+   ],
+   "id": "pizza",
+   "mass": 0.5,
+   "name": "Pizza",
+   "shape": "box"
+  },
+  "pizza-box": {
+   "category": "food",
+   "extent": [
+    0.706,
+    0.661,
+    0.714
+   ],
+   "id": "pizza_box",
+   "mass": 0.6,
+   "name": "Pizza box",
+   "shape": "box"
+  },
+  "plate": {
+   "category": "food",
+   "extent": [
+    0.669,
+    0.067,
+    0.669
+   ],
+   "id": "plate",
+   "mass": 0.5,
+   "name": "Plate",
+   "shape": "cylinder"
+  },
+  "pot": {
+   "category": "food",
+   "extent": [
+    0.493,
+    0.271,
+    0.617
+   ],
+   "id": "pot",
+   "mass": 1.5,
+   "name": "Cooking pot",
+   "shape": "convex"
+  },
+  "pumpkin": {
+   "category": "food",
+   "extent": [
+    0.314,
+    0.172,
+    0.314
+   ],
+   "id": "pumpkin",
+   "mass": 5.0,
+   "name": "Pumpkin",
+   "shape": "convex"
+  },
+  "sandwich": {
+   "category": "food",
+   "extent": [
+    0.324,
+    0.126,
+    0.325
+   ],
+   "id": "sandwich",
+   "mass": 0.25,
+   "name": "Sandwich",
+   "shape": "box"
+  },
+  "soda-bottle": {
+   "category": "food",
+   "extent": [
+    0.135,
+    0.435,
+    0.117
+   ],
+   "id": "soda_bottle",
+   "mass": 0.6,
+   "name": "Soda bottle",
+   "shape": "cylinder"
+  },
+  "soda-can": {
+   "category": "food",
+   "extent": [
+    0.168,
+    0.263,
+    0.168
+   ],
+   "id": "soda_can",
+   "mass": 0.35,
+   "name": "Soda can",
+   "shape": "cylinder"
+  },
+  "turkey": {
+   "category": "food",
+   "extent": [
+    0.712,
+    0.283,
+    0.526
+   ],
+   "id": "turkey",
+   "mass": 5.0,
+   "name": "Roast turkey",
+   "shape": "convex"
+  },
+  "watermelon": {
+   "category": "food",
+   "extent": [
+    0.342,
+    0.357,
+    0.342
+   ],
+   "id": "watermelon",
+   "mass": 4.0,
+   "name": "Watermelon",
+   "shape": "sphere"
+  },
+  "wine-red": {
+   "category": "food",
+   "extent": [
+    0.143,
+    0.524,
+    0.124
+   ],
+   "id": "wine_bottle",
+   "mass": 1.3,
+   "name": "Wine bottle",
+   "shape": "cylinder"
+  }
+ }
+}
