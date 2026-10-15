@@ -61,13 +61,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 1003
+const CHECKS := 1019
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 53
+const SECTIONS := 54
 
 var _passed := 0
 var _failed := 0
@@ -166,6 +166,7 @@ func _run() -> void:
 	await _test_the_float()
 	await _test_the_drop()
 	await _test_the_maps_are_surveyed()
+	await _test_nothing_drawn_is_walked_through()
 	await _test_a_maps_own_props()
 	await _test_toys()
 	await _test_every_maps_toys_stand_clear()
@@ -7381,6 +7382,50 @@ func _test_the_maps_are_surveyed() -> void:
 			"; ".join(found["unreached"]))
 		_check((found["trapped"] as Array).is_empty(), "%s: and no place with no way out" % id,
 			"; ".join(found["trapped"]))
+
+	_done()
+
+
+# --- The collision audit ---------------------------------------------------------
+
+## dot-core's [DotCollisionAudit] over every map as built: visible geometry with no shape
+## under it, which a player walks through. The strict pass: every mesh sits on its own body here, and the lenient one
+## would let a stray shape nearby cover a missing one. What is passable on purpose (liquids, foliage, panes, trigger
+## visuals) carries `dot_no_collision` where the map builds it, with the reason there; a map
+## fails on any finding left. Props are dot-props bodies and map toys are built under the
+## playground, so neither is in a map node. The audit is structural and needs no tree.
+func _test_nothing_drawn_is_walked_through() -> void:
+	print("")
+	_section("every map's drawn geometry has collision or says it is passable")
+
+	var cases: Array = []
+	for id in _zone_map_ids():
+		cases.append([id, "res://maps/%s.gd" % id, ""])
+	cases.append(["pg_generated", "res://maps/pg_generated.gd", "generated"])
+	for id in CUSTOM_MAPS:
+		cases.append([id, "res://maps/pg_data.gd", "res://maps/custom/%s.json" % id])
+
+	for case: Array in cases:
+		var map: Node3D = (load(case[1]) as GDScript).new()
+		if case[2] == "generated":
+			map.configure(1)
+		elif case[2] != "":
+			map.configure_doc(case[2])
+		else:
+			map._build()
+
+		var res := DotCollisionAudit.audit(map)
+		var found := 0
+		if res.ok:
+			var report: DotCollisionAudit = res.value
+			found = report.count()
+			print("    %s: %d findings of %d examined, %d opted out" % [case[0], found, report.examined, report.opted_out])
+			for line in report.describe_lines().slice(1, 12):
+				print("      %s" % line)
+		_check(res.ok and found == 0 and (res.value as DotCollisionAudit).examined > 0,
+			"%s: nothing drawn is walked through" % case[0],
+			"" if res.ok else res.error.message)
+		map.free()
 
 	_done()
 

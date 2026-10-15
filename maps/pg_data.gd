@@ -278,6 +278,10 @@ static func _liquid_mesh(at: Vector3, size: Vector3, colour: Color, index: int) 
 	mesh.position = at
 	mesh.material_override = PlaygroundGeometry._material(colour)
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Water, lava and foliage have no collider by design: a body is swum or pushed through,
+	# not stood on, and the bed under it is solid. The audit's lenient pass would pass it on
+	# the bed's shape; this says it is meant.
+	mesh.set_meta(DotCollisionAudit.META, true)
 	return mesh
 
 

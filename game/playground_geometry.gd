@@ -103,6 +103,9 @@ static func panel(
 	mesh.mesh = box_mesh
 	mesh.material_override = _material(colour)
 	mesh.position = at
+	# Passable by design (this function's whole point): said so to dot-core's collision audit,
+	# so a panel is not one of the findings that a real missing collider would be.
+	mesh.set_meta(DotCollisionAudit.META, true)
 	parent.add_child(mesh)
 	return mesh
 
