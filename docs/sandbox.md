@@ -79,7 +79,7 @@ Twenty-seven pack weapons in the Weapons tab under five categories from the pack
 - **Hold to browse, tap to pin.** One key, not a toggle: a hold is a glance with your place kept; a tap leaves it up while building.
 - **Clicking a prop spawns it and the menu stays open.** A menu that only selects makes a wall nine open-and-closes.
 - **The menu never spawns anything itself.** It emits; the client asks the server.
-- **Five tabs** (props, entities, weapons, tools, builds); **switching clears the filter**, and the search reaches across a tab, not across tabs.
+- **Six tabs** (props, entities, weapons, tools, builds, addons); **switching clears the filter**, and the search reaches across a tab, not across tabs.
 - **The grid is the single source of what is on screen.** `shown()` and `card_for()` read the buttons' metadata rather than re-running the filter.
 - **A card is a `Button`**, focusable, so the grid is navigable by gamepad and arrow keys for free.
 - **The first card takes focus, not the search box; `/` reaches the search and Enter leaves it.** Focusing the search on open sends WASD into it.
@@ -87,6 +87,33 @@ Twenty-seven pack weapons in the Weapons tab under five categories from the pack
 - **`TabBar.clip_tabs` must be off**: it defaults on, reports a minimum width of about one tab, and hides the others behind scroll arrows.
 - The tool gun's settings are a schema-drawn panel; this theme draws no slider track, so the menu gives sliders their own.
 - The **Builds** tab asks the server each time it opens ([below](#saved-builds)); offline it says to join one. Build cards have no icon (a build has no single shape).
+
+- **The look is one `DotUiTheme` palette** (`_palette`, rounder than the default) built onto the menu: rounded plate cards with the thumbnail on them, pill tabs and category chips filled with the accent, a rounded search field. The helpers `_box`, `_style_card`, `_style_pill` and `_style_tabs` are the only places a `StyleBoxFlat` is made. Node names and the `shown()`/`card_for()` metadata did not change.
+- The **Addons** tab lists what addon hooks registered ([below](#the-addons-folder-hook)); clicking an entry emits `addon_item_chosen("addon/item")`.
+
+## The addons folder hook
+
+An addon dropped into `addons/` that has a file `playground_hook.gd` can add entries to the Addons tab. `PlaygroundAddons` (`game/playground_addons.gd`) scans `res://addons/*/playground_hook.gd` when `Playground` boots, on both ends. **An addon without that file is never loaded or called**: its folder is only listed as skipped.
+
+The hook is a script (a `Node` is added under the game, so it can own nodes) with:
+
+```gdscript
+func playground_register(menu) -> void:
+    menu.add_item("tornado", "Tornado", _start, "Disasters", "tooltip")   # id, label, callback, category, hint
+
+func playground_receive(msg: Dictionary) -> void: ...   # optional: a client's half
+```
+
+`menu` also has `host` (the game node), `authoritative` and `send(dict)`. The callback receives a `PlaygroundAddons.Context` (`authoritative`, `world`, `player_id`, `at` = where the player looks, `send(dict)`) and may return a `DotResult`. **The menu never runs a callback**: connected, the client asks with `ARM_ADDON_ITEM` (an `ARM_PROP` sub-kind, id `addon/item`, payload the aim point) and the server runs it through `Playground.activate_addon_item`; offline the client calls that itself. Whatever a callback `send`s is broadcast as `Kind.ADDON` (addon name and a JSON body, 900 bytes at most) and handed to the hook's `playground_receive` on every client. A hook that does not compile or has no `playground_register` is refused and logged; the game carries on.
+
+`addons/pg_natural_disasters/playground_hook.gd` is the adapter for natural-disasters (which knows nothing of the playground): one entry per registered kind, started where the player looks. It loads the manager by path, so a checkout without `addons/natural_disasters` (an optional symlink) simply has no entries. Not yet: a late joiner is not told about a disaster already running (the addon offers `snapshot()`; the hook does not send it).
+
+## NPC tools
+
+Two tool-gun modes and two entities, all inside this repository.
+
+- **Waypoints** (`toolgun/tool_waypoint.gd`, entity `entities/waypoint.gd`): left click lays a frozen point and, with "link each new point" on, links it to the last one; clicking an existing point picks it as the next link's start. Links are `waypoint.links` (authoritative, both ways, dropped when either point is freed); the visible link is a rope in `PlaygroundConstraints` between the two bodies, so it replicates and draws like any rope. Right click removes, reload clears yours. Points are the `waypoints` limit group. `soldier_brain.gd` has a `route` leaf ahead of the heat-map patrol: an NPC with a route of its owner's walks to the nearest point and on along the links, never straight back; with none it behaves as before.
+- **NPC spawner** (`toolgun/tool_npc_spawn.gd`, entity `entities/spawn_point.gd`): left click spawns a kind with a chosen weapon (any a NPC can use, "none", or the catalogue's), one to eight in a ring; "lay a spawn point" instead leaves a frozen point that makes one every N seconds up to a limit alive at once. NPCs it spawns are the ordinary armed NPCs, so they shoot (the suite has two tool-spawned NPCs fight).
 
 ## The icons are drawn from the definition
 

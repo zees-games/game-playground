@@ -77,6 +77,9 @@ enum Kind {
 	## toys in the same order from the map). After MAP, and to a joiner after HELLO. Last, for
 	## the same reason.
 	TOYS,
+	## A message from an addon's hook to its own client half: the addon's folder name and
+	## a dictionary as JSON. To everybody. Last, for the same reason.
+	ADDON,
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
@@ -456,6 +459,9 @@ const ARM_SPAWN_WEAPON := 3
 const ARM_BUILDS := 4
 ## Put my saved build down in front of me: id is its name.
 const ARM_LOAD_BUILD := 5
+## Start an addon's menu entry: id is `addon/item`, payload the point the player looks at as
+## three numbers in JSON, `[x, y, z]`, or empty.
+const ARM_ADDON_ITEM := 6
 
 ## The most a tool's settings may take on the wire. A tool has a handful of numbers.
 const TOOL_SETTINGS_BYTES := 512
@@ -1033,6 +1039,28 @@ static func read_detonate(r: DotNetReader) -> Dictionary:
 	var at := r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
 	var radius := r.read_float32()
 	return {"serial": serial, "position": at, "radius": radius, "ok": r.ok()}
+
+
+# --- ADDON ---------------------------------------------------------------------
+
+const ADDON_NAME_BYTES := 48
+const ADDON_BODY_BYTES := 900
+
+
+static func write_addon(addon: String, body: Dictionary) -> PackedByteArray:
+	var w := _w()
+	w.write_string(addon, ADDON_NAME_BYTES)
+	w.write_string(JSON.stringify(body), ADDON_BODY_BYTES)
+	return w.to_bytes()
+
+
+## [code]ok[/code] is false for a body that is not a JSON object, so a hook is never handed
+## something it did not expect to be a dictionary.
+static func read_addon(r: DotNetReader) -> Dictionary:
+	var addon := r.read_string(ADDON_NAME_BYTES)
+	var parsed: Variant = JSON.parse_string(r.read_string(ADDON_BODY_BYTES))
+	return {"addon": addon, "body": parsed if parsed is Dictionary else {},
+		"ok": r.ok() and parsed is Dictionary}
 
 
 # --- BUILDS --------------------------------------------------------------------

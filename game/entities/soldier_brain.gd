@@ -13,6 +13,7 @@ extends "res://addons/dot_npc_ai/runtime/dot_npc_ai_brain.gd"
 ##       suppress                                    -> hold the range band, shooting
 ##   search where it probably went
 ##   follow the owner (a friendly one)
+##   walk the owner's waypoint route
 ##   patrol where players go
 ##   hold
 ## [/codeblock]
@@ -36,6 +37,17 @@ var aim_at: Vector3 = Vector3.ZERO
 var body: Node3D = null
 
 var _cover_until: float = -INF
+
+## The waypoint being walked to, and the one before it (so a dead end turns round rather than
+## sticking). See [method _walk_route].
+var _wp: Node3D = null
+var _wp_prev: Node3D = null
+
+## How near, horizontally, counts as at a waypoint.
+const WAYPOINT_ARRIVE := 1.4
+
+## How far away the route is looked for when none is being walked.
+const WAYPOINT_SEARCH := 80.0
 
 
 func _build() -> void:
@@ -63,6 +75,7 @@ func _build() -> void:
 		] as Array[DotNpcAiNode]),
 		DotNpcAiLeaf.Action.new(&"search", func(c: DotNpcAiContext) -> int: return search(c, _speed() * 0.7)),
 		DotNpcAiLeaf.Action.new(&"follow", _follow_owner),
+		DotNpcAiLeaf.Action.new(&"route", _walk_route),
 		DotNpcAiLeaf.Action.new(&"patrol", func(c: DotNpcAiContext) -> int: return patrol_hot(c, _speed() * 0.5)),
 		DotNpcAiLeaf.Action.new(&"hold", func(_c: DotNpcAiContext) -> int:
 			halt()
@@ -183,6 +196,64 @@ func _follow_owner(ctx: DotNpcAiContext) -> int:
 		face(flat)
 
 	return DotNpcAiNode.Status.RUNNING
+
+
+## Walks the waypoints the owner laid: to the nearest one, then on along its links, never back
+## the way it came unless it is a dead end. FAILURE with no waypoint in reach, which hands on
+## to the heat-map patrol, so an NPC with no route behaves exactly as before.
+##
+## [b]Ahead of the heat-map patrol and behind everything that fights[/b]: a route is what an
+## NPC does with nothing to do, and a target, a danger or a search all come first.
+func _walk_route(ctx: DotNpcAiContext) -> int:
+	var game: Variant = body.get("game") if body != null else null
+
+	if game == null or not game.has_method(&"nearest_waypoint"):
+		return DotNpcAiNode.Status.FAILURE
+
+	if _wp == null or not is_instance_valid(_wp) or not _wp.is_inside_tree():
+		_wp = game.call(&"nearest_waypoint", npc.owner_id, npc.position(), WAYPOINT_SEARCH)
+		_wp_prev = null
+
+		if _wp == null:
+			return DotNpcAiNode.Status.FAILURE
+
+	var flat := _wp.global_position - npc.position()
+	flat.y = 0.0
+
+	if flat.length() <= WAYPOINT_ARRIVE:
+		_wp = _next_waypoint()
+
+		if _wp == null:
+			return DotNpcAiNode.Status.FAILURE
+
+		flat = _wp.global_position - npc.position()
+		flat.y = 0.0
+
+	steer_with_spacing(_wp.global_position, _speed() * 0.6, ctx.delta)
+	return DotNpcAiNode.Status.RUNNING
+
+
+## The waypoint after the current one: a linked one that is not the one just left (the first
+## such, drawn by this NPC's seed and how many it has passed when there are several), else
+## back the way it came.
+func _next_waypoint() -> Node3D:
+	var options: Array = []
+
+	for other in _wp.call(&"neighbours"):
+		if other != _wp_prev:
+			options.append(other)
+
+	var chosen: Node3D = _wp_prev
+
+	if not options.is_empty():
+		_visited += 1
+		chosen = options[int(DotNpcAiNode.deterministic_unit(npc.seed, _visited) * options.size()) % options.size()]
+
+	_wp_prev = _wp
+	return chosen if chosen != null and is_instance_valid(chosen) else _wp_prev
+
+
+var _visited: int = 0
 
 
 func target_position_of(id: StringName) -> Vector3:

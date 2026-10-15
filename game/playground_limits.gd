@@ -30,6 +30,8 @@ const ENTITIES := &"entities"
 const VEHICLES := &"vehicles"
 const BALLOONS := &"balloons"
 const WEAPONS := &"weapons"
+const WAYPOINTS := &"waypoints"
+const SPAWNERS := &"spawners"
 const CONSTRAINTS := &"constraints"
 
 ## The groups, in the order a player is shown them, and each one's default.
@@ -43,6 +45,8 @@ const DEFAULTS := {
 	VEHICLES: 4,
 	BALLOONS: 30,
 	WEAPONS: 20,
+	WAYPOINTS: 40,
+	SPAWNERS: 6,
 	CONSTRAINTS: 100,
 }
 

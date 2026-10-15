@@ -73,6 +73,8 @@ Thumbs.db
 /addons/dot_game
 /addons/dot_weapon
 /addons/zee_weapons
+# Optional: natural-disasters, shown in the Addons tab by addons/pg_natural_disasters.
+/addons/natural_disasters
 
 # The custom sandbox maps are game-playground-maps, a repository and a pack of their own.
 # "ci" asks dot-ci (v1.3.0+) to link them on the runner too: the suites load all of them.

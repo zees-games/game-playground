@@ -313,6 +313,8 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 		game.pickup.changed.connect(_on_pickup_changed)
 		game.held_changed.connect(_on_held_changed)
 		game.pane_broken.connect(_on_pane_broken)
+		game.addon_message.connect(func(addon: String, body: Dictionary) -> void:
+			_broadcast(PlaygroundEvents.Kind.ADDON, PlaygroundEvents.write_addon(addon, body)))
 		# To the one who hit, and nobody else: a confirmation is about what YOU did.
 		game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
 			_tell(peer_for_player(session_of(id)), PlaygroundEvents.Kind.HIT,
@@ -1519,6 +1521,16 @@ func _on_request(message: DotNetMessage) -> void:
 					builds_requested.emit(peer_id)
 				PlaygroundEvents.ARM_LOAD_BUILD:
 					build_load_requested.emit(peer_id, String(arm["id"]))
+				PlaygroundEvents.ARM_ADDON_ITEM:
+					var looked: Variant = JSON.parse_string(str(arm["payload"])) if str(arm["payload"]) != "" else null
+					var at := Vector3.ZERO
+					if looked is Array and (looked as Array).size() == 3:
+						at = Vector3(float(looked[0]), float(looked[1]), float(looked[2]))
+					var started := game.activate_addon_item(String(arm["id"]), session_id, at)
+					DotLog.result(CHANNEL, "an addon item was asked for", started)
+					if not started.ok:
+						_tell(peer_id, PlaygroundEvents.Kind.NOTICE,
+							PlaygroundEvents.write_notice(session_id, started.error.message))
 				_:
 					var prop_id := arm["id"] as StringName
 					if game.props.catalogue != null and game.props.catalogue.get_prop(prop_id) != null:
@@ -1831,6 +1843,14 @@ func ask_load_build(build_name: String) -> void:
 	))
 
 
+## Asks the server to start an addon's menu entry, [param key] being `addon/item`, with the
+## point the player is looking at. Client side.
+func ask_addon_item(key: String, at: Vector3) -> void:
+	_ask(PlaygroundEvents.Ask.ARM_PROP, PlaygroundEvents.write_arm(
+		PlaygroundEvents.ARM_ADDON_ITEM, StringName(key), JSON.stringify([at.x, at.y, at.z])
+	))
+
+
 ## A player's saved builds, to that player. Server side.
 func send_builds(peer_id: int, list: Array) -> void:
 	_tell(peer_id, PlaygroundEvents.Kind.BUILDS, PlaygroundEvents.write_builds(list))
@@ -1939,6 +1959,10 @@ func _on_event(message: DotNetMessage) -> void:
 			var map_id := PlaygroundEvents.read_map(reader)
 			if game.maps.current == null or game.maps.current.id != map_id:
 				game.change_map(map_id)
+		PlaygroundEvents.Kind.ADDON:
+			var said_by := PlaygroundEvents.read_addon(reader)
+			if bool(said_by["ok"]) and game.addons != null:
+				game.addons.deliver(str(said_by["addon"]), said_by["body"])
 		PlaygroundEvents.Kind.TOYS:
 			var told := PlaygroundEvents.read_toys(reader)
 			if bool(told["ok"]):

@@ -995,6 +995,9 @@ func _build_screens() -> void:
 	menu.weapon_spawn_requested.connect(_on_weapon_spawn_requested)
 	menu.builds_opened.connect(_on_builds_opened)
 	menu.build_chosen.connect(_on_build_chosen)
+	menu.addon_item_chosen.connect(_on_addon_item_chosen)
+	if playground.addons != null:
+		menu.addon_items = playground.addons.describe_items()
 
 	var registered := screens.register(menu)
 	DotLog.result(CHANNEL, "registering the spawn menu", registered)
@@ -2351,6 +2354,27 @@ func _on_builds_opened() -> void:
 		bridge.ask_builds()
 	else:
 		menu.set_builds([])
+
+
+## An addon's entry. The server runs it where the authority is; offline this process is it.
+## The point is where the camera looks: the first thing it hits, else twelve metres on.
+func _on_addon_item_chosen(key: String) -> void:
+	var at := Vector3.ZERO
+	var camera := get_viewport().get_camera_3d()
+
+	if camera != null:
+		var from := camera.global_position
+		var to := from - camera.global_basis.z * 60.0
+		var hit := camera.get_world_3d().direct_space_state.intersect_ray(
+			PhysicsRayQueryParameters3D.create(from, to)
+		)
+		at = hit["position"] if not hit.is_empty() else from - camera.global_basis.z * 12.0
+
+	if bridge != null:
+		bridge.ask_addon_item(key, at)
+	else:
+		var started := playground.activate_addon_item(key, 0, at)
+		DotLog.result(CHANNEL, "starting an addon item", started)
 
 
 func _on_build_chosen(build_name: String) -> void:

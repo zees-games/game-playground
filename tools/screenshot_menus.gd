@@ -99,6 +99,16 @@ func _initialize() -> void:
 			{"name": "watchtower", "props": 41, "custom": false},
 			{"name": "go_kart", "props": 9, "custom": true},
 		]},
+		# The Addons tab as the hook of natural-disasters fills it.
+		{"id": &"spawn_menu", "file": "menu_addons.png", "tab": PlaygroundSpawnMenu.Tab.ADDONS, "addons": [
+			{"key": "pg_natural_disasters/tornado", "label": "Tornado", "category": "Disasters", "hint": ""},
+			{"key": "pg_natural_disasters/thunderstorm", "label": "Thunderstorm", "category": "Disasters", "hint": ""},
+			{"key": "pg_natural_disasters/earthquake", "label": "Earthquake", "category": "Disasters", "hint": ""},
+			{"key": "pg_natural_disasters/blizzard", "label": "Blizzard", "category": "Disasters", "hint": ""},
+			{"key": "pg_natural_disasters/wind", "label": "Wind", "category": "Disasters", "hint": ""},
+		]},
+		{"id": &"spawn_menu", "file": "menu_tools_waypoint.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"waypoint"},
+		{"id": &"spawn_menu", "file": "menu_tools_npc.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"npc_spawn"},
 		{"id": &"game_menu", "file": "menu_general.png", "page": &"general"},
 		# The same page scrolled to its end: the sandbox's rows and the camera motion sliders.
 		{"id": &"game_menu", "file": "menu_general_end.png", "page": &"general", "scroll_end": true},
@@ -156,6 +166,8 @@ func _process(_delta: float) -> bool:
 			if shot.has("settings"):
 				_menu.set_tool_settings(StringName(shot["mode"]), shot["settings"])
 				_menu.set_edit_target("Crate")
+			if shot.has("addons"):
+				_menu.addon_items = shot["addons"]
 			if shot.has("builds"):
 				_menu.builds = shot["builds"]
 			_menu.show_tab(shot["tab"])

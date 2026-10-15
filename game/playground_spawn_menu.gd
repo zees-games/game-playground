@@ -60,6 +60,8 @@ enum Tab {
 	WEAPONS,
 	TOOLS,
 	BUILDS,
+	## What the hooks of the addons folder registered. See [PlaygroundAddons].
+	ADDONS,
 }
 
 ## A prop or an entity was clicked. The client turns this into a spawn request.
@@ -88,6 +90,9 @@ signal weapon_spawn_requested(weapon_id: StringName)
 ## The Builds tab opened: ask the server for this player's builds, then [method set_builds].
 signal builds_opened()
 
+## An addon's entry was clicked: `addon/item`. The client asks the server, or acts directly offline.
+signal addon_item_chosen(key: String)
+
 ## A saved build was clicked: put it down in front of the player.
 signal build_chosen(build_name: String)
 
@@ -100,6 +105,10 @@ var builds: Array = []
 
 ## Whether anything can answer for builds. Off with no server (offline play keeps none).
 var builds_available: bool = true
+
+## The Addons tab's rows: dictionaries with `key`, `label`, `category` and `hint`, from
+## [method PlaygroundAddons.describe_items]. Plain data so the menu never holds an addon's object.
+var addon_items: Array = []
 
 ## What the weapons tab is built from.
 var weapons: Array[PlaygroundWeaponDef] = []
@@ -132,6 +141,7 @@ var _tool_modes: Array = []
 var _settings_box: VBoxContainer = null
 var _npc_weapon_row: Control = null
 
+var _palette: DotUiTheme = null
 var _tab: Tab = Tab.PROPS
 var _category: StringName = ALL
 var _search: String = ""
@@ -153,6 +163,14 @@ func _screen_id() -> StringName:
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# One palette for the whole menu from dot-ui's theme, rounder than the default: every
+	# widget below inherits it, and the few that need more (cards, tabs, the panel) take
+	# their boxes from the same palette so a changed accent changes all of them.
+	_palette = DotUiTheme.dark()
+	_palette.corner = 10.0
+	_palette.accent = Color(0.30, 0.62, 1.0)
+	theme = _palette.build()
 
 	# A dim backdrop, so the menu reads as something in front of the world rather
 	# than as a panel floating in it. It is also what stops a click in the margin
@@ -176,6 +194,10 @@ func _ready() -> void:
 	panel.offset_top = 64.0
 	panel.offset_right = -96.0
 	panel.offset_bottom = -96.0
+	panel.add_theme_stylebox_override("panel", _box(
+		Color(_palette.background.r, _palette.background.g, _palette.background.b, 0.96),
+		16.0, _palette.outline.darkened(0.25), 1
+	))
 	add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -215,7 +237,8 @@ func _build_header() -> Control:
 
 	var title := Label.new()
 	title.text = "Spawn"
-	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", _palette.accent.lightened(0.25))
 	header.add_child(title)
 
 	_tabs = TabBar.new()
@@ -230,6 +253,8 @@ func _build_header() -> Control:
 	_tabs.add_tab("Weapons")
 	_tabs.add_tab("Tools")
 	_tabs.add_tab("Builds")
+	_tabs.add_tab("Addons")
+	_style_tabs(_tabs)
 	_tabs.tab_changed.connect(_on_tab_changed)
 	header.add_child(_tabs)
 
@@ -242,6 +267,8 @@ func _build_header() -> Control:
 	_search_box.placeholder_text = "Search  ( / )"
 	_search_box.custom_minimum_size = Vector2(260.0, 0.0)
 	_search_box.clear_button_enabled = true
+	_search_box.add_theme_stylebox_override("normal", _box(_palette.surface, 18.0, _palette.outline, 1, 14.0, 6.0))
+	_search_box.add_theme_stylebox_override("focus", _box(_palette.surface, 18.0, _palette.accent, 2, 14.0, 6.0))
 	_search_box.text_changed.connect(_on_search_changed)
 	# Enter puts the keyboard back where the player expects it. Without it there is no
 	# way out of the search box that is not the mouse, and W still types a W.
@@ -443,6 +470,63 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
+# --- Looks ------------------------------------------------------------------
+
+## A rounded box from the palette. A helper because five widgets want one and each wants a
+## different fill, border and padding; the StyleBoxFlat defaults are square and borderless.
+func _box(
+	fill: Color, radius: float, line: Color = Color.TRANSPARENT, line_width: int = 0,
+	pad_x: float = 8.0, pad_y: float = 6.0
+) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.set_corner_radius_all(int(radius))
+	box.set_border_width_all(line_width)
+	box.border_color = line
+	box.content_margin_left = pad_x
+	box.content_margin_right = pad_x
+	box.content_margin_top = pad_y
+	box.content_margin_bottom = pad_y
+	return box
+
+
+## A card: a lifted plate with the thumbnail on it, lighter when hovered, outlined in the
+## accent when focused (the arrow keys and a gamepad move focus, so it has to show).
+func _style_card(button: Button) -> void:
+	var plate := _palette.surface.lightened(0.03)
+	button.add_theme_stylebox_override("normal", _box(plate, 12.0, _palette.outline.darkened(0.35), 1, 6.0, 8.0))
+	button.add_theme_stylebox_override("hover", _box(_palette.surface_hover, 12.0, _palette.accent.darkened(0.2), 1, 6.0, 8.0))
+	button.add_theme_stylebox_override("pressed", _box(_palette.accent.darkened(0.55), 12.0, _palette.accent, 2, 6.0, 8.0))
+	button.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0), 12.0, _palette.accent, 2, 6.0, 8.0))
+	button.add_theme_constant_override("icon_max_width", 56)
+	button.add_theme_constant_override("h_separation", 0)
+	button.add_theme_font_size_override("font_size", 14)
+	for state in ["font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(state, Color.WHITE)
+
+
+## A category chip: a pill, filled with the accent while it is the chosen one.
+func _style_pill(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _box(Color(1, 1, 1, 0.04), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
+	button.add_theme_stylebox_override("hover", _box(Color(1, 1, 1, 0.09), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
+	button.add_theme_stylebox_override("pressed", _box(_palette.accent.darkened(0.3), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
+	button.add_theme_stylebox_override("hover_pressed", _box(_palette.accent.darkened(0.2), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
+	button.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0), 16.0, _palette.accent, 2, 12.0, 5.0))
+	for state in ["font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(state, Color.WHITE)
+
+
+func _style_tabs(bar: TabBar) -> void:
+	bar.add_theme_stylebox_override("tab_selected", _box(_palette.accent.darkened(0.25), 16.0, Color.TRANSPARENT, 0, 16.0, 6.0))
+	bar.add_theme_stylebox_override("tab_hovered", _box(Color(1, 1, 1, 0.08), 16.0, Color.TRANSPARENT, 0, 16.0, 6.0))
+	bar.add_theme_stylebox_override("tab_unselected", _box(Color(1, 1, 1, 0.03), 16.0, Color.TRANSPARENT, 0, 16.0, 6.0))
+	bar.add_theme_stylebox_override("tab_focus", _box(Color(0, 0, 0, 0), 16.0, _palette.accent, 2, 16.0, 6.0))
+	bar.add_theme_color_override("font_selected_color", Color.WHITE)
+	bar.add_theme_color_override("font_unselected_color", _palette.text_dim)
+	bar.add_theme_color_override("font_hovered_color", _palette.text)
+	bar.add_theme_constant_override("h_separation", 6)
+
+
 # --- Tabs and categories ----------------------------------------------------
 
 func _on_tab_changed(index: int) -> void:
@@ -490,6 +574,15 @@ func _categories_for_tab() -> PackedStringArray:
 	if _tab == Tab.TOOLS:
 		return PackedStringArray()
 
+	if _tab == Tab.ADDONS:
+		var groups := PackedStringArray()
+		for entry: Dictionary in addon_items:
+			var group := str(entry.get("category", ""))
+			if not groups.has(group):
+				groups.append(group)
+		groups.sort()
+		return groups
+
 	if _tab == Tab.BUILDS:
 		var kinds := PackedStringArray()
 		for entry: Dictionary in builds:
@@ -516,6 +609,7 @@ func _add_category(id: StringName, text: String) -> void:
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.toggle_mode = true
 	button.button_pressed = id == _category
+	_style_pill(button)
 	button.pressed.connect(func() -> void:
 		_category = id
 		# The search and the category are one filter, not two: a search that survived
@@ -547,6 +641,8 @@ func _rebuild_grid() -> void:
 			card = _weapon_card(entry as PlaygroundWeaponDef)
 		elif _tab == Tab.BUILDS:
 			card = _build_card(entry as Dictionary)
+		elif _tab == Tab.ADDONS:
+			card = _addon_card(entry as Dictionary)
 		elif _tab == Tab.TOOLS:
 			card = _tool_card(entry as Object)
 		else:
@@ -562,6 +658,7 @@ func _rebuild_grid() -> void:
 		_empty.text = (
 			"Nothing matches '%s'." % _search if _search != ""
 			else _builds_empty_text() if _tab == Tab.BUILDS
+			else "No addon has registered anything. Put one with a playground_hook.gd in addons/." if _tab == Tab.ADDONS
 			else "Nothing here."
 		)
 
@@ -589,6 +686,7 @@ func _card(icon: Texture2D, text: String, tip: String) -> Button:
 	button.custom_minimum_size = CARD
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
+	_style_card(button)
 	return button
 
 
@@ -652,6 +750,15 @@ func _build_card(entry: Dictionary) -> Button:
 	)
 	card.pressed.connect(func() -> void: build_chosen.emit(build_name))
 	card.set_meta(&"entry", StringName(build_name))
+	return card
+
+
+## One entry an addon registered. The tooltip is the addon's own hint.
+func _addon_card(entry: Dictionary) -> Button:
+	var key := str(entry.get("key", ""))
+	var card := _card(null, str(entry.get("label", key)), str(entry.get("hint", "")))
+	card.pressed.connect(func() -> void: addon_item_chosen.emit(key))
+	card.set_meta(&"entry", StringName(key))
 	return card
 
 
@@ -850,6 +957,9 @@ func _all_in_tab() -> Array:
 	if _tab == Tab.BUILDS:
 		return builds
 
+	if _tab == Tab.ADDONS:
+		return addon_items
+
 	if _tab == Tab.TOOLS:
 		return _tools()
 
@@ -884,6 +994,8 @@ func _count_in_category(category: StringName) -> int:
 
 
 func _category_of(entry: Variant) -> StringName:
+	if entry is Dictionary and (entry as Dictionary).has("key"):
+		return StringName(str((entry as Dictionary).get("category", "")))
 	if entry is Dictionary:
 		return &"custom props" if bool((entry as Dictionary).get("custom", false)) else &"builds"
 	if entry is Object and not (entry is PlaygroundWeaponDef) and not (entry is DotPropDef):
@@ -896,6 +1008,8 @@ func _category_of(entry: Variant) -> StringName:
 
 
 func _name_of(entry: Variant) -> String:
+	if entry is Dictionary and (entry as Dictionary).has("key"):
+		return str((entry as Dictionary).get("label", ""))
 	if entry is Dictionary:
 		return str((entry as Dictionary).get("name", ""))
 	if entry is Object and not (entry is PlaygroundWeaponDef) and not (entry is DotPropDef):
@@ -908,6 +1022,8 @@ func _name_of(entry: Variant) -> String:
 
 
 func _id_of(entry: Variant) -> StringName:
+	if entry is Dictionary and (entry as Dictionary).has("key"):
+		return StringName(str((entry as Dictionary).get("key", "")))
 	if entry is Dictionary:
 		return StringName(str((entry as Dictionary).get("name", "")))
 	if entry is Object and not (entry is PlaygroundWeaponDef) and not (entry is DotPropDef):
@@ -1044,6 +1160,8 @@ func _rebuild_footer() -> void:
 			verb = "Click a tool, then use it with the tool gun"
 		Tab.BUILDS:
 			verb = "Click to put a build down in front of you"
+		Tab.ADDONS:
+			verb = "Click to start it where you are looking"
 
 	_footer.text = "   ·   ".join(PackedStringArray([
 		verb,

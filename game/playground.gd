@@ -22,6 +22,7 @@ const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
 const PlaygroundWeapons := preload("playground_weapons.gd")
 const ToolPhysprop := preload("toolgun/tool_physprop.gd")
 const PlaygroundMaterials := preload("playground_materials.gd")
+const PlaygroundAddons := preload("playground_addons.gd")
 
 ## The playground: a sandbox with a surf map, a bhop map and a lobby, timed and
 ## ranked, with props you can spawn and a physics gun to move them with.
@@ -140,6 +141,14 @@ signal run_filed(
 ## beside it, so there is one place to set it and no way for the two to disagree. A
 ## client leaves it false, runs its own timer for its HUD, and files nothing.
 var authoritative: bool = true
+
+## What the hooks of the addons folder registered: the Q menu's Addons tab, and where a
+## chosen entry runs. Built in [method _ready] after the world exists. See
+## [PlaygroundAddons].
+var addons: PlaygroundAddons = null
+
+## An addon's callback has something every client must be told; the net bridge sends it.
+signal addon_message(addon: String, body: Dictionary)
 
 ## Whether [signal ready_for_players] has been emitted. See that signal.
 var booted: bool = false
@@ -421,6 +430,7 @@ func _ready() -> void:
 	_build_npc_world()
 	_build_maps()
 	_build_player_stack()
+	_build_addons()
 
 	# Physics ticks drive everything. Not _process: a timer sampled per frame counts
 	# a different number of ticks on a 144 Hz monitor than on a 60 Hz one, and the
@@ -433,6 +443,32 @@ func _ready() -> void:
 
 	booted = true
 	ready_for_players.emit()
+
+
+## Finds the addons folder's hooks. After the world, so a hook may parent nodes under it.
+func _build_addons() -> void:
+	addons = PlaygroundAddons.new()
+	addons.message.connect(func(addon: String, body: Dictionary) -> void:
+		addon_message.emit(addon, body)
+	)
+	var count := addons.scan(self, authoritative)
+	DotLog.info(CHANNEL, "addons folder scanned", {"hooks": count, "plain": addons.skipped().size()})
+
+
+## Runs a menu entry an addon registered, as [param player_id] looking at [param at].
+func activate_addon_item(key: String, player_id: int = 0, at: Vector3 = Vector3.ZERO) -> DotResult:
+	if addons == null:
+		return DotResult.fail(DotError.CODE_STATE, "the addons are not built yet")
+
+	if not authoritative:
+		return DotResult.fail(DotError.CODE_FORBIDDEN, "only the authority starts an addon item")
+
+	var ctx := PlaygroundAddons.Context.new()
+	ctx.authoritative = true
+	ctx.world = world
+	ctx.player_id = player_id
+	ctx.at = at
+	return addons.activate(key, ctx)
 
 
 ## Stands up the player-facing addons and binds them to this game.
@@ -1661,9 +1697,45 @@ func _on_prop_removed(prop: DotPropInstance, _reason: StringName) -> void:
 
 	entities.erase(entity)
 	unregister_armed_npc(entity)
+	waypoints.erase(entity)
 
 
 # --- Armed NPCs -----------------------------------------------------------------
+
+## Every waypoint placed, in the order placed. See [method nearest_waypoint].
+var waypoints: Array = []
+
+
+func register_waypoint(entity: Node) -> void:
+	if not waypoints.has(entity):
+		waypoints.append(entity)
+
+
+## The waypoint of [param owner]'s nearest to [param at] within [param radius] metres, or
+## null. By owner, because two builders in one sandbox each laying a patrol would otherwise
+## send one's soldiers along the other's route.
+func nearest_waypoint(owner: StringName, at: Vector3, radius: float = 80.0) -> Node3D:
+	var best: Node3D = null
+	var best_d := radius
+
+	for point in waypoints:
+		if not is_instance_valid(point):
+			continue
+
+		var node := point as Node3D
+		var instance: Variant = point.get("instance")
+
+		if instance == null or (instance as DotPropInstance).owner_id != owner:
+			continue
+
+		var d := node.global_position.distance_to(at)
+
+		if d < best_d:
+			best_d = d
+			best = node
+
+	return best
+
 
 func register_armed_npc(entity: Node) -> void:
 	if not armed_npcs.has(entity):

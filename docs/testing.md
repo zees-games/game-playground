@@ -6,7 +6,7 @@ The family rules on suites (both counters, read stderr, cap every run, re-import
 
 | Suite | What it is |
 | --- | --- |
-| `headless_playground` | **the point of the repository**: boots the whole game, drives bots down every route, files and ranks runs, spawns props and entities, clicks a real spawn menu, fires weapons, changes the map under all of it, and drives the real client's frame hooks |
+| `headless_playground` | **the point of the repository**: boots the whole game, drives bots down every route, files and ranks runs, spawns props and entities, clicks a real spawn menu, fires weapons, changes the map under all of it, and drives the real client's frame hooks; includes the addons hook (against a scratch folder and the real natural-disasters adapter) and the waypoint and NPC spawner tools |
 | `headless_net` | a server and a client in one process over a real link: prediction, mirrors, the bag, vehicles, weapons, chat through the real router, and no engine error over the whole run (an `EngineErrors` logger: two minigames' suites printed `!is_inside_tree()` from a toy pulled after a mid-tick rebuild, green) |
 | `dedicated` | a real `DotServer`, the module and its console commands; exits clean |
 | `headless_presentation` | the presentation layer, settings round trip, effects, the HTTP party |

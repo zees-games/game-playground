@@ -24,6 +24,7 @@ const PlaygroundWeapons := preload("../game/playground_weapons.gd")
 const PlaygroundZee := preload("../game/playground_zee.gd")
 const PlaygroundProjectiles := preload("../game/playground_projectiles.gd")
 const PlaygroundEvents := preload("../game/net/playground_events.gd")
+const PlaygroundAddons := preload("../game/playground_addons.gd")
 const PlaygroundMaterials := preload("../game/playground_materials.gd")
 const ToolPhysprop := preload("../game/toolgun/tool_physprop.gd")
 const PlaygroundLimits := preload("../game/playground_limits.gd")
@@ -60,13 +61,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 944
+const CHECKS := 978
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 51
+const SECTIONS := 52
 
 var _passed := 0
 var _failed := 0
@@ -138,6 +139,7 @@ func _run() -> void:
 	await _test_limits_per_kind()
 	await _test_the_tool_gun()
 	await _test_armed_npcs()
+	await _test_addon_hook_and_npc_tools()
 	await _test_grenades()
 	await _test_spawn_menu()
 	await _test_the_sandbox_and_its_course()
@@ -2894,6 +2896,205 @@ func _test_armed_npcs() -> void:
 		"a weapon put on the ground counts against the weapons limit")
 
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	_done()
+
+
+## A tool gun press at the ground under (x, z), from above: the waypoint and spawner tools
+## work on a point in the world, not on a prop.
+func _tool_at_ground(gun: Object, x: float, z: float, button: StringName) -> DotResult:
+	await get_tree().physics_frame
+	var space := playground.world.get_world_3d().direct_space_state
+	return gun.call(button, space, Vector3(x, 4.0, z), Vector3.DOWN)
+
+
+func _write_fake_addon(root: String, name: String, hook_source: String) -> void:
+	DirAccess.make_dir_recursive_absolute("%s/%s" % [root, name])
+	if hook_source != "":
+		var file := FileAccess.open("%s/%s/playground_hook.gd" % [root, name], FileAccess.WRITE)
+		file.store_string(hook_source)
+		file.close()
+	else:
+		var file := FileAccess.open("%s/%s/other.gd" % [root, name], FileAccess.WRITE)
+		file.store_string("extends Node\nfunc _init() -> void:\n\tprint('SHOULD NOT RUN')\n")
+		file.close()
+
+
+## The addons folder hook, then the waypoint and NPC spawner tools. See [PlaygroundAddons].
+func _test_addon_hook_and_npc_tools() -> void:
+	_section("the addons hook, waypoints and the NPC spawner")
+	await _sandbox_floor()
+
+	# --- The hook, against a scratch folder shaped like res://addons ------------------------------
+	var root := "user://pg_addon_scratch"
+	var hooked := """extends Node
+var got: Array = []
+func playground_register(menu) -> void:
+	menu.add_item("hello", "Say hello", func(ctx): ctx.send({"hi": 1}), "Greetings", "hint")
+	menu.add_item("hello", "again", func(_ctx): pass)
+func playground_receive(msg: Dictionary) -> void:
+	got.append(msg)
+"""
+	_write_fake_addon(root, "fake_with_hook", hooked)
+	_write_fake_addon(root, "fake_plain", "")
+	_write_fake_addon(root, "fake_broken", "extends Node\nfunc nothing() -> void:\n\tpass\n")
+	var broken_file := FileAccess.open("%s/fake_broken/playground_hook.gd" % root, FileAccess.WRITE)
+	broken_file.store_string("extends Node\nfunc nothing() -> void:\n\tpass\n")
+	broken_file.close()
+
+	var addons := PlaygroundAddons.new()
+	var host := Node3D.new()
+	add_child(host)
+	var count := addons.scan(host, true, root)
+	_check(count == 1 and addons.hook_count() == 1, "one folder with a hook is loaded", str(count))
+	_check(addons.skipped().has("fake_plain") and not addons.skipped().has("fake_with_hook"),
+		"a folder without one is passed over, and its scripts never run")
+	_check(addons.items().size() == 1 and addons.items()[0].key() == "fake_with_hook/hello",
+		"the hook's item is registered, and a duplicate id is refused")
+	_check(addons.describe_items()[0]["category"] == "Greetings", "with its category for the menu")
+
+	var told: Array = []
+	addons.message.connect(func(addon: String, body: Dictionary) -> void: told.append([addon, body]))
+	var ctx := PlaygroundAddons.Context.new()
+	_check(addons.activate("fake_with_hook/hello", ctx).ok, "choosing the entry runs its callback")
+	_check(told.size() == 1 and told[0][0] == "fake_with_hook" and int(told[0][1]["hi"]) == 1,
+		"what the callback sends reaches the clients' bridge")
+	_check(addons.deliver("fake_with_hook", {"x": 2}) and host.get_child(0).get("got").size() == 1,
+		"and on a client the hook's own receive is handed it")
+	_check(not addons.activate("nope/nothing", ctx).ok, "an unknown entry is refused")
+	_check(not addons.deliver("fake_plain", {}), "and a message for an addon with no hook goes nowhere")
+
+	var wire := PlaygroundEvents.write_addon("fake_with_hook", {"x": 2})
+	var back := PlaygroundEvents.read_addon(DotNetReader.new(wire))
+	_check(bool(back["ok"]) and back["addon"] == "fake_with_hook" and int(back["body"]["x"]) == 2,
+		"an addon message survives the wire")
+	_check(preload("../game/net/playground_event.gd").fits(), "and every event kind still fits its field")
+	host.queue_free()
+
+	# --- The real folder: dot_core has no hook, natural-disasters has an adapter -------------------
+	_check(playground.addons != null and playground.addons.skipped().has("dot_core"),
+		"the game scanned the real addons folder, and the libraries in it were left alone")
+	var tornado: Object = playground.addons.find("pg_natural_disasters/tornado")
+
+	if tornado == null:
+		print("  skip  natural-disasters is not linked in addons/")
+	else:
+		_check(playground.addons.find("pg_natural_disasters/earthquake") != null
+			and playground.addons.find("pg_natural_disasters/thunderstorm") != null,
+			"the disasters are menu entries")
+		var told_everyone: Array = []
+		playground.addon_message.connect(func(a: String, b: Dictionary) -> void: told_everyone.append(a))
+		var started := playground.activate_addon_item("pg_natural_disasters/tornado", 0, Vector3(30, 0, 30))
+		_check(started.ok, "choosing Tornado starts one", started.error.message if not started.ok else "")
+		var hook: Node = playground.find_child("Addon_pg_natural_disasters", true, false)
+		_check(hook != null and bool(hook.manager.call("is_active", &"tornado")), "and it is running")
+		_check(not told_everyone.is_empty(), "and every client is told")
+		hook.manager.call("stop")
+
+	# --- The waypoint tool ------------------------------------------------------------------------
+	var def := playground.weapon_def(&"toolgun")
+	var gun := PlaygroundWeapons.make(def)
+	gun.equip(playground, def)
+	gun.wielder = &"bot"
+	var points_before: int = playground.waypoints.size()
+	_check(gun.call("set_mode", &"waypoint", {"chain": true}).ok, "the tool gun takes the waypoint tool")
+	var first: DotResult = await _tool_at_ground(gun, 20.0, 20.0, &"primary")
+	var second: DotResult = await _tool_at_ground(gun, 28.0, 20.0, &"primary")
+	_check(first.ok and second.ok and playground.waypoints.size() == points_before + 2,
+		"two points are laid", str(playground.waypoints.size()))
+
+	if first.ok and second.ok:
+		var a: Node = first.value
+		var b: Node = second.value
+		_check(a.links.has(b) and b.links.has(a), "and linked, both ways, because the second chained to the last")
+		_check(not (a.get("ropes") as Array).is_empty(), "with a rope between them for every client to draw")
+		var third: DotResult = await _tool_at_ground(gun, 28.0, 28.0, &"primary")
+		_check(third.ok and third.value.links.has(b), "a third chains on from the second")
+		playground.props.remove((a.get("instance") as DotPropInstance).instance_id)
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		_check(not b.links.has(a), "removing a point unlinks its neighbours")
+
+	var cleared: DotResult = await _tool_at_ground(gun, 0.0, 0.0, &"reload")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(cleared.ok and playground.waypoints.size() == points_before, "reload removes my points")
+
+	# --- A route is walked --------------------------------------------------------------------------
+	var route: Array = []
+	var last: Node = null
+	for x in [-10.0, 10.0]:
+		var laid: DotResult = await _tool_at_ground(gun, x, -20.0, &"primary")
+		if laid.ok:
+			route.append(laid.value)
+	_check(route.size() == 2 and route[0].links.has(route[1]), "a patrol route of two points")
+	var walker := playground.props.spawn(&"npc_wanderer", &"bot", Vector3(-10, 1.0, -20))
+	await get_tree().physics_frame
+	var start: Vector3 = (walker.node as Node3D).global_position if walker != null else Vector3.ZERO
+	var far := 0.0
+	for i in 128 * 12:
+		await get_tree().physics_frame
+		if walker == null or not is_instance_valid(walker.node):
+			break
+		far = maxf(far, (walker.node as Node3D).global_position.distance_to(start))
+		if far > 8.0:
+			break
+	_check(far > 8.0, "an NPC with a route walks it", "%.1f m from the start" % far)
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	await get_tree().physics_frame
+
+	# --- The NPC spawner tool -----------------------------------------------------------------------
+	_check(gun.call("set_mode", &"npc_spawn", {"kind": "npc_soldier", "weapon": "zee_shotgun", "count": 2.0}).ok,
+		"the tool gun takes the NPC spawner")
+	var squad: DotResult = await _tool_at_ground(gun, 40.0, 0.0, &"primary")
+	_check(squad.ok and int(squad.value) == 2, "a click spawns two NPCs")
+	var armed := 0
+	for entity in playground.armed_npcs:
+		if is_instance_valid(entity) and String(entity.get("weapon_id")) == "zee_shotgun":
+			armed += 1
+	_check(armed == 2, "each carrying the weapon the tool was set to", str(armed))
+
+	# Tool-spawned NPCs shoot: an enemy of theirs a few metres off, and they fire.
+	_check(gun.call("set_mode", &"npc_spawn", {"kind": "npc_rebel", "weapon": "default", "count": 1.0}).ok, "and a rebel")
+	var _rebel: DotResult = await _tool_at_ground(gun, 40.0, -14.0, &"primary")
+	var fired := false
+	for i in 128 * 8:
+		await get_tree().physics_frame
+		for entity in playground.armed_npcs:
+			var rig: Variant = entity.get("zee_rig") if is_instance_valid(entity) else null
+			if rig != null and int((rig as ZeeWeaponRig).fire_seq) > 0:
+				fired = true
+		if fired:
+			break
+	_check(fired, "NPCs the tool spawned use their weapons")
+
+	# --- A spawn point ------------------------------------------------------------------------------
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	await get_tree().physics_frame
+	var _sp: Variant = gun.call("set_mode", &"npc_spawn", {
+		"kind": "npc_wanderer", "weapon": "none", "point": true, "interval": 1.0, "limit": 2.0,
+	})
+	var point_res: DotResult = await _tool_at_ground(gun, -40.0, 30.0, &"primary")
+	_check(point_res.ok and point_res.value.has_meta(&"spawn_point"), "a spawn point is laid")
+	var made := 0
+	for i in 128 * 10:
+		await get_tree().physics_frame
+		made = 0
+		for prop in playground.props.all_props():
+			if prop.def != null and String(prop.def.id) == "npc_wanderer":
+				made += 1
+		if made >= 2:
+			break
+	_check(made == 2, "and it keeps making NPCs, up to its limit", str(made))
+	for i in 128 * 3:
+		await get_tree().physics_frame
+	made = 0
+	for prop in playground.props.all_props():
+		if prop.def != null and String(prop.def.id) == "npc_wanderer":
+			made += 1
+	_check(made == 2, "and stops there")
+
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	DirAccess.remove_absolute("%s/fake_with_hook/playground_hook.gd" % root)
 	_done()
 
 

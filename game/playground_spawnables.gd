@@ -304,6 +304,8 @@ static func catalogue() -> DotPropCatalogue:
 		out.add(_vehicle_prop(vehicle))
 
 	out.add(_balloon())
+	out.add(_waypoint())
+	out.add(_spawn_point())
 	out.add(_debris())
 
 	for machine in _machines():
@@ -390,6 +392,47 @@ static func _balloon() -> DotPropDef:
 		"shape": "sphere",
 		"extent": [1.0, 1.0, 1.0],
 		"colour": "e05252",
+		"hidden": true,
+	}
+	return def
+
+
+## A patrol waypoint, as the waypoint tool lays them. Hidden from the menu (the tool is how
+## one is placed) and counted against `waypoints`, so a patrol cannot eat the NPC allowance.
+static func _waypoint() -> DotPropDef:
+	var def := DotPropDef.make(&"waypoint", SCENE_ENTITY)
+	def.display_name = "Waypoint"
+	def.category = &"tools"
+	def.limit_group = &"waypoints"
+	def.mass = 5.0
+	def.cost = 0
+	def.size = DotPropDef.Size.SMALL
+	def.meta = {
+		"kind": "entity",
+		"script": PlaygroundPaths.rebase("res://game/entities/waypoint.gd"),
+		"shape": "box",
+		"extent": [0.9, 0.12, 0.9],
+		"colour": "36d1e0",
+		"hidden": true,
+	}
+	return def
+
+
+## An NPC spawn point, as the spawner tool lays them. Hidden and counted against `spawners`.
+static func _spawn_point() -> DotPropDef:
+	var def := DotPropDef.make(&"spawn_point", SCENE_ENTITY)
+	def.display_name = "NPC spawn point"
+	def.category = &"tools"
+	def.limit_group = &"spawners"
+	def.mass = 5.0
+	def.cost = 0
+	def.size = DotPropDef.Size.SMALL
+	def.meta = {
+		"kind": "entity",
+		"script": PlaygroundPaths.rebase("res://game/entities/spawn_point.gd"),
+		"shape": "box",
+		"extent": [1.2, 0.12, 1.2],
+		"colour": "e0a436",
 		"hidden": true,
 	}
 	return def

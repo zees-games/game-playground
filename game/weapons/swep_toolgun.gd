@@ -34,12 +34,14 @@ const ToolPhysprop := preload("../toolgun/tool_physprop.gd")
 const ToolNpcWeapon := preload("../toolgun/tool_npc_weapon.gd")
 const ToolWire := preload("../toolgun/tool_wire.gd")
 const ToolEdit := preload("../toolgun/tool_edit.gd")
+const ToolWaypoint := preload("../toolgun/tool_waypoint.gd")
+const ToolNpcSpawn := preload("../toolgun/tool_npc_spawn.gd")
 const PlaygroundLimits := preload("../playground_limits.gd")
 
 ## Every mode, in the order the menu shows them.
 const MODES := [
 	ToolResize, ToolColour, ToolRemover, ToolWeld, ToolNocollide, ToolRope,
-	ToolBalloon, ToolPhysprop, ToolNpcWeapon, ToolWire, ToolEdit,
+	ToolBalloon, ToolPhysprop, ToolNpcWeapon, ToolWaypoint, ToolNpcSpawn, ToolWire, ToolEdit,
 ]
 
 ## The balloon this gun ties on. Hidden from the menu: a balloon is the tool's, not a prop.
