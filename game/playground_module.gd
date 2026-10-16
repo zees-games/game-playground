@@ -1209,7 +1209,9 @@ func _on_client_spawn(event: DotEvent) -> void:
 	# Through the bridge, not through the game: the bridge is what builds the entity
 	# that replicates them and announces the join. game.add_player alone would put a
 	# player in the world that no client is ever told about.
-	var added := bridge.add_player(session.peer_id, session.userid, session.label())
+	var added := bridge.add_player(
+		session.peer_id, session.userid, session.label(), _record_key_for(session)
+	)
 
 	if not added.ok:
 		log_warn("could not add a player", {
@@ -1376,6 +1378,18 @@ func _player_id(session: DotClientSession) -> StringName:
 	return StringName("u%d" % session.userid)
 
 
+## The key this seat's records and board rows are filed under: the account's uid (a guest's
+## is per device), never the session's userid, which is a server-local counter that restarts
+## at 1. Empty when the session has no identity, and then the seat is known by its userid, a
+## key [method Playground.is_legacy_key] reads as unranked.
+func _record_key_for(session: DotClientSession) -> StringName:
+	var uid := session.uid()
+	if uid == "":
+		log_warn("a session has no identity; its runs are not ranked", {"userid": session.userid})
+		return &""
+	return StringName(uid)
+
+
 # --- Helpers ---------------------------------------------------------------
 
 ## The player a command is about: a named one for an admin, otherwise the caller.
@@ -1419,7 +1433,7 @@ func _painter_for(id: StringName) -> DotTimerZonePainter:
 
 func _cmd_timer(ctx: DotCmdContext) -> void:
 	var id := _target(ctx)
-	var run := game.timers.run_for(id)
+	var run := game.timers.run_for(game.record_key(id))
 
 	if run == null:
 		ctx.reply("No timer for %s." % String(id))
@@ -1476,7 +1490,7 @@ func _cmd_track(ctx: DotCmdContext) -> void:
 		return
 
 	if ctx.args.is_empty():
-		ctx.reply("Track: %s" % DotTimerTrack.name_of(game.timers.timer_for(id).track))
+		ctx.reply("Track: %s" % DotTimerTrack.name_of(game.timers.timer_for(game.record_key(id)).track))
 		return
 
 	var track := DotTimerTrack.parse(" ".join(Array(ctx.args)))
@@ -1488,7 +1502,7 @@ func _cmd_track(ctx: DotCmdContext) -> void:
 		ctx.reply("No such track: %s" % " ".join(Array(ctx.args)))
 		return
 
-	if not game.timers.set_player_track(id, track):
+	if not game.timers.set_player_track(game.record_key(id), track):
 		ctx.reply("Already on %s." % DotTimerTrack.name_of(track))
 		return
 
@@ -1502,7 +1516,7 @@ func _cmd_top(ctx: DotCmdContext) -> void:
 		return
 
 	var id := _target(ctx, false)
-	var timer := game.timers.timer_for(id)
+	var timer := game.timers.timer_for(game.record_key(id))
 
 	var track := timer.track if timer != null else DotTimerTrack.MAIN
 	var style: StringName = (
@@ -1545,7 +1559,7 @@ func _cmd_checkpoint(ctx: DotCmdContext) -> void:
 		ctx.reply("Only a player has checkpoints.")
 		return
 
-	var checkpoints := game.timers.checkpoints_for(player.player_id)
+	var checkpoints := game.timers.checkpoints_for(game.record_key(player.player_id))
 	var state := player.controller.state
 
 	var saved := checkpoints.save(
@@ -1567,7 +1581,7 @@ func _cmd_teleport(ctx: DotCmdContext) -> void:
 		ctx.reply("Only a player has checkpoints.")
 		return
 
-	var checkpoints := game.timers.checkpoints_for(player.player_id)
+	var checkpoints := game.timers.checkpoints_for(game.record_key(player.player_id))
 
 	if ctx.args.size() > 0 and ctx.args[0].is_valid_int():
 		checkpoints.index = clampi(
@@ -1598,7 +1612,7 @@ func _cmd_checkpoint_clear(ctx: DotCmdContext) -> void:
 		ctx.reply("Only a player has checkpoints.")
 		return
 
-	game.timers.checkpoints_for(player.player_id).clear()
+	game.timers.checkpoints_for(game.record_key(player.player_id)).clear()
 	ctx.reply("Checkpoints cleared. The current run is still flagged.")
 
 

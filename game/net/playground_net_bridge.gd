@@ -432,7 +432,9 @@ func refresh_skins(session_id: int) -> void:
 	_broadcast(PlaygroundEvents.Kind.JOIN, _join_body(session_id))
 
 
-func add_player(peer_id: int, session_id: int, display_name: String) -> DotResult:
+func add_player(
+	peer_id: int, session_id: int, display_name: String, record_key: StringName = &""
+) -> DotResult:
 	if net == null or not net.is_server:
 		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only the server adds players.")
 
@@ -445,7 +447,7 @@ func add_player(peer_id: int, session_id: int, display_name: String) -> DotResul
 	# add_player emits player_added, which _on_player_added answers by building the
 	# entity and announcing the JOIN. The peer mapping is set FIRST so that handler
 	# can find the peer this player belongs to.
-	var player := game.add_player(id, display_name)
+	var player := game.add_player(id, display_name, record_key)
 
 	if player == null:
 		_player_of_peer.erase(peer_id)
@@ -1368,11 +1370,11 @@ func toy_count() -> int:
 
 
 func _on_run_changed(id: StringName, _run: DotTimerRun) -> void:
-	_send_timer(session_of(id))
+	_send_timer(session_of(game.match_id(id)))
 
 
 func _on_run_stopped(id: StringName, _run: DotTimerRun, _reason: StringName) -> void:
-	_send_timer(session_of(id))
+	_send_timer(session_of(game.match_id(id)))
 
 
 func _send_timer(session_id: int) -> void:
@@ -1916,7 +1918,7 @@ func _select_tool(session_id: int, id: StringName, tool_id: StringName) -> void:
 
 func _checkpoint(id: StringName, action: int) -> void:
 	var player: PlaygroundPlayer = game.players.get(id)
-	var checkpoints := game.timers.checkpoints_for(id)
+	var checkpoints := game.timers.checkpoints_for(game.record_key(id))
 	if player == null or checkpoints == null:
 		return
 

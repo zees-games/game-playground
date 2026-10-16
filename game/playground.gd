@@ -432,6 +432,9 @@ func _ready() -> void:
 	_build_player_stack()
 	_build_addons()
 
+	if authoritative:
+		await retire_legacy_records()
+
 	# Physics ticks drive everything. Not _process: a timer sampled per frame counts
 	# a different number of ticks on a 144 Hz monitor than on a 60 Hz one, and the
 	# player's time then depends on their hardware.
@@ -620,7 +623,7 @@ func _simulate_tick(step: float) -> void:
 		player.fill_sample(sample)
 
 		timers.tick_player(
-			id,
+			record_key(id),
 			sample.position,
 			sample.velocity,
 			sample.grounded,
@@ -668,7 +671,7 @@ func tick_timers_only(tick: int) -> void:
 		player.fill_sample(sample)
 
 		timers.tick_player(
-			id,
+			record_key(id),
 			sample.position,
 			sample.velocity,
 			sample.grounded,
@@ -2139,10 +2142,124 @@ func rescan_props() -> PackedStringArray:
 
 # --- Players ---------------------------------------------------------------
 
-## Adds a player and puts them on the current map's spawn.
-func add_player(id: StringName, display_name: String) -> PlaygroundPlayer:
+## match id -> record key, for the players who have one. See [method record_key].
+var _record_keys: Dictionary = {}
+## record key -> match id, the other way, for what the timer manager reports back.
+var _match_ids: Dictionary = {}
+
+
+## The key the timers, the records and the boards know a player by.
+##
+## [b]Not the match id.[/b] The match id (`u<userid>`) is dot-server's sequential,
+## server-local counter: it names a seat for the length of one connection, and the same
+## account reconnecting is a new number (and a restarted server hands the old numbers to
+## strangers). A record keyed by it was a different runner at every connection and could
+## be inherited. The key is the account's `session.uid()` (a guest's is per device), given
+## to [method add_player]. A player added without one (a solo game, a client's copy, a
+## test) is known by the match id, which is then also the key. A display name is never a key.
+func record_key(id: StringName) -> StringName:
+	return _record_keys.get(id, id)
+
+
+## The match id a timer-manager key belongs to; the key itself when none does.
+func match_id(key: StringName) -> StringName:
+	return _match_ids.get(key, key)
+
+
+## True for a key that is a server-local session number (`u<digits>`): the keying records
+## carried before they were keyed by account. See [method retire_legacy_records].
+static func is_legacy_key(key: StringName) -> bool:
+	var text := String(key)
+	return text.length() > 1 and text.begins_with("u") and text.substr(1).is_valid_int() and not text.contains("-")
+
+
+func _claim_record_key(id: StringName, key: StringName) -> void:
+	if key == &"" or key == id:
+		return
+	if _match_ids.has(key) and _match_ids[key] != id:
+		# The same account twice at once would share one timer, and the second seat's
+		# runs would be filed under the first's. It keeps its match id as its key: a
+		# legacy-shaped key, which is never ranked.
+		DotLog.warn(CHANNEL, "an account is already playing; this seat has no records", {
+			"player": String(id), "key": String(key),
+		})
+		return
+	_record_keys[id] = key
+	_match_ids[key] = id
+
+
+func _release_record_key(id: StringName) -> void:
+	var key: StringName = _record_keys.get(id, &"")
+	_record_keys.erase(id)
+	if key != &"":
+		_match_ids.erase(key)
+
+
+## Moves aside every record filed under a [method is_legacy_key] player.
+##
+## Before records were keyed by account they were keyed by the session's `u<userid>`, a
+## server-local counter. Such a row cannot be mapped back to an account (the number was
+## reused after every restart, so even "the same u12" is not one person), and left in
+## place it ranks a stranger's time as a runner who can never be reached again and lets a
+## new seat that draws the same number inherit it. So the rows are written to
+## `legacy_records.jsonl` (in [member PlaygroundConfig.records_directory], else `user://`)
+## and then removed with [method DotTimerManager.wipe_player], which re-scores every board
+## and total they touched. Nothing is deleted before it is written. Idempotent. Returns
+## how many rows were moved.
+func retire_legacy_records() -> int:
+	if not authoritative or timers == null or timers.store == null:
+		return 0
+	var store := timers.store
+	var listed: DotResult = await store.maps()
+	if not listed.ok:
+		return 0
+	var legacy := {}
+	for row in (listed.value as Array):
+		var on_map: DotResult = await store.records_on_map(StringName(str((row as Dictionary).get("map", ""))))
+		if not on_map.ok:
+			continue
+		for record in (on_map.value as Array):
+			if is_legacy_key((record as DotTimerRecord).player_id):
+				legacy[(record as DotTimerRecord).player_id] = true
+	if legacy.is_empty():
+		return 0
+
+	var base := config.records_directory.strip_edges()
+	var path := (base if base != "" else "user://").path_join("legacy_records.jsonl")
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var out := FileAccess.open(path, FileAccess.READ_WRITE if FileAccess.file_exists(path) else FileAccess.WRITE)
+	if out == null:
+		DotLog.error(CHANNEL, "legacy records could not be archived; they stay where they are", {
+			"path": path, "why": error_string(FileAccess.get_open_error()),
+		})
+		return 0
+	out.seek_end()
+
+	var moved := 0
+	for key in legacy:
+		var theirs: DotResult = await store.records_of(key, {"stage": -1})
+		if not theirs.ok:
+			continue
+		for record in (theirs.value as Array):
+			out.store_line(JSON.stringify((record as DotTimerRecord).to_dictionary()))
+		out.flush()
+		var wiped: DotResult = await timers.wipe_player(key)
+		if wiped.ok:
+			moved += int(wiped.value)
+	out.close()
+	DotLog.info(CHANNEL, "records keyed by a session number were moved aside", {
+		"players": legacy.size(), "records": moved, "archive": path,
+	})
+	return moved
+
+
+## Adds a player and puts them on the current map's spawn. [param p_record_key] is the
+## account uid the player's records are filed under; see [method record_key].
+func add_player(id: StringName, display_name: String, p_record_key: StringName = &"") -> PlaygroundPlayer:
 	if players.has(id):
 		return players[id]
+
+	_claim_record_key(id, p_record_key)
 
 	var player := PlaygroundPlayer.new()
 	player.name = "Player_" + String(id)
@@ -2153,14 +2270,14 @@ func add_player(id: StringName, display_name: String) -> PlaygroundPlayer:
 
 	add_child(player)
 
-	var added := timers.add_player(id, display_name)
+	var added := timers.add_player(record_key(id), display_name)
 
 	if not added.ok:
 		DotLog.warn(CHANNEL, "could not give a player a timer", {
 			"player": String(id), "why": added.error.message
 		})
 
-	player.timer = timers.timer_for(id)
+	player.timer = timers.timer_for(record_key(id))
 	player.carry = carry
 	player.carry_enabled_fn = func() -> bool: return config == null or config.prop_surfing
 	# The map's toys: the trampolines and pads that throw them, the roundabout that carries
@@ -2288,12 +2405,13 @@ func remove_player(id: StringName) -> void:
 	# The prop spawner first: it may free nodes, and doing it after the player's own
 	# teardown means a physics gun holding one of them is already gone.
 	props.player_left(id)
-	timers.remove_player(id)
+	timers.remove_player(record_key(id))
 
 	(players[id] as PlaygroundPlayer).queue_free()
 
 	players.erase(id)
 	_samples.erase(id)
+	_release_record_key(id)
 
 
 ## Puts a player at the current map's spawn for their track.
@@ -3172,7 +3290,8 @@ func rock_the_vote(player_id: StringName) -> bool:
 
 # --- Timer events ----------------------------------------------------------
 
-func _on_effect_requested(player_id: StringName, zone: DotTimerZone) -> void:
+func _on_effect_requested(timer_key: StringName, zone: DotTimerZone) -> void:
+	var player_id := match_id(timer_key)
 	var player: PlaygroundPlayer = players.get(player_id)
 
 	if player == null:
@@ -3200,15 +3319,15 @@ func _on_effect_requested(player_id: StringName, zone: DotTimerZone) -> void:
 ## directly off the timer inside `PlaygroundPlayer._on_simulated`, because they change
 ## where the player ends up and so have to be applied on the tick rather than when a
 ## signal arrives.
-func _on_player_finished(player_id: StringName, run: DotTimerRun) -> void:
-	var player: PlaygroundPlayer = players.get(player_id)
+func _on_player_finished(timer_key: StringName, run: DotTimerRun) -> void:
+	var player: PlaygroundPlayer = players.get(match_id(timer_key))
 
 	if player == null:
 		return
 
 	# The movement statistics belong to the controller and the run belongs to the
 	# timer, and this is the one place they meet.
-	timers.note_stats(player_id, player.controller.stats.to_dictionary())
+	timers.note_stats(timer_key, player.controller.stats.to_dictionary())
 	player.controller.stats.reset()
 
 	player.finished.emit(run)
@@ -3223,11 +3342,17 @@ func _on_record_accepted(
 		"style": String(record.style_id),
 	}
 
-	await boards.submit(
-		&"fastest", scope, record.player_id, record.player_name, record.time
-	)
+	# A seat with no account (no identity, or the account already playing) keeps its session
+	# number as its key, and a session number is nobody: its time stands for this process
+	# only and is moved aside at the next start, so the boards never get a row for it.
+	var ranked := not is_legacy_key(record.player_id)
 
-	if record.stats.has("max_speed"):
+	if ranked:
+		await boards.submit(
+			&"fastest", scope, record.player_id, record.player_name, record.time
+		)
+
+	if ranked and record.stats.has("max_speed"):
 		await boards.submit(
 			&"top_speed", scope, record.player_id, record.player_name,
 			float(record.stats["max_speed"])
@@ -3240,10 +3365,11 @@ func _on_record_accepted(
 	totals.add(&"points", record.points)
 	totals.add(&"completions", 1.0)
 
-	await boards.add_stats(record.player_id, totals)
-	await boards.publish_stat(
-		&"points", {}, record.player_id, record.player_name, &"points"
-	)
+	if ranked:
+		await boards.add_stats(record.player_id, totals)
+		await boards.publish_stat(
+			&"points", {}, record.player_id, record.player_name, &"points"
+		)
 
 	# The player may have left between finishing and the record reaching the store —
 	# every `await` above is a chance for it, and a disconnect during the write is
@@ -3253,12 +3379,13 @@ func _on_record_accepted(
 	if who == null:
 		return
 
-	run_filed.emit(record.player_id, who.last_finished, rank, "")
+	run_filed.emit(match_id(record.player_id), who.last_finished, rank, "")
 
 
 func _on_record_refused(
-	player_id: StringName, run: DotTimerRun, reason: String
+	timer_key: StringName, run: DotTimerRun, reason: String
 ) -> void:
+	var player_id := match_id(timer_key)
 	# Reported rather than swallowed. "I finished and nothing happened" is the
 	# commonest complaint on a timer server and the reason is almost always one the
 	# player could have been told.
