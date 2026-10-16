@@ -1,0 +1,12 @@
+Low-poly real-world guns, converted to glTF (muzzle on -Z, origin at the bounding-box centre, scaled, magazines split off where the source had them).
+
+Quaternius, "Ultimate Low Poly Guns Pack" (sub-machine guns, assault rifles, bullpup, shotguns, sniper rifles, revolvers)
+  https://opengameart.org/content/low-poly-guns-pack  (also https://quaternius.itch.io/50-lowpoly-guns)
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+  Used: SubmachineGun_2, SubmachineGun_4, AssaultRifle2_1, AssaultRifle2_4, AssaultRifle_2, AssaultRifle_4, Bullpup_3, Shotgun_1, SniperRifle_3, SniperRifle_4, Revolver_1
+
+Khairul Hidayat, "Low Poly Rocket Launcher" (launcher.glb: tube and loaded rocket joined)
+  https://opengameart.org/content/low-poly-rocket-launcher
+  Licence: listed CC0 on the page; the README in the download says MIT ("use it however you like"). Both are permissive; credited either way.
+
+Rounds (assets/ammo/): Kenney Weapon Pack, CC0, see assets/ammo/LICENSE-kenney-weapon-pack.txt.

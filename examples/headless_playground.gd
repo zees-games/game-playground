@@ -61,7 +61,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 1019
+const CHECKS := 1020
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -3627,6 +3627,11 @@ func _test_zee_weapons() -> void:
 	_section("zee-dot-weapons")
 
 	var zee := PlaygroundZee.defs()
+
+	# A delivered game has only what is vendored in assets/ (zee-dot-weapons tools/sync-art.sh).
+	var models := ZeeWeaponArtTable.validate_models()
+	_check(models.ok, "every model the weapon art table names is vendored",
+		"" if models.ok else models.error.message)
 
 	_check(zee.size() == ZeeWeaponIds.all().size(), "every weapon in the pack is offered",
 		"%d of %d" % [zee.size(), ZeeWeaponIds.all().size()])
