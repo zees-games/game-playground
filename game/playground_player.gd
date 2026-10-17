@@ -1,7 +1,6 @@
 extends CharacterBody3D
 
 const PlaygroundMaterials := preload("playground_materials.gd")
-const PlaygroundBeacon := preload("playground_beacon.gd")
 const PlaygroundCharacter := preload("playground_character.gd")
 
 ## One player: movement, view, the timer, and the tools.
@@ -171,7 +170,7 @@ var downed: bool = false
 
 ## The marker [member beacon] draws, while it does. Client side; built and freed by
 ## [method present_beacon], and never built on a server, which calls nothing that draws.
-var beacon_marker: PlaygroundBeacon = null
+var beacon_marker: DotFxBeacon = null
 
 ## Set by the world so the timer is ticked with the same clock the movement uses.
 ## [b]Assigned through, not just stored.[/b] The controller sizes its step from its own
@@ -1038,7 +1037,7 @@ func fill_sample(sample: DotTimerSample) -> void:
 ## caller that plays it is the one that asked.
 ##
 ## [param local_view] is whether this is the player whose eyes the camera is behind, which
-## hides the column (see [PlaygroundBeacon]).
+## hides the column (see [DotFxBeacon]).
 ##
 ## [b]Not hidden while dead, unlike the reference game's.[/b] Nothing on this node knows
 ## the arena killed it: a dead player here is a body standing where it fell until dot-match's
@@ -1055,8 +1054,16 @@ func present_beacon(delta: float, local_view: bool) -> bool:
 		return false
 
 	if beacon_marker == null:
-		beacon_marker = PlaygroundBeacon.new()
+		beacon_marker = DotFxBeacon.new()
 		beacon_marker.name = "Beacon"
+		# Red-orange, the colour nothing in a grey dev-textured sandbox is, and brighter than
+		# the warm props a player spawns. Ping off: the game plays its own catalogue ping
+		# (BEACON_SOUND) from advance()'s return, so the node's would be heard twice.
+		beacon_marker.colour = Color(1.0, 0.24, 0.14)
+		beacon_marker.ring_radius = 0.78
+		beacon_marker.column_height = 14.0
+		beacon_marker.column_base = 2.1
+		beacon_marker.ping_enabled = false
 		add_child(beacon_marker)
 
 	beacon_marker.local_view = local_view

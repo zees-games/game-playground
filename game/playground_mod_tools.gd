@@ -17,7 +17,7 @@ const PlaygroundPlayer := preload("playground_player.gd")
 ## Blind and beacon are the two that are about a SCREEN rather than a body, and each is one
 ## flag on [PlaygroundPlayer] that `PlaygroundPlayerNet` replicates — the blind to its owner
 ## alone, the beacon to everybody — and that the client draws: `PlaygroundHud` blacks the
-## owner's screen out, `PlaygroundBeacon` rings the player on every screen and pings. The
+## owner's screen out, `DotFxBeacon` rings the player on every screen and pings. The
 ## server decides; nothing about either is a client's to choose. Neither touches the timer:
 ## a blinded run is harder, not assisted, and a beacon is a thing other people see.
 ##

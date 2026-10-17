@@ -32,7 +32,7 @@ The files of [CLAUDE.md](../CLAUDE.md)'s layout, one by one.
 | `game/weapons/`, `game/toolgun/`, `playground_weapons.gd`, `playground_zee.gd`, `playground_projectiles.gd` | the toys, the tool gun's modes, zee-dot-weapons, grenades and rockets |
 | `game/playground_arena.gd`, `playground_waves.gd`, `playground_downs.gd`, `playground_shop.gd`, `playground_spectate.gd`, `playground_party.gd`, `playground_npc_world.gd` | the modes |
 | `game/playground_inventory.gd` | the bag |
-| `game/playground_client.gd`, `playground_hud.gd`, `playground_spawn_menu.gd`, `playground_icons.gd`, `playground_presentation.gd`, `playground_beacon.gd`, `playground_rope_view.gd`, `game/client/` | the client: not headless |
+| `game/playground_client.gd`, `playground_hud.gd`, `playground_spawn_menu.gd`, `playground_icons.gd`, `playground_presentation.gd`, `playground_rope_view.gd`, `game/client/` | the client: not headless |
 | `game/net/` | the dot-net bridge, link, per-kind net classes, events and requests, the bag's wire |
 | `game/playground_map.gd`, `playground_geometry.gd`, `playground_lighting.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building and the palette, each map's dot-lighting, the survey, materials, the generator |
 | `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (builds a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
