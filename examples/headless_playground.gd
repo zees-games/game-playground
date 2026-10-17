@@ -61,7 +61,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 1020
+const CHECKS := 1026
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -3988,6 +3988,38 @@ func _test_spawn_menu() -> void:
 		"and this game's servers are when one is",
 		listing.config.page_url(1) if listing != null else str(on.error)
 	)
+	# Where the site comes from when nobody passed a flag. Web: ?backbone= > page origin;
+	# native: argv > env > the exported default (argv over env is DotConfig.load_layered's
+	# order and cannot be injected here). Each result is also the one a reversed order
+	# would get wrong, so a swap fails a check.
+	OS.unset_environment(env_key)
+	var web_both := PlaygroundBrowser.resolve_default_site({
+		"web": true, "origin": "https://site.example", "query": "https://other.example"
+	})
+	_check(web_both == "https://other.example", "on the web ?backbone= beats the page origin", web_both)
+	var web_origin := PlaygroundBrowser.resolve_default_site({"web": true, "origin": "https://site.example", "query": ""})
+	_check(web_origin == "https://site.example", "and with no query the page's own origin is the site", web_origin)
+	var web_file := PlaygroundBrowser.resolve_default_site({"web": true, "origin": "null", "query": ""})
+	_check(web_file == "", "and a page with no usable origin lists no site", web_file)
+	var web_listing: DotResult = PlaygroundBrowser.site_listing({"web": true, "origin": "https://site.example", "query": ""})
+	_check(
+		web_listing.ok and web_listing.value != null
+			and web_listing.value.config.page_url(1).begins_with("https://site.example/api/content/server/list")
+			and web_listing.value.config.page_url(1).contains("app=playground"),
+		"so a web client lists its own site's servers without a flag"
+	)
+	var saved_default := PlaygroundBrowser.default_backbone_url
+	PlaygroundBrowser.default_backbone_url = "https://deploy.example"
+	var native_default := PlaygroundBrowser.resolve_default_site({"web": false, "origin": "https://site.example", "query": "https://other.example"})
+	_check(native_default == "https://deploy.example", "on native the exported default is used and the page is never asked", native_default)
+	OS.set_environment(env_key, "http://127.0.0.1:9")
+	var env_wins: DotResult = PlaygroundBrowser.site_listing({"web": false})
+	_check(
+		env_wins.ok and env_wins.value != null and env_wins.value.config.backbone_url == "http://127.0.0.1:9",
+		"and the environment beats that default",
+		str(env_wins.value.config.backbone_url) if env_wins.ok and env_wins.value != null else str(env_wins.error)
+	)
+	PlaygroundBrowser.default_backbone_url = saved_default
 	if had != "":
 		OS.set_environment(env_key, had)
 	else:

@@ -207,11 +207,43 @@ func _add_site_listing() -> void:
 		browser.add_source(made.value as DotBrowserSourceBackbone)
 
 
+## The site a deploy bakes in for native builds. Empty means a native client lists no site
+## unless `--browser-backbone-url` / `DOT_BROWSER_BACKBONE_URL` names one. Not a constant
+## public origin on purpose: no canonical public API origin exists in the family yet, and a
+## guess here would ship a LAN build that phones a website. A deploy sets it before the
+## browser opens.
+static var default_backbone_url: String = ""
+
+
+## Which site to list, before argv and environment get a say.
+##
+## [b]On the web the page's own origin[/b], because the site that serves the client also
+## answers the listing and same-origin sidesteps CORS; [code]?backbone=[/code] overrides it
+## for a client embedded somewhere else. Off the web it is [member default_backbone_url].
+## [param probe] stands in for the page in a suite: [code]web[/code], [code]origin[/code],
+## [code]query[/code]. The capability is asked of [DotPlatform], never the OS name.
+static func resolve_default_site(probe: Dictionary = {}) -> String:
+	var web: bool = probe.get("web", DotPlatform.is_web())
+	if not web:
+		return default_backbone_url
+
+	var query: String = probe.get("query", "") if probe.has("query") else DotWeb.query_param("backbone")
+	if query.strip_edges() != "":
+		return query.strip_edges()
+
+	var origin: String = probe.get("origin", "") if probe.has("origin") else DotWeb.origin()
+	# A page opened from a file or an opaque origin reports "null"; that is no site.
+	return origin if origin.begins_with("http") else default_backbone_url
+
+
 ## This game's site listing from the layered config, or [code]success(null)[/code] when no
-## site is configured. Static so a suite can ask without building the window.
-static func site_listing() -> DotResult:
+## site is configured. Order: [code]--browser-backbone-url[/code] > [code]DOT_BROWSER_BACKBONE_URL[/code]
+## > [method resolve_default_site] (web: [code]?backbone=[/code] > page origin; native: the
+## exported default). Static so a suite can ask without building the window.
+static func site_listing(probe: Dictionary = {}) -> DotResult:
 	var defaults := DotBrowserBackboneConfig.new()
 	defaults.app = SITE_APP
+	defaults.backbone_url = resolve_default_site(probe)
 
 	var made := DotBrowserSourceBackbone.from_config(defaults)
 	if not made.ok:
