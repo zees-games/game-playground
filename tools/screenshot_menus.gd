@@ -3,6 +3,7 @@ extends SceneTree
 const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
+const PlaygroundWorkshop := preload("../game/playground_workshop.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundWeapons := preload("../game/playground_weapons.gd")
 
@@ -22,6 +23,7 @@ const SETTLE := 3
 
 var _stack: DotScreenStack = null
 var _menu: PlaygroundSpawnMenu = null
+var _workshop: PlaygroundWorkshop = null
 var _presentation: PlaygroundPresentation = null
 var _game_menu: DotMenu = null
 var _shots: Array[Dictionary] = []
@@ -58,6 +60,19 @@ func _initialize() -> void:
 	menu.weapons = PlaygroundWeapons.built_in()
 	_stack.register(menu)
 	_menu = menu
+
+	# A subscribed weapon pack, as the solo client wires it: the real zee provides.json in a
+	# DotContentIndex, followed by the workshop adapter, so the tab is the one a player sees.
+	var zee_dir := ProjectSettings.globalize_path("res://").path_join("../zee-dot-weapons").simplify_path()
+	var zee_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string(zee_dir.path_join("provides.json")))
+	var index := DotContentIndex.new()
+	var _zee := index.add_pack({
+		"content_id": "gamemann/zee-dot-weapons", "version": "1.0.0", "prefix": zee_dir,
+		"session": "solo", "source": "subscription", "provides": zee_provides,
+	})
+	_workshop = PlaygroundWorkshop.new()
+	_workshop.follow(index, menu.catalogue, menu.weapons)
+	menu.set_pack_rows(_workshop.rows())
 
 	# The Escape menu the client builds (dot-menu's), over this game's own settings document,
 	# and its Tab board with a roster shaped like the one dot-server sends.
@@ -119,6 +134,8 @@ func _initialize() -> void:
 		{"id": &"game_menu", "file": "menu_controls.png", "page": &"controls"},
 		{"id": &"board", "file": "menu_scoreboard.png"},
 		# The console, open: DotConsoleKit's panel, on the layer it puts it on.
+		# The first pack tab, after Addons: zee's weapons grouped by the pack's own categories.
+		{"id": &"spawn_menu", "file": "menu_pack_weapons.png", "tab": PlaygroundSpawnMenu.Tab.size()},
 		{"id": &"console", "file": "console.png"},
 	]
 
@@ -151,6 +168,9 @@ func _process(_delta: float) -> bool:
 		_stack.clear()
 		if _game_menu != null:
 			_game_menu.close_all()
+			# The scoreboard is not one of close_all's pages: left open it drew over the
+			# next menu shot.
+			_game_menu.scoreboard.close()
 
 		var opened := _stack.push(StringName(shot["id"]))
 

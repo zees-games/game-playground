@@ -61,13 +61,13 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 1033
+const CHECKS := 1067
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 54
+const SECTIONS := 55
 
 var _passed := 0
 var _failed := 0
@@ -143,6 +143,7 @@ func _run() -> void:
 	await _test_addon_hook_and_npc_tools()
 	await _test_grenades()
 	await _test_spawn_menu()
+	await _test_workshop()
 	await _test_the_sandbox_and_its_course()
 	await _test_vehicles()
 	await _test_picking_players_up()
@@ -3747,6 +3748,192 @@ func _test_zee_weapons() -> void:
 	PlaygroundZee.disarm(player)
 
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	_done()
+
+
+## The Workshop in solo play: packs a player subscribed to land on the Q menu, only in solo.
+func _test_workshop() -> void:
+	_section("the workshop")
+
+	# The pack's files, written where a pack would be mounted: user://, which is not res://.
+	var root := "user://workshop_fixture"
+	DirAccess.make_dir_recursive_absolute(root.path_join("defs"))
+	var sidearm := PlaygroundZee.catalogue().get_def(&"pistol").duplicate() as DotWeaponDef
+	sidearm.id = &"fixture_sidearm"
+	sidearm.display_name = "Fixture Sidearm"
+	var crate := DotPropDef.make(&"fixture_crate", "res://game/prop.tscn")
+	crate.display_name = "Fixture Crate"
+	var npc := DotNpcDef.make(&"fixture_guard", "")
+	_check(ResourceSaver.save(sidearm, root + "/defs/sidearm.tres") == OK
+		and ResourceSaver.save(crate, root + "/defs/crate.tres") == OK
+		and ResourceSaver.save(npc, root + "/defs/guard.tres") == OK, "the fixture pack's definitions are written")
+
+	var provides := {
+		"schema": 1, "title": "Fixture Pack", "kinds": ["weapon", "prop", "npc"],
+		"categories": [{"id": "sidearm", "name": "Sidearms"}, {"id": "stuff", "name": "Stuff"}],
+		"entries": [
+			{"kind": "weapon", "id": "fixture_sidearm", "name": "Fixture Sidearm", "def": "defs/sidearm.tres", "slot": 2, "category": "sidearm"},
+			{"kind": "prop", "id": "fixture_crate", "name": "Fixture Crate", "def": "defs/crate.tres", "category": "stuff"},
+			{"kind": "npc", "id": "fixture_guard", "name": "Fixture Guard", "def": "defs/guard.tres", "category": "stuff"},
+		],
+	}
+	var index := DotContentIndex.new()
+	index.set_session(DotContentIndex.SESSION_SOLO)
+	var added := index.add_pack({
+		"content_id": "tmc/fixture-pack", "version": "1.0.0", "prefix": root,
+		"session": "solo", "source": "subscription", "provides": provides,
+	})
+	_check(added.ok, "the pack is in the index", "" if added.ok else added.error.message)
+
+	var own_weapons := playground.weapons.size()
+	var own_props := playground.props.catalogue.size()
+	var changes := [0]
+	playground.workshop_changed.connect(func() -> void: changes[0] += 1)
+	var shop := playground.follow_workshop(index)
+	_check(changes[0] == 1, "following announces what is already mounted", str(changes[0]))
+
+	var sidearm_def := playground.weapon_def(&"ws_fixture_sidearm")
+	_check(sidearm_def != null and sidearm_def.meta.get("pack_title") == "Fixture Pack",
+		"solo: the pack weapon is one of the game's weapons, labelled with its pack")
+	_check(playground.weapons.size() == own_weapons + 1, "and the game's own are untouched",
+		"%d -> %d" % [own_weapons, playground.weapons.size()])
+	_check(playground.props.catalogue.has(&"ws_fixture_crate"), "solo: the pack prop is in the prop catalogue")
+	var guard := playground.props.catalogue.get_prop(&"ws_fixture_guard")
+	_check(guard != null and PlaygroundSpawnables.kind_of(guard) == PlaygroundSpawnables.Kind.ENTITY
+		and guard.limit_group == &"npcs", "solo: the pack npc is an entity counted as an NPC")
+	_check(playground.props.catalogue.size() == own_props + 2, "and the game's own props are untouched")
+	_check(shop.rows().size() == 3, "three rows for the menu", str(shop.rows().size()))
+
+	# The menu: a tab per pack, the pack's items grouped by its categories, none on the built-in tabs.
+	var menu := PlaygroundSpawnMenu.new()
+	menu.catalogue = playground.props.catalogue
+	menu.weapons = playground.weapons
+	menu.set_pack_rows(shop.rows())
+	add_child(menu)
+	var stack := DotScreenStack.new()
+	add_child(stack)
+	var _ready_result := stack.setup()
+	var _registered := stack.register(menu)
+	var _pushed := stack.push(menu.screen_id())
+	await get_tree().process_frame
+
+	var pack_tab := PlaygroundSpawnMenu.Tab.size() as PlaygroundSpawnMenu.Tab
+	menu.show_tab(pack_tab)
+	await get_tree().process_frame
+	_check(menu.describe()["pack_tabs"] == ["Fixture Pack"] and menu.describe()["tab"] == "Fixture Pack",
+		"the menu has a tab for the pack", str(menu.describe()["pack_tabs"]))
+	_check(menu.shown().size() == 3 and menu.shown().has(&"ws_fixture_sidearm")
+		and menu.shown().has(&"ws_fixture_crate") and menu.shown().has(&"ws_fixture_guard"),
+		"holding its weapon, prop and npc", str(menu.shown()))
+	_check(menu.card_for(&"ws_fixture_sidearm") != null and menu.card_for(&"ws_fixture_sidearm").tooltip_text.contains("Fixture Pack"),
+		"each card says which pack it is from")
+	menu.show_tab(PlaygroundSpawnMenu.Tab.WEAPONS)
+	await get_tree().process_frame
+	_check(not menu.shown().has(&"ws_fixture_sidearm") and menu.shown().has(&"launcher"),
+		"the Weapons tab keeps only the game's own")
+	menu.show_tab(PlaygroundSpawnMenu.Tab.PROPS)
+	await get_tree().process_frame
+	_check(not menu.shown().has(&"ws_fixture_crate"), "and so does the Props tab")
+	menu.show_tab(PlaygroundSpawnMenu.Tab.ENTITIES)
+	await get_tree().process_frame
+	_check(not menu.shown().has(&"ws_fixture_guard"), "and the Entities tab")
+
+	# Spawning: the prop and the npc through the spawner, the weapon through a rig that fires.
+	var player: PlaygroundPlayer = playground.players[&"bot"]
+	playground.props.limits.spawn_interval = 0.0
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	player.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
+	await get_tree().physics_frame
+	var spawned_crate := playground.props.spawn(&"ws_fixture_crate", &"bot", player.eye_position() + player.aim_direction() * 3.0)
+	var spawned_guard := playground.props.spawn(&"ws_fixture_guard", &"bot", player.eye_position() + player.aim_direction() * 6.0)
+	await get_tree().physics_frame
+	_check(spawned_crate != null and spawned_crate.node != null, "the pack prop spawns")
+	_check(spawned_guard != null and spawned_guard.node != null
+		and str(spawned_guard.node.get_script().resource_path).ends_with("npc_wanderer.gd"),
+		"and the pack npc spawns running a script")
+
+	var rig := PlaygroundZee.arm(player, sidearm_def, ZeeWeaponRig.Role.SERVER, true,
+		playground.tick_rate, playground.current_tick())
+	_check(rig != null and rig.arsenal.catalogue.has(&"fixture_sidearm"),
+		"the pack weapon arms: the rig holds an id the built-in pack does not have")
+	var shots := 0
+	var state := player.controller.state
+	for i in range(120):
+		var held := DotFpsCommand.BUTTON_USER_0 if (i / 10) % 2 == 0 else 0
+		var outcome := rig.simulate_tick(
+			PlaygroundZee.command_for(held, state.yaw, state.pitch, PlaygroundZee.slot_of(rig)),
+			playground.current_tick() + i
+		) if rig != null else null
+		if outcome != null:
+			shots += outcome.shots.size()
+	_check(shots > 0, "and it fires", str(shots))
+	_check(PlaygroundZee.catalogue().has(&"fixture_sidearm") == false,
+		"without leaking into the table a server reads")
+	PlaygroundZee.disarm(player)
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+
+	# A pack mounted later arrives; a map pack lists on the map menu.
+	var before: int = changes[0]
+	var _late := index.add_pack({
+		"content_id": "tmc/fixture-maps", "version": "1.0.0", "prefix": "res://",
+		"session": "solo", "source": "subscription",
+		"provides": {"schema": 1, "title": "Fixture Maps", "kinds": ["map"], "entries": [
+			{"kind": "map", "id": "ws_lobby", "name": "Fixture Lobby", "scene": "maps/pg_lobby.tscn", "map_kind": "sandbox"},
+			{"kind": "map", "id": "ws_arena", "name": "Fixture Arena", "scene": "maps/pg_lobby.tscn", "map_kind": "arena"},
+		]},
+	})
+	_check(not playground.maps.catalogue.available().filter(func(m: DotMapDef) -> bool: return m.id == &"ws_lobby").is_empty(),
+		"solo: a sandbox map pack is on the map list")
+	_check(playground.maps.catalogue.available().filter(func(m: DotMapDef) -> bool: return m.id == &"ws_arena").is_empty(),
+		"and a map of a kind the game does not accept is not")
+	_check(changes[0] == before, "a pack with nothing for the menu does not redraw it")
+
+	# Online: all of it is gone, from every list, and comes back with solo. The pack's tab is
+	# the open one, so the fall back to Props is what is being checked.
+	menu.show_tab(PlaygroundSpawnMenu.Tab.size() as PlaygroundSpawnMenu.Tab)
+	index.set_session(DotContentIndex.SESSION_ONLINE)
+	_check(playground.weapon_def(&"ws_fixture_sidearm") == null and playground.weapons.size() == own_weapons,
+		"online: the pack weapon is not on the menu")
+	_check(not playground.props.catalogue.has(&"ws_fixture_crate") and not playground.props.catalogue.has(&"ws_fixture_guard")
+		and playground.props.catalogue.size() == own_props, "online: the pack props and npcs are gone")
+	_check(shop.rows().is_empty(), "online: no rows")
+	_check(playground.maps.catalogue.available().filter(func(m: DotMapDef) -> bool: return m.id == &"ws_lobby").is_empty(),
+		"online: the pack map is gone")
+	menu.set_pack_rows(shop.rows())
+	await get_tree().process_frame
+	_check(menu.describe()["pack_tabs"] == [] and menu.describe()["tab"] == "PROPS",
+		"online: the menu has no pack tab, and the one that was open fell back")
+	_check(changes[0] > before, "and the session change was announced")
+	index.set_session(DotContentIndex.SESSION_SOLO)
+	_check(playground.weapon_def(&"ws_fixture_sidearm") != null and playground.props.catalogue.has(&"ws_fixture_crate"),
+		"back in solo they return")
+
+	# The real zee pack, as a fixture of its own: all 27 weapons, grouped by its categories.
+	var zee_dir := ProjectSettings.globalize_path("res://").path_join("../zee-dot-weapons").simplify_path()
+	if FileAccess.file_exists(zee_dir.path_join("provides.json")):
+		var zee_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string(zee_dir.path_join("provides.json")))
+		var _zee := index.add_pack({
+			"content_id": "gamemann/zee-dot-weapons", "version": "1.0.0", "prefix": zee_dir,
+			"session": "solo", "source": "subscription", "provides": zee_provides,
+		})
+		var zee_rows := shop.rows().filter(func(r: Dictionary) -> bool: return r["pack_title"] == "Zee Weapons")
+		_check(zee_rows.size() == 27, "zee-dot-weapons' own provides.json lists 27 weapons", str(zee_rows.size()))
+		_check(zee_rows.all(func(r: Dictionary) -> bool: return playground.weapon_def(r["id"]) != null),
+			"each a weapon the game can arm")
+		var smg := playground.weapon_def(&"ws_smg")
+		var smg_rig := PlaygroundZee.arm(player, smg, ZeeWeaponRig.Role.SERVER, true,
+			playground.tick_rate, playground.current_tick())
+		_check(smg_rig != null and smg_rig.arsenal.catalogue.has(&"smg"), "and a pack weapon that shares a built-in id arms with the built-in's art and rules")
+		PlaygroundZee.disarm(player)
+	else:
+		_check(false, "zee-dot-weapons is next to this game", zee_dir)
+
+	menu.queue_free()
+	stack.queue_free()
+	playground.unfollow_workshop()
+	_check(playground.weapon_def(&"ws_fixture_sidearm") == null and not playground.props.catalogue.has(&"ws_fixture_crate")
+		and playground.weapons.size() == own_weapons and playground.props.catalogue.size() == own_props,
+		"unfollowing leaves the game's lists as they were")
 	_done()
 
 

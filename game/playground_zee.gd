@@ -60,6 +60,36 @@ static func catalogue() -> DotWeaponCatalogue:
 	return _catalogue
 
 
+## Pack weapons ([PlaygroundWorkshop]) by zee id, and the catalogue that holds them besides the pack's own.
+static var _pack_defs: Dictionary = {}
+static var _with_packs: DotWeaponCatalogue = null
+
+
+## Replaces the Workshop weapons the rigs may be given. [param defs] are [PlaygroundWeaponDef]s whose
+## `meta.pack_def` is the pack's [DotWeaponDef].
+static func set_pack_defs(defs: Array) -> void:
+	_pack_defs.clear()
+	_with_packs = null
+	for def: PlaygroundWeaponDef in defs:
+		var pack_def: Variant = def.meta.get("pack_def")
+		if pack_def is DotWeaponDef:
+			_pack_defs[zee_id(def)] = pack_def
+
+
+## The catalogue a rig holding [param def] is built over: the pack's own, plus Workshop weapons it
+## does not already have (code wins an id, as in dot-weapon). A copy rather than an addition to
+## [method catalogue], so a solo subscription never leaks into a table a server also reads.
+static func catalogue_for(def: PlaygroundWeaponDef) -> DotWeaponCatalogue:
+	if def == null or not def.meta.has("pack_def") or catalogue().has(zee_id(def)):
+		return catalogue()
+	if _with_packs == null:
+		_with_packs = ZeeWeaponPack.catalogue()
+		for id: StringName in _pack_defs:
+			if not _with_packs.has(id):
+				_with_packs.add(_pack_defs[id])
+	return _with_packs
+
+
 ## The pack, as this game's weapon definitions. Read off the catalogue, so a weapon the pack
 ## adds arrives in the menu without a line here.
 static func defs() -> Array[PlaygroundWeaponDef]:
@@ -121,7 +151,7 @@ static func arm(
 	rig.role = role
 	rig.authority = authority
 	rig.tick_rate = tick_rate
-	rig.catalogue = catalogue()
+	rig.catalogue = catalogue_for(def)
 	rig.player_ref = DotNodeRef.of_path(player.get_path())
 
 	if view_model != null:
