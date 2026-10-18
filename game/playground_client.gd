@@ -1214,7 +1214,7 @@ static func fill_help(help: DotMenuHelp) -> void:
 	if help == null:
 		return
 	help.about = "A sandbox: hold Q, pick a prop, an NPC, a vehicle or a weapon, and click it into the world. Pick things up with the physics gun, freeze them, throw them, weld and wire them, and undo what you made. Timed courses run in the corners, and on the surf and hop maps."
-	help.add_text("Building", "With the physics gun, hold the left mouse button on a prop to carry it, roll the wheel to push it away or pull it close, and press the right button to freeze it where it is. Hold the rotate key to turn what you carry with the mouse. The tool gun's tools are on the spawn menu's Tools tab.")
+	help.add_text("Building", "With the physics gun, hold the left mouse button on a prop to carry it, roll the wheel to push it away or pull it close (with nothing in hand the wheel changes tool), and press the right button to freeze it where it is. Hold the rotate key to turn what you carry with the mouse. The tool gun's tools are on the spawn menu's Tools tab.")
 	help.add_text("Running", "Only on a server that adds the run timer: leave a course's start zone and the timer runs until its end zone. Checkpoints are practice: a run that used one is not a record.")
 	help.add_text("Modes", "A server may turn on the arena (players can hurt each other), waves of NPCs with downs and revives, and a shop where everything has a price. Each is a server setting, so the menu tells you what this one has on.")
 
@@ -1619,6 +1619,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_set_tool(TOOL_GRAV)
 	elif key.is_action(PlaygroundBindings.WEAPONS):
 		_cycle_weapon()
+	elif _wheel_cycle(key):
+		pass
 	elif key.is_action(PlaygroundBindings.TRACK):
 		_timer_key(&"track")
 	elif key.is_action(PlaygroundBindings.STYLE):
@@ -1734,9 +1736,51 @@ func _on_mouse_button(event: InputEventMouseButton) -> void:
 		MOUSE_BUTTON_WHEEL_UP:
 			if _holding:
 				player.phys_gun.push(1.0, 0.1)
+			elif event.pressed:
+				_wheel_cycle(event)
 		MOUSE_BUTTON_WHEEL_DOWN:
 			if _holding:
 				player.phys_gun.push(-1.0, 0.1)
+			elif event.pressed:
+				_wheel_cycle(event)
+
+
+## The wheel, on dot-menu's previous and next weapon actions so a rebind works, when no prop
+## is held (a held prop keeps the wheel for push and pull). The press path for a row moved
+## onto a key is [method _unhandled_input]'s key branch; a wheel event is never a key, so one
+## tick cannot cycle on both.
+func _wheel_cycle(event: InputEvent) -> bool:
+	if event.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION):
+		_cycle_tools(1)
+		return true
+	if event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
+		_cycle_tools(-1)
+		return true
+	return false
+
+
+## The tools in hand-order: the physics gun, the gravity gun, then every weapon this server
+## offers (the tool gun is one of them). Every entry is selectable, so there is no empty slot
+## to skip.
+func _tool_ring() -> Array[StringName]:
+	var ring: Array[StringName] = [TOOL_PHYS, TOOL_GRAV]
+	if playground != null:
+		for w in playground.weapons:
+			if not ring.has(w.id):
+				ring.append(w.id)
+	return ring
+
+
+## One step through [method _tool_ring], wrapping. Nothing while a prop is held, and nothing
+## with fewer than two tools.
+func _cycle_tools(direction: int) -> void:
+	if _holding:
+		return
+	var ring := _tool_ring()
+	if ring.size() < 2:
+		return
+	var at := ring.find(tool)
+	_set_tool(ring[posmod((at if at >= 0 else 0) + direction, ring.size())])
 
 
 ## Q down opens the menu; Q up closes it unless the press was a tap.

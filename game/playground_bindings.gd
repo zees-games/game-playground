@@ -60,6 +60,8 @@ static func make() -> DotMenuBindings:
 	keys.add(PHYS_GUN, &"bind_phys_gun", "Physics gun", "1", "Tools")
 	keys.add(GRAV_GUN, &"bind_grav_gun", "Gravity gun", "2", "Tools")
 	keys.add(WEAPONS, &"bind_weapons", "Next weapon", "3", "Tools")
+	# The wheel cycles tools (dot-menu API 10); a held prop keeps it for push and pull.
+	keys.add_wheel_weapons(DotMenuBindings.WEAPON_PREVIOUS_ACTION, DotMenuBindings.WEAPON_NEXT_ACTION, "Tools")
 	keys.add(VEHICLE, &"bind_vehicle", "Use what you look at, or get in or out of a vehicle", "F", "Tools")
 	keys.add(AIM, &"bind_aim", "Aim down a gun's sights (hold)", "Mouse 2", "Tools")
 	keys.add(BASH, &"bind_bash", "A gun's quick melee", "Mouse 3", "Tools")
