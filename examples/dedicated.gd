@@ -45,8 +45,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 27
-const CHECKS := 240
+const SECTIONS := 28
+const CHECKS := 248
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -135,6 +135,7 @@ func _run() -> void:
 		_test_identity()
 		await _test_live_tools()
 		await _test_blind_and_beacon()
+		await _test_loading_cover()
 		_test_creative()
 		_test_saved_builds()
 		_test_inventory_commands()
@@ -1820,6 +1821,104 @@ func _test_live_tools() -> void:
 	_run_command("pg_arena %s" % ("on" if was_on else "off"))
 	var _released := server.release_session(session.peer_id)
 	game.remove_player(&"u77")
+	_section_done()
+
+
+## [b]A seat behind its loading cover is not harmed, and is once the cover lifts.[/b] A real
+## [DotClientLink] joins over the server's ENet socket and says nothing, as a client still
+## loading its level does. The server's one damage choke point (the arena's `hurt`, which a
+## weapon, an NPC shot and lava all end at) must refuse it; an operator's hit still lands. The
+## client then sends `game.cover` on the real wire and the same hit lands.
+func _test_loading_cover() -> void:
+	print("")
+	print("a client behind its loading cover is not harmed")
+
+	var arena: PlaygroundArena = _module().get("arena")
+	var roster: DotGameRoster = _module().get("loading")
+	var was_on := arena.enabled
+	arena.enabled = true
+
+	var known: Dictionary = {}
+	for each in server.playing_sessions():
+		known[each.userid] = true
+
+	var side := Node.new()
+	side.name = "CoverClient"
+	add_child(side)
+	get_tree().set_multiplayer(MultiplayerAPI.create_default_interface(), side.get_path())
+	# Under a node named like this suite's own, so the RPC path the server sends
+	# ("Dedicated/Server") resolves in the client's separate multiplayer tree too.
+	var mirror := Node.new()
+	mirror.name = name
+	side.add_child(mirror)
+	var link := DotClientLink.new()
+	link.name = "Server"
+	link.player_name = "Cover"
+	link.transport_preference = "udp"
+	link.udp_address = "127.0.0.1:%d" % server.config.port
+	mirror.add_child(link)
+	link.connect_to_server("127.0.0.1:%d" % server.config.port)
+
+	var seat: Array = [null]
+	for _i in 1800:
+		await get_tree().physics_frame
+		for each in server.playing_sessions():
+			if not known.has(each.userid) and game.players.has(StringName("u%d" % each.userid)):
+				seat[0] = each
+		if seat[0] != null:
+			break
+
+	_check(seat[0] != null, "a real client joins over the socket", str(link.last_error))
+
+	if seat[0] == null:
+		side.queue_free()
+		arena.enabled = was_on
+		_section_done()
+		return
+
+	var userid: int = seat[0].userid
+	var key := StringName("u%d" % userid)
+	var health := arena.health_of(key)
+	health.invulnerable_until_tick = -1
+	_check(roster != null and roster.is_loading(userid),
+		"the server holds the seat as loading from its spawn",
+		str(roster.describe()) if roster != null else "no roster")
+
+	var before := health.health
+	var lava: bool = game.hazard_hurt.call(key, 10.0)
+	var shot := arena.hurt(&"", key, 10.0, 0.0)
+	_check(lava and health.health == before and shot != null and shot.refused,
+		"lava and a shot both do nothing to it", "%s -> %s" % [before, health.health])
+
+	var _slap := arena.hurt(&"", key, 10.0, 0.0, DotHitGroup.CHEST, true)
+	_check(health.health < before, "an operator's hit still lands", "%s -> %s" % [before, health.health])
+
+	DotGameClient.report_cover(link, false)
+	var lifted := false
+	for _i in 900:
+		await get_tree().physics_frame
+		if not roster.is_loading(userid):
+			lifted = true
+			break
+	_check(lifted, "its cover report crosses the wire and ends the loading state")
+
+	var after_lift := health.health
+	var _late := arena.hurt(&"", key, 10.0, 0.0)
+	_check(health.health < after_lift, "and the same hit now lands", "%s -> %s" % [after_lift, health.health])
+
+	_check(not roster.is_loading(99999) and not bool(arena.loading_fn.call(&"u99999")),
+		"a seat the roster does not hold is always harmable")
+
+	link.disconnect_from_server("done")
+	var gone := false
+	for _i in 900:
+		await get_tree().physics_frame
+		if not game.players.has(key):
+			gone = true
+			break
+	_check(gone and not roster.is_loading(userid), "it leaves and the roster forgets it")
+	side.queue_free()
+	arena.enabled = was_on
 	_section_done()
 
 

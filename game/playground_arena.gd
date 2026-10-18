@@ -82,6 +82,11 @@ var game: Playground = null
 ## Whether the fight is on. Off is a sandbox.
 var enabled: bool = false
 
+## Whether a player's client is still behind its loading cover: `func(player_key: StringName) -> bool`.
+## The server module fills it from its [DotGameRoster]; unset (offline, a suite, a bot) nobody is
+## loading, so every offline suite is unchanged. See [method hurt].
+var loading_fn: Callable = Callable()
+
 ## player id -> [DotHealth].
 var _health: Dictionary = {}
 
@@ -570,7 +575,7 @@ func _state_label() -> String:
 ## cannot change.
 func hurt(
 	attacker: StringName, victim: StringName, amount: float, distance: float,
-	group: StringName = DotHitGroup.CHEST
+	group: StringName = DotHitGroup.CHEST, admin: bool = false
 ) -> DotDamage:
 	if not enabled:
 		return null
@@ -579,6 +584,19 @@ func hurt(
 
 	if health == null:
 		return null
+
+	# A player whose client is still behind its loading cover froze itself and cannot see, so
+	# no weapon, NPC shot or lava may hurt it. This is the one function every one of them
+	# ends at. A refused damage is returned rather than null: null reads as "the arena is off"
+	# and lava would then send the player to the spawn instead. An [param admin] call (slay,
+	# slap) is the operator's and passes.
+	if not admin and loading_fn.is_valid() and bool(loading_fn.call(victim)):
+		var refused := DotDamage.make(
+			entity_id_of(attacker), entity_id_of(victim), amount, combat.damage_type(DAMAGE_ID)
+		)
+		refused.refuse("loading")
+		DotLog.debug(CHANNEL, "a hit was refused", {"why": "loading", "victim": String(victim)})
+		return refused
 
 	var damage := DotDamage.make(
 		entity_id_of(attacker), entity_id_of(victim), amount,

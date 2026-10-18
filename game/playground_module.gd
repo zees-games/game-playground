@@ -446,6 +446,42 @@ func _report_map(map: DotMapDef, _world: Node = null) -> void:
 		server.games.set_current_map(String(map.id) if map != null else "")
 
 
+## Who is still behind their loading cover, from dot-game's roster used for that alone: this
+## module is not on DotGameModule, so it seats people itself and only borrows the bookkeeping
+## (loading from the spawn event until the client says its cover lifted, again from a map
+## change). The arena asks it by player key (`u<userid>`). A bot is never seated, so never loading.
+var loading: DotGameRoster = null
+var _handles_cover: bool = false
+
+
+## The loading roster and the handler for the client's cover report on dot-server's envelope.
+## A kind on the existing envelope because the RPC set is frozen; a client that predates it is
+## released by the roster's timeout. Duck-typed so an older dot-server still loads this.
+func _build_loading() -> void:
+	loading = DotGameRoster.new()
+	loading.server = server
+
+	if arena != null:
+		arena.loading_fn = func(key: StringName) -> bool:
+			return loading != null and loading.is_loading(String(key).trim_prefix("u").to_int())
+
+	if server == null or not ("envelope" in server):
+		return
+
+	var env: Object = server.get(&"envelope")
+
+	if env != null and env.has_method("register"):
+		env.call("register", DotGameRoster.COVER_KIND, Callable(self, "_on_cover_report"), false)
+		_handles_cover = true
+
+
+func _on_cover_report(peer_id: int, payload: Dictionary) -> void:
+	var covered: Variant = payload.get("covered")
+
+	if loading != null and covered is bool:
+		loading.report_cover(peer_id, covered)
+
+
 ## The identity layer this module built, or null when it found one already running.
 var _identity: DotPlatformIdentity = null
 var _loaded_platform := false
@@ -510,6 +546,21 @@ func _on_profile(event: DotEvent) -> void:
 
 
 func _module_unload() -> void:
+	if _handles_cover and server != null:
+		var env: Object = server.get(&"envelope")
+
+		if env != null and env.has_method("handle"):
+			env.call("handle", DotGameRoster.COVER_KIND, Callable())
+
+		_handles_cover = false
+
+	if arena != null:
+		arena.loading_fn = Callable()
+
+	if loading != null:
+		loading.clear()
+		loading = null
+
 	if _loaded_platform and server != null and server.modules != null and server.modules.has_module("platform"):
 		server.modules.unload_module("platform")
 	_loaded_platform = false
@@ -579,6 +630,8 @@ func _build_extras() -> DotResult:
 
 	if not fought.ok:
 		return fought.wrap("The arena could not be set up")
+
+	_build_loading()
 
 	arena.health_changed.connect(_on_health_changed)
 	arena.player_killed.connect(_on_player_killed)
@@ -1102,6 +1155,8 @@ func _physics_process(_delta: float) -> void:
 		return
 
 	_tick += 1
+	if loading != null:
+		loading.poll_loading()
 	bridge.server_tick(_tick)
 
 	# [b]After the world has ticked, and that is the ordering that matters.[/b] dot-combat
@@ -1168,6 +1223,9 @@ func _on_client_spawn(event: DotEvent) -> void:
 		return
 
 	_joined[session.userid] = true
+
+	if loading != null:
+		var _seated := loading.add(session)
 
 	# Voice and chat learn about them before anything is sent, so a frame or a line that
 	# lands in the same flush as the admission has somewhere to go.
@@ -1274,12 +1332,20 @@ func _build_mod_tools() -> void:
 
 
 func _on_map_changed_for_mod_tools(_map: DotMapDef, _world: Node) -> void:
+	# Every client covers for the new map and says so when it lifts; until it does nobody is
+	# harmed, and one that never re-covers is released after the roster's grace.
+	if loading != null:
+		loading.mark_reloading()
+
 	if mod_tools != null:
 		mod_tools.clear_history()
 
 
 func _on_client_disconnected(session: DotClientSession, _reason: String = "") -> void:
 	var id := _player_id(session)
+
+	if loading != null:
+		loading.remove(session)
 
 	if mod_tools != null:
 		mod_tools.forget(StringName(str(session.userid)))

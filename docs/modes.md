@@ -12,6 +12,10 @@ dot-combat (health, damage types, hitboxes; friendly fire, self damage, falloff,
 - The moderator's god/buddha/hp/slay act on the arena's `DotHealth` and say "the arena is off" when it is ([services.md](services.md#the-moderators-live-tools)).
 - A sandbox has no leading score, so nothing here calls the vote's `note_score`.
 
+### Nobody is harmed behind a loading cover
+
+This module is not a `DotGameModule`, so it borrows dot-game's `DotGameRoster` for the still-loading bookkeeping alone (`PlaygroundModule.loading`: seated on the spawn event, loading until the client's `game.cover` report, again after a map change, released by the roster's timeouts). `PlaygroundArena.loading_fn` asks it by player key, and `PlaygroundArena.hurt`, the one function a shot, an NPC shot, a blast and lava all end at, returns a refused `DotDamage` (reason `loading`) for a loading seat; refused rather than null, because null reads as "arena off" and lava would send the player to the spawn instead. The moderator's slay and slap pass `admin = true`. A bot is never seated, so offline play and every bot suite are unchanged. `dedicated`'s `_test_loading_cover` joins a real client over the socket; `tools/render_cover.sh` renders the cover and the frames after it lifts.
+
 ### B, the arena's loadout
 
 **B opens the loadout only inside the arena** (the lead's call, 2026-10-12): the dot-loadout manager lives in `PlaygroundArena`, which is the server's and only while `pg_arena` is on, so outside it, and always solo, B says "Loadouts are in the arena." instead of doing nothing. The client knows from `pg_arena_on`, a REPLICATED cvar the module keeps in step with the arena (`PlaygroundModule.set_arena`; setting the cvar is also the switch), and turns dot-menu's loadout on and off with it (`PlaygroundClient._set_arena_on`); the server's `closed_fn` says the same words to anybody who asks anyway.

@@ -103,7 +103,7 @@ static func handlers(game: Playground, arena: PlaygroundArena) -> Dictionary:
 			health.invulnerable = false
 			health.cannot_die = false
 			health.invulnerable_until_tick = -1
-			var damage := arena.hurt(&"", key_of(id), health.health + 1000.0, 0.0)
+			var damage := arena.hurt(&"", key_of(id), health.health + 1000.0, 0.0, DotHitGroup.CHEST, true)
 			health.invulnerable = was_god
 			health.cannot_die = was_buddha
 			if damage == null or not damage.lethal:
@@ -122,7 +122,7 @@ static func handlers(game: Playground, arena: PlaygroundArena) -> Dictionary:
 			p.taint_run()
 			var amount := float(args.get("damage", 0.0))
 			if amount > 0.0 and _health(arena, id) != null:
-				var _hurt := arena.hurt(&"", key_of(id), amount, 0.0)
+				var _hurt := arena.hurt(&"", key_of(id), amount, 0.0, DotHitGroup.CHEST, true)
 			return DotResult.success(null),
 
 		DotModTools.ACTION_BLIND: func(id: StringName, args: Dictionary) -> DotResult:
