@@ -119,6 +119,10 @@ var camera: Camera3D = null
 ## player and the camera are all in. See [method _build_gate].
 var gate: DotLoadGate = null
 
+## dot-game's platform layer: builds the gate, answers link and offline, flushes the browser's
+## filesystem, and says when input is blocked. Not its settings, console, pointer or board.
+var platform: DotGameClient = null
+
 ## The player asked to leave from the pause menu.
 ##
 ## Announced rather than acted on: what "leave" means belongs to whatever loaded this
@@ -237,8 +241,8 @@ func _ready() -> void:
 	# spoke to, and every person on the server alone in a private copy of the map. Every
 	# other game in the family reads the registry; this one only had the export. The
 	# export still wins, so two shells in one process keep their own links.
-	if link == null and not OS.get_cmdline_user_args().has("--offline"):
-		link = DotRegistry.get_node_service(LINK_SERVICE)
+	if link == null and not platform.offline:
+		link = platform.link as Node
 
 	if link != null:
 		config.authoritative = false
@@ -407,15 +411,29 @@ func _ready() -> void:
 ## the simulation by itself: a frozen player is skipped by [method Playground._simulate_tick]
 ## (`can_process`), and this client's own sampling and keys check [method _covered].
 func _build_gate() -> void:
-	gate = DotLoadGate.new()
+	platform = DotGameClient.new()
+	platform.name = "Platform"
+	platform.force_offline = link == null and OS.get_cmdline_user_args().has("--offline")
+	platform.link = link
+	# Not taken: the settings document is PlaygroundPresentation's manager with a DotMenu built
+	# round it (the Servers action, the loadout and map menus), and the console must follow
+	# that menu (see _build_pause). The pointer is this client's: Escape releases, then opens,
+	# the Q menu and the server browser are screens on its own stack, and a click recaptures
+	# through them. Tab is the roster's, not the platform's board.
+	platform.use_settings = false
+	platform.use_console = false
+	platform.capture_pointer = false
+	platform.scoreboard_action = &""
+	platform.spawned_fn = func() -> bool:
+		return player != null and camera != null and camera.is_inside_tree()
+	# The chat box, the console and the menu have the keyboard; polled by the platform each
+	# frame, so there is no signal to forward from each of them.
+	platform.busy_fn = _input_busy
+	add_child(platform)
+	gate = platform.gate
 	gate.name = "LoadGate"
-	# A headless run draws nothing, so there is nothing to compile; its warm-up would only wait
-	# out its timeout, and every suite that drives a client would wait with it.
-	gate.warm_up_on_open = DisplayServer.get_name() != "headless"
-	add_child(gate)
 	gate.hold(&"map", "Loading the map")
-	gate.require(&"spawned", func() -> bool:
-		return player != null and camera != null and camera.is_inside_tree(), "Joining")
+	platform.input_blocked_changed.connect(_suspend_input)
 
 
 ## Releases the map hold once the first level is in, and holds again for each map change.
@@ -783,9 +801,8 @@ func _wire_chat_window() -> void:
 		return
 
 	window.submitted.connect(_on_chat_submitted)
-
-	window.opened.connect(func(_channel: StringName) -> void: _refresh_suspended())
-	window.closed.connect(func() -> void: _refresh_suspended())
+	window.opened.connect(func(_channel: StringName) -> void: _suspend_input(platform.is_input_blocked()))
+	window.closed.connect(func() -> void: _suspend_input(platform.is_input_blocked()))
 
 	var client_link := DotRegistry.get_service(&"dot_client_link")
 
@@ -1066,16 +1083,20 @@ func _build_screens() -> void:
 	_build_pause()
 
 
-## Movement stops while anything has the keyboard or the screen: the chat box, the console,
-## or dot-menu's menu. Only when none does is it given back, so the console closing while
-## the chat box is still open does not walk the player. The console reaches this as one of
-## the menu's overlays (`overlays_changed`); see [method PlaygroundPresentation.build_console].
-func _refresh_suspended() -> void:
-	var sampler := active_sampler()
-	if sampler == null:
-		return
-	sampler.suspended = (presentation != null and presentation.swallows_input()) \
+## Something other than the cover has the keyboard or the screen: the chat box, the console,
+## or dot-menu's menu.
+func _input_busy() -> bool:
+	return (presentation != null and presentation.swallows_input()) \
 		or (game_menu != null and game_menu.any_open())
+
+
+## Movement stops while the cover, the chat box, the console or dot-menu's menu is up. Only
+## when none is is it given back, so the console closing while the chat box is still open
+## does not walk the player. Also called when a sampler is built, which starts unsuspended.
+func _suspend_input(blocked: bool) -> void:
+	var sampler := active_sampler()
+	if sampler != null:
+		sampler.suspended = blocked
 
 
 ## The escape menu.
@@ -1135,7 +1156,9 @@ func _build_pause() -> void:
 	game_menu.overlays_changed.connect(func(open: bool) -> void:
 		# Back onto the view the instant it closes, as the screen stack does for its own.
 		_set_captured(not open)
-		_refresh_suspended())
+		# At once, not at the platform's next poll: the keys are given back or taken the
+		# instant the console or menu opens or closes.
+		_suspend_input(platform.is_input_blocked()))
 
 	if settings != null:
 		applier = DotMenuApplier.new()
