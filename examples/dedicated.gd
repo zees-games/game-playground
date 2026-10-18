@@ -45,8 +45,14 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 29
-const CHECKS := 278
+const SECTIONS := 27
+const CHECKS := 240
+
+## What the run timer's checks add when `res://addons/dot_timer` is linked (and
+## `addons/pg_timer` turns it on): the records section and the timer's halves of the
+## tick-rate, command and live-tool sections. A server without the timer is the default.
+const TIMER_SECTIONS := 1
+const TIMER_CHECKS := 24
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
@@ -113,7 +119,6 @@ func _run() -> void:
 		_test_tickrate_reaches_the_timer()
 		await _test_map_commands()
 		_test_timer_commands()
-		_test_zone_workflow()
 		_test_prop_commands()
 		_test_permissions()
 		_test_services()
@@ -134,7 +139,8 @@ func _run() -> void:
 		_test_saved_builds()
 		_test_inventory_commands()
 		_test_welcome_waits_for_ready()
-		await _test_records_follow_the_account()
+		if _timer_linked():
+			await _test_records_follow_the_account()
 		_test_disconnect_is_handled()
 		await _test_module_unloads_cleanly()
 		_test_no_message_preloads_itself()
@@ -146,8 +152,8 @@ func _run() -> void:
 	DotPaths.remove_tree(SERVER_DIR)
 
 	# The copy of this suite that the exit probe runs does not run the probe itself.
-	var sections := SECTIONS - (1 if _is_exit_probe() else 0)
-	var checks := CHECKS - (EXIT_PROBE_CHECKS if _is_exit_probe() else 0)
+	var sections := SECTIONS - (1 if _is_exit_probe() else 0) + (TIMER_SECTIONS if _timer_linked() else 0)
+	var checks := CHECKS - (EXIT_PROBE_CHECKS if _is_exit_probe() else 0) + (TIMER_CHECKS if _timer_linked() else 0)
 
 	_forget_learned_heat()
 
@@ -198,6 +204,11 @@ func _shut_down() -> void:
 	platform = null
 	server = null
 	await get_tree().process_frame
+
+
+## Whether dot-timer is linked into this checkout, which is what turns `addons/pg_timer` on.
+static func _timer_linked() -> bool:
+	return FileAccess.file_exists("res://addons/dot_timer/plugin.cfg")
 
 
 ## The last line of every section. See [constant SECTIONS].
@@ -415,7 +426,7 @@ func _boot() -> void:
 	# first.
 	var pg_config := PlaygroundConfig.new()
 	pg_config.records_directory = ""
-	pg_config.initial_map = &"pg_surf_intro"
+	pg_config.initial_map = &"pg_flatgrass"
 	pg_config.map_seconds = 0.0
 
 	game = Playground.new()
@@ -512,29 +523,23 @@ func _test_tickrate_reaches_the_timer() -> void:
 		"the game counts at 100",
 		"%d" % game.tick_rate
 	)
-	_check(
-		game.timers.tick_rate == 100,
-		"the timer counts at 100",
-		"%d" % game.timers.tick_rate
-	)
-	_check(
-		game.timers.tick_rate_matches_engine(),
-		"and nothing disagrees"
-	)
-
-	var run := DotTimerRun.make(0, &"normal", 1.0 / float(game.timers.tick_rate))
-	run.begin(0.0)
-	run.ticks = 250
-	run.finish(0.0)
-
-	var record := DotTimerRecord.from_run(run, &"m", &"p", "P")
-
-	_check(record.tick_rate == 100, "and a record is stamped with it")
-	_check(
-		absf(record.time - 2.5) < 0.001,
-		"so its time means what it says",
-		"%.3f s" % record.time
-	)
+	# The timer's half, when a server has one: its manager adopts the rate, and a record
+	# is stamped with it, so a time means what it says.
+	if _timer_linked():
+		var manager: Object = game.run_timer.get("manager")
+		_check(int(manager.get("tick_rate")) == 100, "the timer counts at 100",
+			"%d" % int(manager.get("tick_rate")))
+		_check(bool(manager.call("tick_rate_matches_engine")), "and nothing disagrees")
+		var run: Object = load("res://addons/dot_timer/core/dot_timer_run.gd").call(
+			"make", 0, &"normal", 1.0 / float(manager.get("tick_rate")))
+		run.call("begin", 0.0)
+		run.set("ticks", 250)
+		run.call("finish", 0.0)
+		var record: Object = load("res://addons/dot_timer/core/dot_timer_record.gd").call(
+			"from_run", run, &"m", &"p", "P")
+		_check(int(record.get("tick_rate")) == 100, "and a record is stamped with it")
+		_check(absf(float(record.get("time")) - 2.5) < 0.001, "so its time means what it says",
+			"%.3f s" % float(record.get("time")))
 
 	# And the status line says so when they disagree, which is what somebody
 	# debugging it will actually look at.
@@ -549,19 +554,19 @@ func _test_map_commands() -> void:
 	print("map commands")
 
 	var listed := _run_command("pg_map")
-	_check(_said(listed, "pg_surf_intro"), "pg_map lists the maps", str(listed))
+	_check(_said(listed, "pg_flatgrass"), "pg_map lists the maps", str(listed))
 
 	var missing := _run_command("pg_map not_a_map")
 	_check(_said(missing, "no map matches"), "and refuses one that is not there")
 
-	_run_command("pg_map pg_bhop_intro")
+	_run_command("pg_map pg_generated")
 
 	# The command awaits a map change, so it lands over the next few frames.
 	for _i in range(10):
 		await get_tree().process_frame
 
 	_check(
-		game.maps.current.id == &"pg_bhop_intro",
+		game.maps.current.id == &"pg_generated",
 		"pg_map changes map",
 		String(game.maps.current.id)
 	)
@@ -594,13 +599,14 @@ func _test_map_commands() -> void:
 	# GAME -- so on this server, one game and several maps, `map` did the one thing an
 	# operator typing it did not mean.
 	var plain := _run_command("map")
-	_check(_said(plain, "pg_surf_intro"), "`map` lists the maps", str(plain))
+	_check(_said(plain, "pg_generated"), "`map` lists the maps", str(plain))
 
-	_run_command("map pg_surf_intro")
+	# The menu above moved off pg_generated, so this is a real change.
+	_run_command("map pg_generated")
 	for _i in range(10):
 		await get_tree().process_frame
 	_check(
-		game.maps.current.id == &"pg_surf_intro",
+		game.maps.current.id == &"pg_generated",
 		"and `map <id>` changes it, through the game's own reset rather than the session",
 		String(game.maps.current.id)
 	)
@@ -617,7 +623,7 @@ func _test_map_commands() -> void:
 		"a custom map loads through the catalogue, built from its document",
 		"%s, %d nodes" % [String(game.maps.current.id) if game.maps.current != null else "none", built.get_child_count() if built != null else -1]
 	)
-	_run_command("map pg_surf_intro")
+	_run_command("map pg_flatgrass")
 	for _i in range(10):
 		await get_tree().process_frame
 
@@ -668,7 +674,17 @@ func _test_timer_commands() -> void:
 
 	var styles := _run_command("pg_style")
 	_check(_said(styles, "sideways"), "pg_style lists the styles", str(styles))
-	_check(_said(styles, "points"), "with what they are worth")
+	# Points per style are the run timer's, so the list without it is ids and names.
+	_check(_said(styles, "normal"), "with the normal style among them", str(styles))
+
+	# The run timer's commands are `addons/pg_timer`'s, registered only when a server links
+	# dot-timer; without it they are absent rather than answering "no timer" for ever.
+	if not _timer_linked():
+		for command in ["pg_top", "pg_track", "pg_cp", "pg_tp", "pg_cp_clear"]:
+			_check(server.console.find_command(command) == null,
+				"%s is not on a server without the run timer" % command)
+		_section_done()
+		return
 
 	var top := _run_command("pg_top")
 	_check(top.size() > 0, "pg_top answers even with no records", str(top))
@@ -683,106 +699,6 @@ func _test_timer_commands() -> void:
 			"%s refuses politely from the console" % command,
 			str(reply)
 		)
-	_section_done()
-
-
-func _test_zone_workflow() -> void:
-	print("the sm_zones workflow")
-
-	# Drawing a zone the way an admin does on a map whose author never used this
-	# engine: pick a kind, stand on one corner, stand on the other.
-	var before := game.timers.zones.zones.size()
-
-	var began := _run_command("pg_zone start")
-	_check(_said(began, "stand on one corner"), "pg_zone starts a zone", str(began))
-
-	var first := _run_command("pg_zone_mark")
-	_check(_said(first, "first corner"), "the first mark is taken", str(first))
-
-	var second := _run_command("pg_zone_mark")
-	_check(
-		game.timers.zones.zones.size() == before + 1,
-		"and the second completes the zone",
-		"%d -> %d" % [before, game.timers.zones.zones.size()]
-	)
-
-	# Live immediately. An admin who had to reload the map to test a start line
-	# would test it once.
-	_check(
-		game.timers.timer_for(&"nobody") == null
-			or game.timers.zones.zones.size() == before + 1,
-		"and it is live without a map reload"
-	)
-
-	var listed := _run_command("pg_zone_list")
-	_check(_said(listed, "START"), "pg_zone_list shows it", str(listed))
-
-	var undone := _run_command("pg_zone_undo")
-	_check(_said(undone, "removed"), "pg_zone_undo removes it", str(undone))
-	_check(
-		game.timers.zones.zones.size() == before,
-		"and the count goes back"
-	)
-
-	# Saving a set with a problem is refused rather than written with a warning: a
-	# zone file with a start and no end is playable and unfinishable, and the moment
-	# it is on disk somebody else has a copy.
-	var broken := DotTimerZoneSet.new()
-	broken.map_id = &"broken"
-	broken.add(DotTimerZone.make(DotTimerZone.Kind.START).set_box(
-		Vector3.ZERO, Vector3.ONE
-	))
-
-	var real := game.timers.zones
-	game.timers.zones = broken
-
-	var refused := _run_command("pg_zone_save")
-	_check(
-		_said(refused, "not saving"),
-		"a zone set with a problem is not written",
-		str(refused)
-	)
-
-	game.timers.zones = real
-
-	var saved := _run_command("pg_zone_save user://test_zones.json")
-	_check(_said(saved, "wrote"), "and a good one is", str(saved))
-	_check(
-		FileAccess.file_exists("user://test_zones.json"),
-		"with a file on disk"
-	)
-
-	DirAccess.remove_absolute(
-		ProjectSettings.globalize_path("user://test_zones.json")
-	)
-
-	# Both spellings of a track, because both are what somebody types — and reading
-	# only the first token turned `bonus 99` into bonus 1 and then read the 99 as a
-	# stage number, so an impossible track became a plausible zone on the wrong one.
-	for spelling in ["pg_zone start b99", "pg_zone start bonus 99"]:
-		var bad_track := _run_command(spelling)
-		_check(
-			_said(bad_track, "no such track"),
-			"'%s' is refused rather than silently becoming another track" % spelling,
-			str(bad_track)
-		)
-
-	var good_track := _run_command("pg_zone end bonus 2")
-	_check(
-		_said(good_track, "Bonus 2"),
-		"while a real two-token track is understood",
-		str(good_track)
-	)
-
-	_run_command("pg_zone_mark")
-	_run_command("pg_zone_mark")
-
-	var bonus := game.timers.zones.first_of_kind(
-		DotTimerZone.Kind.END, DotTimerTrack.of_bonus(2)
-	)
-	_check(bonus != null, "and the zone lands on it")
-
-	_run_command("pg_zone_undo")
 	_section_done()
 
 
@@ -809,16 +725,16 @@ func _test_prop_commands() -> void:
 func _test_permissions() -> void:
 	print("permissions")
 
-	# The zone commands are CHANGEMAP, not GENERIC: drawing a start line is editing
-	# the map's rules, and somebody who can do it can invalidate every record on it.
-	var zone_cmd: DotConCommand = server.console.find_command("pg_zone")
-	_check(zone_cmd != null, "pg_zone is registered")
+	# Changing the map is CHANGEMAP, not GENERIC: what everybody plays next is the map
+	# admin's call, and a reserved slot holds a flag without holding that one.
+	var map_cmd: DotConCommand = server.console.find_command("pg_map")
+	_check(map_cmd != null, "pg_map is registered")
 
-	if zone_cmd != null:
+	if map_cmd != null:
 		_check(
-			zone_cmd.permission == DotAdminFlags.CHANGEMAP,
+			map_cmd.permission == DotAdminFlags.CHANGEMAP,
 			"and needs the changemap flag",
-			zone_cmd.permission
+			map_cmd.permission
 		)
 
 	var rtv_cmd: DotConCommand = server.console.find_command("pg_rtv")
@@ -1808,44 +1724,48 @@ func _test_live_tools() -> void:
 	session.display_name = "Pat"
 	var _adopted := server.adopt_session(session)
 
+	# The course-run halves need a run timer, and are counted only with one (TIMER_CHECKS).
+	var timed := player.timer != null
 	var stopped: Array[StringName] = []
-	var on_stop := func(_r: DotTimerRun, why: StringName) -> void: stopped.append(why)
-	player.timer.run_stopped.connect(on_stop)
-	player.timer.run.begin(0.0)
+	var on_stop := func(_r: Object, why: StringName) -> void: stopped.append(why)
+	if timed:
+		player.timer.get("run_stopped").connect(on_stop)
+		player.timer.get("run").call("begin", 0.0)
 
 	var _on := await _run_command_later("noclip Pat")
 	_check(DotFpsAdminModifiers.is_noclipped(player.controller), "`noclip Pat` puts them in noclip")
-	_check(stopped.has(&"noclip") and not player.timer.run.is_active(),
-		"and abandons the course run they were on", str(stopped))
-
-	player.timer.run.begin(0.0)
-	player._on_simulated(0, player.controller.state)
-	_check(player.timer.run.tainted, "a run begun while noclipped is marked assisted")
+	if timed:
+		_check(stopped.has(&"noclip") and not player.timer.get("run").call("is_active"),
+			"and abandons the course run they were on", str(stopped))
+		player.timer.get("run").call("begin", 0.0)
+		player._on_simulated(0, player.controller.state)
+		_check(player.timer.get("run").get("tainted"), "a run begun while noclipped is marked assisted")
 	var _off := await _run_command_later("noclip Pat off")
 
-	# A slap is a shove in a direction the slapper knows: speed nobody earned.
-	#
-	# Out of the start zone first. Pat joined at the spawn, which is inside the start, and
-	# standing in the start ends a live run (dot-timer's REASON_RESET): the run begun
-	# here was thrown away on the first tick after the slap and replaced by a clean one,
-	# so the check read a run the slap never touched. Up in the air is in no zone at all.
-	# Then let the timer see the move: leaving the start is what STARTS a run, so a run
-	# begun before that tick is replaced by the timer's own the moment it is processed.
-	player.teleport(Vector3(0.0, 400.0, 0.0))
-	for _i in 4:
-		await get_tree().physics_frame
-	if not player.timer.run.is_active():
-		player.timer.run.begin(0.0)
-	var clean_before_slap := not player.timer.run.tainted
-	var _slapped := await _run_command_later("slap Pat")
-	# Two checks, not one `and`: when it was one, a failure could not say whether the run
-	# was already tainted before the slap or the slap failed to taint it.
-	_check(clean_before_slap, "a run begun after noclip is turned off starts clean")
-	_check(player.timer.run.tainted,
-		"a slap taints the course run it lands in, so it is not a boost with a time at the end")
+	if timed:
+		# A slap is a shove in a direction the slapper knows: speed nobody earned.
+		#
+		# Out of the start zone first. Pat joined at the spawn, which is inside the start, and
+		# standing in the start ends a live run (dot-timer's REASON_RESET): the run begun
+		# here was thrown away on the first tick after the slap and replaced by a clean one,
+		# so the check read a run the slap never touched. Up in the air is in no zone at all.
+		# Then let the timer see the move: leaving the start is what STARTS a run, so a run
+		# begun before that tick is replaced by the timer's own the moment it is processed.
+		player.teleport(Vector3(0.0, 400.0, 0.0))
+		for _i in 4:
+			await get_tree().physics_frame
+		if not player.timer.get("run").call("is_active"):
+			player.timer.get("run").call("begin", 0.0)
+		var clean_before_slap: bool = not player.timer.get("run").get("tainted")
+		var _slapped := await _run_command_later("slap Pat")
+		# Two checks, not one `and`: when it was one, a failure could not say whether the run
+		# was already tainted before the slap or the slap failed to taint it.
+		_check(clean_before_slap, "a run begun after noclip is turned off starts clean")
+		_check(player.timer.get("run").get("tainted"),
+			"a slap taints the course run it lands in, so it is not a boost with a time at the end")
 
-	player.timer.run_stopped.disconnect(on_stop)
-	player.timer.stop()
+		player.timer.get("run_stopped").disconnect(on_stop)
+		player.timer.call("stop")
 
 	var arena: PlaygroundArena = _module().get("arena")
 	var was_on := arena.enabled
@@ -1878,7 +1798,7 @@ func _test_live_tools() -> void:
 		"a moderator moves Pat, so `return` has somewhere to put them")
 
 	var was_map := game.maps.current.id
-	var other := &"pg_bhop_intro" if was_map != &"pg_bhop_intro" else &"pg_surf_intro"
+	var other := &"pg_generated" if was_map != &"pg_generated" else &"pg_flatgrass"
 	_run_command("map %s" % other)
 	for _i in range(10):
 		await get_tree().process_frame
@@ -2270,7 +2190,8 @@ func _test_records_follow_the_account() -> void:
 	print("records follow the account, not the connection")
 
 	var map_id: StringName = game.maps.current.id
-	var store := game.timers.store
+	var manager: Object = game.run_timer.get("manager")
+	var store: Object = manager.get("store")
 
 	# No socket stands behind these peers: swallow what the bridge would send them.
 	var bridge: PlaygroundNetBridge = _module().get("bridge")
@@ -2305,22 +2226,23 @@ func _test_records_follow_the_account() -> void:
 		_section_done()
 		return
 	_check(game.record_key(&"u8801") == &"acct:alice", "and is filed under its account uid, not the userid")
-	_check(player.timer == game.timers.timer_for(&"acct:alice"), "the timer manager knows it by the account")
+	_check(player.timer == manager.call("timer_for", &"acct:alice"), "the timer manager knows it by the account")
 
-	var run := DotTimerRun.make(player.timer.track, player.timer.run.style_id, 0.01)
-	run.begin(0.0)
+	var run: Object = load("res://addons/dot_timer/core/dot_timer_run.gd").call(
+		"make", player.timer.get("track"), player.timer.get("run").get("style_id"), 0.01)
+	run.call("begin", 0.0)
 	for _i in range(6000):
-		run.advance(1.0)
-	run.finish(0.0)
-	for stage in range(1, game.timers.stage_count(run.track) + 1):
-		run.splits[stage] = float(stage)
+		run.call("advance", 1.0)
+	run.call("finish", 0.0)
+	for stage in range(1, int(manager.call("stage_count", run.get("track"))) + 1):
+		run.get("splits")[stage] = float(stage)
 	var why: Array = []
-	game.run_filed.connect(func(_id: StringName, _r: DotTimerRun, _rank: int, reason: String) -> void: why.append(reason))
-	player.timer.run_finished.emit(run)
+	game.run_filed.connect(func(_id: StringName, _time: float, _rank: int, reason: String) -> void: why.append(reason))
+	player.timer.get("run_finished").emit(run)
 	await settle.call()
-	var mine: DotResult = await store.best_for(map_id, DotTimerTrack.MAIN, &"normal", &"acct:alice")
-	_check(mine.ok and mine.value is DotTimerRecord, "the finish is on the board under the account", str(why))
-	var by_number: DotResult = await store.best_for(map_id, DotTimerTrack.MAIN, &"normal", &"u8801")
+	var mine: DotResult = await store.best_for(map_id, 0, &"normal", &"acct:alice")
+	_check(mine.ok and mine.value != null, "the finish is on the board under the account", str(why))
+	var by_number: DotResult = await store.best_for(map_id, 0, &"normal", &"u8801")
 	_check(by_number.ok and by_number.value == null, "and nothing is filed under the userid")
 
 	leave.call(first)
@@ -2332,14 +2254,14 @@ func _test_records_follow_the_account() -> void:
 	await settle.call()
 	_check(game.players.has(&"u8802") and game.record_key(&"u8802") == &"acct:alice",
 		"the reconnect is a new userid on the same account")
-	var best: DotResult = await store.best_for(map_id, DotTimerTrack.MAIN, &"normal", game.record_key(&"u8802"))
-	_check(best.ok and best.value is DotTimerRecord and (best.value as DotTimerRecord).time > 0.0,
+	var best: DotResult = await store.best_for(map_id, 0, &"normal", game.record_key(&"u8802"))
+	_check(best.ok and best.value != null and float(best.value.get("time")) > 0.0,
 		"and keeps the Best it had")
-	var rows: DotResult = await store.top(map_id, DotTimerTrack.MAIN, &"normal", 20)
+	var rows: DotResult = await store.top(map_id, 0, &"normal", 20)
 	_check(rows.ok and (rows.value as Array).size() == 1, "the records board has one row for the account",
 		str((rows.value as Array).size()) if rows.ok else str(rows.error))
 	var fastest: DotResult = await game.boards.page_async(&"fastest", {
-		"map": String(map_id), "track": str(DotTimerTrack.MAIN), "style": "normal",
+		"map": String(map_id), "track": str(0), "style": "normal",
 	})
 	var entries: Array = fastest.value if fastest.ok and fastest.value is Array else []
 	_check(fastest.ok and entries.size() == 1 and (entries[0] as DotLeaderboardEntry).player_id == &"acct:alice",
@@ -2350,7 +2272,7 @@ func _test_records_follow_the_account() -> void:
 	await settle.call()
 	var stranger: DotClientSession = join.call(9203, 8801, "acct:bob", "Bob")
 	await settle.call()
-	var none: DotResult = await store.best_for(map_id, DotTimerTrack.MAIN, &"normal", game.record_key(&"u8801"))
+	var none: DotResult = await store.best_for(map_id, 0, &"normal", game.record_key(&"u8801"))
 	_check(none.ok and none.value == null, "a stranger who draws an earlier userid has no record")
 	leave.call(stranger)
 	await settle.call()
@@ -2366,29 +2288,29 @@ func _test_records_follow_the_account() -> void:
 	await settle.call()
 
 	# Rows written before the change are retired, not ranked and not deleted.
-	var old := DotTimerRecord.new()
-	old.map_id = map_id
-	old.track = DotTimerTrack.MAIN
-	old.style_id = &"normal"
-	old.player_id = &"u12"
-	old.player_name = "Old"
-	old.time = 31.0
+	var old: Object = load("res://addons/dot_timer/core/dot_timer_record.gd").new()
+	old.set("map_id", map_id)
+	old.set("track", 0)
+	old.set("style_id", &"normal")
+	old.set("player_id", &"u12")
+	old.set("player_name", "Old")
+	old.set("time", 31.0)
 	var _put: DotResult = await store.put(old)
 	_check(Playground.is_legacy_key(&"u12") and not Playground.is_legacy_key(&"acct:alice")
 		and not Playground.is_legacy_key(&"local") and not Playground.is_legacy_key(&"user"),
 		"a session-number key is recognised by its shape and an account's is not")
-	var moved: int = await game.retire_legacy_records()
-	var after: DotResult = await store.top(map_id, DotTimerTrack.MAIN, &"normal", 20)
+	var moved: int = await game.run_timer.call("retire_legacy_records")
+	var after: DotResult = await store.top(map_id, 0, &"normal", 20)
 	var left_ids: Array = []
 	for row in (after.value as Array):
-		left_ids.append((row as DotTimerRecord).player_id)
+		left_ids.append(row.get("player_id"))
 	_check(moved == 1 and not left_ids.has(&"u12") and left_ids.has(&"acct:alice"),
 		"a u<N> row leaves the board and the account's stays", str(left_ids))
 	var base: String = game.config.records_directory.strip_edges()
 	var archive := (base if base != "" else "user://").path_join("legacy_records.jsonl")
 	_check(FileAccess.file_exists(archive) and FileAccess.get_file_as_string(archive).contains("\"u12\""),
 		"and is kept in legacy_records.jsonl, not deleted", archive)
-	_check(await game.retire_legacy_records() == 0, "and retiring is idempotent")
+	_check(await game.run_timer.call("retire_legacy_records") == 0, "and retiring is idempotent")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(archive))
 	bridge.net.send_fn = kept_send
 	_section_done()

@@ -5,22 +5,23 @@ extends DotConfig
 ## variables, then [code]--pg-*[/code] arguments.
 ##
 ## [b]The tick rate is the one that matters, and it is deliberately not here.[/b] It
-## lives in [DotTimerConfig] and defaults to "take it from the engine", which on a
-## dot-server is whatever [code]sv_tickrate[/code] was set to. One number, in
+## is taken from the engine ([method Playground._resolve_tick_rate]), which on a
+## dot-server is whatever [code]sv_tickrate[/code] was set to, and a run timer a server
+## added is handed the same number. One number, in
 ## [code]server.cfg[/code], with everything else — rather than a second copy in a
 ## second file that can disagree with the first and produce plausible, wrong,
 ## permanently-filed times.
 ##
 ## [codeblock]
-## ./game --pg-map=pg_surf_intro --pg-records=/srv/records --timer-tick-rate=128
+## ./game --pg-initial-map=pg_generated --pg-map-seed=42 --pg-records-directory=/srv/records
 ## [/codeblock]
 
 @export_group("Content")
 
 ## The map to load on boot.
-@export var initial_map: StringName = &"pg_lobby"
+@export var initial_map: StringName = &"pg_flatgrass"
 
-## A map catalogue JSON file. Empty uses the three maps this build ships.
+## A map catalogue JSON file. Empty uses the maps this build ships.
 ##
 ## The seam between "a game with its own maps" and "a server with a map pool": an
 ## operator points this at a file and the built-in list is not used at all.
@@ -56,7 +57,8 @@ extends DotConfig
 
 ## Whether this instance times, ranks and spawns — the authority.
 ##
-## A client sets this false, runs its own timer for its HUD, and files nothing.
+## A client sets this false; with a run timer added, it times its own run for its HUD and
+## files nothing.
 @export var authoritative: bool = true
 
 ## Seconds a map runs before the session asks for the next one. 0 disables it.

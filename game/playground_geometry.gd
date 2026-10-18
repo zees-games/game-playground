@@ -8,13 +8,10 @@ const PlaygroundPaths := preload("playground_paths.gd")
 ## [b]Why the maps are built by a script rather than authored in the editor.[/b] Two
 ## reasons, and the second is the one that matters. The first is that this project
 ## ships no art and a hand-placed grey box is no more readable in a [code].tscn[/code]
-## than one line of code. The second is that a surf map's timer zones have to line up
-## with its ramps [i]exactly[/i] — a start line half a metre from where the mapper
-## meant it is a leaderboard that cannot be compared with anybody else's — and a map
-## whose geometry and zones are derived from the same constants cannot drift apart.
+## than one line of code. The second is that a map's survey, its toys and the suites read
+## the same constants the geometry was built from, so none of them can drift apart.
 ##
-## A real game authors its maps in the editor and draws its zones with
-## [code]DotTimerZonePainter[/code]. This is a test fixture that happens to be
+## A real game authors its maps in the editor. These are test fixtures that happen to be
 ## playable.
 
 ## The palette: what each kind of surface a movement map is made of is drawn in.
@@ -27,7 +24,7 @@ const PlaygroundPaths := preload("playground_paths.gd")
 ## are albedo, sRGB, chosen bright because the grid texture under them is about 0.82 grey.
 ## Start and end keep their old meanings (green-ish and red-ish) so a route still reads.
 ## The floor is the exception to "bright": a mid cool grey, because it fills half of every
-## frame, and near white (0.90, 0.91, 0.97) it rendered as a fifth of the lobby's pixels at
+## frame, and near white (0.90, 0.91, 0.97) it rendered as a fifth of a flat map's pixels at
 ## pure white under Compatibility; the pastels on it now read against it (game-arena's
 ## ground is the same shade, for the same reason).
 const COLOUR_FLOOR := Color(0.66, 0.68, 0.76)
@@ -37,10 +34,10 @@ const COLOUR_END := Color(1.00, 0.62, 0.72)
 const COLOUR_PLATFORM := Color(0.82, 0.74, 1.00)
 ## A booster: something on the map that throws the player. The one saturated colour.
 const COLOUR_BOOST := Color(1.00, 0.78, 0.22)
-## pg_bhop_intro's float: columns standing in a low-gravity zone, which is invisible.
+## A float: columns standing in a low-gravity zone, which is invisible. A document's "float".
 const COLOUR_FLOAT := Color(0.48, 0.90, 0.90)
-## pg_lobby's relay: a gate's frame, and the see-through pane inside it that a player jumps
-## into to be teleported (a TELEPORT zone, which is as invisible as the float's gravity).
+## A relay gate's frame, and the see-through pane inside it that a player jumps into to be
+## teleported (a TELEPORT zone, which is as invisible as the float's gravity).
 const COLOUR_GATE := Color(0.86, 0.42, 1.00)
 const COLOUR_GATE_PANE := Color(0.86, 0.42, 1.00, 0.30)
 

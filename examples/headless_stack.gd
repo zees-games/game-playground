@@ -74,7 +74,7 @@ func _run() -> void:
 func _build() -> bool:
 	var config := PlaygroundConfig.new()
 	config.records_directory = ""
-	config.initial_map = &"pg_lobby"
+	config.initial_map = &"pg_flatgrass"
 	config.map_seconds = 0.0
 
 	_game = Playground.new()
@@ -189,7 +189,7 @@ func _test_spawn_director() -> void:
 	var spawns := _stack().spawns
 	_check(spawns.sites().size() > 0, "the director has the map's starts in it")
 
-	var res := _stack().choose_start(&"ada", DotTimerTrack.MAIN)
+	var res := _stack().choose_start(&"ada", 0)
 	_check(res.ok, "and answers")
 
 	if not res.ok:
@@ -197,19 +197,19 @@ func _test_spawn_director() -> void:
 
 	var choice := res.value as DotSpawnChoice
 	_check(
-		int(choice.site.meta.get("track", -1)) == DotTimerTrack.MAIN,
+		int(choice.site.meta.get("track", -1)) == 0,
 		"with the site belonging to the track asked for"
 	)
 
 	var map := _game.current_map_node()
 	_check(
-		choice.transform.origin.distance_to(map.spawn_for(DotTimerTrack.MAIN)) < 0.01,
+		choice.transform.origin.distance_to(map.spawn_for(0)) < 0.01,
 		"at the place the map itself would have said"
 	)
 	_check(
 		absf(
 			rad_to_deg(choice.transform.basis.get_euler().y)
-			- map.spawn_yaw_for(DotTimerTrack.MAIN)
+			- map.spawn_yaw_for(0)
 		) < 0.5,
 		"facing the way the map says — the site holds radians and DotFpsState.yaw is "
 		+ "degrees, and the conversion was missing at both ends"

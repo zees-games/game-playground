@@ -108,28 +108,53 @@ var _escapes: Dictionary = {}
 var _void_falls := 0
 
 
-## Surveys a built map. [param spawns] are the points players are put at; [param zones]
-## says where a finish or a respawn is; [param declared] is the map's list of
+## Surveys a built map. [param spawns] are the points players are put at; [param ways_out]
+## says where a finish or a respawn is, as `{box: AABB, pit: bool}` (a pit is a respawn
+## volume a fall can land in; see [method ways_out_of]); [param declared] is the map's list of
 ## `{box: AABB, why: String}` for areas it knows no spawn reaches.
 ##
 ## Returns `{cells, regions, slots, unreached, trapped, spawnless, void_falls}`, where
 ## `slots`, `unreached` and `trapped` are human-readable lines and `spawnless` lists the
 ## spawns that are not over standable ground.
 static func survey(
-	map: Node3D, zones: DotTimerZoneSet, spawns: Array[Vector3], declared: Array
+	map: Node3D, ways_out: Array, spawns: Array[Vector3], declared: Array
 ) -> Dictionary:
 	var s := new()
 	s._collect(map)
-	return s._run(zones, spawns, declared)
+	return s._run(ways_out, spawns, declared)
 
 
 ## Surveys a list of solids directly: for a fixture that is not a map.
 static func survey_solids(
-	boxes: Array[Solid], zones: DotTimerZoneSet, spawns: Array[Vector3], declared: Array
+	boxes: Array[Solid], ways_out: Array, spawns: Array[Vector3], declared: Array
 ) -> Dictionary:
 	var s := new()
 	s.solids = boxes
-	return s._run(zones, spawns, declared)
+	return s._run(ways_out, spawns, declared)
+
+
+## The ways out a run timer's zone set declares: every box END zone, and every box RESPAWN
+## zone as a pit too. [param zones] is a dot-timer `DotTimerZoneSet` or null, read by duck
+## typing because the timer is an optional addon here and a script naming its classes does
+## not compile without it (see `addons/pg_timer`).
+static func ways_out_of(zones: Object) -> Array:
+	var out: Array = []
+
+	if zones == null:
+		return out
+
+	for zone: Object in zones.get("zones"):
+		var consts: Dictionary = zone.get_script().get_script_constant_map()
+		if int(zone.get("shape")) != int((consts["Shape"] as Dictionary)["BOX"]):
+			continue
+		var kind := int(zone.get("kind"))
+		var kinds: Dictionary = consts["Kind"]
+		var from: Vector3 = zone.get("from")
+		var to: Vector3 = zone.get("to")
+		if kind == int(kinds["END"]) or kind == int(kinds["RESPAWN"]):
+			out.append({"box": AABB(from, to - from).abs(), "pit": kind == int(kinds["RESPAWN"])})
+
+	return out
 
 
 ## A solid from a centre, a size and an optional basis — `PlaygroundGeometry.box`'s
@@ -176,13 +201,13 @@ func _collect(map: Node3D) -> void:
 			solids.append(solid(xform.origin, (shape.shape as BoxShape3D).size, xform.basis))
 
 
-func _run(zones: DotTimerZoneSet, spawns: Array[Vector3], declared: Array) -> Dictionary:
+func _run(ways_out: Array, spawns: Array[Vector3], declared: Array) -> Dictionary:
 	var slots := _slots()
 
 	_rasterise()
 	_find_cells()
 	_join_regions()
-	_link_regions(zones)
+	_link_regions(ways_out)
 
 	# Forward from every spawn.
 	var starts: Dictionary = {}
@@ -605,27 +630,22 @@ func _node_at(n: int) -> Vector3:
 
 
 ## Drops, slides, jumps, and which regions are ways out.
-func _link_regions(zones: DotTimerZoneSet) -> void:
-	var exits: Array[DotTimerZone] = []
-	var pits: Array[DotTimerZone] = []
+func _link_regions(ways_out: Array) -> void:
+	var exits: Array[AABB] = []
+	var pits: Array[AABB] = []
 
-	if zones != null:
-		for zone in zones.zones:
-			if zone.shape != DotTimerZone.Shape.BOX:
-				continue
-			if zone.kind == DotTimerZone.Kind.END:
-				exits.append(zone)
-			elif zone.kind == DotTimerZone.Kind.RESPAWN:
-				exits.append(zone)
-				pits.append(zone)
+	for way: Dictionary in ways_out:
+		exits.append(way["box"] as AABB)
+		if bool(way.get("pit", false)):
+			pits.append(way["box"] as AABB)
 
 	# Standing in a finish or a reset is a way out. Driven from the zones rather than the
 	# cells: a sandbox plate is 600,000 cells and a map has a handful of zones.
 	for zone in exits:
-		var ix0 := maxi(0, int(floor((zone.from.x - _origin.x) / CELL)))
-		var ix1 := mini(_nx - 1, int(floor((zone.to.x - _origin.x) / CELL)))
-		var iz0 := maxi(0, int(floor((zone.from.z - _origin.y) / CELL)))
-		var iz1 := mini(_nz - 1, int(floor((zone.to.z - _origin.y) / CELL)))
+		var ix0 := maxi(0, int(floor((zone.position.x - _origin.x) / CELL)))
+		var ix1 := mini(_nx - 1, int(floor((zone.end.x - _origin.x) / CELL)))
+		var iz0 := maxi(0, int(floor((zone.position.z - _origin.y) / CELL)))
+		var iz1 := mini(_nz - 1, int(floor((zone.end.z - _origin.y) / CELL)))
 
 		for iz in range(iz0, iz1 + 1):
 			for ix in range(ix0, ix1 + 1):
@@ -700,7 +720,7 @@ func _link_regions(zones: DotTimerZoneSet) -> void:
 
 ## Where a player who leaves the ground over (x, z) at [param y] comes to rest: a cell,
 ## -2 for a fall into a respawn volume, or -1 for a fall into nothing.
-func _fall(x: float, z: float, y: float, pits: Array[DotTimerZone]) -> int:
+func _fall(x: float, z: float, y: float, pits: Array[AABB]) -> int:
 	var cx := x
 	var cz := z
 	var top := y
@@ -722,8 +742,8 @@ func _fall(x: float, z: float, y: float, pits: Array[DotTimerZone]) -> int:
 
 		if best < 0:
 			for pit in pits:
-				if cx >= pit.from.x and cx <= pit.to.x and cz >= pit.from.z \
-						and cz <= pit.to.z and pit.from.y < top:
+				if cx >= pit.position.x and cx <= pit.end.x and cz >= pit.position.z \
+						and cz <= pit.end.z and pit.position.y < top:
 					return -2
 			_void_falls += 1
 			return -1
@@ -870,11 +890,12 @@ func _cell_under(at: Vector3) -> int:
 	return -1
 
 
-static func _inside(zone: DotTimerZone, at: Vector3) -> bool:
+static func _inside(zone: AABB, at: Vector3) -> bool:
+	var to := zone.end
 	return (
-		at.x >= zone.from.x and at.x <= zone.to.x
-		and at.y >= zone.from.y and at.y <= zone.to.y
-		and at.z >= zone.from.z and at.z <= zone.to.z
+		at.x >= zone.position.x and at.x <= to.x
+		and at.y >= zone.position.y and at.y <= to.y
+		and at.z >= zone.position.z and at.z <= to.z
 	)
 
 

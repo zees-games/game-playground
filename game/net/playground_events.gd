@@ -30,9 +30,10 @@ enum Kind {
 	HELD,
 	## What a player is carrying, so the client draws the right viewmodel.
 	WEAPON,
-	## A player's run state changed: started, stopped, paused.
+	## Reserved: a run timer's run state, before the timer became optional. Never sent now
+	## (`addons/pg_timer` speaks through ADDON); kept so no later kind is renumbered.
 	TIMER,
-	## A player finished. Time and rank.
+	## Reserved, as TIMER: a finish. Never sent now.
 	FINISH,
 	## Text for everyone, or for one player: a refusal, a budget, a vote result.
 	NOTICE,
@@ -101,7 +102,8 @@ enum Ask {
 	CLEAR_MINE,
 	## Put me back at the start of the course.
 	RESTART,
-	## Save a checkpoint (0), teleport to it (1), clear them (2).
+	## Save a checkpoint (0), teleport to it (1), clear them (2). A run timer's practice
+	## checkpoints; ignored by a server without one.
 	CHECKPOINT,
 	## Rock the vote.
 	RTV,
@@ -374,43 +376,6 @@ static func write_map(map_id: StringName) -> PackedByteArray:
 
 static func read_map(r: DotNetReader) -> StringName:
 	return StringName(r.read_string(ID_BYTES))
-
-
-# --- The timer -------------------------------------------------------------
-
-## Run state, through dot-timer's own [DotTimerNet.RunState].
-##
-## [b]Not a hand-rolled encoding, and the first draft of this file was one.[/b] A run is
-## a tick count plus two sub-tick fractions — that is dot-timer's whole design, and it
-## is what makes a 64 Hz run comparable with a 128 Hz one. An encoder here that sent a
-## start tick and forgot the fractions would quantise every mirrored time back to the
-## tickrate, silently, on the client only.
-static func write_timer(player_id: int, state: DotTimerNet.RunState) -> PackedByteArray:
-	var w := _w()
-	w.write_varint(player_id)
-	state.write(w)
-	return w.to_bytes()
-
-
-static func read_timer(r: DotNetReader) -> Dictionary:
-	var player_id := r.read_varint()
-	var state := DotTimerNet.RunState.new()
-	state.read(r)
-	return {"player_id": player_id, "state": state, "ok": r.ok()}
-
-
-static func write_finish(player_id: int, finish: DotTimerNet.Finish) -> PackedByteArray:
-	var w := _w()
-	w.write_varint(player_id)
-	finish.write(w)
-	return w.to_bytes()
-
-
-static func read_finish(r: DotNetReader) -> Dictionary:
-	var player_id := r.read_varint()
-	var finish := DotTimerNet.Finish.new()
-	finish.read(r)
-	return {"player_id": player_id, "finish": finish, "ok": r.ok()}
 
 
 # --- Notices ---------------------------------------------------------------

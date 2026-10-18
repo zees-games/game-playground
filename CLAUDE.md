@@ -1,8 +1,8 @@
 # game-playground
 
-A physics sandbox first: hold Q, pick a prop, an NPC or a weapon, click it and it is yours; hold it with a physics gun, freeze it, throw it, wire it, weld it, undo it. With map support, and with dot-timer kept on courses in the corner of the sandbox as well as on the surf and bhop maps, because that is what says the timer is not a surf-and-bhop thing. Networked over dot-net and delivered as a signed dot-cloud pack.
+A physics sandbox first: hold Q, pick a prop, an NPC or a weapon, click it and it is yours; hold it with a physics gun, freeze it, throw it, wire it, weld it, undo it. With map support. Networked over dot-net and delivered as a signed dot-cloud pack.
 
-It is the only place dot-player-controller, dot-timer, dot-map, dot-props, dot-npc and dot-leaderboard run together, and the bugs that cost days here were all in the seams between them. `examples/headless_playground.tscn` is the point of the repository.
+It is the only place dot-player-controller, dot-map, dot-props, dot-npc and dot-leaderboard run together, and the bugs that cost days here were all in the seams between them. `examples/headless_playground.tscn` is the point of the repository.
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it. **The detail is in [docs/](docs/README.md)**: open the file for what you are touching.
 
@@ -11,11 +11,11 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | Read | Before |
 | --- | --- |
 | [docs/README.md](docs/README.md) | the index |
-| [docs/simulation.md](docs/simulation.md) | the tick loop, the player, styles, timer effects, teleports and spawns, tunables, the tick rate, the module and its commands |
+| [docs/simulation.md](docs/simulation.md) | the tick loop, the player, styles, `post_move_fn`, teleports and spawns, tunables, the tick rate, the module and its commands |
 | [docs/sandbox.md](docs/sandbox.md) | props, entities, NPCs, weapons, zee, projectiles, the Q menu, tools, the tool gun, limits, machines, breaking, pickup, creative, prop surfing, builds |
-| [docs/maps.md](docs/maps.md) | a map, the zone export, the survey, custom map documents, materials, liquids, panes, `pg_generated` |
-| [docs/routes.md](docs/routes.md) | a timed route, the drive bot, reach and pace checks |
-| [docs/vehicles.md](docs/vehicles.md) | vehicles, seats, the circuit, driving over the wire |
+| [docs/maps.md](docs/maps.md) | a map, the survey, custom map documents, materials, liquids, panes, `pg_generated` |
+| [docs/timer.md](docs/timer.md) | anything about the run timer: it does not ship, `addons/pg_timer` adapts dot-timer when a server links it |
+| [docs/vehicles.md](docs/vehicles.md) | vehicles, seats, timed driving, driving over the wire |
 | [docs/netcode.md](docs/netcode.md) | `game/net/`, prediction, remote bodies, the READY gate, mirrors, event and request kinds |
 | [docs/inventory.md](docs/inventory.md) | the bag and its wire |
 | [docs/modes.md](docs/modes.md) | arena, waves and downs, the shop, spectating, hosting |
@@ -29,20 +29,20 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | Path | What |
 | --- | --- |
 | `game/` | `playground.gd` (the simulation, headless), the player, the server module and services, props, `entities/`, `weapons/` and `toolgun/`, the modes, the bag, the client (not headless), `net/`, the maps' base, geometry and lighting. File by file: [docs](docs/README.md#where-the-code-is) |
-| `maps/` | `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built), `pg_generated`, `pg_data` (a JSON map), `*.zones.json` (generated), `custom/` (game-playground-maps, linked) |
+| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (a JSON map), `custom/` (game-playground-maps, linked) |
 | `examples/` | the five suites |
-| `tools/` | `export_zones.gd`, `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd` |
+| `tools/` | `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd` |
+| `addons/pg_timer/` | the optional run-timer adapter: does nothing unless `addons/dot_timer` is linked ([timer](docs/timer.md)) |
 | `assets/`, `scenes/fx/` | vendored CC0 art (zee weapons and arms, the character kit, Kenney's grid); the two effect scenes |
 | `game.yml` | the descriptor that travels in the published pack |
 
 ## Running and testing
 
 - `./game.sh` plays offline (`godot --path .` also works); `./game.sh online` runs a local server and client; `./game.sh test` parses everything and runs all five suites; `./game.sh help` lists the rest.
-- **Run `godot --headless --path . --script tools/export_zones.gd` after changing a map**, or the zone-file check fails. [maps](docs/maps.md#geometry-and-zones-come-from-one-description)
 - `headless_playground -- --only=<method>` runs one section; it is then on whatever map the boot left. [testing](docs/testing.md#the-suites)
 - **Add a `headless_net` test at the end of the connected-player sequence**: both halves share one physics space and the suite is order-sensitive. [testing](docs/testing.md#traps-the-suites-have-hit)
 - A suite or tool that builds a presentation or client calls `PlaygroundPresentation.use_scratch_settings` first: never the player's file. [testing](docs/testing.md#traps-the-suites-have-hit)
-- After touching a camera, the view key or player collision: `godot --headless --path . --script tools/camera_check.gd` (the rig round the lobby's walls, armed; `mp_solidplayers` both ways). [client](docs/client.md#third-person-and-the-body)
+- After touching a camera, the view key or player collision: `godot --headless --path . --script tools/camera_check.gd` (the rig round pg_flatgrass's walls, armed; `mp_solidplayers` both ways). [client](docs/client.md#third-person-and-the-body)
 - **Render after touching the client, a menu or a map** (`tools/screenshot*.sh`, under `xvfb-run`). No assertion sees the screen. [client](docs/client.md#looking-at-it)
 
 ## Rules that bite
@@ -52,15 +52,14 @@ Short forms; the reasoning is in the linked file.
 **Simulation**
 
 - Footsteps and per-map beds are dot-audio's stock (a step's surface is the box's `dot_fps_surface`); measure levels with its `loudness.sh`, and check the pilot walked and spawned. [client](docs/client.md#footsteps-and-the-bed)
-- `Drive.EXTERNAL` always; the game ticks the controllers and **feeds the timer after the move**. [simulation](docs/simulation.md#the-game-owns-the-tick-loop)
+- `Drive.EXTERNAL` always; the game ticks the controllers and **feeds a run timer after the move**. [simulation](docs/simulation.md#the-game-owns-the-tick-loop)
 - Leave the controller's `body_ref` unset; `of_self()` is the controller, a plain `Node`, and the player never moves. [simulation](docs/simulation.md#body_ref-must-not-be-of_self)
-- Apply the movement style and the timer style together (`PlaygroundPlayer.set_style`); never write the live tunables (a style rebuild drops it). [simulation](docs/simulation.md#a-style-has-two-halves-and-they-move-together)
-- The timer decides and the game acts. Effects that move a player are applied on the tick, read at the state's own position (`effect_zone_at`), never from `timer.effect()`. [simulation](docs/simulation.md#the-timer-decides-and-the-game-acts)
-- Effect zones (PUSH, GRAVITY) are not track-filtered; that is dot-timer's and an open question. [simulation](docs/simulation.md#the-timer-decides-and-the-game-acts)
-- Teleport through `PlaygroundPlayer.teleport`; a yaw written into the state lasts until the next command. Facing is `atan2(-dx, -dz)`. It stops the run; only a map's TELEPORT zone passes `keep_run`. [simulation](docs/simulation.md#teleport-and-the-spawn-yaw)
+- **dot-timer does not ship.** No script outside `addons/pg_timer/` names a `DotTimer*` class (the parse pass runs without the addon); the game calls `Playground.run_timer` duck-typed and null-checked, and the adapter loads dot-timer by path. [timer](docs/timer.md)
+- Set a style through `PlaygroundPlayer.set_style` (it emits `style_changed`, which a timer follows); never write the live tunables (a style rebuild drops it). [simulation](docs/simulation.md#a-style-is-movement-and-a-timers-ranking-half-follows-it)
+- An addon that moves a player does it on the tick through `post_move_fn`, read at the state's own position. [simulation](docs/simulation.md#after-the-move-post_move_fn)
+- Teleport through `PlaygroundPlayer.teleport`; a yaw written into the state lasts until the next command. Facing is `atan2(-dx, -dz)`. It stops a run, if there is one. [simulation](docs/simulation.md#teleport-and-the-spawn-yaw)
 - Reach comes from `PlaygroundMap.jump_reach` / `climb_limit`, never from `DotFpsTunables.new()`. [simulation](docs/simulation.md#the-movement-is-a-bhop-servers-not-the-addons-defaults)
 - `sv_tickrate` goes in `server.cfg`; no `pg_tickrate`. [simulation](docs/simulation.md#the-tick-rate-comes-from-servercfg-and-every-link-is-silent)
-- Zone commands are `CHANGEMAP`; saving a set with a problem is refused. [simulation](docs/simulation.md#the-server-module)
 
 **Sandbox**
 
@@ -78,14 +77,13 @@ Short forms; the reasoning is in the linked file.
 - **Map toys** come from a map's `map_toys()`, built on both ends in that order under the playground, never the map; a hit scan asks `shoot_toy` first; the bounce is after the move on every end. [sandbox](docs/sandbox.md#the-maps-toys), [netcode](docs/netcode.md#the-maps-toys)
 - Saved builds are catalogue ids, whole or nothing. [sandbox](docs/sandbox.md#saved-builds)
 
-**Maps and routes**
+**Maps**
 
-- Geometry, zones and the suite read one description per route. [maps](docs/maps.md#geometry-and-zones-come-from-one-description)
+- No built-in map is timed or may assume a timer; a timed map brings its own zones. [maps](docs/maps.md#no-map-here-is-timed)
 - Unreached ground is allowed only where `survey_declared()` says why. [maps](docs/maps.md#every-hand-built-map-is-surveyed)
 - Custom maps are JSON documents, never scripts; a map prop's missing id is skipped, not the map. [maps](docs/maps.md#custom-maps-are-documents)
 - Material numbers are dot-physics'; liquids and foliage have no collider. [maps](docs/maps.md#map-materials)
 - The palette is `PlaygroundGeometry.COLOUR_*`; a map's light is its dot-lighting document, a child of the map node, never a second `WorldEnvironment`; its boxes get dot-lighting's `DotContactShade` (`PlaygroundMap.add_contact_shade`, called by every map once built). Render a look change with `RENDERER=forward_plus` too. [maps](docs/maps.md#the-look)
-- A split must be one nobody can skip; a tilted slab drops along its normal; "it finished" is never the only check. [routes](docs/routes.md#rules-every-route-follows)
 
 **Vehicles**
 

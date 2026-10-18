@@ -70,7 +70,6 @@ signal props_changed()
 ## neither. A joining client is sent the whole world's props through the same event, so
 ## this fires for those too — a listener that makes a noise has to decide which it wants.
 signal prop_arrived(at: Vector3, owner_session: int)
-signal finish_received(player_id: int, time: float, rank: int)
 signal notice_received(player_id: int, text: String)
 
 ## A player got into or out of a vehicle. Client side; the HUD and the camera read it.
@@ -252,7 +251,7 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 	_entities.name = "Entities"
 	add_child(_entities)
 
-	# [b]dot-timer's declared ordering, NOT a sort of the ids.[/b] The first draft
+	# [b]The styles' declared ordering, NOT a sort of the ids.[/b] The first draft
 	# collected `game.movement_styles`' keys and called `Array.sort()` on them — and
 	# Godot compares StringNames by their INTERNED POINTER, not lexicographically. Two
 	# peers therefore build two different tables, and a style index means a different
@@ -261,9 +260,8 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 	# message type in dot-net, and it is invisible in any one-process test, because one
 	# process has one intern table and both ends agree by construction.
 	#
-	# `styles_in_order` sorts on a declared integer, which is the same on every machine.
-	for style in game.timers.styles_in_order():
-		_style_ids.append(style.id)
+	# `style_order` is dot-player-controller's declared list, the same on every machine.
+	_style_ids.assign(game.style_order)
 
 	net.send_fn = _send
 
@@ -319,9 +317,6 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 		game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
 			_tell(peer_for_player(session_of(id)), PlaygroundEvents.Kind.HIT,
 				PlaygroundEvents.write_hit(victim, amount, point, killed, headshot)))
-		game.timers.player_started.connect(_on_run_changed)
-		game.timers.player_stopped.connect(_on_run_stopped)
-		game.run_filed.connect(_on_run_filed)
 		game.weapon_picked_up.connect(_on_weapon_picked_up)
 
 		if game.projectiles != null:
@@ -1369,43 +1364,6 @@ func toy_count() -> int:
 	return n
 
 
-func _on_run_changed(id: StringName, _run: DotTimerRun) -> void:
-	_send_timer(session_of(game.match_id(id)))
-
-
-func _on_run_stopped(id: StringName, _run: DotTimerRun, _reason: StringName) -> void:
-	_send_timer(session_of(game.match_id(id)))
-
-
-func _send_timer(session_id: int) -> void:
-	var player: PlaygroundPlayer = game.players.get(_player_key(session_id))
-	if player == null or player.timer == null:
-		return
-
-	var run := player.timer.run
-	if run == null:
-		return
-
-	var style_id := player.timer_style.id if player.timer_style != null else &"normal"
-	var state := DotTimerNet.state_of(run, _tick, _style_index(style_id))
-
-	_broadcast(PlaygroundEvents.Kind.TIMER, PlaygroundEvents.write_timer(session_id, state))
-
-
-func _on_run_filed(id: StringName, run: DotTimerRun, rank: int, reason: String) -> void:
-	var session_id := session_of(id)
-	if run == null:
-		return
-
-	var finish := DotTimerNet.finish_of(run, _style_index(run.style_id), rank)
-	_broadcast(PlaygroundEvents.Kind.FINISH,
-		PlaygroundEvents.write_finish(session_id, finish))
-
-	if reason != "":
-		_tell(peer_for_player(session_id), PlaygroundEvents.Kind.NOTICE,
-			PlaygroundEvents.write_notice(session_id, "Not recorded: %s" % reason))
-
-
 # --- Client: asking --------------------------------------------------------
 
 func ask_ready() -> void:
@@ -1547,7 +1505,10 @@ func _on_request(message: DotNetMessage) -> void:
 		PlaygroundEvents.Ask.RESTART:
 			game.spawn_player(id)
 		PlaygroundEvents.Ask.CHECKPOINT:
-			_checkpoint(id, PlaygroundEvents.read_index(reader))
+			# A run timer's practice checkpoints; nothing to do without one.
+			var action := PlaygroundEvents.read_index(reader)
+			if game.run_timer != null:
+				game.run_timer.call("checkpoint", id, action)
 		PlaygroundEvents.Ask.RTV:
 			game.rock_the_vote(id)
 		PlaygroundEvents.Ask.SAY:
@@ -1916,28 +1877,6 @@ func _select_tool(session_id: int, id: StringName, tool_id: StringName) -> void:
 	_broadcast(PlaygroundEvents.Kind.WEAPON, PlaygroundEvents.write_weapon(session_id, tool_id))
 
 
-func _checkpoint(id: StringName, action: int) -> void:
-	var player: PlaygroundPlayer = game.players.get(id)
-	var checkpoints := game.timers.checkpoints_for(game.record_key(id))
-	if player == null or checkpoints == null:
-		return
-
-	var s := player.controller.state
-	match action:
-		0:
-			checkpoints.save(
-				s.position, s.velocity, s.yaw, s.pitch, s.is_grounded(), s.is_crouched()
-			)
-		1:
-			var cp := checkpoints.load_current()
-			if cp != null:
-				player.teleport(cp.position, cp.yaw)
-				player.controller.state.velocity = cp.velocity
-				player.controller.state.pitch = cp.pitch
-		2:
-			checkpoints.clear()
-
-
 # --- Client: applying ------------------------------------------------------
 
 func _on_event(message: DotNetMessage) -> void:
@@ -1994,17 +1933,6 @@ func _on_event(message: DotNetMessage) -> void:
 					held_props[int(holding["player_id"])] = int(holding["net_id"])
 				else:
 					held_props.erase(int(holding["player_id"]))
-		PlaygroundEvents.Kind.TIMER:
-			_apply_timer(reader)
-		PlaygroundEvents.Kind.FINISH:
-			var finish := PlaygroundEvents.read_finish(reader)
-			if bool(finish["ok"]):
-				var f: DotTimerNet.Finish = finish["finish"]
-				finish_received.emit(
-					int(finish["player_id"]),
-					f.time(1.0 / float(maxi(game.tick_rate, 1))),
-					f.rank
-				)
 		PlaygroundEvents.Kind.NOTICE:
 			var notice := PlaygroundEvents.read_notice(reader)
 			if bool(notice["ok"]):
@@ -2467,28 +2395,6 @@ func _apply_prop_gone(reader: DotNetReader) -> void:
 		behaviour.prop.queue_free()
 
 	props_changed.emit()
-
-
-func _apply_timer(reader: DotNetReader) -> void:
-	var info := PlaygroundEvents.read_timer(reader)
-	if not bool(info["ok"]):
-		return
-
-	var player: PlaygroundPlayer = game.players.get(_player_key(int(info["player_id"])))
-	if player == null or player.timer == null:
-		return
-
-	var state: DotTimerNet.RunState = info["state"]
-
-	# Against the ESTIMATED server tick, not the local one: the local tick runs a lead
-	# ahead so commands arrive in time, and a HUD counting from it would show every run
-	# a flight time longer than the server will file it.
-	player.timer.run = DotTimerNet.run_from_state(
-		state,
-		net.clock.server_tick(),
-		1.0 / float(maxi(game.tick_rate, 1)),
-		_style_id(state.style_index)
-	)
 
 
 # --- Sending ---------------------------------------------------------------

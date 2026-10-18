@@ -5,7 +5,7 @@ const PlaygroundGeometry := preload("playground_geometry.gd")
 ## A generated sandbox: a pipeline, a document, and boxes extruded out of it.
 ##
 ## [b]This is the only map in the family that is not written down.[/b] Every other one —
-## `pg_lobby`, `dm_atrium`, `bhop_g2g_stages` — is a `_build()` full of constants, which
+## `pg_flatgrass`, `dm_atrium`, `bhop_g2g_stages` — is a `_build()` full of constants, which
 ## is the right shape for a level somebody designed. A sandbox is the one place where
 ## "somewhere new every time" is worth more than "somewhere good", because what a player
 ## does in it is build, and what they build is the level.

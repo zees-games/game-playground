@@ -181,8 +181,7 @@ func pick_up(holder: PlaygroundPlayer, target: PlaygroundPlayer, origin: Vector3
 	_holder_of[target.player_id] = holder.player_id
 
 	target.set_held(true)
-	if target.timer != null:
-		target.timer.stop(DotTimer.REASON_TELEPORT)
+	target.stop_run(&"teleport")
 
 	DotLog.info(CHANNEL, "picked up", {"holder": String(holder.player_id), "target": String(target.player_id)})
 	changed.emit(holder.player_id, target.player_id, true)

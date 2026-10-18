@@ -23,9 +23,9 @@ const Playground := preload("../playground.gd")
 ## It lists addresses only; every row is still asked what it is, like any other.
 ##
 ## [b]The map filter is the one thing here that is this game's.[/b] A sandbox server on
-## `pg_lobby` and one on `pg_surf_intro` are different places to somebody choosing where to
-## go, and dot-server reports the running map in a query — so a person who wants the surf
-## map can have only servers on it, without any server having to be asked.
+## `pg_flatgrass` and one on a custom map are different places to somebody choosing where to
+## go, and dot-server reports the running map in a query — so a person who wants one map can
+## have only servers on it, without any server having to be asked.
 
 # A screen on a player's machine, where nobody reads a log: the asking is dot-browser's, and it
 # logs its own queries. The one thing said here is a site listing that was configured and could

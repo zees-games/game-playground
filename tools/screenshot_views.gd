@@ -69,7 +69,7 @@ func _initialize() -> void:
 
 	var config := PlaygroundConfig.new()
 	config.records_directory = ""
-	config.initial_map = &"pg_lobby"
+	config.initial_map = &"pg_flatgrass"
 	config.map_seconds = 0.0
 
 	_game = Playground.new()

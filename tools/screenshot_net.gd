@@ -234,7 +234,7 @@ func _make_game(server: bool, scope: StringName, parent: Node) -> Playground:
 	var config := PlaygroundConfig.new()
 	config.records_directory = ""
 	config.map_seconds = 0.0
-	config.initial_map = &"pg_lobby"
+	config.initial_map = &"pg_flatgrass"
 	config.authoritative = server
 
 	var game := Playground.new()
