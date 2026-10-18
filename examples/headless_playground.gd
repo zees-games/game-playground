@@ -61,7 +61,7 @@ const TICK := 1.0 / 128.0
 ## project is the thing dot-map exists to avoid.
 const PgLobby := preload("res://maps/pg_lobby.gd")
 
-const CHECKS := 1032
+const CHECKS := 1033
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -8179,6 +8179,14 @@ func _the_spawn_yaw_survives_a_tick(
 	await get_tree().physics_frame
 
 
+## Frames until [member PlaygroundClient.gate] is open (physics frames, because it settles on them).
+func _gate_opens(client: PlaygroundClient) -> void:
+	for _i in range(240):
+		if client.gate == null or client.gate.is_open():
+			return
+		await get_tree().physics_frame
+
+
 func _test_the_client_boots() -> void:
 	_section("the client boots")
 
@@ -8196,6 +8204,13 @@ func _test_the_client_boots() -> void:
 
 	for _i in range(4):
 		await get_tree().process_frame
+
+	# The load gate covers the client, and holds its input and its body, until the level, the
+	# player and the camera are in and the physics has settled: a test that drives the
+	# client waits for it as a player would.
+	await _gate_opens(client)
+	_check(client.gate != null and client.gate.is_open(), "the load gate opens once the level, player and camera are in",
+		"state %s held %s" % [client.gate.state(), client.gate.reasons()] if client.gate != null else "no gate")
 
 	_check(client.playground != null, "the client builds a playground")
 	_check(

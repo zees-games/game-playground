@@ -115,6 +115,9 @@ var armour: int = 0
 var match_label: String = ""
 var match_seconds: float = 0.0
 var camera: Camera3D = null
+## Keeps the screen covered, and the local body and the input still, until the level, the
+## player and the camera are all in. See [method _build_gate].
+var gate: DotLoadGate = null
 
 ## The player asked to leave from the pause menu.
 ##
@@ -209,6 +212,9 @@ var _net_buttons: int = 0
 
 
 func _ready() -> void:
+	# First, before anything can be drawn: the map arrives after this node is in the tree.
+	_build_gate()
+
 	playground = Playground.new()
 	playground.name = "Playground"
 
@@ -308,6 +314,8 @@ func _ready() -> void:
 			})
 			return
 
+	_wire_gate_to_maps()
+
 	if link != null:
 		# The server creates the player and JOIN is what tells this client about it, so
 		# there is nobody to adopt yet. Everything below that needs one checks.
@@ -333,6 +341,7 @@ func _ready() -> void:
 
 		player = playground.add_player(player_id, display_name)
 		player.samples_input = true
+		gate.freeze(player)
 
 		# The sampler is built in the player's _ready, which has already run — so it is
 		# built here instead. Setting the flag alone would leave a player who is
@@ -388,6 +397,44 @@ func _ready() -> void:
 ## cannot tell the two apart; sounding somebody else's would greet every join with a burst
 ## of an hour's building. Your own cannot be in that backlog — the session is new — and it
 ## is the one sound that answers something you just did.
+## The load gate: the screen stays covered, and the local body and the input stay still, until
+## the level is built, the local player exists and its camera is current.
+##
+## [b]Without it the player moved before the world was whole.[/b] Offline the player spawns in
+## the tick the first map lands, and a connected client draws from the first frame with no
+## player, no camera and a HUD that has nobody to read; a map change tore the old level down
+## and rebuilt it in front of a body that kept falling through the gap. The gate does not stop
+## the simulation by itself: a frozen player is skipped by [method Playground._simulate_tick]
+## (`can_process`), and this client's own sampling and keys check [method _covered].
+func _build_gate() -> void:
+	gate = DotLoadGate.new()
+	gate.name = "LoadGate"
+	# A headless run draws nothing, so there is nothing to compile; its warm-up would only wait
+	# out its timeout, and every suite that drives a client would wait with it.
+	gate.warm_up_on_open = DisplayServer.get_name() != "headless"
+	add_child(gate)
+	gate.hold(&"map", "Loading the map")
+	gate.require(&"spawned", func() -> bool:
+		return player != null and camera != null and camera.is_inside_tree(), "Joining")
+
+
+## Releases the map hold once the first level is in, and holds again for each map change.
+## Connected to `changing` (before the old level goes) and `changed` (the new one is built).
+func _wire_gate_to_maps() -> void:
+	gate.release(&"map")
+	playground.maps.changing.connect(
+		func(_from: DotMapDef, _to: DotMapDef) -> void: gate.hold(&"map", "Loading the map")
+	)
+	playground.maps.changed.connect(
+		func(_map: DotMapDef, _loaded: Node) -> void: gate.release(&"map")
+	)
+
+
+## True while the load gate covers the screen: no input, no tool, no prediction.
+func _covered() -> bool:
+	return gate != null and not gate.is_open()
+
+
 func _wire_presentation() -> void:
 	if presentation == null or presentation.settings == null \
 			or presentation.audio == null or presentation.fx == null:
@@ -586,6 +633,7 @@ func _adopt() -> void:
 		return
 
 	player = mine
+	gate.freeze(player)
 
 	# Now, and not before: this is the first moment there is a node to parent a camera
 	# to. See the note in _ready.
@@ -613,7 +661,9 @@ func _net_physics(delta: float) -> void:
 
 	var sampler := active_sampler()
 
-	if sampler == null:
+	# The clock above has advanced; only the sampling waits, so the mouse does not pile up
+	# a turn behind the cover and the server sees an idle body until it lifts.
+	if sampler == null or _covered():
 		return
 
 	# [b]Each pass is its own tick.[/b] `advance` has already moved the clock by all of
@@ -1429,6 +1479,9 @@ func active_sampler() -> DotFpsSampler:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _covered():
+		return
+
 	# [b]The console first.[/b] This client reads bare letters -- Q opens the spawn menu,
 	# 1 and 2 switch tools, F gets into a car, E spawns -- so without this, typing
 	# `seed` at the console opens the menu, switches a tool and spawns a crate. It is the
@@ -2166,7 +2219,7 @@ func _physics_process(delta: float) -> void:
 		_net_physics(delta)
 		return
 
-	if player == null:
+	if player == null or _covered():
 		return
 
 	# Held from the physics loop, because the spring writes a velocity the solver

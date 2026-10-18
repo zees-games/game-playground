@@ -587,7 +587,12 @@ func _simulate_tick(step: float) -> void:
 			entity.entity_tick(step)
 
 	for id in players:
-		(players[id] as PlaygroundPlayer).simulate(_tick, step)
+		var body := players[id] as PlaygroundPlayer
+		# A body the client's load gate froze (`process_mode` DISABLED) waits for the level
+		# and the camera; simulating it anyway is how it fell through a map not yet built.
+		if body.is_inside_tree() and not body.can_process():
+			continue
+		body.simulate(_tick, step)
 
 	# The toys after everybody moved: a walk into a ball pushes it, weight tips a see-saw.
 	_advance_toys(step)

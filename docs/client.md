@@ -120,3 +120,7 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 ## M, the map menu
 
 M is dot-menu's map menu (`PlaygroundBindings.MAP` is `dot_menu_maps`, still stored as `bind_map`): solo `PlaygroundClient.map_menu_rows()` lists the catalogue (custom and delivered maps included) and `change_from_menu()` changes through `Playground.change_map`; on a server dot-vote's map menu changes through `game.change_map` for the owner's `sv_map_menu_flag` and gives anybody else a vote. No other row may default to M; `headless_playground` and `dedicated` check it.
+
+## The load gate
+
+`PlaygroundClient.gate` is dot-core's `DotLoadGate` (API level 10), built first in `_ready`. It holds `map` (released once the first level is in, held again on each `maps.changing`, released on `maps.changed`) and requires `spawned` (the local player and a camera in the tree). The local body is `freeze`d, which `Playground._simulate_tick` honours (`can_process`), and the client's own keys, tool tick and netcode sampling check `_covered()`. Before it, solo drew the body falling onto the floor in the first seven frames with no cover, and a connected client drew a HUD with no player. `tools/load_probe.gd` (xvfb-run, not `--headless`) prints per frame whether the map, player, camera and cover exist and where the body is, and saves frames 3, 15 and the last to `screenshots/`.
