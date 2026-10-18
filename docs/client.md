@@ -110,7 +110,7 @@ Every UI change wants a frame rendered and looked at; no assertion sees a 0 × 0
 | Tool | Renders |
 | --- | --- |
 | `tools/screenshot.sh <map>` | a map's set shots (`--fx` for the effects) |
-| `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, Addons, the waypoint and NPC spawner panels, the edit panel), dot-menu's pages (General twice, the second scrolled to the camera motion), the Tab board, the console open |
+| `tools/screenshot_menus.sh` | the spawn menu's tabs (Tools, Entities, Machines, Builds, Addons, a zee pack tab, the waypoint and NPC spawner panels, the edit panel), dot-menu's pages (General twice, the second scrolled to the camera motion), the Tab board, the console open |
 | `tools/screenshot_views.sh` | first and third person, bodies, a rider, the HUD clock, creative, blind and beacon, the edit outline, a weapon's ammunition and two confirmed hits (`hud_hits`), a map ballot's chat line beside the drawn panel |
 | `tools/render_feel.sh` | the first-person camera's motion: a drop, hops, a strafe, flight at speed; frames, a per-frame CSV and contact sheets in `screenshots/feel/` |
 | `tools/screenshot_net.sh` | a connected client watching another player, with a per-frame movement probe |

@@ -113,6 +113,13 @@ var addon_items: Array = []
 ## What the weapons tab is built from.
 var weapons: Array[PlaygroundWeaponDef] = []
 
+## What subscribed packs offer ([method PlaygroundWorkshop.rows]): a tab per `pack_title`, after the
+## Addons tab, holding every kind that pack provides. Plain rows, so the menu names no addon type.
+var pack_rows: Array[Dictionary] = []
+
+## The tabs after [constant Tab.ADDONS], one per pack. A pack tab's index is `Tab.size() + position`.
+var _pack_titles: PackedStringArray = PackedStringArray()
+
 ## Which prop is armed, so the spawn key and the launcher repeat it.
 var selected: StringName = &""
 
@@ -254,6 +261,7 @@ func _build_header() -> Control:
 	_tabs.add_tab("Tools")
 	_tabs.add_tab("Builds")
 	_tabs.add_tab("Addons")
+	_sync_pack_tabs()
 	_style_tabs(_tabs)
 	_tabs.tab_changed.connect(_on_tab_changed)
 	header.add_child(_tabs)
@@ -547,6 +555,57 @@ func _on_tab_changed(index: int) -> void:
 	refresh()
 
 
+## Replaces the pack rows and the pack tabs with them. A pack that went (an online session hides every
+## solo pack) takes its tab with it, and an open one falls back to Props rather than showing nothing.
+func set_pack_rows(rows: Array[Dictionary]) -> void:
+	pack_rows = rows
+	var was_open := _pack_title()
+	# Asked before the bars change: removing the selected tab makes the TabBar move itself to a
+	# neighbour, so asking afterwards finds an ordinary tab and the fallback never runs.
+	var was_pack := _is_pack_tab()
+	_sync_pack_tabs()
+	if _grid == null:
+		return
+	if was_pack and not _pack_titles.has(was_open):
+		_tabs.current_tab = int(Tab.PROPS)
+		return
+	refresh()
+
+
+func _sync_pack_tabs() -> void:
+	var titles := PackedStringArray()
+	for row in pack_rows:
+		var title := str(row.get("pack_title", ""))
+		if not titles.has(title):
+			titles.append(title)
+	_pack_titles = titles
+	if _tabs == null:
+		return
+	while _tabs.tab_count > Tab.size():
+		_tabs.remove_tab(_tabs.tab_count - 1)
+	for title in titles:
+		_tabs.add_tab(title)
+
+
+func _is_pack_tab() -> bool:
+	return int(_tab) >= Tab.size()
+
+
+## The pack whose tab is open, or "".
+func _pack_title() -> String:
+	var at := int(_tab) - Tab.size()
+	return _pack_titles[at] if at >= 0 and at < _pack_titles.size() else ""
+
+
+func _rows_of_open_pack() -> Array:
+	var out: Array = []
+	var title := _pack_title()
+	for row in pack_rows:
+		if str(row.get("pack_title", "")) == title:
+			out.append(row)
+	return out
+
+
 ## What the server says this player has saved. Redraws the tab when it is open.
 func set_builds(list: Array) -> void:
 	builds = list
@@ -568,8 +627,17 @@ func _rebuild_categories() -> void:
 
 
 func _categories_for_tab() -> PackedStringArray:
+	if _is_pack_tab():
+		var named := PackedStringArray()
+		for row: Dictionary in _rows_of_open_pack():
+			var category := str(row.get("category", ""))
+			if not named.has(category):
+				named.append(category)
+		named.sort()
+		return named
+
 	if _tab == Tab.WEAPONS:
-		return PlaygroundWeapons.categories(weapons)
+		return PlaygroundWeapons.categories(_own_weapons())
 
 	if _tab == Tab.TOOLS:
 		return PackedStringArray()
@@ -637,7 +705,9 @@ func _rebuild_grid() -> void:
 	for entry in visible_now:
 		var card: Button
 
-		if _tab == Tab.WEAPONS:
+		if _is_pack_tab():
+			card = _pack_card(entry as Dictionary)
+		elif _tab == Tab.WEAPONS:
 			card = _weapon_card(entry as PlaygroundWeaponDef)
 		elif _tab == Tab.BUILDS:
 			card = _build_card(entry as Dictionary)
@@ -741,6 +811,25 @@ func _weapon_card(def: PlaygroundWeaponDef) -> Button:
 				card.accept_event()
 		)
 
+	return card
+
+
+## One thing a pack provides. Weapons are equipped, everything else is spawned, through the same
+## signals the built-in tabs use, so nothing downstream knows a pack was involved.
+func _pack_card(row: Dictionary) -> Button:
+	var id := row.get("id", &"") as StringName
+	var icon := row.get("icon") as Texture2D
+	var def: Variant = row.get("def")
+	if icon == null and def is PlaygroundWeaponDef:
+		icon = PlaygroundIcons.for_weapon(def as PlaygroundWeaponDef)
+	elif icon == null and def is DotPropDef:
+		icon = PlaygroundIcons.for_def(def as DotPropDef)
+	var card := _card(icon, str(row.get("name", id)), str(row.get("tip", "")))
+	if row.get("kind") == &"weapon":
+		card.pressed.connect(_on_weapon_pressed.bind(id))
+	else:
+		card.pressed.connect(_on_prop_pressed.bind(id))
+	card.set_meta(&"entry", id)
 	return card
 
 
@@ -958,8 +1047,11 @@ func _set_setting(key: String, value: Variant) -> void:
 
 ## Everything on the current tab, before the category and the search are applied.
 func _all_in_tab() -> Array:
+	if _is_pack_tab():
+		return _rows_of_open_pack()
+
 	if _tab == Tab.WEAPONS:
-		return weapons
+		return _own_weapons()
 
 	if _tab == Tab.BUILDS:
 		return builds
@@ -984,9 +1076,21 @@ func _all_in_tab() -> Array:
 	for def in catalogue.props:
 		# A balloon is the tool gun's and a pickup is the weapons tab's right click: in the
 		# catalogue so the spawner can count and limit them, not on a tab to be placed.
-		if PlaygroundSpawnables.kind_of(def) == wanted and not bool(def.meta.get("hidden", false)):
+		if (
+			PlaygroundSpawnables.kind_of(def) == wanted and not bool(def.meta.get("hidden", false))
+			and not def.meta.has("pack")
+		):
 			out.append(def)
 
+	return out
+
+
+## The game's own weapons: a pack's have a tab of their own.
+func _own_weapons() -> Array[PlaygroundWeaponDef]:
+	var out: Array[PlaygroundWeaponDef] = []
+	for weapon in weapons:
+		if not weapon.meta.has("pack"):
+			out.append(weapon)
 	return out
 
 
@@ -1001,6 +1105,8 @@ func _count_in_category(category: StringName) -> int:
 
 
 func _category_of(entry: Variant) -> StringName:
+	if entry is Dictionary and (entry as Dictionary).has("pack_title"):
+		return StringName(str((entry as Dictionary).get("category", "")))
 	if entry is Dictionary and (entry as Dictionary).has("key"):
 		return StringName(str((entry as Dictionary).get("category", "")))
 	if entry is Dictionary:
@@ -1015,6 +1121,8 @@ func _category_of(entry: Variant) -> StringName:
 
 
 func _name_of(entry: Variant) -> String:
+	if entry is Dictionary and (entry as Dictionary).has("pack_title"):
+		return str((entry as Dictionary).get("name", ""))
 	if entry is Dictionary and (entry as Dictionary).has("key"):
 		return str((entry as Dictionary).get("label", ""))
 	if entry is Dictionary:
@@ -1029,6 +1137,8 @@ func _name_of(entry: Variant) -> String:
 
 
 func _id_of(entry: Variant) -> StringName:
+	if entry is Dictionary and (entry as Dictionary).has("pack_title"):
+		return (entry as Dictionary).get("id", &"") as StringName
 	if entry is Dictionary and (entry as Dictionary).has("key"):
 		return StringName(str((entry as Dictionary).get("key", "")))
 	if entry is Dictionary:
@@ -1160,6 +1270,9 @@ func _rebuild_footer() -> void:
 	# weapon really does something different from clicking a prop.
 	var verb := "Click to spawn"
 
+	if _is_pack_tab():
+		verb = "From %s: click to spawn or equip" % _pack_title()
+
 	match _tab:
 		Tab.WEAPONS:
 			verb = "Click to equip, right click to drop one"
@@ -1207,7 +1320,8 @@ static func name_of_tool(tool_id: StringName) -> String:
 
 func describe() -> Dictionary:
 	var out := super.describe()
-	out["tab"] = Tab.keys()[_tab]
+	out["tab"] = Tab.keys()[_tab] if int(_tab) < Tab.size() else _pack_title()
+	out["pack_tabs"] = Array(_pack_titles)
 	out["category"] = String(_category)
 	out["shown"] = shown().size()
 	out["selected"] = String(selected)

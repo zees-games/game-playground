@@ -203,3 +203,11 @@ Separate from props: a toy is part of the map, placed by its author, from dot-pr
 - `sv_toys`, `sv_toys_awake` and `sv_toys_push` are dot-props' cvars, bound by the module REPLICATED and followed by the client. The awake cap is 24, or 8 in a browser build.
 - Toys stay where they are kicked for the life of the map; a map change builds them again. A toy below -60 m goes home.
 
+
+## Subscribed packs in the Q menu (solo only)
+
+`provides.json` declares what the game `accepts` from the content index: kinds weapon, prop, npc, entity, tool and map (map kinds sandbox, surf, bhop, kz, race). `tool` is declared but nothing consumes it yet. `PlaygroundWorkshop` (`game/playground_workshop.gd`) is the one adapter: it follows a `DotContentIndex`, turns weapon listings (via `DotWeaponCatalogue.follow_content`) into `PlaygroundWeaponDef`s and prop, npc and entity rows into `DotPropDef`s (ids prefixed `ws_`, `meta.pack` set), and hands the menu `rows()` grouped by pack title and category. The spawn menu adds one tab per pack after Addons and keeps pack defs out of its built-in Props, Entities and Weapons tabs. Maps follow content through `DotMapCatalogue.follow_content`.
+
+Only the offline client follows (`link == null and bridge == null`): a dedicated server and a connected client never do, so in an online session the pack entries disappear and the pack tab goes. Pack rigs use `PlaygroundZee.catalogue_for(def)`, a copy, so a subscription never leaks into the table a server reads.
+
+dot-props and dot-npc have no `follow_content` yet; when they gain one, `_prop_def` leaves this file. Pack weapons that are not zee ids have no world model or art, and there is no right-click drop for them.

@@ -19,6 +19,7 @@ const PlaygroundSpawnables := preload("playground_spawnables.gd")
 const PlaygroundVehicle := preload("playground_vehicle.gd")
 const PlaygroundVehicles := preload("playground_vehicles.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
+const PlaygroundWorkshop := preload("playground_workshop.gd")
 const PlaygroundWeapons := preload("playground_weapons.gd")
 const ToolPhysprop := preload("toolgun/tool_physprop.gd")
 const PlaygroundMaterials := preload("playground_materials.gd")
@@ -371,6 +372,12 @@ var toy_rules: DotPropToyRules = DotPropToyRules.new()
 ## The map's toys are about to go (a map change), on both ends. What the bridge releases their
 ## entities on, before the nodes are freed.
 signal toys_clearing()
+
+## Pack content ([method follow_workshop]) appeared, went, or was hidden by a session change.
+signal workshop_changed()
+
+## The Workshop's adapter, once [method follow_workshop] has been called.
+var workshop: PlaygroundWorkshop = null
 
 ## The map's toys are built, on both ends. What a client's bridge pairs them on.
 signal toys_built()
@@ -2388,6 +2395,32 @@ func set_player_style(id: StringName, style_id: StringName) -> bool:
 		return false
 
 	return player.set_style(movement_styles[style_id]).ok
+
+
+## Starts offering what the player subscribed to (the Workshop) on the spawn menu and the map
+## list: pack weapons, props, NPCs and entities, and maps of the kinds `provides.json` accepts.
+##
+## [b]Solo only, and it is the caller that decides.[/b] The offline client calls this; a dedicated
+## server and a connected client never do, so an online game has none of it, and the index's own
+## session tag hides it again for a solo game that goes online. [param index] defaults to the
+## shared one.
+func follow_workshop(index: DotContentIndex = null) -> PlaygroundWorkshop:
+	var shared := index if index != null else DotContentIndex.shared()
+	if workshop == null:
+		workshop = PlaygroundWorkshop.new()
+		workshop.changed.connect(func() -> void: workshop_changed.emit())
+	workshop.follow(shared, props.catalogue, weapons)
+	if maps != null and maps.catalogue != null:
+		maps.catalogue.follow_content(shared, PlaygroundWorkshop.accepted_map_kinds())
+	return workshop
+
+
+## Stops [method follow_workshop]: the pack rows leave the catalogue and the weapon list.
+func unfollow_workshop() -> void:
+	if workshop != null:
+		workshop.unfollow()
+	if maps != null and maps.catalogue != null:
+		maps.catalogue.unfollow_content()
 
 
 ## The definition of one weapon, or null.

@@ -1043,6 +1043,13 @@ func _build_screens() -> void:
 	if playground.addons != null:
 		menu.addon_items = playground.addons.describe_items()
 
+	# The Workshop, solo only: a connected client's menu is the server's, and its index says online.
+	if link == null and bridge == null:
+		menu.set_pack_rows(playground.follow_workshop().rows())
+		playground.workshop_changed.connect(
+			func() -> void: menu.set_pack_rows(playground.workshop.rows())
+		)
+
 	var registered := screens.register(menu)
 	DotLog.result(CHANNEL, "registering the spawn menu", registered)
 
