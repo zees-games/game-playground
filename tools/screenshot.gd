@@ -127,9 +127,41 @@ var _toy_box: DotPropToyBox = null
 var _toy_placements: Array = []
 
 
+## Maps converted from a community .bsp (game-playground-maps' tools/import_bsp.py): they have no
+## hand-picked angles, so these are worked out from the document, an oblique view over the
+## whole thing, a high view straight down and the player's eye at the spawn facing the middle.
+const IMPORTED := ["pgc_construct_small"]
+
+
+func _imported_shots(id: String) -> Array[Dictionary]:
+	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://maps/custom/%s.json" % id))
+	var lo := Vector3(INF, INF, INF)
+	var hi := Vector3(-INF, -INF, -INF)
+	for b: Dictionary in doc["boxes"]:
+		if str(b.get("material", "")) == "water":
+			continue
+		var at := Vector3(b["at"][0], b["at"][1], b["at"][2])
+		var half := Vector3(b["size"][0], b["size"][1], b["size"][2]) / 2.0
+		lo = lo.min(at - half)
+		hi = hi.max(at + half)
+	var centre := (lo + hi) / 2.0
+	var ext := hi - lo
+	var sp: Array = doc["spawn"]
+	var spawn := Vector3(sp[0], sp[1] + 0.7, sp[2])
+	var reach := maxf(ext.x, ext.z)
+	return [
+		{"name": id, "from": centre + Vector3(0.0, reach * 0.9, reach * 0.55), "at": centre},
+		{"name": id + "_top", "from": centre + Vector3(0.0, reach * 1.1, 0.1), "at": centre},
+		{"name": id + "_spawn", "from": spawn, "at": Vector3(centre.x, spawn.y - 0.3, centre.z)},
+		{"name": id + "_side", "from": Vector3(lo.x + ext.x * 0.15, lo.y + minf(ext.y, 12.0), hi.z - ext.z * 0.15), "at": Vector3(centre.x, lo.y + 1.0, centre.z)},
+	]
+
+
 ## Angles per map, because a 200 m sandbox with two courses in opposite corners has
 ## nothing useful to say from one camera.
 func _shots_for(id: String) -> Array[Dictionary]:
+	if id in IMPORTED:
+		return _imported_shots(id)
 	if id == "pgc_plots":
 		return [
 			{"name": "pgc_plots", "from": Vector3(0.0, 70.0, 95.0), "at": Vector3(0.0, 0.0, -5.0)},
