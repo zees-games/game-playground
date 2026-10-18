@@ -1,24 +1,12 @@
 # Maps
 
-Maps are content, not projects (see dot-map's [docs/content.md](../../dot-map/docs/content.md) for why a project per map falls apart). The built-in maps are `pg_lobby`, `pg_surf_intro`, `pg_bhop_intro` (hand-built scripts), `pg_generated` (seeded) and `pg_data` (builds any JSON map document). The custom maps are documents from game-playground-maps, linked in as `maps/custom`. Every timed route on the hand-built maps is in [routes.md](routes.md).
+Maps are content, not projects (see dot-map's [docs/content.md](../../dot-map/docs/content.md) for why a project per map falls apart). The built-in maps are `pg_flatgrass` (hand-built: a 200 m grass plate with walls, a movement corner and the map's toys, and the default everywhere), `pg_generated` (seeded) and `pg_data` (builds any JSON map document). The custom maps are documents from game-playground-maps, linked in as `maps/custom`.
 
-## Geometry and zones come from one description
+## No map here is timed
 
-Each hand-built map builds its geometry **and** its zones from the same constants and functions, so a start line cannot drift half a metre from the ramps (a leaderboard nobody can compare). A route is one function (`PgLobby.tower_route()`, `PgBhopIntro.ladder_route()`, `PgSurfIntro.bank_basis()` …) that the geometry, the zones and the suite all read and nothing else does.
+The game ships no run timer ([timer.md](timer.md)), so no built-in map declares zones and nothing in a map's build may assume a timer. A server that links dot-timer brings its own timed maps: a map's zones come from its own `timer_zones()` or a `<map>.zones.json` beside its scene, and `addons/pg_timer` binds them on every map change. The survey takes a map's ways out as plain `{box, pit}` entries (`PlaygroundMapSurvey.ways_out_of` reads them off a timer's zone set), so it surveys a timed map without naming the timer either.
 
-A **delivered** map ships geometry and a zone file, so `tools/export_zones.gd` writes the `*.zones.json` files from the same source, they are committed, and `headless_playground`'s `_test_zone_file_matches_the_map` fails when the file no longer matches. **Run it after changing a map:**
-
-```bash
-godot --headless --path . --script tools/export_zones.gd
-```
-
-Every route's zone set is checked **for its own track** by dot-timer's `DotTimerZoneSet.route_problems()` (`[track-zone-1]`): `problems()` is per zone, and a set complete for track 0 and partial for track 1 passes it while being unfinishable. `pg_lobby`'s circuit is the one route with no pit and says so in its zones' `meta.pitless_tracks` (the road runs inside the plate's walls).
-
-## The timer is not a surf-and-bhop thing
-
-`pg_lobby` is a sandbox on the **main** track with no start or end zone (the one place proving the rest of the game does not quietly require a timer), and timed courses on bonus tracks beside it. Nothing about a jump course is a movement genre: it is zones round platforms with the same sub-tick fractions, styles, records and replays. The mixed case is a better test than the empty one because it is the case a real sandbox server is in.
-
-`pg_generated` deliberately has **no timer course**: a generated course is one nobody can learn and a record nobody can beat.
+`pg_generated` has no course even with a timer: a generated course is one nobody can learn and a record nobody can beat.
 
 ## The look
 

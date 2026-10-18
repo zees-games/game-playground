@@ -1,19 +1,19 @@
 # The simulation and its joins
 
-This game is the only place dot-player-controller, dot-timer, dot-map, dot-props, dot-npc and dot-leaderboard run together, and every bug that cost days here was in a seam between them: a bridge reconciling on top of another bridge, a message keyed on the wrong id, a value computed and consumed by nothing. This file is those seams.
+This game is the only place dot-player-controller, dot-map, dot-props, dot-npc and dot-leaderboard run together (and dot-timer, when a server links it: [timer.md](timer.md)), and every bug that cost days here was in a seam between them: a bridge reconciling on top of another bridge, a message keyed on the wrong id, a value computed and consumed by nothing. This file is those seams.
 
 ## The game owns the tick loop
 
-`DotFpsController.Drive.EXTERNAL`, not `LOCAL`, even in single player. In `LOCAL` the controller accumulates frame time and ticks itself, so the timer would be fed from a signal fired inside somebody else's loop, and a bot could not be driven at all. `Playground._simulate_tick` owns it, which makes the order explicit:
+`DotFpsController.Drive.EXTERNAL`, not `LOCAL`, even in single player. In `LOCAL` the controller accumulates frame time and ticks itself, so a run timer would be fed from a signal fired inside somebody else's loop, and a bot could not be driven at all. `Playground._simulate_tick` owns it, which makes the order explicit:
 
 1. `props.advance`, `maps.advance`, then the vehicles are driven and ticked
 2. the NPC candidate list is rebuilt once, then the NPC world and every entity tick (see [sandbox.md](sandbox.md#perception-is-dot-npcs-being-a-prop-is-still-dot-props))
 3. every player: sample (if local), then `controller.simulate_tick` (`PlaygroundPlayer.simulate`)
 4. pickup, projectiles, debris, doors, liquids, pane impacts
-5. `Playground._carry_riders` copies each rider's seat position into `controller.state.position` (the timer, the NPC list, the HUD and `PlaygroundPlayerNet` all read it, and nothing else writes it while seated)
-6. every player: `timers.tick_player` with the position the move **just produced**
+5. `Playground._carry_riders` copies each rider's seat position into `controller.state.position` (a run timer, the NPC list, the HUD and `PlaygroundPlayerNet` all read it, and nothing else writes it while seated)
+6. the run timer, if a server has one (`Playground.run_timer.tick`), with the position the move **just produced**
 
-**The timer must come after the move.** The timer works out whether the player crossed a line during this tick from where they were and where they now are; ticking it first shifts every run by exactly one tick, and by a different amount at each tick rate, which is the tick-rate dependence dot-timer's sub-tick fractions exist to remove. It is also the shape a dot-net bridge and a dedicated server use.
+**A run timer must come after the move.** The timer works out whether the player crossed a line during this tick from where they were and where they now are; ticking it first shifts every run by exactly one tick, and by a different amount at each tick rate, which is the tick-rate dependence dot-timer's sub-tick fractions exist to remove. It is also the shape a dot-net bridge and a dedicated server use.
 
 **Entities tick before players**, at the fixed rate. Not `_process`, which makes an NPC's speed a function of the frame rate; not after the players, which leaves a chaser visibly a tick behind its target.
 
@@ -21,31 +21,15 @@ This game is the only place dot-player-controller, dot-timer, dot-map, dot-props
 
 `DotNodeRef.of_self()` on the controller resolves to the controller, a plain `Node`. `setup()` refuses ("the player body must be a Node3D"), `motor` stays null, and the player never moves. Leave it unset: it defaults to the parent. Its first appearance cost nine failures that all pointed somewhere else.
 
-## A style has two halves and they move together
+## A style is movement, and a timer's ranking half follows it
 
-`DotFpsStyle` transforms the tunables and filters the command; `DotTimerStyle` says whether the run counts and what it is worth. `PlaygroundPlayer.set_style` applies both. One alone gives a run timed as "normal" while the player is sideways, and nothing errors. `DotFpsController.set_style` **rebuilds the motor**, which assigning the property does not; the suite checks that specifically.
+`DotFpsStyle` transforms the tunables and filters the command. `PlaygroundPlayer.set_style` applies it and emits `style_changed`, which is how `addons/pg_timer` puts the matching `DotTimerStyle` (whether a run counts and what it is worth) on the player's timer when a server has one ([timer.md](timer.md)). `DotFpsController.set_style` **rebuilds the motor**, which assigning the property does not; the suite checks that specifically.
 
 A style rebuilds the tunables from the controller's base copy, so anything written into the live tunables (a collision mask) is lost on the next style change. Go through the controller's setters (`set_collision_mask`).
 
-## The timer decides and the game acts
+## After the move: `post_move_fn`
 
-`DotTimer` never moves a player. `Playground._on_effect_requested` turns a `RESPAWN`, `TELEPORT` or `SLAY` zone into something that happens, because what those mean differs between a first-person game, a 2D game and a replay being scrubbed.
-
-Effects that change **where the player ends up** are read straight off the timer inside `PlaygroundPlayer._on_simulated`, on the tick, not from a signal (a signal puts it a tick late):
-
-- **Prespeed clamp and speed limits.** Ask `timer.in_zone(...)` for membership. `is_inside(Kind.START)` answers only for effect zones and is always false for START; using it once made the prespeed clamp dead.
-- **PUSH** (the launch's boosters): the zone's acceleration times the step, every tick in it. Upward on the ground is a launch without touching the motor, because `DotFpsMotor._categorise_ground` puts a player moving out of the floor in AIR.
-- **GRAVITY** (the float): in the air only, gives back `gravity * (1 - number)` of the vertical speed the motor took this tick. On the ground gravity is what holds a player to the floor.
-- **Read at the state's own position** (`PlaygroundPlayer.effect_zone_at`), not `timer.effect(...)` (`[playground-push-1]`). The timer's effect is where it last sampled the player, and a predicting client replays ticks with its timer at the newest one, so a replay across a booster's edge pushed ticks that had been outside it: one correction per launch.
-- **Effect zones are not track-filtered.** dot-timer's `_rebuild_effects` takes every EFFECT zone the player is in whatever their track, so a sandbox player on the main track who walks onto a booster or into the float is thrown or floats too. Whether effects should follow the track is a dot-timer question and Christian's call. RESPAWN/TELEPORT/SLAY are track-filtered, which is what makes a reset volume under a bonus course usable beside people building on the main track.
-
-## Statistics land when the run ends
-
-The natural moment to fold a run's statistics in is the moment it finishes, when it is no longer active. `DotTimerManager.note_stats` once guarded on "only while active" and discarded exactly that call (fixed in dot-timer).
-
-## Getting into a vehicle and the timer
-
-`Playground._on_seated` stops the run unless `PlaygroundMap.track_is_driven(track)` says the track is driven (default false, so foot courses are unchanged: a jump course driven in a buggy is not comparable). On a driven track, **getting out** ends the run, because the rest of the lap on foot is not the same lap. The map answers because the map is the only thing that knows.
+`PlaygroundPlayer._on_simulated` calls `post_move_fn` (unset by default) on every simulated tick, a prediction replay's included, after the move and before toys and riding. It is the one place an addon can change where the player ends up on the same tick on every end; `addons/pg_timer` uses it for the timer's zone effects (prespeed clamp, speed limit, PUSH, GRAVITY), read at the state's own position. A signal would put it a tick late.
 
 ## Teleport and the spawn yaw
 
@@ -53,19 +37,15 @@ The natural moment to fold a run's statistics in is the moment it finishes, when
 
 Facing a direction is `atan2(-dx, -dz)`: `DotFpsMotor._view_basis` builds forward as `(-sin(yaw), 0, -cos(yaw))`. The obvious `atan2(dx, dz)` is 180 degrees out and mirrored.
 
-**A teleport stops the run, except a map's own TELEPORT zone.** A teleport that kept the clock running is the simplest cheat on a timed map, so `PlaygroundPlayer.teleport` stops it; `Playground._on_effect_requested` passes `keep_run` for a TELEPORT zone, which the timer only asks for on the player's own track and already expects (`DotTimer.MOVING_KINDS`). That is what lets `pg_lobby`'s relay gates be part of a route.
+**A teleport stops a run, if there is one** (`PlaygroundPlayer.stop_run`, a no-op without a timer). A teleport that kept the clock running is the simplest cheat on a timed map; only a map's own TELEPORT zone keeps it, and that is the adapter's.
 
 **A respawn here is a teleport of the same body** (`Playground.spawn_player`), so nothing a handler set is lost and `DotModTools.respawned` is never called: blind, beacon, noclip and freeze all survive a respawn (game-arena ends the last two with the body).
 
 `Playground.spawn_player` steps a spawn to the nearest free point on two rings of eight at `SPAWN_SPACING` (1.5 m) (`_clear_of_players`), which stays on the smallest start pad; past seventeen people the centre is shared. Every start here is one point, and without this two players joining stood inside each other's heads.
 
-## Tracks on a map are derived
-
-`Playground.tracks_on_this_map()` is derived from the zones, not declared: the zone file is what a delivered map ships, so a declaration would be the half missing exactly when it matters. `MAIN` is always in the result, because a sandbox is a legitimate track.
-
 ## A map change happens with everything in flight
 
-`_on_map_changing` runs before anything is torn down: it stops every run, makes every tool let go, and clears the props, all of which stand on geometry about to be freed. dot-map then loads the new scene before freeing the old, so a failure leaves the server on a working map. The module also clears dot-moderation's `return` history on every map change (`[modtools-return-1]`): every entry is a point on the map just freed.
+`_on_map_changing` runs before anything is torn down: it tells the run timer (which stops every run), makes every tool let go, and clears the props, all of which stand on geometry about to be freed. dot-map then loads the new scene before freeing the old, so a failure leaves the server on a working map. The module also clears dot-moderation's `return` history on every map change (`[modtools-return-1]`): every entry is a point on the map just freed.
 
 A generated or document map needs configuring before anybody spawns: `_on_map_changed` calls `configure()` / `configure_doc()` first, then map props, then spawns.
 
@@ -92,10 +72,10 @@ A generated or document map needs configuring before anybody spawns: `_on_map_ch
 ```
 server.cfg: sv_tickrate 100 -> dot-server _apply_tickrate() -> Engine.physics_ticks_per_second
   -> Playground._resolve_tick_rate() -> Playground.tick_rate
-  -> DotTimerConfig.tick_rate = 0 ("ask the engine") -> DotTimerManager.tick_rate -> DotTimerRecord.tick_rate
+  -> (with dot-timer linked) the run timer's manager -> every record it files
 ```
 
-A timer counting 128 a second on a server stepping 100 reports every run 28% long, and nothing about the run looks unusual. `dedicated`'s `_test_tickrate_reaches_the_timer` walks the chain with the server at 100 precisely because the project default is 128. `sv_tickrate` goes in **`server.cfg`, not `autoexec.cfg`**: it is startup-only, and dot-server execs the first before the listener and the second after. There is deliberately **no `pg_tickrate` cvar**: a second cvar for the same number can disagree with the first.
+A timer counting 128 a second on a server stepping 100 reports every run 28% long, and nothing about the run looks unusual. `dedicated`'s `_test_tickrate_reaches_the_timer` walks the chain with the server at 100 precisely because the project default is 128 (the timer's links only when dot-timer is linked). `sv_tickrate` goes in **`server.cfg`, not `autoexec.cfg`**: it is startup-only, and dot-server execs the first before the listener and the second after. There is deliberately **no `pg_tickrate` cvar**: a second cvar for the same number can disagree with the first.
 
 ## The server module
 
@@ -103,9 +83,8 @@ A timer counting 128 a second on a server stepping 100 reports every run 28% lon
 
 | Commands | |
 | --- | --- |
-| `pg_timer` `pg_restart` `pg_style` `pg_track` `pg_top` | the run |
-| `pg_cp` `pg_tp` `pg_cp_clear` | practice mode |
-| `pg_zone` `pg_zone_mark` `pg_zone_spawn` `pg_zone_list` `pg_zone_undo` `pg_zone_save` | drawing zones |
+| `pg_restart` `pg_style` | back to the spawn; the movement style |
+| `pg_timer` `pg_track` `pg_top` `pg_cp` `pg_tp` `pg_cp_clear` | the run and practice checkpoints: `addons/pg_timer`'s, only when a server links dot-timer ([timer.md](timer.md)) |
 | `pg_map` `pg_nextmap` `pg_rtv` `pg_extend` | maps |
 | `pg_prop` `pg_undo` `pg_props_clear` `pg_limits` | props |
 | `pg_save` `pg_load` `pg_builds` `pg_build_delete` | saved builds |
@@ -116,7 +95,3 @@ A timer counting 128 a second on a server stepping 100 reports every run 28% lon
 | `pg_vote` `pg_achievements` | what plays next, what somebody has earned |
 | `pg_give` `pg_inv` | put something in somebody's bag, and read it |
 
-- **The zone commands are `CHANGEMAP`, not `GENERIC`.** Drawing a start line edits the map's rules and can invalidate every record on it.
-- **One painter per admin.** Two admins drawing at once would otherwise share a first corner and save a zone spanning the distance between them.
-- **A zone is live the moment it is drawn** (`set_zones` after the second mark). An admin who had to reload to test a start line would test it once.
-- **Saving a set with a problem is refused, not warned about.** A zone file with a start and no end is playable and unfinishable, and once on disk somebody else has a copy.

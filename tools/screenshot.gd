@@ -11,8 +11,8 @@ const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 ## — or when a pillar is standing where the player spawns, which is a real bug this map
 ## had and which no count caught.
 ##
-##   xvfb-run -a godot --path . --script tools/screenshot.gd -- --map pg_lobby
-##   tools/screenshot.sh pg_lobby --fx     # a spawn puff and the physics gun's beam
+##   xvfb-run -a godot --path . --script tools/screenshot.gd -- --map pg_flatgrass
+##   tools/screenshot.sh pg_flatgrass --fx     # a spawn puff and the physics gun's beam
 ##
 ## Needs a real rendering context, so it does NOT run under `--headless`; `xvfb-run` is
 ## how it runs on a machine with no display. It writes into `screenshots/`, which is
@@ -21,9 +21,8 @@ const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const OUT_DIR := "screenshots"
 
 const MAPS := {
-	"pg_lobby": "res://maps/pg_lobby.tscn",
-	"pg_surf_intro": "res://maps/pg_surf_intro.tscn",
-	"pg_bhop_intro": "res://maps/pg_bhop_intro.tscn",
+	"pg_flatgrass": "res://maps/pg_flatgrass.tscn",
+	"pg_generated": "res://maps/pg_generated.tscn",
 }
 
 var _shots: Array[Dictionary] = []
@@ -38,7 +37,7 @@ func _initialize() -> void:
 	var _scratch := PlaygroundPresentation.use_scratch_settings("screenshot")
 	var args := OS.get_cmdline_user_args()
 	var index := args.find("--map")
-	var id := args[index + 1] if index >= 0 and index + 1 < args.size() else "pg_lobby"
+	var id := args[index + 1] if index >= 0 and index + 1 < args.size() else "pg_flatgrass"
 
 	# A custom map (game-playground-maps, linked as maps/custom) is a document the shared
 	# data-map scene builds.
@@ -157,8 +156,8 @@ func _imported_shots(id: String) -> Array[Dictionary]:
 	]
 
 
-## Angles per map, because a 200 m sandbox with two courses in opposite corners has
-## nothing useful to say from one camera.
+## Angles per map, because a 200 m sandbox with a park at one end and a movement corner at
+## the other has nothing useful to say from one camera.
 func _shots_for(id: String) -> Array[Dictionary]:
 	if id in IMPORTED:
 		return _imported_shots(id)
@@ -258,280 +257,22 @@ func _shots_for(id: String) -> Array[Dictionary]:
 			{"name": "pgc_slopes_pond", "from": Vector3(-34.0, 5.0, 46.0), "at": Vector3(-50.0, -0.5, 28.0)},
 			{"name": "pgc_slopes_runout", "from": Vector3(22.0, 7.0, -66.0), "at": Vector3(0.0, 0.0, -82.0)},
 		]
-	if id == "pg_bhop_intro":
-		# Two routes, and the frames have to show they ARE two: the main run down x = 0
-		# and the narrows six metres up at x = 28. An overview from straight above shows
-		# neither the height between them nor the narrowing, so both of these are shot
-		# from off to one side and low.
-		return [
-			# Both routes at once, from beside and above the start. The one angle that
-			# shows the narrows to be a separate course rather than a wider shoulder of
-			# the main one.
-			{
-				"name": "pg_bhop_intro_overview",
-				"from": Vector3(108.0, 54.0, 52.0),
-				"at": Vector3(14.0, -2.0, -62.0),
-			},
-			# Down the narrows from behind its start pad, at a player's height. This is
-			# the frame that says whether the narrowing reads: ten blocks going away
-			# from the camera, each one a little less wide than the last.
-			{
-				"name": "pg_bhop_intro_narrows",
-				"from": Vector3(28.0, 9.5, 26.0),
-				"at": Vector3(28.0, 5.0, -46.0),
-			},
-			# Square across both routes, from just above the narrows' height. Nearly
-			# perpendicular on purpose: from any angle down the length the two courses
-			# overlap in the frame and the higher one reads as the far side of the
-			# lower. This is the frame that shows there are six metres between them.
-			{
-				"name": "pg_bhop_intro_both",
-				"from": Vector3(86.0, 11.0, -34.0),
-				"at": Vector3(0.0, 3.0, -38.0),
-			},
-			# Bonus 2, the switchback: three legs climbing west-east-west up to the
-			# finish at 9 m. From the south and well above, looking down at forty
-			# degrees. [b]The first attempt was from the south-west at twenty
-			# degrees and 47 m out[/b], and a 3 m block at that range and angle is a
-			# sliver on the horizon: the route was a smudge beside the main run's
-			# much bigger blocks. Down at it is the only angle where the three legs
-			# and both turns are separate things.
-			{
-				"name": "pg_bhop_intro_switchback",
-				"from": Vector3(-36.0, 27.0, -12.0),
-				"at": Vector3(-36.5, 4.0, 4.0),
-			},
-			# The first turn from beside it, at the height of the leg it turns onto:
-			# the frame that says whether a turning block reads as a turn rather than
-			# as one more block in a line.
-			{
-				"name": "pg_bhop_intro_switchback_turn",
-				"from": Vector3(-58.0, 9.0, 18.0),
-				"at": Vector3(-42.0, 4.0, 4.0),
-			},
-			# Bonus 3, the ascent: four jumps onto blocks and four ramps up off them,
-			# climbing from 2 m to 10 m along z at x = 60. From square beside it and a
-			# little above the top, because the thing the frame has to show is the
-			# PROFILE — each ramp steeper than the last — and from any angle down the
-			# route the ramps foreshorten into the blocks.
-			{
-				"name": "pg_bhop_intro_ascent",
-				"from": Vector3(100.0, 8.0, -22.0),
-				"at": Vector3(60.0, 6.0, -22.0),
-			},
-			# And from behind the pad at a player's height: what a player sees before
-			# the first jump, a green pad, a gap, and the first ramp going up.
-			{
-				"name": "pg_bhop_intro_ascent_start",
-				"from": Vector3(60.0, 5.5, 17.0),
-				"at": Vector3(60.0, 4.0, -20.0),
-			},
-			# Bonus 4, the ladder: eleven jumps a metre up each, along z at x = -76.
-			# From square beside it on the west, where nothing stands behind it, for
-			# the ascent's reason: the frame has to show the PROFILE, a staircase of
-			# columns each a metre taller than the last.
-			{
-				"name": "pg_bhop_intro_ladder",
-				"from": Vector3(-124.0, 12.0, -20.0),
-				"at": Vector3(-76.0, 7.0, -20.0),
-			},
-			# And from behind the pad at a player's height: the first rung a metre
-			# over the pad, and the climb going away up the line.
-			{
-				"name": "pg_bhop_intro_ladder_start",
-				"from": Vector3(-78.5, 4.5, 16.0),
-				"at": Vector3(-76.0, 7.0, -20.0),
-			},
-			# Bonus 5, the float: seven jumps too far for the ground, along z at x = 120.
-			# From the east, where nothing stands behind it (the ascent's profile camera
-			# is at x = 100, on the other side), so the frame is the gaps: columns far
-			# further apart than anywhere else on the map, every other one 2 m up.
-			{
-				"name": "pg_bhop_intro_float",
-				"from": Vector3(176.0, 12.0, -30.0),
-				"at": Vector3(120.0, 5.0, -30.0),
-			},
-			# And from behind the pad at a player's height: the first gap, which reads
-			# as one nobody can jump, because outside the zone nobody can.
-			{
-				"name": "pg_bhop_intro_float_start",
-				"from": Vector3(122.5, 4.5, 16.0),
-				"at": Vector3(120.0, 4.0, -20.0),
-			},
-			# Bonus 6, the drop: eight jumps down, 3 m each, along z at x = -150. From the
-			# west, where nothing stands behind it (the ladder's profile camera is at
-			# x = -124, on the other side), so the frame is the staircase: a 25 m pad tower
-			# and columns stepping down to the finish at the other starts' height.
-			{
-				"name": "pg_bhop_intro_drop",
-				"from": Vector3(-212.0, 20.0, -28.0),
-				"at": Vector3(-150.0, 12.0, -28.0),
-			},
-			# And from above and behind the pad, down the line: the columns stepping away
-			# below the pad's lip. At a player's height the lip hides every one of them,
-			# which is the drop's point and makes a frame of nothing but pad.
-			{
-				"name": "pg_bhop_intro_drop_start",
-				"from": Vector3(-147.0, 36.0, 22.0),
-				"at": Vector3(-150.0, 10.0, -40.0),
-			},
-		]
-
-	if id == "pg_surf_intro":
-		# Two routes, and they are at right angles to each other in what they ask for:
-		# the main valley runs 220 m down x = 0 with its descent in the floor between
-		# the ramps, and the plunge is one 48 m face at x = 60 that drops 61 m. An
-		# overview from above shows the valley and makes the plunge read as a wall, so
-		# two of these three are shot from beside it and low.
-		return [
-			# Both routes at once, from beside and above the start pads.
-			{
-				"name": "pg_surf_intro_overview",
-				"from": Vector3(148.0, 78.0, 84.0),
-				"at": Vector3(20.0, -6.0, -78.0),
-			},
-			# Square across the plunge, from the height of its middle. The frame that
-			# says whether a 52° face reads as something you fall DOWN rather than
-			# something you fall OFF — from any angle along the run it is a line.
-			{
-				"name": "pg_surf_intro_plunge",
-				"from": Vector3(138.0, 44.0, -20.0),
-				"at": Vector3(60.0, 2.0, -30.0),
-			},
-			# Over the shoulder of somebody on the pad, looking down the route. NOT
-			# from eye height ON the pad: a face that falls away in front of you is
-			# invisible from standing on the lip, so that frame is a green rectangle
-			# and says nothing about the map. Raised and set back instead, which is
-			# the angle that shows the pad, the lip and the whole descent at once.
-			{
-				"name": "pg_surf_intro_plunge_eye",
-				"from": Vector3(96.0, 50.0, 30.0),
-				"at": Vector3(60.0, 9.0, -30.0),
-			},
-			# Bonus 2, the cascade: eleven jumps down a slalom of blocks at x = -60,
-			# from 40 m to 26 m over 70 m of Z. Square beside it from the west, a little
-			# above its middle, because the thing this frame has to show is the PROFILE
-			# — every block lower than the last — from above at forty-five degrees, so the
-			# block tops read too. [b]The first angle was from above and
-			# behind the pad[/b], which put the main run's 220 m ramp across the whole
-			# background and made the staircase a scatter of tiles in front of it.
-			{
-				"name": "pg_surf_intro_cascade",
-				"from": Vector3(-94.0, 62.0, -28.0),
-				"at": Vector3(-60.0, 30.0, -28.0),
-			},
-			# From over the backstop and above a player's head: the staircase falling
-			# away in front of them, which is the first thing a player on bonus 2 sees.
-			# Over the backstop, not behind it — from behind it the frame is a wall.
-			{
-				"name": "pg_surf_intro_cascade_start",
-				"from": Vector3(-60.0, 48.0, 16.0),
-				"at": Vector3(-60.0, 30.0, -30.0),
-			},
-			# Bonus 3, the long bank: one face at x = 110, banked 56 degrees and falling
-			# 17 m over 140 m of Z. From the low side, above and behind the pad, looking
-			# along and across its face, so the frame shows the thing it is: a face tilted toward the
-			# camera that runs away downhill, with the finish pad past its far end.
-			{
-				"name": "pg_surf_intro_bank",
-				"from": Vector3(66.0, 66.0, 28.0),
-				"at": Vector3(110.0, 22.0, -70.0),
-			},
-			# Over the backstop, down the bank: what a rider on the pad is about to drop on.
-			{
-				"name": "pg_surf_intro_bank_start",
-				"from": Vector3(104.0, 47.0, 16.0),
-				"at": Vector3(110.0, 26.0, -60.0),
-			},
-			# Bonus 4, the transfer: two faces facing each other across a gap, the first
-			# (right, x 165..177) from the pad and the second (left, x 152..163) lower and
-			# starting a third of the way down it. From behind and above the pair, down the
-			# valley between them, so the frame shows the gap a rider crosses.
-			{
-				"name": "pg_surf_intro_transfer",
-				"from": Vector3(163.0, 66.0, 34.0),
-				"at": Vector3(161.0, 14.0, -80.0),
-			},
-			# Over the backstop, down the first face, with the second face across the gap.
-			{
-				"name": "pg_surf_intro_transfer_start",
-				"from": Vector3(170.0, 47.0, 16.0),
-				"at": Vector3(164.0, 24.0, -60.0),
-			},
-		]
-
-	if id != "pg_lobby":
+	if id != "pg_flatgrass":
 		return [
 			{"name": "%s_overview" % id, "from": Vector3(-90, 70, 90), "at": Vector3(0, 8, 0)},
 			{"name": "%s_eye" % id, "from": Vector3(-20, 4, 30), "at": Vector3(0, 6, 0)},
 		]
 
-	# The middle of the jump course, which moved when the course grew from nine
-	# platforms to twelve: it now runs from z = 56 to z = -20 and climbs to 16 m, so a
-	# camera aimed at the old midpoint looked at the first third of it and cut the
-	# climb off at the top of the frame.
-	var course := Vector3(60.0, 11.0, 14.0)
-	var tower := Vector3(-60.0, 7.0, 60.0)
-
 	return [
-		# The whole plate, so the two courses can be seen to be in opposite corners and
-		# the middle can be seen to be empty, which is what a sandbox is for.
-		{"name": "pg_lobby_overview", "from": Vector3(-150, 130, 150), "at": Vector3(0, 4, 0)},
+		# The whole field, so the middle can be seen to be empty, which is what a sandbox is for.
+		{"name": "pg_flatgrass_overview", "from": Vector3(-150, 130, 150), "at": Vector3(0, 4, 0)},
 		# Eye level in the middle, which is where a player actually stands.
-		{"name": "pg_lobby_eye", "from": Vector3(-10, 2.0, 20), "at": Vector3(20, 6, -10)},
+		{"name": "pg_flatgrass_eye", "from": Vector3(-10, 2.0, 20), "at": Vector3(20, 6, -10)},
 		# The toys: the park in the south-west, and the balls, barrels and lane by the spawn.
-		{"name": "pg_lobby_park", "from": Vector3(-2.0, 5.0, 31.0), "at": Vector3(-13.0, 0.5, 14.0)},
-		{"name": "pg_lobby_toys_spawn", "from": Vector3(-4.0, 3.0, 6.0), "at": Vector3(6.0, 0.3, 4.0)},
-		# Bonus 1: the jump course, along its length.
-		{"name": "pg_lobby_course", "from": Vector3(86, 26, 72), "at": course},
-		# Bonus 2: the tower, from above its top and well out from it.
-		#
-		# [b]Both parts matter and the first attempt got both wrong.[/b] From below, the
-		# spiral's far side is hidden behind the pillar and the sandbox wall cuts the
-		# frame in half at exactly the height the platforms are; from close in, a 70
-		# degree lens puts the top of the tower off the top of the picture. Looking
-		# DOWN at it from outside is the only angle that shows a spiral to be a spiral
-		# rather than a scattering of slabs.
-		{"name": "pg_lobby_tower", "from": Vector3(-36, 21, 84), "at": tower},
-		# The tower's base at eye height, from just off the pad.
-		#
-		# Shot from BESIDE it rather than from the spawn point looking along the course.
-		# From the spawn, a dev-textured spiral is a few identical slabs against the sky
-		# with nothing to give them a scale — which is honestly what a player sees and
-		# is useless as evidence. From the side, the pad, the pillar and the first turn
-		# are all in one frame and a person can tell whether the first jump is a jump.
-		{"name": "pg_lobby_tower_eye", "from": Vector3(-72, 5.0, 48), "at": Vector3(-59, 6.0, 61)},
-
-		# Bonus 3, the circuit. Two angles, because the two things worth looking at are
-		# opposite: whether the lap reads as a closed loop round the whole plate (from
-		# high above the corner), and whether the road reads as a road at a driver's
-		# height (down the start/finish straight, from the grid).
-		{"name": "pg_lobby_circuit", "from": Vector3(-120, 105, 130), "at": Vector3(0, 0, 30)},
-		{"name": "pg_lobby_circuit_grid", "from": Vector3(-26, 3.0, 82), "at": Vector3(40, 2.0, 82)},
-
-		# Bonus 4, the stepping stones: ten columns at z = -56 from x 15 to 54, shrinking
-		# from 2 m across to 1 m. From the north and above, square to the line, so the
-		# shrinking and the sway either side of the line both read; and from behind the
-		# pad and off to one side at a little over head height: straight down the line the
-		# columns stand behind each other and read as one.
-		{"name": "pg_lobby_stones", "from": Vector3(34, 16, -34), "at": Vector3(34, 3.0, -56)},
-		{"name": "pg_lobby_stones_start", "from": Vector3(5, 9.0, -49), "at": Vector3(30, 4.0, -57)},
-
-		# Bonus 5, the launch: three decks and a finish at x = -50 from z 2 to 44.5, tops 2,
-		# 5, 8 and 8 m, each deck's far end an amber booster. From the empty east side, level
-		# with the middle deck, so the steps up read as more than a jump; and from behind the
-		# pad, where the boosters read as the way on.
-		{"name": "pg_lobby_launch", "from": Vector3(-24, 11.0, 23), "at": Vector3(-50, 5.0, 23)},
-		{"name": "pg_lobby_launch_start", "from": Vector3(-40, 13.0, -8), "at": Vector3(-50, 4.0, 22)},
-
-		# Bonus 6, the relay: three legs at z 46, 56 and 66 between x 10 and 38, pads at 2,
-		# 6 and 10 m, the first two ending in a violet gate hanging in the air. From the
-		# south-east and above, so the three tiers and both gates are in one frame; and from
-		# behind the first pad and north of the line at a little over head height, looking up
-		# the first leg at its gate, which is what a player sees before the first teleport
-		# (from the south the movement corner's steep ramp fills half the frame).
-		{"name": "pg_lobby_relay", "from": Vector3(52, 22.0, 24), "at": Vector3(24, 6.0, 56)},
-		{"name": "pg_lobby_relay_start", "from": Vector3(5, 7.0, 51), "at": Vector3(32, 3.0, 45)},
+		{"name": "pg_flatgrass_park", "from": Vector3(-2.0, 5.0, 31.0), "at": Vector3(-13.0, 0.5, 14.0)},
+		{"name": "pg_flatgrass_toys_spawn", "from": Vector3(-4.0, 3.0, 6.0), "at": Vector3(6.0, 0.3, 4.0)},
+		# The movement corner: the staircase and both ramps.
+		{"name": "pg_flatgrass_corner", "from": Vector3(0.0, 8.0, 10.0), "at": Vector3(10.0, 3.0, -22.0)},
 	]
 
 
@@ -544,7 +285,7 @@ var _fx_pending := false
 
 ## A prop spawning and a prop on the end of the physics gun, drawn by the real presentation
 ## layer: [method PlaygroundPresentation.on_prop_spawned] and
-## [method PlaygroundPresentation.on_tool_beam], from a player's eye on the lobby's plate.
+## [method PlaygroundPresentation.on_tool_beam], from a player's eye on the field.
 ##
 ## [b]The puff is slowed to a twentieth of real speed and restarted once spawned[/b], for
 ## game-arena's reason: it lives 420 ms and a software frame under xvfb is long enough that

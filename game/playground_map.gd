@@ -2,20 +2,21 @@ extends Node3D
 
 ## Base class for the playground's built-in maps.
 ##
-## [b]A map carries its own zones here, and a delivered map would ship a JSON
-## file.[/b] Both routes are real and dot-map supports both: `DotMapDef.zones_path`
-## points at a file, and a map that ships inside the game's own build can instead
-## answer [method timer_zones] directly. This project uses the second for its own
-## maps and keeps a written-out copy of one of them in `maps/` — with a check in the
-## headless suite that the two agree, because a zone file that has drifted from the
-## geometry it was drawn against is a leaderboard nobody can compare.
+## [b]No map here knows about a run timer.[/b] The game ships none: a server that adds
+## dot-timer gets `addons/pg_timer`, which reads a map's zones from the JSON file dot-map
+## loaded beside it (`DotMapDef.zones_path`), or from a `timer_zones()` method a delivered
+## map may define. A map is geometry, spawns and toys, and every built-in one plays the same
+## with the timer present or absent.
 ##
-## Subclasses override [method _build] and [method timer_zones].
+## Subclasses override [method _build].
 
 const PlaygroundPlayer := preload("playground_player.gd")
 
-## Where players appear if the map has no spawn zone.
+## Where players appear: the map's own spawn, unless a run timer's SPAWN zone says otherwise.
 @export var fallback_spawn: Vector3 = Vector3(0.0, 2.0, 0.0)
+
+## The yaw [member fallback_spawn] faces, in degrees.
+@export var fallback_yaw: float = 0.0
 
 # --- What the movement can do ----------------------------------------------
 #
@@ -26,9 +27,9 @@ const PlaygroundPlayer := preload("playground_player.gd")
 # the tree still asks the movement itself. `headless_playground` asserts these three
 # against the tunables the server actually applies.
 #
-# They lived in `pg_lobby` until a second map needed them. Here rather than a second
-# copy in `pg_bhop_intro`, because two copies of one number is this tree's most
-# repeated bug and the base class is the one place every built-in map already reads.
+# Here rather than a copy in each map that sizes a jump, because two copies of one number
+# is this tree's most repeated bug and the base class is the one place every built-in map
+# already reads.
 
 ## Ground speed, m/s. `DotFpsTunables.max_speed`.
 const MOVE_SPEED := 7.0
@@ -75,15 +76,15 @@ static func _movement() -> DotFpsTunables:
 ## The clear air between two standable boxes, seen from above, in metres. 0.0 when
 ## they touch or overlap.
 ##
-## [b]Box to box, not centre to centre minus a width.[/b] The second is what
-## `pg_lobby`'s tower was checked with, and it is a different number in every
+## [b]Box to box, not centre to centre minus a width.[/b] The second is what a jump
+## tower was once checked with, and it is a different number in every
 ## direction: two axis-aligned squares 45 degrees apart round a circle are closer at
 ## their corners than their centres say, and a square pad beside a square platform
 ## diagonally off its corner is 0.2 m of air that a centre distance calls 3.8.
 ##
-## A route on a built-in map is a list of these boxes, in the order a player lands on
-## them — see `PgLobby.tower_route` — so the gap and the rise of every jump are read off
-## the geometry rather than kept beside it as a table that can drift.
+## A route on a map is a list of these boxes, in the order a player lands on them, so
+## the gap and the rise of every jump are read off the geometry rather than kept beside
+## it as a table that can drift.
 static func gap_between(from: AABB, to: AABB) -> float:
 	var dx := maxf(
 		0.0, maxf(to.position.x - from.end.x, from.position.x - to.end.x)
@@ -163,35 +164,15 @@ func _build() -> void:
 	pass
 
 
-## The map's timer zones, or null for a map with no timer.
-func timer_zones() -> DotTimerZoneSet:
-	return null
-
-
-## Where a player on [param track] starts.
-func spawn_for(track: int) -> Vector3:
-	var zones := timer_zones()
-
-	if zones != null:
-		var spawn := zones.first_of_kind(DotTimerZone.Kind.SPAWN, track)
-
-		if spawn != null:
-			return spawn.destination
-
+## Where a player on [param track] starts. Every track starts at the map's spawn here; a
+## run timer's SPAWN zone for a track is asked first, by [method Playground.start_for].
+func spawn_for(_track: int) -> Vector3:
 	return fallback_spawn
 
 
 ## The yaw a player faces when they spawn on [param track], in degrees.
-func spawn_yaw_for(track: int) -> float:
-	var zones := timer_zones()
-
-	if zones != null:
-		var spawn := zones.first_of_kind(DotTimerZone.Kind.SPAWN, track)
-
-		if spawn != null:
-			return spawn.destination_yaw
-
-	return 0.0
+func spawn_yaw_for(_track: int) -> float:
+	return fallback_yaw
 
 
 ## Standable places on this map that no spawn is MEANT to reach, each as
@@ -218,13 +199,13 @@ func map_toys() -> Array:
 ## Whether [param track] is meant to be driven rather than run.
 ##
 ## [b]Default false, which is every map that existed before there were cars.[/b]
-## [code]Playground._on_seated[/code] cancels a run when a player gets into a vehicle,
-## because a foot course driven round in a buggy is not a time anybody can compare with
-## one that was jumped — and dot-timer has no idea a vehicle exists, so nothing below
-## this can tell the difference.
+## A run timer (`addons/pg_timer`, when a server added dot-timer) cancels a run when a
+## player gets into a vehicle, because a foot course driven round in a buggy is not a time
+## anybody can compare with one that was jumped — and dot-timer has no idea a vehicle
+## exists, so nothing below this can tell the difference.
 ##
 ## A circuit inverts that: the car is the point, and getting OUT of it mid-lap is the
 ## thing that should end the run. A map says which of its tracks are which, because the
-## map is the only thing that knows. See `pg_lobby`'s bonus 3.
+## map is the only thing that knows.
 func track_is_driven(_track: int) -> bool:
 	return false

@@ -9,7 +9,7 @@ const PlaygroundPlayer := preload("playground_player.gd")
 ## [b]The same three addons the other games join, and the third set of proximity
 ## answers.[/b] game-hungario is an arena, so its voice is proximity. A sandbox is a room
 ## and an arena at once —
-## people build together in one corner and run the course in another — so **text has a
+## people build together in one corner and fight or race in another — so **text has a
 ## near channel and voice is the whole server**, which is the arrangement every sandbox
 ## server has ever shipped with, and for the reason they all found: a builder shouting for
 ## a hand should be heard, and somebody in the corner reading should be able to stop

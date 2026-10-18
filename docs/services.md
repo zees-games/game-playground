@@ -24,7 +24,7 @@ A sandbox is a room and an arena at once (people build in one corner and run the
 
 ## The moderator's live tools
 
-`PlaygroundModTools` is built in the module, because health belongs to the arena layer. Noclip, freeze, speed and gravity are predicted modifiers; god, buddha, hp and slay act on the arena's `DotHealth` and say "the arena is off" when it is; slap shoves either way; respawn is the course start; teleports end the course run.
+`PlaygroundModTools` is built in the module, because health belongs to the arena layer. Noclip, freeze, speed and gravity are predicted modifiers; god, buddha, hp and slay act on the arena's `DotHealth` and say "the arena is off" when it is; slap shoves either way; respawn is the spawn; teleports end a run when there is a run timer.
 
 **An admin's help can never make a time.** Noclip abandons the run it interrupts, `PlaygroundPlayer` taints every run while noclip, a speed step or a gravity step is on, and a slap taints the run it lands in. Give and strip are refused, so there is no admin's weapon to taint a run with.
 
@@ -32,7 +32,7 @@ A sandbox is a room and an arena at once (people build in one corner and run the
 
 ## Statistics and achievements
 
-dot-stats and dot-achievements sit under the boards the timer already had. Every stat is recorded from a signal the game already fires (a second count is a second number that can disagree), and `DotAchievementStatsLink` is a signal connection, not twenty call sites. `dedicated` checks that **every stat an achievement watches is declared**: one watching an unreported stat never unlocks and nothing errors. `dedicated` wipes the player's stored achievement progress (`user://`) before it runs, because a suite whose result depends on how many times it has been run is not a suite.
+dot-stats and dot-achievements sit beside the leaderboards (whose run boards are the timer's, when a server has one). Every stat is recorded from a signal the game already fires (a second count is a second number that can disagree), and `DotAchievementStatsLink` is a signal connection, not twenty call sites. `dedicated` checks that **every stat an achievement watches is declared**: one watching an unreported stat never unlocks and nothing errors. `dedicated` wipes the player's stored achievement progress (`user://`) before it runs, because a suite whose result depends on how many times it has been run is not a suite.
 
 ## The vote
 
@@ -64,4 +64,4 @@ The module follows the server's hibernation with both map clocks (`vote.director
 
 `PlaygroundBrowser`, the client half, starts from history and typed addresses. With a site configured (`--browser-backbone-url=<origin>` or `DOT_BROWSER_BACKBONE_URL`) it also reads the site's listing of this game's servers (`DotBrowserSourceBackbone`, app `playground`, website-city's `/api/content/server/list`), addresses only; without one nothing reaches out to a website.
 
-**Timer records are keyed by the account, not the connection.** The in-match id stays `u<userid>`, but dot-server's userid is a sequential counter that restarts with the server, so keying records by it split one player into several runners and handed a stranger an old record. `PlaygroundModule._record_key_for` gives `session.uid()` (a guest's is per device); `Playground.record_key(id)` and `match_id(key)` translate at the timer boundary, and the timer store, the `fastest`, `top_speed` and `points` boards and the checkpoints use the account uid. A seat with no identity, or a second concurrent connection of one account, keeps `u<N>` and is unranked. Legacy `u<N>` rows are retired at start (`retire_legacy_records()`): appended to `legacy_records.jsonl` beside the records store (or in `user://`), then wiped; nothing can say which account owned one, so they cannot be migrated. `dedicated` covers it.
+**Timer records (with dot-timer linked, [timer.md](timer.md)) are keyed by the account, not the connection.** The in-match id stays `u<userid>`, but dot-server's userid is a sequential counter that restarts with the server, so keying records by it split one player into several runners and handed a stranger an old record. `PlaygroundModule._record_key_for` gives `session.uid()` (a guest's is per device); `Playground.record_key(id)` and `match_id(key)` translate at the timer boundary, and the timer store, the `fastest`, `top_speed` and `points` boards and the checkpoints use the account uid. A seat with no identity, or a second concurrent connection of one account, keeps `u<N>` and is unranked. Legacy `u<N>` rows are retired at start (`retire_legacy_records()`): appended to `legacy_records.jsonl` beside the records store (or in `user://`), then wiped; nothing can say which account owned one, so they cannot be migrated. `dedicated` covers it.

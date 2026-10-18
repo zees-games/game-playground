@@ -35,11 +35,9 @@ Some of what you can do:
 - **Creative mode.** Type `!creative` and nobody can touch you or your props, and you can't hurt anybody.
 - **Fight.** `pg_arena 1` turns on damage between players, and `pg_waves` sends waves of armed NPCs. The dead fall as ragdolls ([dot-player-char](https://github.com/modcommunity/dot-player-char)), players and NPCs alike; the server picks how each goes down and everybody sees the same fall (`sv_ragdoll 0` for a quick fall with no physics, `sv_ragdoll_reactions` to weight the falls).
 
-There are four maps:
+There are two maps built in, beside the custom maps the map pack adds:
 
-- **pg_lobby** is the sandbox: a 200-metre plate to build on. Its main track has no timer, so building is never timed. In one corner there is a jump course (bonus 1), a spiral tower (bonus 2) and a driving circuit round the plate (bonus 3). Press **T** to switch to one.
-- **pg_surf_intro** is two surf ramps meeting in a valley, with a steep slide and a slalom of blocks as bonuses.
-- **pg_bhop_intro** is bunny-hop blocks with widening gaps, plus six bonus courses.
+- **pg_flatgrass** is the sandbox and the default: a 200-metre plate of grass to build on, walled in, with a corner of ramps and steps to try the movement on and the map's toys (balls, a see-saw, a roundabout) near the spawn.
 - **pg_generated** is built from a seed each time it loads: rooms joined by corridors, with props scattered through them. Start with `--pg-map-seed=<n>` to pick the seed, so you can share a layout.
 
 ## Controls
@@ -59,10 +57,10 @@ There are four maps:
 | **Z** | Undo your last spawn |
 | **WASD** / **Space** / **Ctrl** | Move / jump (hold to keep hopping) / crouch |
 | **F5** | First or third person |
-| **T** | Switch track (the sandbox or one of the courses) |
+| **T** | Switch track, on a server with the run timer |
 | **Tab** (hold) | Scoreboard: who is on, their score, time connected and ping |
 | **N** | Change movement style |
-| **C** / **V** | Save a checkpoint / go back to it |
+| **C** / **V** | Save a checkpoint / go back to it, on a server with the run timer |
 | **X** / **G** | Pick a checkpoint / forget them all |
 | **Y** / **U** | Chat / chat with nearby players |
 | **M** | Next map |
@@ -132,17 +130,9 @@ pg_limits u3                 // what player u3 is using against their limits
 | `pg_save <name>`, `pg_load <name>`, `pg_builds`, `pg_build_delete <name>` | Saved builds |
 | `pg_shop [0\|1]` | Prices for spawning, paid from a bag |
 | `pg_give <player> <prop> [count]`, `pg_inv <player>` | Put things in a player's bag, or read it |
-| `pg_zone`, `pg_zone_mark`, `pg_zone_save` | Draw timer zones (see below) |
 
-### Drawing timer zones
-Any map can get a timed course. Stand in the map and draw the zones from the console:
-
-```
-pg_zone start          // the kind of zone to draw
-pg_zone_mark           // stand on one corner
-pg_zone_mark           // then the other
-pg_zone_save           // write them to disk
-```
+### Adding the run timer
+The game does not ship a run timer. A server that wants timed courses adds [dot-timer](https://github.com/modcommunity/dot-timer): put its `addons/dot_timer` folder in the project (a link or a copy), run `godot --headless --path . --import` once, and start the server. The playground's own `addons/pg_timer` notices it and turns timing on: zones from a map's zone file, records and leaderboards, `pg_timer`, `pg_track`, `pg_top`, `pg_cp`, `pg_tp` and `pg_cp_clear`, and the T and checkpoint keys. Details in [docs/timer.md](docs/timer.md).
 
 ### Admin commands
 These come from [dot-moderation](https://github.com/modcommunity/dot-moderation): `!noclip`, `!freeze`, `!slay`, `!bring` and the rest. `blind <player>` blacks out that player's screen, and `beacon <player>` puts a ring and a ping on them for everybody to see.
@@ -168,7 +158,7 @@ With `pg_shop 1`, spawning costs money. A player's bag is a 10 x 6 grid with a 4
 
 | Suite | What it covers |
 | --- | --- |
-| `headless_playground` | The whole game: props, NPCs, weapons, every tool, limits, the menu, the courses and map changes |
+| `headless_playground` | The whole game: props, NPCs, weapons, every tool, limits, the menu, map changes, and the run timer when it is linked |
 | `headless_net` | A server and a client in one process, over the network code |
 | `headless_presentation` | What a client draws and plays |
 | `headless_stack` | The whole stack of addons together |

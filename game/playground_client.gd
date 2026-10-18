@@ -41,9 +41,9 @@ const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
 ## R            unfreeze everything you have frozen
 ## Z            undo your last spawn
 ## 1 / 2 / 3    physics gun / gravity gun / cycle the weapons you have
-## T            switch track: the sandbox, or the course in the corner
-## Tab          cycle style      M   next map
-## C V X B      practice checkpoints: save, go to, cycle, forget
+## T            switch track (with a run timer: the server added dot-timer)
+## N            cycle style      M   next map
+## C V X G      practice checkpoints, with a run timer: save, go to, cycle, forget
 ## [/codeblock]
 
 const CHANNEL := "playground.client"
@@ -70,7 +70,7 @@ const MENU_TAP_SECONDS := 0.25
 const SPAWN_REACH := 3.0
 
 ## The map to open on if the configuration names none. A client has to be somewhere.
-const FALLBACK_MAP := &"pg_lobby"
+const FALLBACK_MAP := &"pg_flatgrass"
 
 @export var player_id: StringName = &"local"
 @export var display_name: String = "Player"
@@ -571,13 +571,6 @@ func _build_netcode() -> DotResult:
 			])
 		if presentation != null:
 			presentation.on_vote_cue(StringName(str(info.get("cue", ""))))
-	)
-	bridge.finish_received.connect(func(pid: int, time: float, rank: int) -> void:
-		if hud != null and pid == bridge.local_player_id:
-			hud.notice("%s%s" % [
-				DotTimerRun.format_time(time),
-				" — rank %d" % rank if rank > 0 else ""
-			])
 	)
 
 	# Stock tunables until there is a player to ask. The sampler turns the view at the
@@ -1199,7 +1192,7 @@ static func fill_help(help: DotMenuHelp) -> void:
 		return
 	help.about = "A sandbox: hold Q, pick a prop, an NPC, a vehicle or a weapon, and click it into the world. Pick things up with the physics gun, freeze them, throw them, weld and wire them, and undo what you made. Timed courses run in the corners, and on the surf and hop maps."
 	help.add_text("Building", "With the physics gun, hold the left mouse button on a prop to carry it, roll the wheel to push it away or pull it close, and press the right button to freeze it where it is. Hold the rotate key to turn what you carry with the mouse. The tool gun's tools are on the spawn menu's Tools tab.")
-	help.add_text("Running", "Leave a course's start zone and the timer runs until its end zone. Checkpoints are practice: a run that used one is not a record.")
+	help.add_text("Running", "Only on a server that adds the run timer: leave a course's start zone and the timer runs until its end zone. Checkpoints are practice: a run that used one is not a record.")
 	help.add_text("Modes", "A server may turn on the arena (players can hurt each other), waves of NPCs with downs and revives, and a shop where everything has a price. Each is a server setting, so the menu tells you what this one has on.")
 
 
@@ -1604,18 +1597,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif key.is_action(PlaygroundBindings.WEAPONS):
 		_cycle_weapon()
 	elif key.is_action(PlaygroundBindings.TRACK):
-		_cycle_track()
+		_timer_key(&"track")
 	elif key.is_action(PlaygroundBindings.STYLE):
 		# Tab is the scoreboard, held, as in every game here; the style moved to N.
 		_cycle_style()
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_SAVE):
-		_save_checkpoint()
+		_timer_key(&"checkpoint_save")
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_LOAD):
-		_load_checkpoint()
+		_timer_key(&"checkpoint_load")
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_NEXT):
-		_cycle_checkpoint()
+		_timer_key(&"checkpoint_next")
 	elif key.is_action(PlaygroundBindings.CHECKPOINT_CLEAR):
-		_clear_checkpoints()
+		_timer_key(&"checkpoint_clear")
 	elif key.is_action(DotMenuBindings.LOADOUT_ACTION) and loadout_menu != null and not arena_on:
 		# B opens the loadout only in the arena (the menu is disabled outside it, so the key
 		# reaches here): said, rather than a key that does nothing.
@@ -2515,86 +2508,29 @@ func _unfreeze_all() -> void:
 		hud.notice("Unfroze %d prop%s." % [thawed, "" if thawed == 1 else "s"])
 
 
-# --- Practice ---------------------------------------------------------------
+# --- A run timer's keys ------------------------------------------------------
 #
-# Saving is free; teleporting is what costs the run. That asymmetry is the whole of
-# practice mode, and it is why the two are separate keys rather than one toggle.
+# The track and the practice checkpoints are a run timer's, and none ships: the keys are
+# handed to `addons/pg_timer` when a server added dot-timer, and say so when it did not.
 
-func _checkpoints() -> DotTimerCheckpoints:
-	return playground.timers.checkpoints_for(player_id)
-
-
-func _save_checkpoint() -> void:
-	var state := player.controller.state
-	var saved := _checkpoints().save(
-		state.position, state.velocity, state.yaw, state.pitch,
-		state.is_grounded(), state.is_crouched()
-	)
-
-	if hud == null:
-		return
-
-	if not saved.ok:
-		hud.notice(saved.error.message)
-		return
-
-	hud.notice("Checkpoint %d saved" % _checkpoints().count())
-
-
-func _load_checkpoint() -> void:
-	var checkpoints := _checkpoints()
-	var checkpoint := checkpoints.load_current()
-
-	if checkpoint == null:
-		if hud != null:
-			hud.notice("No checkpoints. C saves one.")
-		return
-
-	# Restored through the player's own teleport, which abandons the run — a
-	# teleport that kept the clock running is the simplest possible cheat on any
-	# timed map, and a checkpoint restore is a teleport.
-	player.teleport(checkpoint.position, checkpoint.yaw)
-	player.controller.state.velocity = checkpoint.velocity
-	player.controller.state.pitch = checkpoint.pitch
-
-	if hud != null:
-		hud.notice("Checkpoint %d of %d" % [
-			checkpoints.index + 1, checkpoints.count()
-		])
-
-
-func _cycle_checkpoint() -> void:
-	var checkpoints := _checkpoints()
-
-	if checkpoints.next() == null:
-		return
-
-	if hud != null:
-		hud.notice("Checkpoint %d of %d" % [
-			checkpoints.index + 1, checkpoints.count()
-		])
-
-
-func _clear_checkpoints() -> void:
-	_checkpoints().clear()
-
-	if hud != null:
-		# Said explicitly, because it is the thing a player will assume it does:
-		# clearing the set does not launder a run that already used one.
-		hud.notice("Checkpoints cleared. The current run is still flagged.")
+func _timer_key(action: StringName) -> void:
+	if playground.run_timer != null and playground.run_timer.has_method("on_key"):
+		playground.run_timer.call("on_key", action, player_id, hud)
+	elif hud != null:
+		hud.notice("No run timer on this server.")
 
 
 # --- Styles, tracks and maps -----------------------------------------------
 
 func _cycle_style() -> void:
-	var styles := playground.timers.styles_in_order()
+	var styles := playground.style_order
 
 	if styles.is_empty():
 		return
 
 	_style_index = (_style_index + 1) % styles.size()
 
-	var chosen := styles[_style_index]
+	var chosen: DotFpsStyle = playground.movement_styles[styles[_style_index]]
 
 	if bridge != null:
 		# The server owns which style a player is on: it decides what the movement IS,
@@ -2605,13 +2541,6 @@ func _cycle_style() -> void:
 	if playground.set_player_style(player_id, chosen.id) and hud != null:
 		hud.notice("Style: %s" % chosen.display_name)
 
-
-## Switches between the sandbox and whatever courses this map has.
-##
-## [b]The key that makes the minigame reachable at all.[/b] `pg_lobby` is a sandbox
-## on the main track and a jump course on bonus 1, which is what lets one map be both
-## without a timer running over somebody who is building — and without this the bonus
-## track would be a zone set nothing could ever enter.
 
 ## First person to third and back, through the controller switch.
 ##
@@ -2674,32 +2603,6 @@ func _other_players() -> Array:
 		if other != player and is_instance_valid(other):
 			out.append(other)
 	return out
-
-
-func _cycle_track() -> void:
-	if player.timer == null:
-		return
-
-	var tracks := playground.tracks_on_this_map()
-
-	if tracks.size() < 2:
-		if hud != null:
-			hud.notice("This map has one track.")
-		return
-
-	var index := tracks.find(player.timer.track)
-	var next := tracks[(index + 1) % tracks.size()]
-
-	if not player.timer.set_track(next):
-		return
-
-	# Moved to the new track's spawn. Staying put would leave a player standing in
-	# the sandbox with a course timer that can never start, which looks exactly like
-	# a timer that is broken.
-	playground.spawn_player(player_id)
-
-	if hud != null:
-		hud.notice("Track: %s" % DotTimerTrack.name_of(next))
 
 
 ## What M lists solo: every map in the catalogue, the kind as the mode and the tier under it.

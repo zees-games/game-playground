@@ -8,7 +8,7 @@ const PlaygroundPlayer := preload("playground_player.gd")
 ##
 ## [b]A sandbox is the loosest of the five games and the layer still earns its place.[/b]
 ## There is no match, no round and no win condition; there is a world people build in,
-## a course in the corner with a timer on it, and a session that lasts as long as the
+## a server's maps to run on, and a session that lasts as long as the
 ## server does. What the layer buys is the part a sandbox needs most and has least of:
 ## a record of who is here that survives them dropping out for a minute.
 ##
@@ -139,8 +139,8 @@ func _build_physics() -> DotResult:
 	# frozen props stop being bit arithmetic at the call site.
 	physics.profile = DotPhysicsProfile.from_project()
 
-	# The one thing this game decides. The course in the corner is timed by dot-timer,
-	# and a run set at one rate is not comparable with one set at another.
+	# The one thing this game decides. A server's course may be timed (a run timer, when
+	# one was added), and a run set at one rate is not comparable with one set at another.
 	physics.profile.tick_rate = game.tick_rate
 
 	physics.layout = DotPhysicsLayout.sandbox_3d()
@@ -266,9 +266,9 @@ func _build_spawns() -> void:
 
 ## Re-reads the map's start points. Call after a map change.
 ##
-## One site per track: the playground's course has a main run and bonuses like any
-## other, and the track is carried in the site's metadata so a mode that wants a
-## specific one can ask with a condition.
+## One site per track: a timed course has a main run and bonuses, and the track is
+## carried in the site's metadata so a mode that wants a specific one can ask with a
+## condition. A map with no run timer has the main track only.
 func refresh_spawns() -> void:
 	if spawns == null or game == null:
 		return
@@ -283,28 +283,30 @@ func refresh_spawns() -> void:
 
 	_sites_from = game.maps.current.id if game.maps != null and game.maps.current != null else &""
 
-	# Every track the map could have: the main run and up to eight bonuses. A map with
-	# no bonus answers the origin for those, which is the skip below — reading
-	# DotTimerTrack's own range rather than guessing a count is what keeps this right
-	# when a map gains a ninth.
-	for track in range(DotTimerTrack.MAIN, DotTimerTrack.COUNT):
-		var at := map.spawn_for(track)
+	# Every track the map has something on: the main track, and a run timer's bonuses when
+	# a server added one. The game answers both halves, so this names no timer class.
+	for track in game.tracks_on_this_map():
+		var start := game.start_for(track)
+
+		if start.is_empty():
+			continue
+
+		var at: Vector3 = start["at"]
 
 		if at.is_equal_approx(Vector3.ZERO):
 			continue
 
-		# [b]Radians in, because that is what a site holds.[/b] `spawn_yaw_for` answers
-		# in degrees — it reads `DotTimerZone.destination_yaw`, which the zone painter
-		# writes with `rad_to_deg` — and `DotSpawnSite.sample` builds
-		# `Basis(Vector3.UP, yaw)`, which is radians. Storing one as the other put a
+		# [b]Radians in, because that is what a site holds.[/b] A start's yaw is in
+		# degrees (a zone painter writes it with `rad_to_deg`) and `DotSpawnSite.sample`
+		# builds `Basis(Vector3.UP, yaw)`, which is radians. Storing one as the other put a
 		# number 57 times too large into the field and nothing said so, because nothing
 		# had ever called `sample()`: the site's own yaw had never been read.
 		var site := DotSpawnSite.point(
-			StringName("start_%d" % track), at, deg_to_rad(map.spawn_yaw_for(track))
+			StringName("start_%d" % track), at, deg_to_rad(float(start["yaw"]))
 		)
 		site.meta = {"track": track}
-		site.priority = 10 if track == DotTimerTrack.MAIN else 0
-		site.id = StringName(DotTimerTrack.short_name_of(track))
+		site.priority = 10 if track == 0 else 0
+		site.id = StringName("main" if track == 0 else "b%d" % track)
 		spawns.add_site(site)
 
 	DotLog.debug(CHANNEL, "start sites", {"count": spawns.sites().size()})
@@ -421,7 +423,7 @@ func _ensure_sites_current() -> void:
 ## the sites are still the map's, and what the director adds is the choice among them,
 ## the per-site cooldown and, with the arena layer on, the protection window
 ## [DotSpawnProtection] only ever grants from inside [method DotSpawnDirector.choose].
-func choose_start(id: StringName, track: int = DotTimerTrack.MAIN) -> DotResult:
+func choose_start(id: StringName, track: int = 0) -> DotResult:
 	_ensure_sites_current()
 
 	var key := String(id)

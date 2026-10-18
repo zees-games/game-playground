@@ -21,9 +21,8 @@ const PlaygroundWorldGen := preload("../game/playground_worldgen.gd")
 ##   feature of every generated world and a seed nobody can name is a world nobody can
 ##   share.
 ##
-## There is deliberately no timer course on it. A generated jump course would be a course
-## nobody could learn and a record nobody could beat, which is the opposite of what
-## dot-timer is for — and `pg_lobby` already proves a sandbox map can carry one.
+## There is deliberately no timed course on it, even with a run timer added: a generated
+## jump course would be a course nobody could learn and a record nobody could beat.
 
 ## The seed this map was built from. Set by [Playground] out of `pg_seed` before the
 ## scene is added, so that a map change with a chosen seed produces the chosen map.
@@ -113,14 +112,6 @@ func _plain_plate() -> void:
 		PlaygroundGeometry.COLOUR_FLOOR
 	)
 	fallback_spawn = Vector3(SIZE * 0.5, 1.5, SIZE * 0.5)
-
-
-## No zones at all, and that is the point rather than an omission.
-##
-## A generated jump course is a course nobody can learn and a record nobody can beat.
-## `pg_lobby` carries the timer; this map carries the sandbox.
-func timer_zones() -> DotTimerZoneSet:
-	return DotTimerZoneSet.new()
 
 
 func spawn_for(_track: int) -> Vector3:

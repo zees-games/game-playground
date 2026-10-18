@@ -241,16 +241,18 @@ func _watch_game() -> void:
 
 
 func _on_run_filed(
-	player_id: StringName, run: DotTimerRun, _rank: int, _reason: String
+	player_id: StringName, time: float, _rank: int, _reason: String
 ) -> void:
-	if run == null:
+	# Only a run timer emits this (none ships; a server adds one), and a negative time is a
+	# run it could not say the length of.
+	if time < 0.0:
 		return
 
 	_record(player_id, &"finishes", 1.0)
 	# A LOWEST: the tracker keeps the smaller reading, which is what a best time is. A
 	# COUNTER here would sum every run somebody ever did into one enormous number and the
 	# achievement would unlock for persistence rather than for speed.
-	_record(player_id, &"fastest_run", run.time())
+	_record(player_id, &"fastest_run", time)
 
 
 ## One reading, under the key this player is filed as.

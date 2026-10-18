@@ -25,12 +25,14 @@ const ToolPhysprop := preload("toolgun/tool_physprop.gd")
 const PlaygroundMaterials := preload("playground_materials.gd")
 const PlaygroundAddons := preload("playground_addons.gd")
 
-## The playground: a sandbox with a surf map, a bhop map and a lobby, timed and
-## ranked, with props you can spawn and a physics gun to move them with.
+## The playground: a sandbox on a flat grass plate, with props you can spawn and a
+## physics gun to move them with. Any map a server adds plays here too, surf and bunny-hop
+## courses among them; a run timer is not shipped, and a server that adds dot-timer gets
+## one through `addons/pg_timer` (see [member run_timer]).
 ##
 ## [b]This is the only place every addon in the movement half of the family runs
-## together[/b] — dot-player-controller, dot-timer, dot-map, dot-props and
-## dot-leaderboard, over dot-core — and, by the family's own repeated lesson, the
+## together[/b] — dot-player-controller, dot-map, dot-props and dot-leaderboard, over
+## dot-core — and, by the family's own repeated lesson, the
 ## seams between them are where the bugs are. Each addon's own suite runs it with the
 ## others absent; `examples/headless_playground.tscn` is the only thing that runs the
 ## joins.
@@ -41,8 +43,8 @@ const PlaygroundAddons := preload("playground_addons.gd")
 ##
 ## [b]It is a server and a client in one process.[/b] Nothing here is networked yet —
 ## dot-net's bridge is the next piece, and the shape is deliberately ready for it:
-## the timer is authoritative in one place, the prop spawner in the same place, and
-## the player's own copy of both would be non-authoritative.
+## the prop spawner is authoritative in one place, and the player's own copy of it
+## would be non-authoritative.
 
 const CHANNEL := "playground"
 
@@ -97,10 +99,13 @@ signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vect
 ## server; the client equips it offline.
 signal weapon_picked_up(player_id: StringName, weapon_id: StringName)
 
-## Somebody finished a run. [param rank] is 0 when it was not filed.
-signal run_filed(
-	player_id: StringName, run: DotTimerRun, rank: int, reason: String
-)
+## Somebody finished a timed run, [param time] seconds long. [param rank] is 0 when it was
+## not filed, and [param reason] then says why. Emitted only by a run timer (see
+## [member run_timer]); a game without one never emits it.
+##
+## A time rather than dot-timer's run object, because this file must compile with the
+## timer absent, and a signal naming its class would not.
+signal run_filed(player_id: StringName, time: float, rank: int, reason: String)
 
 @export_group("Content")
 
@@ -124,8 +129,8 @@ signal run_filed(
 ## operator put in [code]server.cfg[/code] — see [method _resolve_tick_rate]. The
 ## export is the fallback for a client or a test with no server to ask.
 ##
-## It is also what every [DotTimerRecord] this instance files is stamped with, which
-## is what lets a disputed time be checked afterwards.
+## It is also what every record a run timer files is stamped with, which is what lets a
+## disputed time be checked afterwards.
 @export_range(1, 240, 1) var tick_rate: int = 128
 
 ## Registry scope, so a server game and a client game can share one process — the shape
@@ -140,7 +145,7 @@ signal run_filed(
 ##
 ## Derived from [member PlaygroundConfig.authoritative] on ready rather than exported
 ## beside it, so there is one place to set it and no way for the two to disagree. A
-## client leaves it false, runs its own timer for its HUD, and files nothing.
+## client leaves it false, runs its own copy of everything for its HUD, and files nothing.
 var authoritative: bool = true
 
 ## What the hooks of the addons folder registered: the Q menu's Addons tab, and where a
@@ -175,7 +180,16 @@ var rotation_ends_maps: bool = true
 ## already moved, and under the deployed `trigger: rtv_only` with no duration, thirty
 ## minutes the server did not have.
 var clock_fn: Callable = Callable()
-var timers: DotTimerManager = null
+
+## The run timer, or null: the game ships none.
+##
+## [b]Attached by `addons/pg_timer`'s hook, and only when `addons/dot_timer` is present.[/b]
+## A server that wants timed runs adds the dot_timer addon (or a player subscribes to it);
+## the hook then builds a `DotTimerManager` and calls [method attach_run_timer]. Untyped and
+## called by name, because nothing in the game may name a dot-timer class: every script must
+## compile in a checkout without it. What it is called with is the whole interface, and
+## every call below is guarded on null.
+var run_timer: Object = null
 var props: DotPropSpawner = null
 
 ## The vehicles. Every one of them is also a [DotPropInstance] in [member props] — see
@@ -376,13 +390,14 @@ var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
 var players: Dictionary = {}
 
-## The movement half of each style, by id. The ranking half lives on the manager.
+## The movement styles, by id: dot-player-controller's own set.
 var movement_styles: Dictionary = {}
 
-## Reused per player so a tick allocates nothing.
-var _samples: Dictionary = {}
+## The styles' ids in declared order, which is the same on every machine. What a style index
+## means on the wire, and what the style key cycles through.
+var style_order: Array[StringName] = []
 
-## Simulation ticks run. The tick number every player and every timer is stamped with.
+## Simulation ticks run. The tick number every player is stamped with.
 var _tick: int = 0
 
 ## Frame time not yet spent on a simulation tick.
@@ -429,7 +444,6 @@ func _ready() -> void:
 
 	_build_styles()
 	_build_leaderboards()
-	_build_timers()
 	_build_props()
 	_build_inventory()
 	_build_vehicles()
@@ -439,8 +453,10 @@ func _ready() -> void:
 	_build_player_stack()
 	_build_addons()
 
-	if authoritative:
-		await retire_legacy_records()
+	# A run timer's records keyed the old way are moved aside before the first map. The
+	# timer's own business, here only because it has to come before `change_map`.
+	if authoritative and run_timer != null:
+		await run_timer.call("retire_legacy_records")
 
 	# Physics ticks drive everything. Not _process: a timer sampled per frame counts
 	# a different number of ticks on a 144 Hz monitor than on a 60 Hz one, and the
@@ -507,8 +523,8 @@ func _build_player_stack() -> void:
 ##
 ## [b]The engine's, when a server has set it.[/b] The chain is: an operator writes
 ## `sv_tickrate 128` in `server.cfg`; dot-server's `_apply_tickrate` writes
-## `Engine.physics_ticks_per_second`; this reads it; `DotTimerManager` adopts it; and
-## it lands on every record filed. Without that, the timer's rate would be an export
+## `Engine.physics_ticks_per_second`; this reads it; a run timer adopts it; and it lands
+## on every record filed. Without that, the rate would be an export
 ## on a node nobody would think to change, and a server retuned from 64 to 128 would
 ## go on producing times computed against 64 — twice their real length, on a
 ## leaderboard shared with servers that got it right, with no error anywhere.
@@ -560,7 +576,7 @@ func _physics_process(delta: float) -> void:
 ## The order is the point, and it is the same order a dedicated server uses:
 ## move every player, then time the tick with the position the move produced. Timing
 ## first shifts every run by exactly one tick — and by a DIFFERENT amount at each
-## tickrate, which is the tickrate dependence dot-timer's sub-tick fractions exist to
+## tickrate, which is the tickrate dependence a run timer's sub-tick fractions exist to
 ## remove.
 func _simulate_tick(step: float) -> void:
 	props.advance(step)
@@ -628,23 +644,9 @@ func _simulate_tick(step: float) -> void:
 	for id in players:
 		(players[id] as PlaygroundPlayer).drive_character(step)
 
-	for id in players:
-		var player: PlaygroundPlayer = players[id]
-		var sample: DotTimerSample = _samples[id]
-
-		player.fill_sample(sample)
-
-		timers.tick_player(
-			record_key(id),
-			sample.position,
-			sample.velocity,
-			sample.grounded,
-			sample.alive,
-			player.controller.state.yaw,
-			player.controller.state.pitch,
-			sample.buttons,
-			player.replay_flags()
-		)
+	# The run timer last, with the positions every move above produced.
+	if run_timer != null:
+		run_timer.call("tick", _tick)
 
 
 ## One authoritative tick driven from outside, at a tick number the driver chose.
@@ -661,14 +663,15 @@ func tick_once(tick: int) -> void:
 		player_stack.tick(tick)
 
 
-## The timer half of a tick, and nothing else.
+## The client's half of a tick: what it was told is in the air, and the run timer.
 ##
 ## What a CLIENT runs. A client may not simulate props — rigid bodies are not
 ## reproducible across machines, which is the whole reason this sandbox is
 ## server-authoritative — and it may not simulate remote players, which are
 ## interpolated from snapshots. Its own player is simulated by the predictor through
-## [PlaygroundPlayerNet]. What is left is feeding every timer the position it can see,
-## so a local run reads a tick earlier than any packet could deliver it.
+## [PlaygroundPlayerNet]. What is left is the projectiles it was told about, and feeding a
+## run timer the position it can see, so a local run reads a tick earlier than any packet
+## could deliver it.
 func tick_timers_only(tick: int) -> void:
 	_tick = tick
 
@@ -676,23 +679,8 @@ func tick_timers_only(tick: int) -> void:
 	if projectiles != null:
 		projectiles.tick(1.0 / float(maxi(tick_rate, 1)))
 
-	for id in players:
-		var player: PlaygroundPlayer = players[id]
-		var sample: DotTimerSample = _samples[id]
-
-		player.fill_sample(sample)
-
-		timers.tick_player(
-			record_key(id),
-			sample.position,
-			sample.velocity,
-			sample.grounded,
-			sample.alive,
-			player.controller.state.yaw,
-			player.controller.state.pitch,
-			sample.buttons,
-			player.replay_flags()
-		)
+	if run_timer != null:
+		run_timer.call("tick", _tick)
 
 
 ## Puts the whole game on a tick rate decided elsewhere — a server's `sv_tickrate`,
@@ -716,10 +704,12 @@ func set_tick_rate(rate: int) -> bool:
 	if rate <= 0 or rate == tick_rate:
 		return false
 
-	timers.set_tick_rate(rate)
-	# Read back rather than assigned: the timer manager clamps, and two copies of this
-	# number that disagree is the failure the whole method exists to prevent.
-	tick_rate = timers.tick_rate
+	tick_rate = rate
+
+	# The run timer is told, because two copies of this number that disagree is the
+	# failure the whole method exists to prevent.
+	if run_timer != null:
+		run_timer.call("set_tick_rate", rate)
 
 	for id in players:
 		(players[id] as PlaygroundPlayer).tick_rate = tick_rate
@@ -733,6 +723,7 @@ func set_tick_rate(rate: int) -> bool:
 func _build_styles() -> void:
 	for style in DotFpsStyle.defaults():
 		movement_styles[style.id] = style
+		style_order.append(style.id)
 
 
 func _build_leaderboards() -> void:
@@ -744,64 +735,8 @@ func _build_leaderboards() -> void:
 	boards.report_to_backbone = config.report_to_backbone
 	add_child(boards)
 
-	var fastest := DotLeaderboardDef.make(
-		&"fastest", DotLeaderboardDef.Kind.TIME
-	)
-	fastest.display_name = "Fastest time"
-	boards.define(fastest)
-
-	var top_speed := DotLeaderboardDef.make(
-		&"top_speed", DotLeaderboardDef.Kind.POINTS
-	)
-	top_speed.display_name = "Highest speed"
-	top_speed.decimals = 1
-	top_speed.unit = "m/s"
-	boards.define(top_speed)
-
-	var points := DotLeaderboardDef.make(
-		&"points", DotLeaderboardDef.Kind.POINTS
-	)
-	points.display_name = "Ranking points"
-	points.decimals = 1
-	boards.define(points)
-
-
-func _build_timers() -> void:
-	timers = DotTimerManager.new()
-	timers.name = "Timers"
-
-	# Handed a DotTimerConfig rather than having its exports set one at a time, so
-	# the timer half is configured through the same layered path as everything else
-	# — and so `tick_rate = 0` means "take it from the engine", which is what a
-	# server operator setting `sv_tickrate` expects to control.
-	var timer_config := DotTimerConfig.new()
-	timer_config.tick_rate = 0
-	timer_config.default_tick_rate = tick_rate
-	timer_config.authoritative = authoritative
-	timer_config.record_runs = true
-	timer_config.records_directory = config.records_directory
-	timer_config.record_replays = config.record_replays
-	timer_config.fastest_expected_speed = 40.0
-
-	timers.config = timer_config
-
-	add_child(timers)
-
-	# After `_ready` has applied the config, so this is the value everything agrees
-	# on rather than the export's default.
-	tick_rate = timers.tick_rate
-
-	var timer_styles := DotTimerStyle.defaults()
-	for style in timer_styles:
-		# The community timers' `startinair`, on: a hopper leaves the start pad mid-hop more often
-		# than not, and the prespeed clamp above is what guards the dive-through.
-		style.allow_air_start = true
-	timers.set_styles(timer_styles)
-
-	timers.record_accepted.connect(_on_record_accepted)
-	timers.record_refused.connect(_on_record_refused)
-	timers.effect_requested.connect(_on_effect_requested)
-	timers.player_finished.connect(_on_player_finished)
+	# No boards are defined here: the game ranks nothing by itself. A run timer defines its
+	# own (`fastest`, `top_speed`, `points`) when a server adds one.
 
 
 func _build_props() -> void:
@@ -1522,18 +1457,10 @@ func _on_seated(
 
 	player.set_riding(true, vehicle.node as Node3D)
 
-	# The run goes on a track that is run, and it is not optional there: a timed course
-	# driven in a car is not a run anybody can compare with one that was walked, and
-	# dot-timer has no idea a vehicle exists. Stopping it is the same call a teleport
-	# makes, for the same reason.
-	#
-	# [b]On a track that is DRIVEN, getting in is the opposite of a reason to stop.[/b]
-	# `pg_lobby`'s bonus 3 is a circuit, where the car is the point; cancelling there
-	# would make a driving track impossible to build, and the rule that could not tell
-	# the two apart is why there was not one. The map answers, because the map is the
-	# only thing that knows which of its tracks is which.
-	if player.timer != null and not _track_is_driven(player.timer.track):
-		player.timer.stop(DotTimer.REASON_TELEPORT)
+	# A run timer decides what getting in means for a run (it ends one on foot and keeps
+	# one on a driving track; see `PlaygroundMap.track_is_driven`).
+	if run_timer != null:
+		run_timer.call("on_seated", player)
 
 	# A physics gun cannot hold a prop from inside a car. Not a rule about vehicles: the
 	# tools reach from the eye and the eye has just moved, so whatever was on the end of
@@ -1561,11 +1488,9 @@ func _on_unseated(
 
 	player.set_riding(false)
 
-	# And the mirror image on a driving track: the run ends when the driver leaves the
-	# car, because the rest of the lap on foot is not the same lap. On a foot track
-	# getting out changes nothing, which is what it has always done.
-	if player.timer != null and _track_is_driven(player.timer.track):
-		player.timer.stop(DotTimer.REASON_TELEPORT)
+	# And the mirror image: on a driving track the run ends when the driver leaves the car.
+	if run_timer != null:
+		run_timer.call("on_unseated", player)
 
 	# Put down where the sweep said there was room, through the controller's own state
 	# rather than by moving the node: the movement reads position from the state and
@@ -2018,13 +1943,11 @@ static func map_catalogue() -> DotMapCatalogue:
 	var catalogue := DotMapCatalogue.new()
 
 	var table := [
-		[&"pg_lobby", "Playground", DotMapDef.KIND_SANDBOX, 1],
-		[&"pg_surf_intro", "Surf: Introduction", DotMapDef.KIND_SURF, 2],
-		[&"pg_bhop_intro", "Bhop: Introduction", DotMapDef.KIND_BHOP, 3],
+		# The base: a big flat plate of grass, and the default everywhere.
+		[&"pg_flatgrass", "Flatgrass", DotMapDef.KIND_SANDBOX, 1],
 		# The one map in this family that is not written down. A sandbox's content is
 		# what the players build in it, so "somewhere new" is worth more here than
-		# "somewhere good" -- which is not true of the three above, and is why this is
-		# the only one.
+		# "somewhere good".
 		[&"pg_generated", "Playground: Generated", DotMapDef.KIND_SANDBOX, 1],
 	]
 
@@ -2156,11 +2079,11 @@ func rescan_props() -> PackedStringArray:
 
 ## match id -> record key, for the players who have one. See [method record_key].
 var _record_keys: Dictionary = {}
-## record key -> match id, the other way, for what the timer manager reports back.
+## record key -> match id, the other way, for what a run timer reports back.
 var _match_ids: Dictionary = {}
 
 
-## The key the timers, the records and the boards know a player by.
+## The key a run timer, its records and the boards know a player by.
 ##
 ## [b]Not the match id.[/b] The match id (`u<userid>`) is dot-server's sequential,
 ## server-local counter: it names a seat for the length of one connection, and the same
@@ -2173,13 +2096,13 @@ func record_key(id: StringName) -> StringName:
 	return _record_keys.get(id, id)
 
 
-## The match id a timer-manager key belongs to; the key itself when none does.
+## The match id a record key belongs to; the key itself when none does.
 func match_id(key: StringName) -> StringName:
 	return _match_ids.get(key, key)
 
 
 ## True for a key that is a server-local session number (`u<digits>`): the keying records
-## carried before they were keyed by account. See [method retire_legacy_records].
+## carried before they were keyed by account. A run timer moves such records aside.
 static func is_legacy_key(key: StringName) -> bool:
 	var text := String(key)
 	return text.length() > 1 and text.begins_with("u") and text.substr(1).is_valid_int() and not text.contains("-")
@@ -2207,64 +2130,6 @@ func _release_record_key(id: StringName) -> void:
 		_match_ids.erase(key)
 
 
-## Moves aside every record filed under a [method is_legacy_key] player.
-##
-## Before records were keyed by account they were keyed by the session's `u<userid>`, a
-## server-local counter. Such a row cannot be mapped back to an account (the number was
-## reused after every restart, so even "the same u12" is not one person), and left in
-## place it ranks a stranger's time as a runner who can never be reached again and lets a
-## new seat that draws the same number inherit it. So the rows are written to
-## `legacy_records.jsonl` (in [member PlaygroundConfig.records_directory], else `user://`)
-## and then removed with [method DotTimerManager.wipe_player], which re-scores every board
-## and total they touched. Nothing is deleted before it is written. Idempotent. Returns
-## how many rows were moved.
-func retire_legacy_records() -> int:
-	if not authoritative or timers == null or timers.store == null:
-		return 0
-	var store := timers.store
-	var listed: DotResult = await store.maps()
-	if not listed.ok:
-		return 0
-	var legacy := {}
-	for row in (listed.value as Array):
-		var on_map: DotResult = await store.records_on_map(StringName(str((row as Dictionary).get("map", ""))))
-		if not on_map.ok:
-			continue
-		for record in (on_map.value as Array):
-			if is_legacy_key((record as DotTimerRecord).player_id):
-				legacy[(record as DotTimerRecord).player_id] = true
-	if legacy.is_empty():
-		return 0
-
-	var base := config.records_directory.strip_edges()
-	var path := (base if base != "" else "user://").path_join("legacy_records.jsonl")
-	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	var out := FileAccess.open(path, FileAccess.READ_WRITE if FileAccess.file_exists(path) else FileAccess.WRITE)
-	if out == null:
-		DotLog.error(CHANNEL, "legacy records could not be archived; they stay where they are", {
-			"path": path, "why": error_string(FileAccess.get_open_error()),
-		})
-		return 0
-	out.seek_end()
-
-	var moved := 0
-	for key in legacy:
-		var theirs: DotResult = await store.records_of(key, {"stage": -1})
-		if not theirs.ok:
-			continue
-		for record in (theirs.value as Array):
-			out.store_line(JSON.stringify((record as DotTimerRecord).to_dictionary()))
-		out.flush()
-		var wiped: DotResult = await timers.wipe_player(key)
-		if wiped.ok:
-			moved += int(wiped.value)
-	out.close()
-	DotLog.info(CHANNEL, "records keyed by a session number were moved aside", {
-		"players": legacy.size(), "records": moved, "archive": path,
-	})
-	return moved
-
-
 ## Adds a player and puts them on the current map's spawn. [param p_record_key] is the
 ## account uid the player's records are filed under; see [method record_key].
 func add_player(id: StringName, display_name: String, p_record_key: StringName = &"") -> PlaygroundPlayer:
@@ -2282,14 +2147,6 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 
 	add_child(player)
 
-	var added := timers.add_player(record_key(id), display_name)
-
-	if not added.ok:
-		DotLog.warn(CHANNEL, "could not give a player a timer", {
-			"player": String(id), "why": added.error.message
-		})
-
-	player.timer = timers.timer_for(record_key(id))
 	player.carry = carry
 	player.carry_enabled_fn = func() -> bool: return config == null or config.prop_surfing
 	# The map's toys: the trampolines and pads that throw them, the roundabout that carries
@@ -2297,9 +2154,7 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 	player.toys = toys
 	player.bounced_fn = _on_bounced
 
-	player.set_style(
-		movement_styles[&"normal"], timers.style_for(&"normal")
-	)
+	var _styled := player.set_style(movement_styles[&"normal"])
 
 	player.phys_gun = DotPhysGun.new()
 	player.phys_gun.spawner = props
@@ -2345,7 +2200,10 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 
 	players[id] = player
 	player.set_water(water_boxes())
-	_samples[id] = DotTimerSample.new()
+
+	# Given a timer before the first spawn, which asks it which track the player is on.
+	if run_timer != null:
+		run_timer.call("add_player", id, player)
 
 	spawn_player(id)
 
@@ -2417,12 +2275,13 @@ func remove_player(id: StringName) -> void:
 	# The prop spawner first: it may free nodes, and doing it after the player's own
 	# teardown means a physics gun holding one of them is already gone.
 	props.player_left(id)
-	timers.remove_player(record_key(id))
+
+	if run_timer != null:
+		run_timer.call("remove_player", id)
 
 	(players[id] as PlaygroundPlayer).queue_free()
 
 	players.erase(id)
-	_samples.erase(id)
 	_release_record_key(id)
 
 
@@ -2450,7 +2309,7 @@ func spawn_player(id: StringName) -> void:
 	# beam on the next tick.
 	pickup.forget(players, id)
 
-	var track := player.timer.track if player.timer != null else DotTimerTrack.MAIN
+	var track := track_of(id)
 	var map := current_map_node()
 
 	# [b]The director chooses among the map's own starts; the map is the fallback.[/b]
@@ -2471,8 +2330,12 @@ func spawn_player(id: StringName) -> void:
 			)
 			return
 
-	if map != null:
-		player.teleport(_clear_of_players(map.spawn_for(track), id), map.spawn_yaw_for(track))
+	var start := start_for(track)
+
+	if not start.is_empty():
+		player.teleport(_clear_of_players(start["at"], id), float(start["yaw"]))
+	elif map != null:
+		player.teleport(_clear_of_players(map.fallback_spawn, id), map.fallback_yaw)
 	else:
 		player.teleport(_clear_of_players(Vector3(0.0, 2.0, 0.0), id), 0.0)
 
@@ -2523,19 +2386,15 @@ func _someone_at(spot: Vector3, id: StringName) -> bool:
 	return false
 
 
-## Puts a player on a style, both halves.
+## Puts a player on a movement style. A run timer hears it through the player's
+## `style_changed` and moves the ranking half with it.
 func set_player_style(id: StringName, style_id: StringName) -> bool:
 	var player: PlaygroundPlayer = players.get(id)
 
 	if player == null or not movement_styles.has(style_id):
 		return false
 
-	var ranking := timers.style_for(style_id)
-
-	if ranking == null:
-		return false
-
-	return player.set_style(movement_styles[style_id], ranking).ok
+	return player.set_style(movement_styles[style_id]).ok
 
 
 ## Starts offering what the player subscribed to (the Workshop) on the spawn menu and the map
@@ -2895,29 +2754,63 @@ func current_map_node() -> PlaygroundMap:
 	return maps.world as PlaygroundMap if maps != null else null
 
 
-## Which tracks this map actually has something on, main track first.
+## Which tracks this map has something on, main track (0) first.
 ##
-## [b]Derived from the zones rather than declared on the map.[/b] A second list of
-## tracks is a second thing that can disagree with the zone file — and it is the zone
-## file a delivered map ships, so the declaration would be the half that is missing
-## exactly when it matters.
-##
-## [constant DotTimerTrack.MAIN] is always in the result even when it has no zones at
-## all, because a sandbox is a legitimate track: `pg_lobby` is one, and a player has
-## to be able to get back to it from the course.
+## The run timer's answer, from its zones, when there is one. [code][0][/code] otherwise,
+## because a sandbox is a legitimate track and every map has it.
 func tracks_on_this_map() -> Array[int]:
-	var out: Array[int] = [DotTimerTrack.MAIN]
+	var out: Array[int] = [0]
 
-	if timers == null or timers.zones == null:
-		return out
-
-	for zone in timers.zones.zones:
-		if zone.track != DotTimerTrack.MAIN and not out.has(zone.track):
-			out.append(zone.track)
-
-	out.sort()
+	if run_timer != null:
+		out.assign(run_timer.call("tracks"))
 
 	return out
+
+
+## The track [param id] is on: the run timer's answer, or 0 (the main track).
+func track_of(id: StringName) -> int:
+	if run_timer != null:
+		return int(run_timer.call("track_of", id))
+
+	return 0
+
+
+## Where a player on [param track] starts, as `{at: Vector3, yaw: float}` (degrees), or an
+## empty dictionary when there is no map or the track has no start.
+##
+## The run timer's SPAWN zone first, when it has one for the track: a course's start is
+## the timer's to say, and a sandbox with no timer starts every track at the map's spawn.
+func start_for(track: int) -> Dictionary:
+	if run_timer != null:
+		var zoned: Dictionary = run_timer.call("start_for", track)
+
+		if not zoned.is_empty():
+			return zoned
+
+	var map := current_map_node()
+
+	if map == null:
+		return {}
+
+	return {"at": map.spawn_for(track), "yaw": map.spawn_yaw_for(track)}
+
+
+## Called by a run timer's hook to plug itself in. See [member run_timer].
+func attach_run_timer(timer: Object) -> void:
+	run_timer = timer
+	DotLog.info(CHANNEL, "a run timer is attached", {"by": str(timer.get_script().resource_path)})
+
+
+## A time as `m:ss.mmm`, the way every run timer shows one: thousandths, always, because
+## runs are decided by them. A copy of dot-timer's format, so the HUD and the logs can say a
+## time with the timer absent.
+static func format_time(seconds: float) -> String:
+	var total := absf(seconds)
+	var hours := int(total / 3600.0)
+	var minutes := int(fmod(total, 3600.0) / 60.0)
+	var rest := fmod(total, 60.0)
+	var text := "%d:%02d:%06.3f" % [hours, minutes, rest] if hours > 0 else "%d:%06.3f" % [minutes, rest]
+	return ("-" if seconds < 0.0 else "") + text
 
 
 # --- Maps ------------------------------------------------------------------
@@ -2973,11 +2866,11 @@ func _on_map_changing(_from: DotMapDef, _to: DotMapDef) -> void:
 	# prop is parented to it.
 	pickup.release_all(players)
 
+	if run_timer != null:
+		run_timer.call("on_map_changing")
+
 	for id in players:
 		var player: PlaygroundPlayer = players[id]
-
-		if player.timer != null:
-			player.timer.stop(DotTimer.REASON_RESET)
 
 		if player.phys_gun != null:
 			player.phys_gun.release()
@@ -2994,8 +2887,6 @@ func _on_map_changing(_from: DotMapDef, _to: DotMapDef) -> void:
 
 
 func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
-	var playground_map := loaded as PlaygroundMap
-
 	# A map that has to be told something before it can build itself. Duck-typed rather
 	# than type-checked, so a delivered map with the same shape works and this file names
 	# nothing from `maps/`.
@@ -3025,32 +2916,15 @@ func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
 	if authoritative and loaded != null and loaded.has_method("map_props"):
 		spawn_map_props(loaded.call("map_props"), loaded.call("map_wires"))
 
-	# A map that carries its own zones hands them over; one that ships a JSON file
-	# has already had it read by dot-map, into `maps.zones_json`. Both routes end
-	# here, which is what lets a delivered map and a built-in one behave the same.
-	var zones: DotTimerZoneSet = null
-
-	if playground_map != null:
-		zones = playground_map.timer_zones()
-
-	if zones == null and maps.zones_json != "":
-		var parsed := DotTimerZoneSet.from_json(maps.zones_json)
-
-		if parsed.ok:
-			zones = parsed.value
-		else:
-			DotLog.warn(CHANNEL, "a map's zone file could not be read", {
-				"map": String(map.id), "why": parsed.error.message
-			})
-
-	timers.set_zones(zones)
+	# The run timer's zones before anybody is spawned: a course's start is one of them.
+	if run_timer != null:
+		run_timer.call("on_map_changed", map, loaded)
 
 	for id in players:
 		spawn_player(id)
 
 	DotLog.info(CHANNEL, "map ready", {
 		"map": String(map.id),
-		"zones": zones.zones.size() if zones != null else 0,
 		"players": players.size(),
 	})
 
@@ -3326,114 +3200,6 @@ func rock_the_vote(player_id: StringName) -> bool:
 	return maps.rock_the_vote(player_id, players.size())
 
 
-# --- Timer events ----------------------------------------------------------
-
-func _on_effect_requested(timer_key: StringName, zone: DotTimerZone) -> void:
-	var player_id := match_id(timer_key)
-	var player: PlaygroundPlayer = players.get(player_id)
-
-	if player == null:
-		return
-
-	# The timer never moves a player. It says what the map asked for and this
-	# decides what that means here — which is the only reason the same timer works
-	# for a first-person game, a 2D game and a replay being scrubbed.
-	match zone.kind:
-		DotTimerZone.Kind.RESPAWN:
-			spawn_player(player_id)
-		DotTimerZone.Kind.TELEPORT:
-			# Part of the route (the timer only asks for a zone on the player's own track,
-			# pg_lobby's relay gates), so the run is kept: a respawn is the one that ends it.
-			player.teleport(zone.destination, zone.destination_yaw, true)
-		DotTimerZone.Kind.SLAY:
-			spawn_player(player_id)
-		_:
-			pass
-
-
-## Zones the timer cannot act on are applied here, once per tick, by the player.
-##
-## Nothing to do at this level: the effects that matter to the movement are read
-## directly off the timer inside `PlaygroundPlayer._on_simulated`, because they change
-## where the player ends up and so have to be applied on the tick rather than when a
-## signal arrives.
-func _on_player_finished(timer_key: StringName, run: DotTimerRun) -> void:
-	var player: PlaygroundPlayer = players.get(match_id(timer_key))
-
-	if player == null:
-		return
-
-	# The movement statistics belong to the controller and the run belongs to the
-	# timer, and this is the one place they meet.
-	timers.note_stats(timer_key, player.controller.stats.to_dictionary())
-	player.controller.stats.reset()
-
-	player.finished.emit(run)
-
-
-func _on_record_accepted(
-	record: DotTimerRecord, _previous: DotTimerRecord, rank: int
-) -> void:
-	var scope := {
-		"map": String(record.map_id),
-		"track": str(record.track),
-		"style": String(record.style_id),
-	}
-
-	# A seat with no account (no identity, or the account already playing) keeps its session
-	# number as its key, and a session number is nobody: its time stands for this process
-	# only and is moved aside at the next start, so the boards never get a row for it.
-	var ranked := not is_legacy_key(record.player_id)
-
-	if ranked:
-		await boards.submit(
-			&"fastest", scope, record.player_id, record.player_name, record.time
-		)
-
-	if ranked and record.stats.has("max_speed"):
-		await boards.submit(
-			&"top_speed", scope, record.player_id, record.player_name,
-			float(record.stats["max_speed"])
-		)
-
-	# Points are global rather than per map: a player's standing on the server is
-	# the sum of what they have earned, and scoping it per map would make every map
-	# its own points board, which is what "fastest" already is.
-	var totals := DotStatSet.new()
-	totals.add(&"points", record.points)
-	totals.add(&"completions", 1.0)
-
-	if ranked:
-		await boards.add_stats(record.player_id, totals)
-		await boards.publish_stat(
-			&"points", {}, record.player_id, record.player_name, &"points"
-		)
-
-	# The player may have left between finishing and the record reaching the store —
-	# every `await` above is a chance for it, and a disconnect during the write is
-	# exactly when this path is slowest.
-	var who := timers.player(record.player_id)
-
-	if who == null:
-		return
-
-	run_filed.emit(match_id(record.player_id), who.last_finished, rank, "")
-
-
-func _on_record_refused(
-	timer_key: StringName, run: DotTimerRun, reason: String
-) -> void:
-	var player_id := match_id(timer_key)
-	# Reported rather than swallowed. "I finished and nothing happened" is the
-	# commonest complaint on a timer server and the reason is almost always one the
-	# player could have been told.
-	DotLog.info(CHANNEL, "a run was not recorded", {
-		"player": String(player_id), "why": reason
-	})
-
-	run_filed.emit(player_id, run, 0, reason)
-
-
 # --- Diagnostics -----------------------------------------------------------
 
 func describe() -> Dictionary:
@@ -3443,7 +3209,7 @@ func describe() -> Dictionary:
 		"props": props.world_count() if props != null else 0,
 		"tick_rate": tick_rate,
 		"time_left": time_left_text(),
-		"timers": timers.describe() if timers != null else {},
+		"run_timer": run_timer.call("describe") if run_timer != null else {},
 	}
 
 
@@ -3457,7 +3223,7 @@ func describe_lines() -> PackedStringArray:
 	out.append("props        %d" % (props.world_count() if props != null else 0))
 	out.append("tick rate    %d%s" % [
 		tick_rate,
-		"" if timers == null or timers.tick_rate_matches_engine()
+		"" if run_timer == null or tick_rate == Engine.physics_ticks_per_second
 			else " (DISAGREES with the engine's %d)" % Engine.physics_ticks_per_second,
 	])
 	out.append("time left    %s" % time_left_text())
@@ -3491,17 +3257,6 @@ func time_left_text() -> String:
 
 func _exit_tree() -> void:
 	DotRegistry.unregister_instance(DotRegistry.scoped_name(SERVICE, service_scope), self)
-
-
-## Whether the current map calls [param track] a driving track.
-##
-## Answered by the map, defaulting to false when there is no map loaded — the state a
-## dedicated server is in between `changelevel`s, where there is also nobody riding
-## anything, and where the safe answer is the one every map gave before there were cars.
-func _track_is_driven(track: int) -> bool:
-	var map := current_map_node()
-
-	return map != null and map.track_is_driven(track)
 
 
 ## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at

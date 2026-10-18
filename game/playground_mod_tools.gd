@@ -4,13 +4,13 @@ const Playground := preload("playground.gd")
 const PlaygroundArena := preload("playground_arena.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
 
-## What dot-moderation's live tools mean in a sandbox with a timed course in the corner.
+## What dot-moderation's live tools mean in a sandbox that may carry a run timer.
 ##
 ## Movement is `DotFpsAdminModifiers`, so the owning client predicts it. Health belongs to
 ## the arena layer and exists only while `pg_arena` is on, so god, buddha, hp and slay say
 ## "not on this server" when it is off rather than being absent — whether they mean
-## anything is a cvar, not a build. The course is the timer's, and the timer's rule is the
-## one the timer server has: an admin's help can never make a time. Noclip abandons the run
+## anything is a cvar, not a build. A run belongs to the timer when a server links one
+## ([code]addons/pg_timer[/code]), and its rule is that an admin's help can never make a time. Noclip abandons the run
 ## in progress, `PlaygroundPlayer` taints any run made while noclipped or on a speed or
 ## gravity step, and a teleport by an admin ends the run.
 ##
@@ -40,8 +40,8 @@ static func handlers(game: Playground, arena: PlaygroundArena) -> Dictionary:
 			if p == null:
 				return _absent(id)
 			var on := bool(args["on"])
-			if on and p.timer != null:
-				p.timer.stop(&"noclip")
+			if on:
+				p.stop_run(&"noclip")
 			return DotFpsAdminModifiers.set_noclip(p.controller, on),
 
 		DotModTools.ACTION_FREEZE: func(id: StringName, args: Dictionary) -> DotResult:
@@ -119,8 +119,7 @@ static func handlers(game: Playground, arena: PlaygroundArena) -> Dictionary:
 			p.controller.state.velocity += Vector3(3.0, 5.0, 3.0)
 			p.controller.state.mode = DotFpsState.Mode.AIR
 			# Speed nobody earned: an admin's help, which a course time must not carry.
-			if p.timer != null:
-				p.timer.taint()
+			p.taint_run()
 			var amount := float(args.get("damage", 0.0))
 			if amount > 0.0 and _health(arena, id) != null:
 				var _hurt := arena.hurt(&"", key_of(id), amount, 0.0)
@@ -165,10 +164,8 @@ static func teleport(game: Playground, id: StringName, to: Variant) -> void:
 	if p == null or p.riding or not (to is Vector3):
 		return
 
+	# `teleport` stops a run itself.
 	p.teleport(to as Vector3, p.controller.state.yaw)
-
-	if p.timer != null:
-		p.timer.stop(DotTimer.REASON_TELEPORT)
 
 
 static func _player(game: Playground, id: StringName) -> PlaygroundPlayer:

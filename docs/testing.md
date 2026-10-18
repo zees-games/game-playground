@@ -6,16 +6,16 @@ The family rules on suites (both counters, read stderr, cap every run, re-import
 
 | Suite | What it is |
 | --- | --- |
-| `headless_playground` | **the point of the repository**: boots the whole game, drives bots down every route, files and ranks runs, spawns props and entities, clicks a real spawn menu, fires weapons, changes the map under all of it, and drives the real client's frame hooks; includes the model props (every stock prop spawns with a shape and stays above the floor, a dropped-in model appears and spawns) and the addons hook (against a scratch folder and the real natural-disasters adapter) and the waypoint and NPC spawner tools |
+| `headless_playground` | **the point of the repository**: boots the whole game, spawns props and entities, clicks a real spawn menu, fires weapons, changes the map under all of it, and drives the real client's frame hooks; includes the model props (every stock prop spawns with a shape and stays above the floor, a dropped-in model appears and spawns) and the addons hook (against a scratch folder and the real natural-disasters adapter) and the waypoint and NPC spawner tools |
 | `headless_net` | a server and a client in one process over a real link: prediction, mirrors, the bag, vehicles, weapons, chat through the real router, and no engine error over the whole run (an `EngineErrors` logger: two minigames' suites printed `!is_inside_tree()` from a toy pulled after a mid-tick rebuild, green) |
 | `dedicated` | a real `DotServer`, the module and its console commands; exits clean |
 | `headless_presentation` | the presentation layer, settings round trip, effects, the HTTP party |
 | `headless_stack` | the player stack (`PlaygroundPlayerStack`: roster, sides, classes, collision layout, spawn director, view switch, character) against a real sandbox |
 
-`./game.sh test` parses everything and runs all five; `./game.sh test headless_net` runs one. By hand: `--import`, the `--check-only` pass, `tools/export_zones.gd`, then each `examples/<suite>.tscn` under `timeout`. Every suite counts sections and a CHECKS total; each section's last line is `_section_done()`.
+`./game.sh test` parses everything and runs all five; `./game.sh test headless_net` runs one. By hand: `--import`, the `--check-only` pass, then each `examples/<suite>.tscn` under `timeout`. Every suite counts sections and a CHECKS total; each section's last line is `_section_done()`.
 
-- `headless_playground -- --only=<method>` runs the boot and one section; the totals are not checked. **A section run alone is on whatever map the boot left**: a section that needs a map loads it (most load `pg_lobby`) and lands its player first.
-- **Run `tools/export_zones.gd` after changing a map**, or the zone-file check fails.
+- `headless_playground -- --only=<method>` runs the boot and one section; the totals are not checked. **A section run alone is on whatever map the boot left**: a section that needs a map loads it (most load `pg_flatgrass`) and lands its player first.
+- **The suites run without dot-timer**, which is how the game ships. Linked, `headless_playground` and `dedicated` add their `TIMER_SECTIONS` and `TIMER_CHECKS` and run the timer's sections; absent they print a SKIP line ([timer.md](timer.md#testing-it)). Run both ways after touching `addons/pg_timer`.
 - `tools/map_props.gd` checks a custom map's props stay put ([maps.md](maps.md#map-props)).
 - Every addon's own suite still has to pass; these exercise the joins and do not re-test what the addons cover.
 

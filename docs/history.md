@@ -2,6 +2,8 @@
 
 Every one of these parsed cleanly and most produced no error. Each is kept because the shape could come back; where the lesson is still a rule, the rule is also in [CLAUDE.md](../CLAUDE.md) or a topic file. The family-wide list is [bugs-found.md](../../../docs/bugs-found.md).
 
+The maps named below (`pg_lobby`, `pg_surf_intro`, `pg_bhop_intro`) and their timed routes were removed with the run timer on 2026-10-18 ([timer.md](timer.md)); what they found stays here.
+
 ## Found here, in other repositories
 
 One line each; the detail is in [bugs-found.md](../../../docs/bugs-found.md) or the addon's own docs.

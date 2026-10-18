@@ -170,7 +170,7 @@ Glass panes in a map are separate (`pg_breakable_glass`, on): see [maps.md](maps
 
 ## Picking players up
 
-The physics gun picks up a PLAYER in its beam before a prop (`PlaygroundPickup`). A held player is a rider with no vehicle: their movement, prediction and timer stop as in a seat, and on the wire it is a SEAT with vehicle 0, which an older client understands. Moved by sweeping the body (a wall stops them); letting go keeps the beam's velocity. Immunity is by role (`pg_pickup_immune`), an override role beats it (`pg_pickup_override`, `root`), `pg_pickup 0` turns it off. **A refusal is an answer**: the prop behind an immune player is not grabbed instead. A seat, respawn, map change or the holder leaving let go.
+The physics gun picks up a PLAYER in its beam before a prop (`PlaygroundPickup`). A held player is a rider with no vehicle: their movement, prediction and any run stop as in a seat, and on the wire it is a SEAT with vehicle 0, which an older client understands. Moved by sweeping the body (a wall stops them); letting go keeps the beam's velocity. Immunity is by role (`pg_pickup_immune`), an override role beats it (`pg_pickup_override`, `root`), `pg_pickup 0` turns it off. **A refusal is an answer**: the prop behind an immune player is not grabbed instead. A seat, respawn, map change or the holder leaving let go.
 
 ## Creative mode
 

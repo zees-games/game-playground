@@ -4,14 +4,12 @@ const Playground := preload("playground.gd")
 const PlaygroundGeometry := preload("playground_geometry.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
 
-## The playground's HUD: the timer, the speedometer, the strafe statistics, and a
-## line saying what just happened.
+## The playground's HUD: a status line, the tools, the ammo, the hit marks, and a line
+## saying what just happened.
 ##
-## [b]Composed from dot-timer's HUD rather than replacing it.[/b] `DotTimerHud` draws
-## the clock, the split and the speed and ships no art, which is exactly the division
-## the family wants; this adds the things that are the game's — a notice line, a prop
-## count, the current map — and lays the whole out. A game that wanted a different
-## clock would subclass `DotTimerHud`; this one does not.
+## [b]No clock of its own.[/b] A run timer is not shipped; when a server adds dot-timer,
+## `addons/pg_timer` puts dot-timer's own HUD block (the clock, the split, the speed) in
+## [member timer_hud] and adds its parts to the status line through [member status_fn].
 
 ## How long a notice stays up, in seconds.
 const NOTICE_SECONDS := 4.0
@@ -29,19 +27,26 @@ static func piece_theme() -> Theme:
 	return t
 
 
-## The theme's HUD colours onto dot-timer's block (the time, the speed, the strafes), which is
-## not a dot-ui piece and so does not read the theme the menu sets on this HUD. What
-## game-g2gfast's HUD does with the same block. [param palette] is the menu's; null is the
-## default theme.
+## The theme's HUD colours onto a run timer's block (the time, the speed, the strafes), which
+## is not a dot-ui piece and so does not read the theme the menu sets on this HUD.
+## [param palette] is the menu's; null is the default theme. Kept so a timer block added
+## later is themed too.
 func apply_theme(palette: DotMenuPalette = null) -> void:
-	var p := palette if palette != null else DotMenuPalette.new()
+	_palette = palette if palette != null else DotMenuPalette.new()
 	if timer_hud != null:
-		timer_hud.panel_colour = p.hud_plate
-		timer_hud.neutral_colour = p.hud_text
-		timer_hud.detail_colour = p.hud_detail
-		timer_hud.ahead_colour = p.hud_ahead
-		timer_hud.behind_colour = p.hud_behind
+		timer_hud.set("panel_colour", _palette.hud_plate)
+		timer_hud.set("neutral_colour", _palette.hud_text)
+		timer_hud.set("detail_colour", _palette.hud_detail)
+		timer_hud.set("ahead_colour", _palette.hud_ahead)
+		timer_hud.set("behind_colour", _palette.hud_behind)
 		timer_hud.queue_redraw()
+
+
+## Puts a run timer's HUD block in, themed. Called by `addons/pg_timer`.
+func set_timer_hud(block: Control) -> void:
+	timer_hud = block
+	add_child(block)
+	apply_theme(_palette)
 
 
 ## What is in hand and how much is in it: a zee weapon's magazine and reserve, bottom right.
@@ -55,7 +60,14 @@ var hit_marker: DotHitMarker = null
 var key_fn: Callable = Callable()
 var damage_numbers: DotDamageNumbers = null
 
-var timer_hud: DotTimerHud = null
+## A run timer's HUD block (dot-timer's `DotTimerHud`), or null. See [method set_timer_hud].
+var timer_hud: Control = null
+
+## `func(player_id) -> PackedStringArray`: a run timer's parts of the status line (the
+## track, the checkpoint, PRACTICE). Unset without one.
+var status_fn: Callable = Callable()
+
+var _palette: DotMenuPalette = null
 
 var _notice: Label = null
 var _status: Label = null
@@ -140,26 +152,6 @@ func _ready() -> void:
 	blind_overlay.visible = false
 	add_child(blind_overlay)
 
-	# THE WHOLE RECT, not a box in the corner.
-	#
-	# `DotTimerHud` places its own compact block in a corner of whatever rect it is
-	# given, so the rect is the AREA it lays out inside rather than the block. The
-	# 360 x 200 this used to be would pin the overlay to the corner of a box in the
-	# corner, which is not what anything wanted.
-	timer_hud = DotTimerHud.new()
-	timer_hud.name = "Timer"
-	timer_hud.set_anchors_preset(Control.PRESET_FULL_RECT)
-	timer_hud.offset_left = 0.0
-	timer_hud.offset_top = 0.0
-	timer_hud.offset_right = 0.0
-	timer_hud.offset_bottom = 0.0
-	# TOP_LEFT here and BOTTOM_CENTRE in game-g2gfast, deliberately. A sandbox's
-	# centre-bottom is where the spawn menu and the tool prompts go, and a course in
-	# the corner of a building game is not the thing a player is staring at.
-	timer_hud.corner = DotTimerHud.Placement.TOP_LEFT
-	timer_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(timer_hud)
-
 	_notice = Label.new()
 	_notice.name = "Notice"
 	_notice.position = Vector2(24.0, 240.0)
@@ -235,13 +227,9 @@ func bind(p_playground: Playground, p_player: StringName) -> void:
 	playground.run_filed.connect(_on_run_filed)
 	playground.map_ready.connect(_on_map_ready)
 
-	playground.timers.player_staged.connect(
-		func(id: StringName, number: int, split: float) -> void:
-			if id == player_id:
-				notice("Stage %d — %s" % [
-					number, DotTimerRun.format_time(split)
-				])
-	)
+	# A run timer's own block and status parts, and its stage notices.
+	if playground.run_timer != null:
+		playground.run_timer.call("attach_hud", self, player_id)
 	playground.props.refused.connect(
 		func(id: StringName, _prop: StringName, reason: String) -> void:
 			if id == player_id:
@@ -292,18 +280,8 @@ func _process(delta: float) -> void:
 	var held: Variant = player.zee_rig
 	show_weapon(held as ZeeWeaponRig if is_instance_valid(held) and held is ZeeWeaponRig else null)
 
-	timer_hud.style_name = (
-		player.timer_style.display_name if player.timer_style != null else ""
-	)
-	timer_hud.show_run(
-		player.timer.run if player.timer != null else null,
-		player.speed(),
-		player.controller.stats.to_dictionary()
-	)
-
 	if _status != null:
 		var map := playground.maps.current
-		var checkpoints := playground.timers.checkpoints_for(player_id)
 
 		var parts := PackedStringArray([map.name_or_id() if map != null else "-"])
 
@@ -321,28 +299,14 @@ func _process(delta: float) -> void:
 		parts.append("%d props" % playground.props.world_count())
 		parts.append(player.movement_style.display_name if player.movement_style else "-")
 
-		if checkpoints != null and not checkpoints.is_empty():
-			parts.append("cp %d/%d" % [
-				checkpoints.index + 1, checkpoints.count()
-			])
-
-		# Said on the HUD, not only in a log: a run that used a checkpoint cannot be
-		# recorded, and finding that out at the finish line after four minutes is the
-		# worst possible moment to be told.
-		if player.timer != null and player.timer.run.used_checkpoints:
-			parts.append("PRACTICE")
-
 		# On the HUD for the same reason: a builder who forgot it was on would wonder why
 		# their shots did nothing.
 		if player.creative:
 			parts.append("CREATIVE")
 
-		# The track, always, and not only when it is a bonus. On a map that is a
-		# sandbox on one track and a course on another, "which one am I on" is the
-		# difference between a timer that is broken and a timer that is not running
-		# because you asked it not to.
-		if player.timer != null:
-			parts.append(DotTimerTrack.name_of(player.timer.track))
+		# A run timer's parts: the checkpoint, PRACTICE, the track.
+		if status_fn.is_valid():
+			parts.append_array(status_fn.call(player_id))
 
 		_status.text = "   ·   ".join(parts)
 
@@ -429,62 +393,19 @@ func _armed_name() -> String:
 	return def.name_or_id() if def != null else String(armed_prop)
 
 
-func _on_run_filed(
-	id: StringName, run: DotTimerRun, rank: int, reason: String
-) -> void:
+func _on_run_filed(id: StringName, time: float, rank: int, reason: String) -> void:
 	if id != player_id:
 		return
 
 	if reason != "":
-		notice("%s — not recorded: %s" % [run.formatted_time(), reason])
+		notice("%s — not recorded: %s" % [Playground.format_time(time), reason])
 		return
 
-	notice("%s — rank %d" % [run.formatted_time(), rank])
+	notice("%s — rank %d" % [Playground.format_time(time), rank])
 
 
 func _on_map_ready(map: DotMapDef) -> void:
 	notice("Now playing %s" % map.name_or_id())
-
-	# The comparison the clock shows. Read once per map rather than per frame,
-	# because it only changes when the map, the track or the style does.
-	_refresh_comparison()
-
-
-func _refresh_comparison() -> void:
-	var player: PlaygroundPlayer = playground.players.get(player_id)
-
-	if player == null or playground.timers.store == null:
-		return
-
-	var map := playground.maps.current
-
-	if map == null:
-		return
-
-	# Awaited: the store may be a database (DotTimerStoreSql), and every store's reads
-	# are coroutines in shape. Against the memory and file stores this returns at once.
-	var mine: DotResult = await playground.timers.store.best_for(
-		map.id, player.timer.track, player.timer.style.id if player.timer.style else &"normal",
-		player_id
-	)
-	var top: DotResult = await playground.timers.store.top(
-		map.id, player.timer.track,
-		player.timer.style.id if player.timer.style else &"normal", 1
-	)
-
-	var personal := 0.0
-	var record := 0.0
-
-	if not is_instance_valid(self) or not playground.players.has(player_id):
-		return
-
-	if mine.ok and mine.value is DotTimerRecord:
-		personal = (mine.value as DotTimerRecord).time
-
-	if top.ok and (top.value as Array).size() > 0:
-		record = ((top.value as Array)[0] as DotTimerRecord).time
-
-	timer_hud.set_comparisons(personal, record)
 
 
 ## What the status line says about the map's time left: the server's clock when it has

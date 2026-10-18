@@ -88,7 +88,7 @@ func _initialize() -> void:
 	PlaygroundClient.add_general_rows(_game_menu)
 	_game_menu.scoreboard.source = func() -> Dictionary:
 		return {
-			"server": {"name": "Playground  |  build anything", "map": "pg_lobby", "players": 4, "max": 24},
+			"server": {"name": "Playground  |  build anything", "map": "pg_flatgrass", "players": 4, "max": 24},
 			"you": "2",
 			"players": [
 				{"id": "1", "name": "gamemann", "score": 42, "seconds": 1840, "ping": 23},

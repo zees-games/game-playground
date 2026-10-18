@@ -8,11 +8,9 @@ const PlaygroundZee := preload("../playground_zee.gd")
 ## What a networked playground player replicates: the movement state, and an
 ## administrator's two marks.
 ##
-## The timer is not replicated per tick. A client runs its own [DotTimer] over its own
-## copy of the zones and reaches the same answer a tick earlier than any packet could,
-## which is the whole reason the timer is deterministic; the server sends run identities
-## and finishes as reliable events instead. Same division [G2GPlayerNet] makes, for the
-## same reason.
+## No run timer is replicated. A server that added dot-timer (`addons/pg_timer`) times on
+## both ends: a client runs its own timer over its own copy of the zones for its HUD, and
+## the server's verdict on a finish arrives as an addon message.
 ##
 ## The props a player spawns are NOT here either. They are their own entities with their
 ## own behaviour, because a prop outlives the player who spawned it and a barrel punted

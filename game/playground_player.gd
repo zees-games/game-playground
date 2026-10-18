@@ -3,39 +3,34 @@ extends CharacterBody3D
 const PlaygroundMaterials := preload("playground_materials.gd")
 const PlaygroundCharacter := preload("playground_character.gd")
 
-## One player: movement, view, the timer, and the tools.
+## One player: movement, view, and the tools.
 ##
 ## [b]This class is the bridge, and the bridges are where the bugs are.[/b] Every
 ## addon here is complete and tested on its own; what has never run is the joins
 ## between them, and the family's own history says that is where everything is found.
 ## Concretely, this file is the only place that knows:
 ##
-## - the timer must be ticked from the **movement** loop, once per simulated tick,
-##   with the position the movement just produced — not from `_process`, and not
-##   before the move;
-## - a style has two halves that must be applied together
-##   ([code]DotFpsStyle[/code] and [code]DotTimerStyle[/code]);
-## - a zone's effects are the game's to apply, because the timer will not touch a
-##   player;
-## - a prespeed limit runs *inside* the simulation, so it is applied between the
-##   move and the next tick rather than when a signal happens to arrive.
+## - anything that changes where a player ends up runs *inside* the simulation, after
+##   the move ([member post_move_fn], the toys, a prop underfoot), so a predicting
+##   client's replay of a tick gets what the server's tick got;
+## - a style is dot-player-controller's [code]DotFpsStyle[/code]; a run timer, when a
+##   server added one, hears [signal style_changed] and puts its ranking half beside it.
 
 const CHANNEL := "playground.player"
 
-## Whether admin help was on last tick, so it is logged when it changes rather than on
-## every one of 128 ticks a second.
-var _assisted := false
+## The movement style changed. What a run timer listens to for its ranking half.
+signal style_changed(style: DotFpsStyle)
 
-## Reused by [method effect_zone_at], which runs every tick.
-var _effect_found: Array[DotTimerZone] = []
-
-## The run finished. The world files it; the player just reports.
-signal finished(run: DotTimerRun)
+## `func(player, state: DotFpsState) -> void`, run on every simulated tick after the move and
+## before the toys: a run timer's zone effects (push, speed limit, gravity, the prespeed
+## clamp). Unset when there is none. On the tick rather than from a signal, because each of
+## them changes where the player ends up.
+var post_move_fn: Callable = Callable()
 
 @export var player_id: StringName = &"local"
 @export var display_name: String = "Player"
 
-## Whether this player's timer may file records. Server-side only.
+## Whether this is the authority's copy of the player. Server-side only.
 @export var authoritative: bool = false
 
 ## Whether a command is sampled from the input devices each tick.
@@ -88,8 +83,9 @@ var sampler: DotFpsSampler = null
 ## See [method class_base_tunables].
 var _class_base: DotFpsTunables = null
 
-## This player's timer. Owned by the world's [DotTimerManager], not by this node.
-var timer: DotTimer = null
+## This player's run timer, when a server added dot-timer: a `DotTimer` owned by
+## `addons/pg_timer`'s manager, untyped because the addon may be absent. Null otherwise.
+var timer: Object = null
 
 ## Standing on a moving prop. Set by the game on join; see [method _ride_prop].
 var carry: DotPropCarry = null
@@ -111,9 +107,6 @@ var carried_metres: float = 0.0
 
 ## The movement half of the style in force.
 var movement_style: DotFpsStyle = null
-
-## The ranking half.
-var timer_style: DotTimerStyle = null
 
 ## The tools, when the game has dot-props.
 var phys_gun: DotPhysGun = null
@@ -545,19 +538,30 @@ static func movement_tunables() -> DotFpsTunables:
 	return t
 
 
-## Puts this player on a style. Both halves, together.
+## Puts this player on a movement style.
 ##
-## [b]Both, or neither.[/b] Applying only the movement half means a run is timed and
-## ranked as "normal" while the player is actually sideways; applying only the ranking
-## half means the opposite. Either way the leaderboard is wrong and nothing errors.
-func set_style(movement: DotFpsStyle, ranking: DotTimerStyle) -> DotResult:
+## [signal style_changed] is how a run timer keeps its ranking half in step: applying only
+## the movement half would time and rank a run as "normal" while the player is actually
+## sideways, and nothing would error.
+func set_style(movement: DotFpsStyle) -> DotResult:
 	movement_style = movement
-	timer_style = ranking
+	var applied := controller.set_style(movement)
+	style_changed.emit(movement)
+	return applied
 
+
+## Stops the run in progress, if there is a run timer. [param reason] is one of dot-timer's
+## stop reasons (`&"teleport"`, `&"noclip"`, ...), as a StringName.
+func stop_run(reason: StringName) -> void:
 	if timer != null:
-		timer.set_style(ranking)
+		timer.call("stop", reason)
 
-	return controller.set_style(movement)
+
+## Marks the run in progress as assisted, if there is a run timer: it finishes and is never
+## filed.
+func taint_run() -> void:
+	if timer != null:
+		timer.call("taint")
 
 
 ## Moves the player, cancelling any run.
@@ -606,9 +610,9 @@ func teleport(to: Vector3, yaw: float = INF, keep_run: bool = false) -> void:
 	# The run goes with it. A teleport that kept the clock running is the simplest
 	# possible cheat on any timed map, and a respawn zone is a teleport. The one exception
 	# is [param keep_run]: a map's own TELEPORT zone on the player's track, which the timer
-	# asked for (it is part of the route: pg_lobby's relay gates) and already expects.
-	if timer != null and not keep_run:
-		timer.stop(DotTimer.REASON_TELEPORT)
+	# asked for (it is part of the route) and already expects.
+	if not keep_run:
+		stop_run(&"teleport")
 
 
 func speed() -> float:
@@ -795,11 +799,10 @@ func simulate(tick: int, delta: float) -> void:
 
 ## Called once per simulated tick, by the controller, after the move.
 ##
-## [b]After the move, and that ordering is the point.[/b] The timer decides whether
-## the player crossed a line during this tick, which it works out from where they were
-## and where they now are — so it has to be told the position the move produced, not
-## the one it started from. Ticking the timer first shifts every time by exactly one
-## tick and, worse, shifts it by a different amount at each tickrate.
+## [b]After the move, and that ordering is the point.[/b] What runs here changes where
+## the player ends up this tick, and a run timer decides whether the player crossed a line
+## from where they were and where they now are — so it has to see the position the move
+## produced, not the one it started from.
 func _on_simulated(_tick: int, state: DotFpsState) -> void:
 	global_position = state.position
 
@@ -808,85 +811,8 @@ func _on_simulated(_tick: int, state: DotFpsState) -> void:
 	if not riding and controller.motor != null:
 		swim.update(controller.motor, state)
 
-	if timer == null:
-		return
-
-	# An admin's help makes a run assisted, every tick it is on — noclip, or a speed or
-	# gravity step. `taint` is dot-timer's own mark and `can_record` refuses it, so the run
-	# finishes and shows and is never filed. Every tick, because a run begun while the
-	# help is on must carry it too. game-g2gfast's player does the same, for the same
-	# reason; see PlaygroundModTools.
-	var helped := (
-		DotFpsAdminModifiers.is_noclipped(controller)
-		or not is_equal_approx(DotFpsAdminModifiers.speed_of(controller), 1.0)
-		or not is_equal_approx(DotFpsAdminModifiers.gravity_of(controller), 1.0)
-	)
-
-	if helped:
-		timer.taint()
-
-	# Said on the edge, not every tick. INFO when it comes on, because "my time was not
-	# filed" is the complaint an admin will be asked about and this is the answer.
-	if helped != _assisted:
-		_assisted = helped
-		if helped:
-			DotLog.info(CHANNEL, "admin help is on: this player's runs are assisted and will not be filed", {
-				"player": String(player_id),
-				"noclip": DotFpsAdminModifiers.is_noclipped(controller),
-				"speed": DotFpsAdminModifiers.speed_of(controller),
-				"gravity": DotFpsAdminModifiers.gravity_of(controller),
-			})
-		else:
-			DotLog.debug(CHANNEL, "admin help is off", {"player": String(player_id)})
-
-	# The prespeed limit runs INSIDE the simulation: clamping a player's speed
-	# changes where they end up, so it has to happen on the tick, every tick, rather
-	# than when a signal is delivered.
-	if (
-		timer_style != null
-		and movement_style != null
-		and movement_style.prespeed_limit > 0.0
-		# in_zone, not is_inside: is_inside answers only for EFFECT zones and is
-		# always false for START, which left this clamp dead. game-g2gfast had the
-		# same line; its netcode suite is what found it.
-		and timer.in_zone(DotTimerZone.Kind.START)
-	):
-		state.velocity = DotTimerRules.clamp_prespeed(
-			state.velocity, movement_style.prespeed_limit
-		)
-
-	var speed_zone := timer.effect(DotTimerZone.Kind.SPEED_LIMIT)
-
-	if speed_zone != null:
-		state.velocity = DotTimerRules.apply_speed_limit(state.velocity, speed_zone)
-
-	# A PUSH zone (pg_lobby's boosters, bonus 5) is an acceleration, applied every tick
-	# the player is in it, on the tick, for the prespeed clamp's reason. Upward on the
-	# ground is a launch: the motor puts a player moving out of the floor in AIR.
-	#
-	# [b]Where the player IS this tick, not `timer.effect(PUSH)`.[/b] The timer's effect is
-	# where it last sampled them, and a predicting client replays a run of ticks after every
-	# snapshot with the timer standing at the newest one: each replay across a booster's edge
-	# pushed ticks that were outside it (or the reverse), and a connected client was
-	# corrected on every launch. Asked of the zone index at the state's own position, the
-	# answer is a function of the state, so a replayed tick gets the push it got the first
-	# time, and the server computes it the same way. `[playground-push-1]`.
-	var push_zone := effect_zone_at(state.position, DotTimerZone.Kind.PUSH)
-
-	if push_zone != null:
-		state.velocity = DotTimerRules.apply_push(
-			state.velocity, push_zone, 1.0 / float(maxi(1, controller.tick_rate))
-		)
-
-	# A GRAVITY zone (pg_bhop_intro's float, bonus 5) scales gravity in the air by its
-	# number: the motor took a whole tick of it off the vertical speed, and this gives the
-	# unwanted part back. Air only, because on the ground gravity is what holds a player to
-	# the floor and nothing is falling. Where the player is, for the push's reason.
-	var gravity_zone := effect_zone_at(state.position, DotTimerZone.Kind.GRAVITY)
-
-	if gravity_zone != null and not state.is_grounded() and controller.tunables != null:
-		state.velocity.y += controller.tunables.gravity * (1.0 - gravity_zone.number) \
-			/ float(maxi(1, controller.tick_rate))
+	if post_move_fn.is_valid():
+		post_move_fn.call(self, state)
 
 	_launch_from_toy(state)
 	_ride_prop(state)
@@ -946,21 +872,6 @@ func _ride_prop(state: DotFpsState) -> void:
 	carried_metres += lift.length()
 
 
-## The EFFECT zone of [param kind] at [param point], or null. Read off the timer's zone index
-## rather than its effects, so it depends on nothing but the point; overlapping zones of one
-## kind resolve as the timer's own effects do, the last one found winning. EFFECT zones are
-## not track-filtered in dot-timer, and neither is this.
-func effect_zone_at(point: Vector3, kind: DotTimerZone.Kind) -> DotTimerZone:
-	if timer == null or timer.index == null:
-		return null
-	timer.index.zones_at(point, _effect_found)
-	var found: DotTimerZone = null
-	for zone in _effect_found:
-		if zone.kind == kind:
-			found = zone
-	return found
-
-
 ## Gets in or out of a vehicle. Called by the ride's `on_seated` / `on_unseated`.
 ##
 ## Both halves matter and the second is the one that is easy to leave out: a player put
@@ -1017,17 +928,6 @@ func pending_command() -> DotFpsCommand:
 	return controller.current_command if controller.current_command != null else DotFpsCommand.new()
 
 
-## The sample the world feeds the timer with. Reused, never allocated per tick.
-func fill_sample(sample: DotTimerSample) -> void:
-	var state := controller.state
-
-	sample.position = state.position
-	sample.velocity = state.velocity
-	sample.grounded = state.is_grounded()
-	sample.alive = true
-	sample.buttons = state.previous_buttons
-
-
 ## Draws [member beacon] for one frame, and says when it pings.
 ##
 ## Called once a frame by whatever draws this player — `PlaygroundClient._process` for every
@@ -1079,28 +979,19 @@ func describe() -> Dictionary:
 		"name": display_name,
 		"style": String(movement_style.id) if movement_style != null else "-",
 		"speed": "%.1f m/s" % speed(),
-		"run": str(timer.run) if timer != null else "-",
+		"run": str(timer.get("run")) if timer != null else "-",
 		"blinded": blinded,
 		"beacon": beacon,
 	}
 
 
-## Set by [method teleport], read once by [method replay_flags].
+## Set by [method teleport], read once by [method take_teleported].
 var _teleported: bool = false
 
 
-## This tick's dot-timer replay flags: ducked, jumped and teleported. A replay declared all
-## three from the start and nothing wrote them, so a ghost never crouched or jumped and was
-## smeared across every teleport. Read once a tick, by whatever feeds the timer.
-func replay_flags() -> int:
-	var flags := 0
-	if controller != null and controller.state != null:
-		var state := controller.state
-		if state.crouch_fraction > 0.5:
-			flags |= DotTimerReplay.FLAG_DUCKED
-		if state.time_since_jump < 1.5 / float(maxi(controller.tick_rate, 1)):
-			flags |= DotTimerReplay.FLAG_JUMPED
-	if _teleported:
-		flags |= DotTimerReplay.FLAG_TELEPORT
-		_teleported = false
-	return flags
+## Whether this player was teleported since the last call, and forgets it. Read once a tick
+## by a run timer's replay recorder, so a ghost is not smeared across a teleport.
+func take_teleported() -> bool:
+	var was := _teleported
+	_teleported = false
+	return was

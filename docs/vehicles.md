@@ -12,7 +12,7 @@ dot-vehicle is installed for the half this game would get wrong, and **not** for
 - **`configure` before `adopt`.** `DotVehicleWheeled` caches the body's `VehicleWheel3D` children once, at bind.
 - **`continuous_cd` is turned back off for a vehicle.** `PlaygroundProp` turns it on (a sandbox throws things); under wheel raycasts it fights the wheel solver and the car judders at speed.
 - **`Basis.looking_at(dir)` aims -Z at `dir`, and a vehicle's forward is -Z.** Negating it puts the car on the grid backwards.
-- **A rider's node is carried; their movement state is not.** dot-vehicle reparents the rider into the seat (which moves the camera), but the timer, the NPC list, the HUD and `PlaygroundPlayerNet` read `controller.state.position`. `Playground._carry_riders` writes it back after the vehicles tick and before the timers ([simulation.md](simulation.md#the-game-owns-the-tick-loop)).
+- **A rider's node is carried; their movement state is not.** dot-vehicle reparents the rider into the seat (which moves the camera), but a run timer, the NPC list, the HUD and `PlaygroundPlayerNet` read `controller.state.position`. `Playground._carry_riders` writes it back after the vehicles tick and before a run timer ([simulation.md](simulation.md#the-game-owns-the-tick-loop)).
 - **The controller is turned off, not ignored**: `PlaygroundPlayer.riding` skips `simulate_tick` while still sampling, because the same keys drive the car. `Playground.drive_command` is the mapping, static so a test can reach it. The brake is `BUTTON_CROUCH`. The handbrake is `BUTTON_JUMP`. S brakes while the car rolls forward and reverses once it has stopped (dot-vehicle's `brake_then_reverse`, applied in `_drive_vehicles` where the vehicle's speed is known): the buggy from 50 km/h stops in 10.6 m on S, as on the brake. The handbrake does not slide (`handbrake_grip_fraction` left at 1.0).
 - **Brakes are newtons** (dot-vehicle 4f4afaf; Godot read them as an impulse per step before, and the buggy stopped from 50 km/h in 1.85 m on the brake). The buggy's 5200 N on 620 kg stops it from 50 km/h in 10.5 m, the handbrake's 9000 N on the rear wheels in 7.2 m, and 0-50 km/h is 2.9 s; `headless_playground`'s vehicles section measures both from the plate's south-west corner facing +Z (-Z meets the plate's edge at z = -72 before 50 km/h).
 - **A riding client stops predicting**: `PlaygroundPlayerNet` does no `simulate_tick` while riding and writes the server's position onto the node even on a predicted entity. The render-eye blend is skipped while riding (a blend toward a tick nothing simulated lurches backwards).
@@ -20,15 +20,9 @@ dot-vehicle is installed for the half this game would get wrong, and **not** for
 - **F gets in and out**, after F's use on a button or door ([sandbox.md](sandbox.md#the-tools)).
 - A rider sits: `PlaygroundCharacter.set_seated` puts the person in its made sitting pose (`seated`) with its origin `seat_height()` under the seat; the capsule body drops by its leg height and swings the legs forward.
 
-## The circuit
+## Timed driving
 
-`pg_lobby` bonus 3 is a driving circuit round the outside of the plate: a rounded rectangle about 611 m round, 12 m wide, kerbs both sides, 26 m corner radius, clear of the foot courses. Everything (road, kerbs, grid, finish, three splits, spawn yaw) is derived from `PgLobby.circuit_point(s)`: on a track crossed at 25 m/s, half a metre off is two ticks.
-
-**A loop whose start and finish are the same place finishes on the tick it starts**, so the grid is at `s = 0` and the finish line is 12 m **behind** it: a car leaves the grid away from the line and crosses it on the way back.
-
-The track is driven (`track_is_driven`), so getting in does not cancel the run and getting out ends it ([simulation.md](simulation.md#getting-into-a-vehicle-and-the-timer)).
-
-**Known wrong comment, not changed:** `pg_lobby.gd`'s `CIRCUIT_SEGMENTS` note reasons from "a 387 m lap" and "under 9 cm of scallop". The loop is about 611 m, so each of the 64 chords is about 9.6 m and the 26 m corners leave about 0.44 m (c²/8r) between chord and arc. The buggy still drives entirely on the road. More segments would change a scored track's surface, so that is Christian's call.
+There is no circuit here any more: it was `pg_lobby`'s bonus 3 and went with the map and the timer (2026-10-18, [timer.md](timer.md)). With dot-timer linked, a map can say a track is driven (`PlaygroundMap.track_is_driven`), and then getting in does not cancel the run and getting out ends it. **A loop whose start and finish are the same place finishes on the tick it starts**, so such a map puts its grid ahead of the finish line and the car crosses it on the way back.
 
 ## What a driver feels, and the decisions taken on it (`[veh-3]`)
 

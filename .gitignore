@@ -7,7 +7,6 @@
 # A shipped build copies them in instead.
 /addons/dot_core
 /addons/dot_entity
-/addons/dot_timer
 /addons/dot_map
 /addons/dot_props
 /addons/dot_leaderboard

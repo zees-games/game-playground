@@ -24,7 +24,6 @@ const PlaygroundCharacter := preload("../game/playground_character.gd")
 const PlaygroundInventory := preload("../game/playground_inventory.gd")
 const PlaygroundInventoryNet := preload("../game/net/playground_inventory_net.gd")
 const PlaygroundRequest := preload("../game/net/playground_request.gd")
-const PgLobby := preload("res://maps/pg_lobby.gd")
 
 ## game-playground over the wire: a real server, a real client, and a lossy loopback
 ## between them.
@@ -58,13 +57,13 @@ const CLIENT_ENGINE_TICK_RATE := 60
 ## before and after, so the real store and the next run both start empty.
 const NET_PUNISHMENTS := "user://headless_net_punishments.json"
 
-const CHECKS := 390
+const CHECKS := 379
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 47
+const SECTIONS := 45
 
 var _passed := 0
 var _failed := 0
@@ -157,9 +156,6 @@ func _run() -> void:
 		await _test_inventory_from_the_server()
 		await _test_inventory_is_private()
 		await _test_nothing_before_ready()
-		# After every section that cares where the player stands: it sends them to the
-		# launch and back. Nothing it does adds a body.
-		await _test_push_over_the_wire()
 		await _test_inventory_flood()
 		await _test_inventory_rejoin()
 		await _test_zee_over_the_wire()
@@ -183,8 +179,6 @@ func _run() -> void:
 		await _test_drawn_ammo_corrected()
 		# Lays the player down and stands them up again; adds no body.
 		await _test_downed_over_the_wire()
-		# Walks through the relay's first gate and back to the track it was on; adds no body.
-		await _test_relay_gate_over_the_wire()
 		# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
 		# the leave, because a ball it kicks would be in the way of whatever came after.
 		await _test_map_toys_over_the_wire()
@@ -282,12 +276,12 @@ func _test_event_wire() -> void:
 	_section("every event round-trips")
 
 	var hello := PlaygroundEvents.read_hello(
-		DotNetReader.new(PlaygroundEvents.write_hello(9, 128, 4242, &"pg_lobby"))
+		DotNetReader.new(PlaygroundEvents.write_hello(9, 128, 4242, &"pg_flatgrass"))
 	)
 	_check(int(hello["player_id"]) == 9, "hello: the player id")
 	_check(int(hello["tick_rate"]) == 128, "hello: the tick rate", str(hello["tick_rate"]))
 	_check(int(hello["server_tick"]) == 4242, "hello: the server tick")
-	_check(hello["map_id"] == &"pg_lobby", "hello: the map")
+	_check(hello["map_id"] == &"pg_flatgrass", "hello: the map")
 	_check(bool(hello["ok"]), "hello: the reader was not exhausted")
 
 	var join := PlaygroundEvents.read_join(
@@ -454,8 +448,8 @@ func _test_event_wire() -> void:
 	# --- votes and loadouts ---
 	_check(
 		PlaygroundEvents.read_vote(
-			DotNetReader.new(PlaygroundEvents.write_vote("nominate pg_lobby"))
-		) == "nominate pg_lobby",
+			DotNetReader.new(PlaygroundEvents.write_vote("nominate pg_flatgrass"))
+		) == "nominate pg_flatgrass",
 		"vote: a token, which is a token because what an id MEANS is a source's business"
 	)
 
@@ -520,7 +514,7 @@ func _make_game(server: bool, scope: StringName, parent: Node) -> Playground:
 	# Records in memory: a headless run must not write into the user's data directory.
 	config.records_directory = ""
 	config.map_seconds = 0.0
-	config.initial_map = &"pg_lobby"
+	config.initial_map = &"pg_flatgrass"
 	config.authoritative = server
 	# No spawn cooldown. It is a real server rule and dot-props tests it; here it only
 	# couples these checks to how much simulated time the steps between them happen to
@@ -1134,13 +1128,13 @@ func _toy_of(game: Playground, id: String) -> DotPropToy:
 func _test_map_toys_over_the_wire() -> void:
 	_section("the map's toys over the wire")
 
-	var on_lobby := _server_game.maps.current != null and _server_game.maps.current.id == &"pg_lobby"
+	var on_lobby := _server_game.maps.current != null and _server_game.maps.current.id == &"pg_flatgrass"
 	if not on_lobby:
-		var _changed: DotResult = await _server_game.change_map(&"pg_lobby")
+		var _changed: DotResult = await _server_game.change_map(&"pg_flatgrass")
 	for i in 240:
 		_exchange()
 		await _steps(1)
-		if _client_game.maps.current != null and _client_game.maps.current.id == &"pg_lobby" and _client_bridge.toy_count() > 0:
+		if _client_game.maps.current != null and _client_game.maps.current.id == &"pg_flatgrass" and _client_bridge.toy_count() > 0:
 			break
 	await _exchange_steps(8)
 
@@ -1196,11 +1190,11 @@ func _test_map_toys_over_the_wire() -> void:
 	var plots := _server_game.toys.count()
 	_check(plots > 0 and _client_bridge.toy_count() == plots and _client_game.toys.count() == plots,
 		"a map change replaces them on both ends", "%d on the server, %d paired on the client" % [plots, _client_bridge.toy_count()])
-	var _back: DotResult = await _server_game.change_map(&"pg_lobby")
+	var _back: DotResult = await _server_game.change_map(&"pg_flatgrass")
 	for i in 240:
 		_exchange()
 		await _steps(1)
-		if _client_game.maps.current != null and _client_game.maps.current.id == &"pg_lobby" and _client_bridge.toy_count() == _server_game.toys.count():
+		if _client_game.maps.current != null and _client_game.maps.current.id == &"pg_flatgrass" and _client_bridge.toy_count() == _server_game.toys.count():
 			break
 	await _exchange_steps(8)
 	_done()
@@ -1401,18 +1395,18 @@ func _test_handshake() -> void:
 	# gives two peers two different tables — and this suite CANNOT see that, because one
 	# process has one intern table and both ends agree no matter how the table was built.
 	# It took a browser client joining and putting itself on "Sideways" to show it. So
-	# assert the SOURCE instead: the table must match dot-timer's declared ordering,
-	# which is an integer and is the same on every machine.
+	# assert the SOURCE instead: the table must match the declared ordering
+	# (`Playground.style_order`, dot-player-controller's list), the same on every machine.
 	var declared := PackedStringArray()
-	for style in _server_game.timers.styles_in_order():
-		declared.append(String(style.id))
+	for style_id in _server_game.style_order:
+		declared.append(String(style_id))
 
 	var built := PackedStringArray()
 	for style_id in _server_bridge.style_table():
 		built.append(String(style_id))
 
 	_check(built == declared,
-		"the style table follows dot-timer's declared ordering, not a StringName sort",
+		"the style table follows the declared ordering, not a StringName sort",
 		"%s vs %s" % [str(built), str(declared)])
 
 	var mine := _client_player()
@@ -1996,6 +1990,11 @@ func _test_tools() -> void:
 
 	if player == null:
 		return
+
+	# Out of the park first. pg_flatgrass puts beach balls and barrels round the spawn, and a
+	# crate held over one rests on it: carried 0.41 m in a swing that should take it 1.7.
+	player.teleport(Vector3(-40.0, 0.0, -40.0), player.controller.state.yaw)
+	await _steps(8)
 
 	var at := player.eye_position() + player.aim_direction() * 2.5
 	var why := PackedStringArray()
@@ -2724,7 +2723,6 @@ func _find_vehicle_node(game: Playground) -> PlaygroundVehicle:
 	return null
 
 
-
 ## A line typed on the client, through the real services layer, and back to the client.
 ##
 ## [b]Every other chat check in this file is the codec[/b] — an encoder against its
@@ -2845,15 +2843,23 @@ func _test_chat_end_to_end() -> void:
 func _test_timer() -> void:
 	_section("the timer")
 
+	# A run timer is `addons/pg_timer` over dot-timer, there only when a server links it;
+	# without it nobody has one, on either end.
+	var linked := FileAccess.file_exists("res://addons/dot_timer/plugin.cfg")
 	var player := _client_player()
-	_check(player != null and player.timer != null, "the client player has a timer")
+	_check(player != null and (player.timer != null) == linked,
+		"the client player has a timer exactly when dot-timer is linked")
 
 	# A client runs its own timer over its own copy of the zones and reaches the same
-	# answer a tick earlier than any packet could. What travels is the run's identity.
+	# answer a tick earlier than any packet could, so both must count at one rate.
+	var rates := [-1, -1]
+	if linked:
+		rates = [int(_client_game.run_timer.get("manager").get("tick_rate")),
+			int(_server_game.run_timer.get("manager").get("tick_rate"))]
 	_check(
-		_client_game.timers.tick_rate == _server_game.timers.tick_rate,
+		rates[0] == rates[1],
 		"counted at one rate on both ends, which is what makes a time comparable",
-		"%d vs %d" % [_client_game.timers.tick_rate, _server_game.timers.tick_rate]
+		"%d vs %d" % rates
 	)
 	_done()
 
@@ -3844,116 +3850,6 @@ func _voice_frame() -> PackedByteArray:
 	return packet.to_bytes()
 
 
-## A walk from pg_lobby's launch pad, holding forward on [param yaw] for [param limit]
-## ticks or (with [param stop_on_deck]) until the server's player stands past deck 1's
-## near edge. Returns what it measured.
-func _launch_walk(yaw: float, limit: int, stop_on_deck: bool) -> Dictionary:
-	var mine := _client_player()
-	var theirs := _server_player()
-	var pad := PgLobby.launch_deck(0)
-	var deck1 := PgLobby.launch_deck(1)
-
-	theirs.teleport(Vector3(PgLobby.LAUNCH_X, pad.end.y + 0.05, pad.position.z + 1.5), yaw)
-	await _steps(48)
-
-	var c := _forward()
-	c.yaw = yaw
-	var corrections_before := _corrections_and_snaps()
-	var top := pad.end.y
-	var client_top := pad.end.y
-	var ticks := 0
-	for i in range(limit):
-		await _step(c)
-		ticks += 1
-		top = maxf(top, theirs.controller.state.position.y)
-		client_top = maxf(client_top, mine.controller.state.position.y)
-		if stop_on_deck and theirs.controller.state.position.z > deck1.position.z + 1.0 \
-				and theirs.controller.state.is_grounded():
-			break
-	var corrections := _corrections_and_snaps() - corrections_before
-	var at := theirs.controller.state.position
-	await _steps(32)
-	return {
-		"corrections": corrections,
-		"ticks": ticks,
-		"thrown": top - pad.end.y,
-		"client_thrown": client_top - pad.end.y,
-		"at": at,
-		"gap": mine.controller.state.position.distance_to(theirs.controller.state.position),
-	}
-
-
-## A connected client rides a booster, and is thrown where the server throws it.
-##
-## [b]`PlaygroundPlayer._on_simulated` applies a PUSH zone on the tick (pg_lobby's launch,
-## bonus 5), and a predicted client runs the same code.[/b] Its timer is fed by
-## `tick_timers_only` after its predicted players simulate, where the server's is fed inside
-## `tick_once`, and a replay after a correction reads the effect in force now rather than at
-## the replayed tick. Any of that out by a tick is a launch that is a correction every time.
-## So two walks of the same length from the launch's pad: up the line, over the booster and
-## onto deck 1, and back off the pad's other end onto the plate (the usual: a walk and a 2 m
-## drop, no booster). The throw may cost no more corrections than the walk.
-##
-## No track is set: dot-timer's EFFECT zones are not track-filtered (`DotTimer._rebuild_effects`
-## takes every zone the player is in), so a booster throws anybody on any track, on both
-## ends alike. `[playground-push-1]`.
-func _test_push_over_the_wire() -> void:
-	_section("a booster throws a connected client where the server throws it")
-
-	var mine := _client_player()
-	var theirs := _server_player()
-	if mine == null or theirs == null:
-		_check(false, "a connected player to launch")
-		return
-	var home := theirs.controller.state.position
-	var home_yaw := theirs.controller.state.yaw
-
-	var launched: Dictionary = await _launch_walk(180.0, 360, true)
-	var usual: Dictionary = await _launch_walk(0.0, int(launched["ticks"]), false)
-	print("    the launch over the wire: thrown %.2f m by the server and %.2f m by the client's prediction, onto deck 1 in %d ticks with %d corrections, ending %.4f m from the server; the same %d ticks walked off the pad's back: %d corrections, thrown %.2f m" % [
-		float(launched["thrown"]), float(launched["client_thrown"]), int(launched["ticks"]),
-		int(launched["corrections"]), float(launched["gap"]), int(usual["ticks"]),
-		int(usual["corrections"]), float(usual["thrown"])])
-
-	_check(
-		float(launched["thrown"]) > PgLobby.launch_apex() * 0.8,
-		"the server throws the player about launch_apex up",
-		"%.2f m against %.2f" % [float(launched["thrown"]), PgLobby.launch_apex()]
-	)
-	_check(
-		absf(float(launched["client_thrown"]) - float(launched["thrown"])) < 0.1,
-		"and the client predicted the same throw",
-		"%.2f m against the server's %.2f" % [
-			float(launched["client_thrown"]), float(launched["thrown"])]
-	)
-	var at: Vector3 = launched["at"]
-	var deck1 := PgLobby.launch_deck(1)
-	_check(
-		at.z > deck1.position.z and absf(at.y - deck1.end.y) < 0.2,
-		"onto deck 1, 3 m up, without pressing jump",
-		"at %s, deck top %.2f" % [str(at), deck1.end.y]
-	)
-	_check(
-		float(usual["thrown"]) < 0.5,
-		"the walk it is measured against goes nowhere near a booster",
-		"%.2f m up" % float(usual["thrown"])
-	)
-	_check(
-		int(launched["corrections"]) <= int(usual["corrections"]),
-		"and the throw costs no more corrections than that walk",
-		"%d against %d" % [int(launched["corrections"]), int(usual["corrections"])]
-	)
-	_check(
-		float(launched["gap"]) < 0.05,
-		"and the client ends the throw where the server has them",
-		"%.4f m" % float(launched["gap"])
-	)
-
-	theirs.teleport(home, home_yaw)
-	await _steps(48)
-	_done()
-
-
 ## A connected client standing on a prop the server moves (prop surfing).
 ##
 ## [b]Measured, because the client cannot carry itself the way the server does.[/b] Riding is
@@ -4495,95 +4391,6 @@ func _test_downed_over_the_wire() -> void:
 	await _steps(2)
 	mirror.face_body()
 	_check(not mirror.downed and figure != null and not figure.downed, "and stands when picked up")
-	_done()
-
-
-## A connected client walks through pg_lobby's first relay gate (bonus 6, the first
-## TELEPORT zones in the game), and its run goes through with it.
-##
-## [b]The gate is the timer's ask and the game's act on both ends[/b]
-## (`Playground._on_effect_requested` -> `PlaygroundPlayer.teleport(..., keep_run)`): the
-## server's timer is fed inside `tick_once`, the client's by `tick_timers_only` after its
-## predicted player moves, and a replay after a correction reads the zone in force now. A tick
-## out between them is a client drawn on the wrong leg until the snapshot pulls it across.
-func _test_relay_gate_over_the_wire() -> void:
-	_section("a connected client walks through a relay gate with the server")
-
-	var mine := _client_player()
-	var theirs := _server_player()
-	if mine == null or theirs == null:
-		_check(false, "a connected player to walk the relay")
-		_done()
-		return
-
-	var track_before := theirs.timer.track
-	var yaw := PgLobby.relay_yaw(0)
-	var dir := PgLobby.relay_direction(0)
-	var leg := PgLobby.relay_leg(0)
-	var gate: AABB = PgLobby.relay_gate_zone(leg[leg.size() - 1])
-	_check(
-		theirs.timer.set_track(PgLobby.RELAY_TRACK) and mine.timer.set_track(PgLobby.RELAY_TRACK),
-		"both ends' timers are on the relay's track"
-	)
-	# On leg 1's pad, where the track's spawn puts a player, so leaving it starts a run.
-	var pad: AABB = leg[0]
-	theirs.teleport(Vector3(pad.position.x + 1.0 if dir > 0.0 else pad.end.x - 1.0, pad.end.y + 0.05, PgLobby.RELAY_Z[0]), yaw)
-	await _steps(48)
-
-	var stops: Array[StringName] = []
-	var on_stop := func(_run: DotTimerRun, reason: StringName) -> void: stops.append(reason)
-	theirs.timer.run_stopped.connect(on_stop)
-	var arrival := PgLobby.relay_arrival(1)
-	var c := _forward()
-	c.yaw = yaw
-	var corrections_before := _corrections_and_snaps()
-	var through_at := -1
-	var gate_from := -1
-	var running_before := [false, false]
-	for i in range(600):
-		# Jump from the far edge of whatever deck they stand on, as a player does: the decks
-		# and the gate are a jump apart.
-		var at := theirs.controller.state.position
-		var near_edge := false
-		for box: AABB in leg:
-			var far := box.end.x if dir > 0.0 else box.position.x
-			if at.x > box.position.x - 0.1 and at.x < box.end.x + 0.1 and absf(at.x - far) < 0.6:
-				near_edge = true
-		c.set_button(DotFpsCommand.BUTTON_JUMP, near_edge and theirs.controller.state.is_grounded())
-		await _step(c)
-		# From a metre short of the gate: the jump onto its sill is the walk's, not the gate's.
-		if gate_from < 0 and absf(theirs.controller.state.position.x - gate.get_center().x) < gate.size.x * 0.5 + 1.0:
-			gate_from = _corrections_and_snaps()
-			running_before = [theirs.timer.run.is_active(), mine.timer.run.is_active()]
-		if theirs.controller.state.position.distance_to(arrival) < 3.0:
-			through_at = i
-			break
-	var corrections := _corrections_and_snaps() - corrections_before
-	await _steps(32, DotFpsCommand.new())
-	var at_gate := _corrections_and_snaps() - gate_from if gate_from >= 0 else -1
-	theirs.timer.run_stopped.disconnect(on_stop)
-	var gap := mine.controller.state.position.distance_to(theirs.controller.state.position)
-	print("    the relay gate over the wire: through after %d ticks, %d corrections on the way (the jumps), %d from a metre short of the gate to settled; client ends %.3f m from the server; runs before the gate %s, after %s; stops %s" % [
-		through_at, corrections, at_gate, gap, str(running_before),
-		str([theirs.timer.run.is_active(), mine.timer.run.is_active()]), str(stops)])
-
-	_check(through_at >= 0, "the server puts them on leg 2's pad", "server at %s" % str(theirs.controller.state.position))
-	_check(
-		mine.controller.state.position.distance_to(arrival) < 3.0 and gap < 0.1,
-		"and the client has them there too",
-		"%.3f m apart" % gap
-	)
-	_check(at_gate == 0, "and the gate costs the prediction nothing", "%d corrections and snaps" % at_gate)
-	_check(
-		running_before == [true, true] and theirs.timer.run.is_active() and mine.timer.run.is_active()
-			and stops.is_empty(),
-		"a run on both ends goes through the gate and keeps running",
-		"before %s, after %s, stops %s" % [str(running_before),
-			str([theirs.timer.run.is_active(), mine.timer.run.is_active()]), str(stops)]
-	)
-
-	var _back := theirs.timer.set_track(track_before)
-	_back = mine.timer.set_track(track_before)
 	_done()
 
 
