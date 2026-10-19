@@ -18,6 +18,7 @@ const PlaygroundPlayerNet := preload("../game/net/playground_player_net.gd")
 ## tools/screenshot_net.sh --no-interp    # the same with the client's interpolation off
 ## tools/screenshot_net.sh --walk         # THIS client strafes its own player: is it predicted?
 ## tools/screenshot_net.sh --downed       # the other player is down (the server's flag): crawling?
+## tools/screenshot_net.sh --died         # ... and then bleeds out: the ragdoll starts from the crawl
 ## [/codeblock]
 ##
 ## A server and a client in one process, joined by the loopback `headless_net` uses: the
@@ -104,6 +105,11 @@ var _zee: StringName = &""
 var _hold := false
 ## The other player stands in front, downed on the server, instead of running.
 var _downed := false
+## `--died`: with `--downed`, the server's downs layer then reports the bleed-out. The client
+## does what `PlaygroundClient.fall` does (the death rides `Kind.COMBAT`): a ragdoll copied
+## from the crawling figure. Frames are saved the instant it spawns and again once it settles.
+var _died := false
+var _ragdolls: DotPlayerRagdolls = null
 var _presentation: PlaygroundPresentation = null
 
 
@@ -136,6 +142,9 @@ func _run() -> void:
 			_hold = true
 		elif arg == "--downed":
 			_downed = true
+		elif arg == "--died":
+			_downed = true
+			_died = true
 
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://screenshots"))
 	await _build()
@@ -146,6 +155,8 @@ func _run() -> void:
 		await get_tree().process_frame
 
 	var base := out.get_basename()
+	if _died:
+		await _bleed_out(base)
 	for i in range(4):
 		await RenderingServer.frame_post_draw
 		var image := get_viewport().get_texture().get_image()
@@ -162,6 +173,30 @@ func _run() -> void:
 	# subtracted a buffer counted in SNAPSHOTS from a tick number (dot-net's docs/history.md, #18).
 	print("interpolator: ", _client_net.interpolator.describe())
 	get_tree().quit()
+
+
+## The downed player bleeds out: the client copies a ragdoll from the figure it draws (the
+## crawl pose), exactly `PlaygroundClient.fall`. Saves `<base>_died_0` on the spawn frame and
+## `_died_1`..`_3` as it falls.
+func _bleed_out(base: String) -> void:
+	var theirs: PlaygroundPlayer = _client_game.players.get(&"u%d" % OTHER_SESSION)
+	var body := theirs.character.body() if theirs != null and theirs.character != null else null
+	if body == null:
+		print("died: no body drawn")
+		return
+	_ragdolls = DotPlayerRagdolls.new()
+	_ragdolls.name = "Ragdolls"
+	_ragdolls.rules = _client_game.ragdoll_rules
+	add_child(_ragdolls)
+	var made := _ragdolls.spawn(body, DotPlayerDeath.new(), Vector3.ZERO)
+	print("died: ragdoll ", "spawned" if made != null else "NOT spawned")
+	for i in range(4):
+		for _f in range(1 if i == 0 else 20):
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var path := "%s_died_%d.png" % [base, i]
+		get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(path))
+		print("saved %s" % path)
 
 
 func _build() -> void:
