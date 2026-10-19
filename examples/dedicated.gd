@@ -7,6 +7,7 @@ const PlaygroundDowns := preload("../game/playground_downs.gd")
 const PlaygroundEvent := preload("../game/net/playground_event.gd")
 const PlaygroundEvents := preload("../game/net/playground_events.gd")
 const PlaygroundNetBridge := preload("../game/net/playground_net_bridge.gd")
+const PlaygroundNetLink := preload("../game/net/playground_net_link.gd")
 const PlaygroundRequest := preload("../game/net/playground_request.gd")
 const PlaygroundPlatform := preload("../game/playground_platform.gd")
 const PlaygroundProgress := preload("../game/playground_progress.gd")
@@ -45,8 +46,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 28
-const CHECKS := 248
+const SECTIONS := 29
+const CHECKS := 255
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -144,6 +145,7 @@ func _run() -> void:
 			await _test_records_follow_the_account()
 		_test_disconnect_is_handled()
 		await _test_module_unloads_cleanly()
+		await _test_a_module_reload()
 		_test_no_message_preloads_itself()
 
 	if not probe.is_empty():
@@ -2476,6 +2478,79 @@ func _test_module_unloads_cleanly() -> void:
 	_check(reloaded.ok, "and it can be loaded again")
 
 	await get_tree().process_frame
+	_section_done()
+
+
+## A module reload must leave ONE link under the server, still named for the client's route.
+## Two used to be left, the live one renamed `@Node@n`, and every RPC to a real client was lost
+## without an error. The proof is a real client over the socket: the server's snapshots and
+## events must reach a link of the client's own.
+func _test_a_module_reload() -> void:
+	print("")
+	print("a module reload leaves one live link")
+
+	for _i in range(2):
+		_check(server.modules.unload_module("playground").ok, "the module unloads")
+		var back: DotResult = await server.modules.load_module("res://game/playground_module.gd")
+		_check(back.ok, "and loads again", back.error.message if not back.ok else "")
+	for _i in range(5):
+		await get_tree().process_frame
+
+	var links := 0
+	for child in server.get_children():
+		if child.get_script() == PlaygroundNetLink:
+			links += 1
+	_check(links == 1 and server.has_node(NodePath(String(PlaygroundNetLink.NODE_NAME))),
+		"exactly one link, under the name the client routes to", "%d" % links)
+
+	var side := Node.new()
+	side.name = "ReloadClient"
+	add_child(side)
+	get_tree().set_multiplayer(MultiplayerAPI.create_default_interface(), side.get_path())
+	var mirror := Node.new()
+	mirror.name = name
+	side.add_child(mirror)
+	var link := DotClientLink.new()
+	link.name = "Server"
+	link.player_name = "Reloaded"
+	link.transport_preference = "udp"
+	link.udp_address = "127.0.0.1:%d" % server.config.port
+	mirror.add_child(link)
+	# The client's own link, re-made on each phase change as a real client's game scene does:
+	# DotClientLink clears its children while connecting. Heard is what any of them counted.
+	var heard := [0]
+	var attach := func(_a: Variant = null, _b: Variant = null) -> void:
+		if link.get_node_or_null(NodePath(String(PlaygroundNetLink.NODE_NAME))) == null:
+			var sink := PlaygroundNetLink.attached_to(link, null, false)
+			sink.name = PlaygroundNetLink.NODE_NAME
+			link.add_child(sink)
+	attach.call()
+	link.phase_changed.connect(attach)
+	var known: Dictionary = {}
+	for each in server.playing_sessions():
+		known[each.userid] = true
+	link.connect_to_server("127.0.0.1:%d" % server.config.port)
+	# The server's side of the wire is the bridge's own link, told to send to the newcomer:
+	# real snapshots wait for the client's READY, which needs a client-side bridge, and the
+	# route (Server/Playground to the client's same path) is all this is about.
+	var live: PlaygroundNetLink = _module().get("bridge").link
+	_check(live.get_parent() == server, "the bridge's link is the one under the server")
+	for _i in 1800:
+		await get_tree().physics_frame
+		for each in server.playing_sessions():
+			if not known.has(each.userid) and heard[0] == 0:
+				live.send_event(each.peer_id, PackedByteArray([0]))
+		var sink := link.get_node_or_null(NodePath(String(PlaygroundNetLink.NODE_NAME)))
+		if sink != null:
+			heard[0] = maxi(heard[0], sink.snapshots_received + sink.events_received)
+		if heard[0] > 0:
+			break
+	_check(heard[0] > 0, "a real client still hears the server's RPCs after two reloads",
+		"%d heard, %s" % [heard[0], link.last_error])
+	link.disconnect_from_server("done")
+	for _i in range(10):
+		await get_tree().process_frame
+	side.queue_free()
 	_section_done()
 
 

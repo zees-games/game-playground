@@ -71,14 +71,13 @@ var voice_sent: int = 0
 var voice_received: int = 0
 
 
+## Makes the link; the caller places it (see [DotGameLink]).
 static func attached_to(
-	parent: Node, p_bridge: PlaygroundNetBridge, server: bool
+	_parent: Node, p_bridge: PlaygroundNetBridge, server: bool
 ) -> PlaygroundNetLink:
 	var link := PlaygroundNetLink.new()
-	link.name = NODE_NAME
 	link.bridge = p_bridge
 	link.is_server = server
-	parent.add_child(link)
 	return link
 
 

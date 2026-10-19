@@ -282,6 +282,11 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 	net.messages.on(PlaygroundRequest.NAME, _on_request)
 
 	link = PlaygroundNetLink.attached_to(link_parent, self, net.is_server)
+	# Not parent.add_child: the link sits under the server (RPCs route by path) but must die
+	# with this bridge. A bare add_child left a second link after a module reload and Godot
+	# renamed the live one `@Node@n`, so RPCs to clients were lost. DotGameLink frees it with
+	# the bridge without remove_child, which errors on a busy parent.
+	DotGameLink.attach(link, link_parent, self, PlaygroundNetLink.NODE_NAME)
 
 	_attach_inventory()
 
