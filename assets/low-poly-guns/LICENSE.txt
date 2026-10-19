@@ -1,12 +1,28 @@
-Low-poly real-world guns, converted to glTF (muzzle on -Z, origin at the bounding-box centre, scaled, magazines split off where the source had them).
+Real-world guns, kitbashed. Each gun here is built by a script in art-src/guns/ (guns.py has one recipe per gun) from parts of the CC0 sources below, cut, reshaped and joined with parts modelled in the script, recoloured to this pack's own palette (zee_kit.py, PALETTE), bevelled, and exported as glTF (muzzle on -Z, origin at the bounding-box centre, magazines as their own files). No gun is a copy of any one source model. Rebuild: blender -b --python art-src/guns/build.py
 
-Quaternius, "Ultimate Low Poly Guns Pack" (sub-machine guns, assault rifles, bullpup, shotguns, sniper rifles, revolvers)
-  https://opengameart.org/content/low-poly-guns-pack  (also https://quaternius.itch.io/50-lowpoly-guns)
-  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
-  Used: SubmachineGun_2, SubmachineGun_4, AssaultRifle2_1, AssaultRifle2_4, AssaultRifle_2, AssaultRifle_4, Bullpup_3, Shotgun_1, SniperRifle_3, SniperRifle_4, Revolver_1
+Quaternius, "Ultimate Low Poly Guns Pack" (July 2019)
+  https://opengameart.org/content/low-poly-guns-pack  (also https://quaternius.com)
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/ (stated on the page; the download carries no licence file)
+  Parts taken, per gun (everything else on each gun is modelled in the script):
+    rifle           AssaultRifle2_2 receiver, grip and magazine; AssaultRifle2_1 stock (stretched)
+    carbine         AssaultRifle_3 receiver, grip and magazine; the Stock accessory
+    smg             SubmachineGun_1 receiver, grip and magazine (lengthened); SubmachineGun_5 folding stock; the Grip accessory
+    machine_pistol  Pistol_6 frame and slide; the Grip accessory
+    revolver        Revolver_3 frame, cylinder, hammer, trigger and grip (grip lengthened)
+    battle_rifle    Shotgun_3 receiver and stock; AssaultRifle_2 top cover; the Bipod accessory (folded)
+    burst_rifle     SubmachineGun_3 receiver and grip (enlarged); AssaultRifle2_1 stock and magazine
+    shotgun         Shotgun_3 receiver; Shotgun_ShortStock pistol-grip stock (shrunk)
+    bullpup         Bullpup_1 body, grip and magazine
+    marksman        SniperRifle_5 chassis, stock and grip; the Silencer_2 and Scope_1 accessories
+    sniper          SniperRifle_1 stock and bolt; the Scope_2 and Bipod accessories
+    launcher        the Grip accessory (twice)
+  Removed from the donors and replaced: barrels, handguards, muzzle devices, sights, scopes, rail teeth, foregrips.
 
-Khairul Hidayat, "Low Poly Rocket Launcher" (launcher.glb: tube and loaded rocket joined)
-  https://opengameart.org/content/low-poly-rocket-launcher
-  Licence: listed CC0 on the page; the README in the download says MIT ("use it however you like"). Both are permissive; credited either way.
+Kenney, "Blaster Kit" 2.1
+  https://kenney.nl/assets/blaster-kit
+  Licence: CC0 1.0 (assets/blaster-kit/LICENSE-kenney-blaster-kit.txt)
+  Parts taken: silencer-larger (the smg's integral suppressor, stretched), scope-small (the launcher's sight).
+
+Modelled in the scripts (CC0 with the rest of this folder's art): every handguard, barrel, brake, flash hider, compensator, suppressor band, rail, sight, ring, sunshade, the revolver's under-lug and vent rib, the shotgun's heat shield, tube and pump, the launcher's tube, venturi and grips' housing, and the magazines of the machine pistol and the battle rifle.
 
 Rounds (assets/ammo/): Kenney Weapon Pack, CC0, see assets/ammo/LICENSE-kenney-weapon-pack.txt.
