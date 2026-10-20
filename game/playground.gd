@@ -2006,6 +2006,18 @@ func rotation_commands() -> Dictionary:
 	return rotation_file.commands() if rotation_file != null else {}
 
 
+## Every name a command of this game's own answers to (the first is the one help shows), from
+## maps.yml's `commands: names:` block; the role's own name with no file. Lets `pg_rtv` and its
+## siblings be renamed the way dot-vote's roles are.
+func command_names(role: String) -> PackedStringArray:
+	var names: Dictionary = rotation_commands().get("names", {})
+
+	if not names.has(role):
+		return PackedStringArray([role])
+
+	return DotCommandNames.all_of("", names, {}, role)
+
+
 ## The maps this build ships. A server with delivered maps loads a JSON catalogue.
 ##
 ## An instance method that forwards, so a caller with a [Playground] keeps working — and

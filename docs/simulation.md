@@ -85,7 +85,7 @@ A timer counting 128 a second on a server stepping 100 reports every run 28% lon
 | --- | --- |
 | `pg_restart` `pg_style` | back to the spawn; the movement style |
 | `pg_timer` `pg_track` `pg_top` `pg_cp` `pg_tp` `pg_cp_clear` | the run and practice checkpoints: `addons/pg_timer`'s, only when a server links dot-timer ([timer.md](timer.md)) |
-| `pg_map` `pg_nextmap` `pg_rtv` `pg_extend` | maps |
+| `pg_map` `pg_nextmap` `pg_rtv` `pg_extend` | maps (with `pg_vote`, renameable from maps.yml's `commands: names:`, see `bind_map_commands`; a name must be lowercase letters, digits and underscores, so `!`-forms are dropped by dot-core) |
 | `pg_prop` `pg_undo` `pg_props_clear` `pg_limits` | props |
 | `pg_save` `pg_load` `pg_builds` `pg_build_delete` | saved builds |
 | `pg_status` | everything at once |

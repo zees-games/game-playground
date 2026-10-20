@@ -238,16 +238,7 @@ func _module_load() -> DotResult:
 	map_commands.spec_fn = game.rotation_commands
 	map_commands.bind(self)
 
-	add_command(
-		"pg_map", _cmd_map, "Change map, or list what there is",
-		DotAdminFlags.CHANGEMAP
-	).with_chat()
-	add_command("pg_nextmap", _cmd_nextmap, "What plays next, and how long is left", "").with_chat()
-	add_command("pg_rtv", _cmd_rtv, "Rock the vote", "").with_chat()
-	add_command(
-		"pg_extend", _cmd_extend, "Extend the current map",
-		DotAdminFlags.CHANGEMAP
-	).with_chat()
+	bind_map_commands(add_command)
 
 	# --- Props -------------------------------------------------------------
 	add_command("pg_prop", _cmd_prop, "Spawn a prop in front of you", "").with_chat()
@@ -303,10 +294,6 @@ func _module_load() -> DotResult:
 	add_command(
 		"pg_inv", _cmd_inv,
 		"pg_inv <player> — what somebody is carrying", DotAdminFlags.GENERIC
-	)
-	add_command(
-		"pg_vote", _cmd_vote,
-		"pg_vote [open|next|status] — what plays next", DotAdminFlags.CHANGEMAP
 	)
 	add_command(
 		"pg_achievements", _cmd_achievements,
@@ -1538,6 +1525,30 @@ func _cmd_nextmap(ctx: DotCmdContext) -> void:
 		game.maps.time_limit.rtv_votes(),
 		game.maps.time_limit.rtv_needed(game.players.size()),
 	])
+
+
+## The game's own map and vote commands (`pg_map`, `pg_nextmap`, `pg_rtv`, `pg_extend`,
+## `pg_vote`), each registered under every name maps.yml's `commands: names:` gives its role,
+## the role's own name with no file. Takes the registrar as a Callable so a check can bind them
+## on a console of its own: the live one already holds the defaults.
+func bind_map_commands(register: Callable) -> void:
+	var table := [
+		["pg_map", _cmd_map, "Change map, or list what there is", DotAdminFlags.CHANGEMAP],
+		["pg_nextmap", _cmd_nextmap, "What plays next, and how long is left", ""],
+		["pg_rtv", _cmd_rtv, "Rock the vote", ""],
+		["pg_extend", _cmd_extend, "Extend the current map", DotAdminFlags.CHANGEMAP],
+	]
+
+	for row: Array in table:
+		for name in game.command_names(row[0]):
+			var cmd: Variant = register.call(name, row[1], row[2], row[3])
+			if cmd != null:
+				cmd.with_chat()
+
+	# Not chat-typable by default: it is the operator's (CHANGEMAP), as it always was.
+	for name in game.command_names("pg_vote"):
+		var _cmd: Variant = register.call(
+			name, _cmd_vote, "pg_vote [open|next|status] — what plays next", DotAdminFlags.CHANGEMAP)
 
 
 func _cmd_rtv(ctx: DotCmdContext) -> void:

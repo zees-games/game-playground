@@ -47,7 +47,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 30
-const CHECKS := 273
+const CHECKS := 280
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -1506,6 +1506,52 @@ func _test_map_rotation_file() -> void:
 		"a renamed rtv command is registered from maps.yml's commands")
 	var replies := _run_command("rockthevote")
 	_check(not replies.is_empty(), "and answers", " ".join(replies))
+
+	# The game's own commands rename from the same block. They bind on a console of their own:
+	# the live one already holds the defaults, and the check is that the OLD names are absent.
+	var named := DotMapRotationFile.from_trees([{"defaults": {
+		"rotations": {"main": {"maps": ["pg_flatgrass"]}},
+		"commands": {"names": {
+			"pg_rtv": "game_rtv", "pg_map": ["gamemap", "gm"],
+			"pg_nextmap": "upnext", "pg_extend": "moretime", "pg_vote": "gamevote"}},
+	}}], "game-playground")
+	var plain_names: PackedStringArray = game.command_names("pg_rtv")
+	game.rotation_file = named.value
+	var fresh := DotConsole.new()
+	module.bind_map_commands(fresh.command)
+	_check(fresh.find_command("game_rtv") != null and fresh.find_command("pg_rtv") == null,
+		"a renamed pg_rtv is registered under its new name and not its old one")
+	_check(fresh.find_command("gamemap") != null and fresh.find_command("gm") != null
+			and fresh.find_command("pg_map") == null, "a role takes a list of names, the first for help")
+	_check(fresh.find_command("upnext") != null and fresh.find_command("moretime") != null
+			and fresh.find_command("gamevote") != null and fresh.find_command("pg_nextmap") == null
+			and fresh.find_command("pg_extend") == null and fresh.find_command("pg_vote") == null,
+		"pg_nextmap, pg_extend and pg_vote rename too")
+	_check(fresh.find_command("game_rtv").chat_policy == DotConCommand.ChatPolicy.ALLOWED
+			and fresh.find_command("gamemap").permission == DotAdminFlags.CHANGEMAP,
+		"and keep their chat policy and permission")
+
+	var rocker := DotClientSession.new()
+	rocker.peer_id = 4747
+	rocker.userid = 47
+	rocker.display_name = "Renamer"
+	var new_name_replies: Array[String] = []
+	var typed_new := rocker.make_context("game_rtv", PackedStringArray(), DotCmdContext.Source.CHAT,
+		func(text: String) -> void: new_name_replies.append(text))
+	var ran_new := fresh.execute("game_rtv", typed_new)
+	_check(not new_name_replies.is_empty() and not _said(PackedStringArray(new_name_replies), "unknown"),
+		"the renamed pg_rtv answers from chat", " ".join(new_name_replies))
+	var old_name_replies: Array[String] = []
+	var typed_old := rocker.make_context("pg_rtv", PackedStringArray(), DotCmdContext.Source.CHAT,
+		func(text: String) -> void: old_name_replies.append(text))
+	var ran_old := fresh.execute("pg_rtv", typed_old)
+	_check(not ran_old.ok and ran_new != null and not _said(PackedStringArray(old_name_replies), "rock"),
+		"and the old name no longer does", " ".join(old_name_replies))
+	fresh.free()
+
+	game.rotation_file = built.value
+	_check(game.command_names("pg_rtv") == PackedStringArray(["pg_rtv"]) and plain_names == PackedStringArray(["pg_rtv"]),
+		"a file that does not name them leaves the defaults")
 
 	# No file again: everything back in, as before maps.yml.
 	game.rotation_file = null
