@@ -79,6 +79,10 @@ signal clock_due(state: Dictionary)
 
 var director: DotVoteDirector = null
 var commands: DotVoteCommands = null
+
+## `() -> Dictionary`: maps.yml's `commands:` block, so an operator renames the vote's commands
+## without this game naming any. The module points it at the game's rotation file.
+var commands_spec_fn: Callable = Callable()
 var game: Playground = null
 
 ## How many people are playing. Every threshold in a vote needs it.
@@ -261,6 +265,7 @@ func install_commands(host: Object) -> DotResult:
 	commands = DotVoteCommands.new()
 	commands.director = director
 	commands.names = COMMAND_NAMES
+	commands.spec_fn = commands_spec_fn
 
 	var bound := commands.bind(host)
 

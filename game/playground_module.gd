@@ -216,6 +216,16 @@ func _module_load() -> DotResult:
 	# sandbox was the first place the old default read as an obstruction rather than a
 	# policy. What a map change destroys on a records server is a run, and there are no
 	# ranked runs here; `pg_map` beside it has been `.with_chat()` since it was written.
+	var _rotation := game.load_rotation()
+	add_cvar(
+		"sv_map_rotation_file", game.config.map_rotation_file,
+		"maps.yml: the maps that rotate, in named rotations. Unlisted maps stay installed."
+	).changed.connect(
+		func(_old: String, new_value: String) -> void:
+			game.config.map_rotation_file = new_value.strip_edges()
+			var _read := game.load_rotation()
+	)
+
 	var map_commands := DotMapCommands.new()
 	map_commands.session = game.maps
 	map_commands.change_fn = func(id: StringName) -> DotResult:
@@ -223,6 +233,9 @@ func _module_load() -> DotResult:
 	map_commands.allow_chat_change = true
 	map_commands.player_count_fn = func() -> int:
 		return game.players.size()
+	map_commands.rotation_file_fn = func() -> DotMapRotationFile:
+		return game.rotation_file
+	map_commands.spec_fn = game.rotation_commands
 	map_commands.bind(self)
 
 	add_command(
@@ -780,6 +793,7 @@ func _build_extras() -> DotResult:
 	vote = PlaygroundVote.new()
 	vote.name = "Vote"
 	vote.player_count_fn = func() -> int: return game.players.size()
+	vote.commands_spec_fn = game.rotation_commands
 	vote.is_admin_fn = _voter_is_admin
 
 	# The drawn ballot, to each playing session with its own voter id (`u<userid>`), so the
@@ -1472,9 +1486,10 @@ func _cmd_map(ctx: DotCmdContext) -> void:
 		var lines := PackedStringArray(["Maps:"])
 
 		for map in game.maps.catalogue.maps:
-			lines.append("  %-24s tier %d  %s%s" % [
+			lines.append("  %-24s tier %d  %s%s%s" % [
 				String(map.id), map.tier, String(map.kind),
 				"" if map.enabled else "  (disabled)",
+				"" if map.in_rotation else "  (not in rotation)",
 			])
 
 		ctx.reply_lines(lines)

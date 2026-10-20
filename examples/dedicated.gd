@@ -46,8 +46,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 29
-const CHECKS := 255
+const SECTIONS := 30
+const CHECKS := 273
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -133,6 +133,7 @@ func _run() -> void:
 		await _test_progress()
 		_test_query()
 		_test_vote()
+		_test_map_rotation_file()
 		_test_identity()
 		await _test_live_tools()
 		await _test_blind_and_beacon()
@@ -1430,6 +1431,93 @@ func _test_progress() -> void:
 
 	var written: DotResult = await progress.achievements.flush()
 	_check(written.ok, "progress writes to disk", str(written.error))
+	_section_done()
+
+
+## maps.yml on the live module: a map outside the active rotation stays installed and is never
+## chosen, balloted or nominated; a rotation switch takes effect; a renamed command exists.
+func _test_map_rotation_file() -> void:
+	print("")
+	print("maps.yml")
+
+	var module := _module()
+	var vote: PlaygroundVote = module.get("vote")
+
+	_check(game.maps != null and vote != null and vote.director != null, "the game has maps and a vote")
+	if game.maps == null or vote == null or vote.director == null:
+		return
+
+	var catalogue := game.maps.catalogue
+	var built := DotMapRotationFile.from_trees([{"defaults": {
+		"rotation": "main",
+		"rotations": {
+			"main": {"mode": "cycle", "cooldown": 0, "maps": ["pg_flatgrass"]},
+			"alt": {"maps": ["pg_generated"]},
+		},
+		"commands": {"names": {"rtv": "rockthevote"}},
+	}}], "game-playground")
+	_check(built.ok, "a maps.yml with two rotations and a renamed rtv parses",
+		"" if built.ok else built.error.message)
+	if not built.ok:
+		return
+
+	var kept_file: DotMapRotationFile = game.rotation_file
+	game.rotation_file = built.value
+	game.apply_rotation()
+
+	var flat := catalogue.get_map(&"pg_flatgrass")
+	var gen := catalogue.get_map(&"pg_generated")
+	_check(flat.in_rotation and not gen.in_rotation, "the active rotation puts pg_generated out and pg_flatgrass in")
+	_check(catalogue.get_map(&"pg_generated") != null and not game.in_rotation(&"pg_generated"),
+		"and pg_generated stays installed in the catalogue")
+	_check(not catalogue.available().has(gen) and catalogue.available().has(flat), "available() leaves it out")
+
+	var drew_gen := false
+	for i in 100:
+		var chosen := game.maps.rotation.choose(0)
+		if chosen != null and chosen.id == &"pg_generated":
+			drew_gen = true
+	_check(not drew_gen, "100 draws of the next map never choose a map outside the rotation")
+	_check(not game.maps.rotation.set_next(&"pg_generated"), "it cannot be forced as the next map")
+
+	var ids := vote.director.source.choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
+	_check(not ids.has(&"pg_generated") and ids.has(&"pg_flatgrass"),
+		"a map outside the rotation is not on the ballot, one inside is")
+	var nominated := vote.director.nominate(&"u77", &"pg_generated")
+	_check(not nominated.ok, "nominate refuses a map outside the rotation")
+	_check(not vote.director.nominated_ids().has(&"pg_generated"), "and nothing was recorded")
+
+	var listed := _run_command("pg_map")
+	_check(_said(listed, "pg_generated") and _said(listed, "not in rotation"),
+		"the map list marks the maps that are not in rotation", str(listed))
+
+	var switched := game.rotation_file.switch(game.maps.rotation, "alt")
+	_check(switched.ok and gen.in_rotation and not flat.in_rotation, "switching to the alt rotation takes effect")
+	ids = vote.director.source.choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
+	_check(not ids.has(&"pg_flatgrass") and ids.has(&"pg_generated"), "and the ballot follows it")
+	_check(not game.rotation_file.switch(game.maps.rotation, "nope").ok, "an unknown rotation is refused")
+
+	var rtv := DotVoteCommands.new()
+	rtv.director = vote.director
+	rtv.spec_fn = game.rotation_commands
+	var bound := rtv.bind(server.console)
+	_check(bound.ok and rtv.command_name("rtv") == "rockthevote"
+		and server.console.find_command("rockthevote") != null,
+		"a renamed rtv command is registered from maps.yml's commands")
+	var replies := _run_command("rockthevote")
+	_check(not replies.is_empty(), "and answers", " ".join(replies))
+
+	# No file again: everything back in, as before maps.yml.
+	game.rotation_file = null
+	game.apply_rotation()
+	var all_in := true
+	for def in catalogue.maps:
+		all_in = all_in and def.in_rotation
+	_check(all_in, "with no file every map is in rotation again")
+	_check(game.rotation_commands().is_empty(), "and no command is renamed")
+
+	game.rotation_file = kept_file
+	game.apply_rotation()
 	_section_done()
 
 

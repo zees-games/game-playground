@@ -64,6 +64,13 @@ extends DotConfig
 ## Seconds a map runs before the session asks for the next one. 0 disables it.
 @export_range(0.0, 86400.0, 30.0) var map_seconds: float = 2700.0
 
+## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the game's own
+## shipped `res://maps.yml` (dot-map's `DotMapRotationFile`: named rotations, `random` or
+## `cycle`, wildcards, command names). Empty, or no such file, rotates every map. A map the
+## active rotation leaves out stays installed (`pg_map <id>` loads it); it is only never
+## chosen, balloted or nominated. `sv_map_rotation_file`.
+@export var map_rotation_file: String = "cfg/maps.yml"
+
 ## Fraction of the players who must rock the vote to end a map early.
 @export_range(0.0, 1.0, 0.05) var rtv_fraction: float = 0.6
 
