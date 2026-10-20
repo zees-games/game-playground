@@ -3321,7 +3321,16 @@ func _test_workshop() -> void:
 		"back in solo they return")
 
 	# The real zee pack, as a fixture of its own: all 27 weapons, grouped by its categories.
+	# Found through addons/zee_weapons rather than as ../zee-dot-weapons: the link points
+	# at the sibling checkout on a dev box and into .deps/ under CI, which clones no siblings.
+	var zee_link := ProjectSettings.globalize_path("res://addons/zee_weapons")
 	var zee_dir := ProjectSettings.globalize_path("res://").path_join("../zee-dot-weapons").simplify_path()
+	var addons_dir := DirAccess.open(zee_link.get_base_dir())
+	if addons_dir != null and addons_dir.is_link(zee_link):
+		var target := addons_dir.read_link(zee_link)
+		if target.is_relative_path():
+			target = zee_link.get_base_dir().path_join(target)
+		zee_dir = target.simplify_path().get_base_dir().get_base_dir()
 	if FileAccess.file_exists(zee_dir.path_join("provides.json")):
 		var zee_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string(zee_dir.path_join("provides.json")))
 		var _zee := index.add_pack({
