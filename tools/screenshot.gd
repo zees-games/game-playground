@@ -129,7 +129,7 @@ var _toy_placements: Array = []
 ## Maps converted from a community .bsp (game-playground-maps' tools/import_bsp.py): they have no
 ## hand-picked angles, so these are worked out from the document, an oblique view over the
 ## whole thing, a high view straight down and the player's eye at the spawn facing the middle.
-const IMPORTED := ["pgc_construct_small"]
+const IMPORTED := ["pgc_construct_small", "pgc_smallbase"]
 
 
 func _imported_shots(id: String) -> Array[Dictionary]:

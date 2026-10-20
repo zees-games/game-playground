@@ -54,7 +54,7 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 708
+const CHECKS := 714
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -4841,7 +4841,7 @@ func _test_ice_slime_foliage() -> void:
 
 
 ## game-playground-maps' documents this suite surveys. See `_test_the_maps_are_surveyed`.
-const CUSTOM_MAPS := ["pgc_plots", "pgc_quarry", "pgc_slopes", "pgc_town", "pgc_islands", "pgc_site", "pgc_warehouse", "pgc_canyon", "pgc_harbour", "pgc_bowl", "pgc_obstacle", "pgc_nature", "pgc_construct_small"]
+const CUSTOM_MAPS := ["pgc_plots", "pgc_quarry", "pgc_slopes", "pgc_town", "pgc_islands", "pgc_site", "pgc_warehouse", "pgc_canyon", "pgc_harbour", "pgc_bowl", "pgc_obstacle", "pgc_nature", "pgc_construct_small", "pgc_smallbase"]
 
 
 ## A floor with one of everything on it: a 0.5 m slot between two walls, a platform 5 m
