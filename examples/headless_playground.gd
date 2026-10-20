@@ -54,7 +54,7 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 707
+const CHECKS := 708
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -5086,36 +5086,37 @@ func _test_the_client_boots() -> void:
 		"yaw %.3f -> %.3f" % [released_yaw, client.player.controller.state.yaw]
 	)
 
-	# [b]Escape releases and never captures; a click captures.[/b] game-g2gfast's
-	# contract, for the browser: Escape is how a browser itself leaves pointer lock and it
-	# then refuses to re-enter from a key for about a second, so an Escape that toggled
-	# the capture back silently did nothing every other press on the web. `_set_captured`
-	# moves the override with it, which is what these read.
-	client.mouse_capture_override = true
+	# [b]Escape releases and never captures; a click captures -- the platform's job now.[/b]
+	# game-g2gfast's contract, for the browser. `Input.mouse_mode` is a no-op under the dummy
+	# display server, so what is checked is the configuration (dot-game's own suite drives
+	# the release), that no screen is up for the pointer rule, and that Escape on a pointer
+	# that is not captured is the second press and opens the menu, never a capture.
+	var plat: DotGameClient = client.platform
+	_check(
+		plat != null and plat.escape_releases_pointer and plat.capture_pointer
+		and plat.menu == client.game_menu and plat.console != null
+		and plat.console == client.presentation.console,
+		"the platform owns the pointer and the menu, and built the console after it"
+	)
+	_check(
+		plat.pointer_fn.call() == true and not client._menu_is_open(),
+		"a click may take the pointer back while no screen is up"
+	)
 	var escape := InputEventKey.new()
 	escape.physical_keycode = KEY_ESCAPE
 	escape.pressed = true
-	client._unhandled_input(escape)
-
-	_check(
-		client.mouse_capture_override == false and not client._menu_is_open(),
-		"Escape releases the pointer and opens nothing on the first press"
-	)
-
-	# With no menu the second press is where the old toggle captured again.
 	var kept_menu: DotMenu = client.game_menu
-	client.game_menu = null
+	client.mouse_capture_override = false
 	client._unhandled_input(escape)
-	client.game_menu = kept_menu
-
 	_check(
-		client.mouse_capture_override == false,
-		"and a second Escape never captures it again, which a browser would refuse"
+		kept_menu != null and kept_menu.is_open() and client.mouse_capture_override == false,
+		"Escape with the pointer free is the second press: it opens the menu and never captures"
 	)
+	kept_menu.close_all()
 
 	# With the menu, the second Escape opens it — dot-menu's, whose own Escape is off so
 	# this game keeps its two steps — and Escape closes it again.
-	client._unhandled_input(escape)
+	kept_menu.open()
 	var opened := kept_menu != null and kept_menu.is_open()
 	# The menu swallows an Escape that lands within its grace of opening (a browser's own
 	# pointer-lock Escape arriving late must not flash it shut), and this one lands in the
@@ -5228,16 +5229,19 @@ func _test_the_client_boots() -> void:
 	_check(e.is_action(&"pg_spawn"), "and Reset puts it back on E")
 	client.mouse_capture_override = true
 
-	# From released, whatever the line above left, so this check stands on its own.
+	# From released, whatever the line above left, so this check stands on its own: the click
+	# that takes the pointer back (the platform captures it) is spent on that and punts nothing.
 	client.mouse_capture_override = false
+	client._was_driving = false
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
+	var tool_before: Variant = client.get(&"_aiming")
 	client._unhandled_input(click)
 
 	_check(
-		client.mouse_capture_override == true,
-		"a click on the world is what takes the pointer back"
+		client.get(&"_aiming") == tool_before and not client._menu_is_open(),
+		"a click with the pointer released is spent on taking it back"
 	)
 
 	client.mouse_capture_override = true
@@ -5602,6 +5606,7 @@ func _test_the_wheel_cycles_tools() -> void:
 	_check(ring.size() >= 2 and ring[0] == &"phys", "a client has two or more tools to cycle", str(ring))
 
 	client.mouse_capture_override = true
+	client._was_driving = true
 	client._set_tool(ring[0])
 	client.call("_unhandled_input", down)
 	_check(client.tool == ring[1], "a wheel-down press moves one slot on", str(client.tool))

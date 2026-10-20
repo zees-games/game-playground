@@ -114,14 +114,14 @@ Short forms; the reasoning is in the linked file.
 - Wait on `playground.booted`, not only the signal. [client](docs/client.md#booting)
 - Every key is a `PlaygroundBindings` row read through its action, never a keycode (Escape excepted); H is help, so no row may default to H. [client](docs/client.md#keys-help-and-leave)
 - M is dot-menu's map menu: solo through `Playground.change_map`, on a server dot-vote's menu (the owner's flag changes, anybody else votes). No other row may default to M. [client](docs/client.md#m-the-map-menu)
-- Escape releases then opens dot-menu; only a click captures. This client owns the pointer. [client](docs/client.md#escape-the-pointer-and-the-menu)
+- Escape releases then opens dot-menu; only a click captures. The platform owns the pointer (`escape_releases_pointer`, `pointer_fn` false while a screen of this client's stack is up). [client](docs/client.md#escape-the-pointer-and-the-menu)
 - The character body goes under the rig, not the visual; `auto_drive` off. [client](docs/client.md#third-person-and-the-body)
 - Chat lines go to the chat box, and to the HUD notice line only when there is no box (a ballot was drawn twice). [client](docs/client.md#the-chat-box)
 - The first-person camera is written only in `PlaygroundPlayer.present_camera`; there is no `DotFpsView`. Right mouse aims a zee gun (a tool's secondary otherwise); its quick melee is Mouse 3. [client](docs/client.md#the-first-person-camera)
 - The hit marker, damage numbers and the red burst come from the server's `Kind.HIT`, never the local rig; the glance pieces need a shell with dot-ui 4. [client](docs/client.md#the-hud)
 - The HUD follows the menu's theme and HUD size; `PlaygroundHud.piece_theme()` is the accent only, never plate, text or ink. [client](docs/client.md#the-hud)
 - B is the arena's loadout (dot-loadout's, bound by the module), enabled only while the replicated `pg_arena_on` says so. [modes](docs/modes.md#b-the-arenas-loadout)
-- Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`build_console(menu)`). [client](docs/client.md#the-chat-box)
+- Typing suspends the sampler as well as swallowing input; the console does it as a menu overlay, so it is built after the menu (`platform.adopt_menu` then `platform.add_console`, handed to `presentation.adopt_console`). [client](docs/client.md#the-chat-box)
 
 ## Not here yet
 

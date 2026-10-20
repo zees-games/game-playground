@@ -731,7 +731,15 @@ func _apply_chat_visibility() -> void:
 ## the player while they type: the sampler polls the keys, and a focused line edit does
 ## not stop `Input.is_action_pressed`.
 func build_console(menu: Object = null) -> void:
-	console = DotConsoleKit.build(self, settings, menu)
+	adopt_console(DotConsoleKit.build(self, settings, menu))
+
+
+## Takes a console built elsewhere (the client's platform builds it, after the menu) and gives
+## it this game's commands. Its panel is found beside it, wherever the kit put the layer.
+func adopt_console(built: DotConsoleController) -> void:
+	console = built
+	if console == null:
+		return
 
 	var server_sources := console.sources().slice(1)
 	for s in server_sources:
@@ -740,7 +748,7 @@ func build_console(menu: Object = null) -> void:
 	for s in server_sources:
 		console.add_source(s)
 
-	console_panel = get_node_or_null(^"ConsoleLayer/ConsolePanel") as DotConsolePanel
+	console_panel = console.get_parent().get_node_or_null(^"ConsoleLayer/ConsolePanel") as DotConsolePanel
 
 
 ## This game's own commands; the kit has `help`, `clear`, `settings` and every setting.

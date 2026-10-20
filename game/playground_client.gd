@@ -185,6 +185,10 @@ var _zee_buttons: int = 0
 ## come up and the lens zooms. Presentation only.
 var _aiming: bool = false
 
+## Whether the pointer was a look input at the last frame; see the click branch of
+## `_unhandled_input`, and the 'Click to play' notice in `_process`.
+var _was_driving: bool = false
+
 ## Where the style key is in the list.
 var _style_index: int = 0
 
@@ -415,14 +419,18 @@ func _build_gate() -> void:
 	platform.name = "Platform"
 	platform.force_offline = link == null and OS.get_cmdline_user_args().has("--offline")
 	platform.link = link
-	# Not taken: the settings document is PlaygroundPresentation's manager with a DotMenu built
-	# round it (the Servers action, the loadout and map menus), and the console must follow
-	# that menu (see _build_pause). The pointer is this client's: Escape releases, then opens,
-	# the Q menu and the server browser are screens on its own stack, and a click recaptures
-	# through them. Tab is the roster's, not the platform's board.
+	# Not built by the platform: the settings document is PlaygroundPresentation's manager with
+	# a DotMenu built round it (the Servers action, the loadout and map menus), handed over by
+	# `adopt_menu`, and the console must follow that menu, so `add_console` comes later (see
+	# _build_pause). The pointer is the platform's: the first Escape frees it, the second opens
+	# the menu, and a click or the menu closing takes it back -- except while the Q menu or the
+	# server browser, screens on this client's own stack, are up. Tab is the roster's, not the
+	# platform's board.
 	platform.use_settings = false
 	platform.use_console = false
-	platform.capture_pointer = false
+	platform.escape_releases_pointer = true
+	platform.pointer_fn = func() -> bool:
+		return screens == null or not screens.any_open()
 	platform.scoreboard_action = &""
 	platform.spawned_fn = func() -> bool:
 		return player != null and camera != null and camera.is_inside_tree()
@@ -801,8 +809,8 @@ func _wire_chat_window() -> void:
 		return
 
 	window.submitted.connect(_on_chat_submitted)
-	window.opened.connect(func(_channel: StringName) -> void: _suspend_input(platform.is_input_blocked()))
-	window.closed.connect(func() -> void: _suspend_input(platform.is_input_blocked()))
+	window.opened.connect(func(_channel: StringName) -> void: platform.refresh_blocked())
+	window.closed.connect(func() -> void: platform.refresh_blocked())
 
 	var client_link := DotRegistry.get_service(&"dot_client_link")
 
@@ -1134,10 +1142,15 @@ func _build_pause() -> void:
 	game_menu.leave_on_its_own = true
 	add_child(game_menu)
 	var _set := game_menu.setup()
-	# The console after the menu, so DotConsoleKit registers it as one of the menu's
+	# The platform takes the menu (the input block, the pointer, `menu_state_changed`), then
+	# builds the console after it, so DotConsoleKit registers it as one of the menu's
 	# overlays: opening it then stops the player through `overlays_changed` below.
+	platform.board_snapshot_fn = board_snapshot
+	platform.board_prepare_fn = _prepare_board
+	platform.adopt_menu(game_menu)
+	var _platform_up := platform.setup()
 	if presentation != null:
-		presentation.build_console(game_menu)
+		presentation.adopt_console(platform.add_console(presentation.settings) as DotConsoleController)
 
 	add_general_rows(game_menu)
 	fill_help(game_menu.help)
@@ -1153,12 +1166,11 @@ func _build_pause() -> void:
 		var _maps: Variant = game_menu.call(&"use_maps", map_menu_rows, change_from_menu)
 	_use_loadout_menu()
 	game_menu.action_requested.connect(_on_menu_action_chosen)
-	game_menu.overlays_changed.connect(func(open: bool) -> void:
-		# Back onto the view the instant it closes, as the screen stack does for its own.
-		_set_captured(not open)
+	game_menu.overlays_changed.connect(func(_open: bool) -> void:
 		# At once, not at the platform's next poll: the keys are given back or taken the
-		# instant the console or menu opens or closes.
-		_suspend_input(platform.is_input_blocked()))
+		# instant the console or menu opens or closes. The pointer follows through the
+		# platform's own menu-state handler.
+		platform.refresh_blocked())
 
 	if settings != null:
 		applier = DotMenuApplier.new()
@@ -1169,7 +1181,6 @@ func _build_pause() -> void:
 		var _applied := applier.setup()
 		_bind_look()
 
-	_wire_board()
 
 
 ## The HUD in the menu's theme and at the player's HUD size, live (dot-menu's `follow_hud`,
@@ -1233,8 +1244,9 @@ func _on_menu_action_chosen(id: StringName) -> void:
 
 ## The Tab board: everybody in the sandbox, their score, how long they have been on and their
 ## ping. Online the server's roster; offline, this world's players.
-func _wire_board() -> void:
-	var board := game_menu.scoreboard
+func _prepare_board(made: Object) -> void:
+	# Typed: `columns` is a typed array, which an untyped Object will not assign to.
+	var board := made as DotMenuScoreboard
 	board.title_text = "Playground"
 	board.columns = [
 		{"key": &"name", "title": "Player", "width": 3.0},
@@ -1242,10 +1254,6 @@ func _wire_board() -> void:
 		{"key": &"seconds", "title": "Time", "kind": DotMenuScoreboard.KIND_DURATION},
 		{"key": &"ping", "title": "Ping", "kind": DotMenuScoreboard.KIND_PING},
 	]
-	if link != null and link.has_signal(&"scoreboard_received"):
-		board.feed_from(link)
-	else:
-		board.source = board_snapshot
 
 
 ## The board offline. Public so a suite can read it.
@@ -1265,6 +1273,14 @@ var _started_msec: int = Time.get_ticks_msec()
 
 
 func _process(_delta: float) -> void:
+	var driving := mouse_drives_view()
+	if _was_driving and not driving:
+		# The button's release goes to whatever took the pointer, so the aim is let go.
+		_aiming = false
+		# Freed with nothing open and Escape held: the platform's first Escape.
+		if hud != null and not _menu_is_open() and Input.is_physical_key_pressed(KEY_ESCAPE):
+			hud.notice("Click to play. Escape again for the menu.")
+	_was_driving = driving
 	if presentation != null:
 		# Once a frame, with where the camera is. dot-audio culls by distance from the
 		# listener and dot-fx ages what it spawned, and neither ticks itself -- for the
@@ -1460,22 +1476,6 @@ func mouse_drives_view() -> bool:
 	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
-## Captures or releases the pointer: the one place this client writes the mouse mode
-## itself (the screen stack writes it as screens open and close).
-##
-## [b]Through a method so a suite can see what was asked for.[/b] The dummy display server
-## drops the write, so the override — when a suite has set one — follows it, and the
-## Escape and click-to-capture checks read that.
-func _set_captured(on: bool) -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on else Input.MOUSE_MODE_VISIBLE
-	# The button's release goes to whatever took the pointer, so the aim is let go here.
-	if not on:
-		_aiming = false
-
-	if mouse_capture_override != null:
-		mouse_capture_override = on
-
-
 ## Points the applier's look settings (`sensitivity`, at dot-menu's degrees per count) at
 ## the tunables every sampler this client turns the view with reads, and applies them now.
 ##
@@ -1521,17 +1521,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	# [b]A click on the world with the pointer released takes it back, and does nothing
-	# else.[/b] Escape releases and never captures (see KEY_ESCAPE below), so this is the
-	# way back — game-g2gfast's contract, because a browser refuses pointer lock from a
-	# key for about a second after Escape and grants it to a click. Spent on capturing
-	# rather than also firing: the player was pointing, not aiming. Before the
-	# `player == null` guard for g2gfast's reason too — a click while the world is still
-	# loading must not be swallowed, or the cursor is never captured at all.
+	# else.[/b] The platform captures it (its `_unhandled_input` runs before this one, so
+	# `mouse_drives_view` is already true); `_was_driving` is last frame's answer, which is
+	# what says this click was the one that took the pointer. Spent on capturing rather than
+	# also firing: the player was pointing, not aiming. Before the `player == null` guard
+	# for g2gfast's reason too -- a click while the world is still loading must not be
+	# swallowed, or the cursor is never captured at all.
 	if (
 		event is InputEventMouseButton and (event as InputEventMouseButton).pressed
-		and not _menu_is_open() and not mouse_drives_view()
+		and not _menu_is_open() and not _was_driving
 	):
-		_set_captured(true)
 		return
 
 	if player == null:
@@ -1653,22 +1652,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			# and a second handler here would pop it and open the pause menu in one
 			# press.
 			#
-			# [b]Release, THEN open, and never capture.[/b] game-g2gfast's contract:
-			# Escape is how a browser itself exits pointer lock, and it then refuses to
-			# re-enter for about a second — so a toggle bound to Escape works on the
-			# desktop and silently does nothing every other press on the web. One key
-			# that releases and one gesture that captures (a click, in
-			# `_unhandled_input`) is the same contract on both. The second press opens
-			# the pause menu, game-arena's two-step, which g2gfast has no menu for;
-			# with no pause menu it does nothing. It used to capture again there, which
-			# was the toggle.
-			if not _menu_is_open():
-				if mouse_drives_view():
-					_set_captured(false)
-					if hud != null:
-						hud.notice("Click to play. Escape again for the menu.")
-				elif game_menu != null:
-					game_menu.open()
+			# [b]Release, THEN open, and never capture.[/b] The release is the platform's
+			# (`escape_releases_pointer`: it frees a captured pointer on the first Escape and
+			# consumes it, so that press never gets here); this is the second press. Capturing
+			# is a click's job, because a browser refuses pointer lock from a key for about a
+			# second after Escape.
+			if not _menu_is_open() and game_menu != null:
+				game_menu.open()
 
 
 ## The key [param action] is on, as the player has it bound: for a sentence on the HUD.
