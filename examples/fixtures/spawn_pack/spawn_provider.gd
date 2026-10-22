@@ -22,6 +22,12 @@ func spawn_entries() -> Array:
 				return DotResult.success("ok")},
 		{"category": "Props", "id": "scene_npc", "name": "Scene NPC", "kind": "npc",
 			"spawn": "res://examples/fixtures/spawn_pack/scene_npc.tscn"},
+		{"category": "NPCs", "id": "stat_npc", "name": "Stat NPC", "kind": "npc",
+			"spawn": {"health": 50, "speed": 3.0},
+			"spawn_fn": func(c: Dictionary) -> DotResult:
+				custom_calls.append(c)
+				return DotResult.success("ok")},
+		{"category": "NPCs", "id": "stat_only", "name": "Stats only", "kind": "npc", "spawn": {"health": 5}},
 		{"id": "", "kind": "npc"},
 		{"id": "bad_spawn", "kind": "npc", "spawn": 12},
 		"not a dictionary",

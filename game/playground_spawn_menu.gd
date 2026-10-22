@@ -54,10 +54,17 @@ const CARD := Vector2(146.0, 92.0)
 ## the convention every search-in-a-list uses and it is not a movement key.
 const SEARCH_KEY := KEY_SLASH
 
+## The provider kinds that have a tab of their own ([enum Tab]); other kinds stay on Addons.
+const PROVIDER_TAB_KINDS: PackedStringArray = ["weapon", "npc", "bot"]
+
 enum Tab {
 	PROPS,
 	ENTITIES,
+	## A spawn provider's npc and bot entries. Hidden until one exists ([method _sync_provider_tabs]).
+	NPCS,
 	WEAPONS,
+	## A spawn provider's weapon entries. Hidden until one exists.
+	PACK_WEAPONS,
 	TOOLS,
 	BUILDS,
 	## What the hooks of the addons folder registered. See [PlaygroundAddons].
@@ -108,7 +115,10 @@ var builds_available: bool = true
 
 ## The Addons tab's rows: dictionaries with `key`, `label`, `category` and `hint`, from
 ## [method PlaygroundAddons.describe_items]. Plain data so the menu never holds an addon's object.
-var addon_items: Array = []
+var addon_items: Array = []:
+	set(value):
+		addon_items = value
+		_sync_provider_tabs()
 
 ## What the weapons tab is built from.
 var weapons: Array[PlaygroundWeaponDef] = []
@@ -255,12 +265,10 @@ func _build_header() -> Control:
 	# and lets the HBox lay the title out underneath it. Two of the three tabs were
 	# unreachable and the heading was drawn through. Only a screenshot shows it.
 	_tabs.clip_tabs = false
-	_tabs.add_tab("Props")
-	_tabs.add_tab("Entities")
-	_tabs.add_tab("Weapons")
-	_tabs.add_tab("Tools")
-	_tabs.add_tab("Builds")
-	_tabs.add_tab("Addons")
+	# In `Tab` order. "Pack Weapons" rather than "Weapons": the game's own weapons tab has that name.
+	for tab_title in ["Props", "Entities", "NPCs", "Weapons", "Pack Weapons", "Tools", "Builds", "Addons"]:
+		_tabs.add_tab(tab_title)
+	_sync_provider_tabs()
 	_sync_pack_tabs()
 	_style_tabs(_tabs)
 	_tabs.tab_changed.connect(_on_tab_changed)
@@ -587,6 +595,36 @@ func _sync_pack_tabs() -> void:
 		_tabs.add_tab(title)
 
 
+## Shows the NPCs and Pack Weapons tabs only while a spawn provider has entries of that kind, and
+## falls back to Props when the open one lost its entries. Hidden rather than removed, so the
+## tab indices stay the enum's.
+func _sync_provider_tabs() -> void:
+	if _tabs == null:
+		return
+	var was_open := _tab
+	_tabs.set_tab_hidden(int(Tab.NPCS), _provider_items(Tab.NPCS).is_empty())
+	_tabs.set_tab_hidden(int(Tab.PACK_WEAPONS), _provider_items(Tab.PACK_WEAPONS).is_empty())
+	if _grid != null and _is_provider_tab(was_open) and _provider_items(was_open).is_empty():
+		_tabs.current_tab = int(Tab.PROPS)
+
+
+static func _is_provider_tab(tab: int) -> bool:
+	return tab == int(Tab.NPCS) or tab == int(Tab.PACK_WEAPONS)
+
+
+## The provider entries a tab lists: weapons on Pack Weapons, npc and bot on NPCs. Any other kind
+## stays on the Addons tab with the hooks' items. A hook's own item has no kind.
+func _provider_items(tab: int) -> Array:
+	var out: Array = []
+	for entry: Dictionary in addon_items:
+		var kind := str(entry.get("kind", ""))
+		if tab == int(Tab.PACK_WEAPONS) and kind == "weapon":
+			out.append(entry)
+		elif tab == int(Tab.NPCS) and (kind == "npc" or kind == "bot"):
+			out.append(entry)
+	return out
+
+
 func _is_pack_tab() -> bool:
 	return int(_tab) >= Tab.size()
 
@@ -624,7 +662,8 @@ func _rebuild_categories() -> void:
 		_add_category(
 			# A pack names its own categories ("NPCs"), which capitalize() would break into "Np Cs".
 			id, "%s (%d)" % [
-				category_name if _tab == Tab.ADDONS else category_name.capitalize(), _count_in_category(id)
+				category_name if _tab == Tab.ADDONS or _is_provider_tab(_tab) else category_name.capitalize(),
+				_count_in_category(id)
 			]
 		)
 
@@ -645,9 +684,9 @@ func _categories_for_tab() -> PackedStringArray:
 	if _tab == Tab.TOOLS:
 		return PackedStringArray()
 
-	if _tab == Tab.ADDONS:
+	if _tab == Tab.ADDONS or _is_provider_tab(_tab):
 		var groups := PackedStringArray()
-		for entry: Dictionary in addon_items:
+		for entry: Dictionary in _all_in_tab():
 			var group := str(entry.get("category", ""))
 			if not groups.has(group):
 				groups.append(group)
@@ -714,7 +753,7 @@ func _rebuild_grid() -> void:
 			card = _weapon_card(entry as PlaygroundWeaponDef)
 		elif _tab == Tab.BUILDS:
 			card = _build_card(entry as Dictionary)
-		elif _tab == Tab.ADDONS:
+		elif _tab == Tab.ADDONS or _is_provider_tab(_tab):
 			card = _addon_card(entry as Dictionary)
 		elif _tab == Tab.TOOLS:
 			card = _tool_card(entry as Object)
@@ -859,6 +898,10 @@ func _addon_card(entry: Dictionary) -> Button:
 	var icon: Texture2D = null
 	if icon_path != "" and ResourceLoader.exists(icon_path):
 		icon = load(icon_path) as Texture2D
+	# A provider entry without art gets a generated tile (its kind's silhouette, a colour from its
+	# label), so a pack that ships no icons still has a grid that reads. A hook's item has no kind.
+	if icon == null and str(entry.get("kind", "")) != "":
+		icon = PlaygroundIcons.for_provider(str(entry.get("kind", "")), str(entry.get("label", key)))
 	var card := _card(icon, str(entry.get("label", key)), str(entry.get("hint", "")))
 	card.pressed.connect(func() -> void: addon_item_chosen.emit(key))
 	card.set_meta(&"entry", StringName(key))
@@ -1063,8 +1106,16 @@ func _all_in_tab() -> Array:
 	if _tab == Tab.BUILDS:
 		return builds
 
+	if _is_provider_tab(_tab):
+		return _provider_items(_tab)
+
 	if _tab == Tab.ADDONS:
-		return addon_items
+		# Weapons and NPCs of a provider have tabs of their own; the rest (and the hooks') stay here.
+		var rest: Array = []
+		for entry: Dictionary in addon_items:
+			if not str(entry.get("kind", "")) in PROVIDER_TAB_KINDS:
+				rest.append(entry)
+		return rest
 
 	if _tab == Tab.TOOLS:
 		return _tools()
@@ -1283,6 +1334,10 @@ func _rebuild_footer() -> void:
 	match _tab:
 		Tab.WEAPONS:
 			verb = "Click to equip, right click to drop one"
+		Tab.PACK_WEAPONS:
+			verb = "Click to be given it"
+		Tab.NPCS:
+			verb = "Click to spawn it where you are looking"
 		Tab.TOOLS:
 			verb = "Click a tool, then use it with the tool gun"
 		Tab.BUILDS:

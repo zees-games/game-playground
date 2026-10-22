@@ -22,6 +22,16 @@ const OUT_DIR := "res://screenshots"
 const SETTLE := 3
 
 var _stack: DotScreenStack = null
+## What a spawn provider hands the menu, as PlaygroundAddons.describe_items makes it.
+const PROVIDER_ROWS: Array = [
+	{"key": "demo_pack/rifle", "label": "Rifle", "category": "Firearms", "hint": "Rifle - weapon from demo_pack", "kind": "weapon"},
+	{"key": "demo_pack/pistol", "label": "Pistol", "category": "Firearms", "hint": "", "kind": "weapon"},
+	{"key": "demo_pack/blade", "label": "Combat blade", "category": "Melee", "hint": "", "kind": "weapon"},
+	{"key": "demo_pack/guard", "label": "Guard", "category": "Soldiers", "hint": "", "kind": "npc"},
+	{"key": "demo_pack/patrol", "label": "Patrol x4", "category": "Soldiers", "hint": "", "kind": "npc"},
+	{"key": "demo_pack/sparring_bot", "label": "Sparring bot", "category": "Bots", "hint": "", "kind": "bot"},
+]
+
 var _menu: PlaygroundSpawnMenu = null
 var _workshop: PlaygroundWorkshop = null
 var _presentation: PlaygroundPresentation = null
@@ -124,14 +134,8 @@ func _initialize() -> void:
 			{"key": "pg_natural_disasters/blizzard", "label": "Blizzard", "category": "Disasters", "hint": ""},
 			{"key": "pg_natural_disasters/wind", "label": "Wind", "category": "Disasters", "hint": ""},
 		]},
-		# The Addons tab as a spawn provider fills it: weapons, NPCs and bots grouped by category.
-		{"id": &"spawn_menu", "file": "menu_spawn_provider.png", "tab": PlaygroundSpawnMenu.Tab.ADDONS, "addons": [
-			{"key": "demo_pack/rifle", "label": "Rifle", "category": "Weapons", "hint": "Rifle - weapon from demo_pack", "kind": "weapon"},
-			{"key": "demo_pack/pistol", "label": "Pistol", "category": "Weapons", "hint": "", "kind": "weapon"},
-			{"key": "demo_pack/guard", "label": "Guard", "category": "NPCs", "hint": "", "kind": "npc"},
-			{"key": "demo_pack/patrol", "label": "Patrol x4", "category": "NPCs", "hint": "", "kind": "npc"},
-			{"key": "demo_pack/sparring_bot", "label": "Sparring bot", "category": "Bots", "hint": "", "kind": "bot"},
-		]},
+		{"id": &"spawn_menu", "file": "menu_provider_weapons.png", "tab": PlaygroundSpawnMenu.Tab.PACK_WEAPONS, "addons": PROVIDER_ROWS},
+		{"id": &"spawn_menu", "file": "menu_provider_npcs.png", "tab": PlaygroundSpawnMenu.Tab.NPCS, "addons": PROVIDER_ROWS},
 		{"id": &"spawn_menu", "file": "menu_tools_waypoint.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"waypoint"},
 		{"id": &"spawn_menu", "file": "menu_tools_npc.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"npc_spawn"},
 		{"id": &"game_menu", "file": "menu_general.png", "page": &"general"},

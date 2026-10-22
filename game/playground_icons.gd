@@ -99,6 +99,14 @@ static func for_weapon(def: PlaygroundWeaponDef) -> Texture2D:
 	return generated(Glyph.WEAPON, 1.0, def.colour)
 
 
+## A tile for a spawn provider's entry that ships no icon: the silhouette of its kind (a weapon, or
+## a figure for everything else) in a colour taken from the label, so two entries differ at a glance
+## and the same one looks the same every session.
+static func for_provider(kind: String, label: String) -> Texture2D:
+	var hue := float(label.hash() % 360) / 360.0
+	return generated(Glyph.WEAPON if kind == "weapon" else Glyph.ENTITY, 1.0, Color.from_hsv(hue, 0.55, 0.85))
+
+
 static func _glyph_for(def: DotPropDef) -> Glyph:
 	if PlaygroundSpawnables.kind_of(def) == PlaygroundSpawnables.Kind.ENTITY:
 		return Glyph.ENTITY

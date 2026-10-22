@@ -54,7 +54,7 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 728
+const CHECKS := 739
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2661,7 +2661,7 @@ func _test_spawn_providers() -> void:
 	var found := addons.scan_providers(playground, fixtures)
 	_check(found == 1 and addons.provider_count() == 1,
 		"one valid provider is found, the one without spawn_entries is refused", str(found))
-	_check(addons.items().size() == 5, "bad entries (no id, bad spawn, not a dictionary) are skipped",
+	_check(addons.items().size() == 7, "bad entries (no id, bad spawn, not a dictionary) are skipped",
 		str(addons.items().size()))
 	var rows := addons.describe_items()
 	var cats := {}
@@ -2670,6 +2670,54 @@ func _test_spawn_providers() -> void:
 	_check(cats.has("Weapons") and cats.has("NPCs") and cats.has("Bots"),
 		"the menu rows carry the pack's categories", str(cats.keys()))
 	_check(addons.find("spawn_pack/test_guard").kind == "npc", "and the kind")
+
+	# The menu: own tabs, shown only while a provider has entries of that kind.
+	var pmenu := PlaygroundSpawnMenu.new()
+	pmenu.catalogue = playground.props.catalogue
+	pmenu.weapons = playground.weapons
+	add_child(pmenu)
+	var pstack := DotScreenStack.new()
+	add_child(pstack)
+	pstack.setup()
+	pstack.register(pmenu)
+	pstack.push(pmenu.screen_id())
+	await get_tree().process_frame
+	var ptabs: TabBar = pmenu.find_child("Tabs", true, false)
+	var npc_tab := int(PlaygroundSpawnMenu.Tab.NPCS)
+	var gun_tab := int(PlaygroundSpawnMenu.Tab.PACK_WEAPONS)
+	_check(ptabs.is_tab_hidden(npc_tab) and ptabs.is_tab_hidden(gun_tab),
+		"with no provider entries the NPCs and Pack Weapons tabs are hidden")
+	pmenu.addon_items = rows
+	_check(not ptabs.is_tab_hidden(npc_tab) and not ptabs.is_tab_hidden(gun_tab),
+		"with provider entries both tabs appear")
+	pmenu.show_tab(PlaygroundSpawnMenu.Tab.PACK_WEAPONS)
+	await get_tree().process_frame
+	_check(pmenu.shown().size() == 2 and pmenu.card_for(&"spawn_pack/test_gun") != null,
+		"Pack Weapons lists the weapon entries only", str(pmenu.shown()))
+	_check(pmenu.card_for(&"spawn_pack/test_gun").icon != null, "an entry without an icon gets a generated tile")
+	var asked: Array = []
+	pmenu.addon_item_chosen.connect(func(key: String) -> void: asked.append(key))
+	pmenu.card_for(&"spawn_pack/test_gun").pressed.emit()
+	_check(asked == ["spawn_pack/test_gun"], "clicking a card asks for the entry by key (the authority path)")
+	pmenu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
+	await get_tree().process_frame
+	_check(pmenu.shown().size() == 5 and pmenu.card_for(&"spawn_pack/test_bot") != null,
+		"NPCs lists npc and bot entries", str(pmenu.shown()))
+	pmenu._search = "guard"
+	pmenu._rebuild_grid()
+	await get_tree().process_frame
+	_check(pmenu.shown() == [&"spawn_pack/test_guard"], "and the search box filters them", str(pmenu.shown()))
+	pmenu._search = ""
+	pmenu.show_tab(PlaygroundSpawnMenu.Tab.ADDONS)
+	await get_tree().process_frame
+	_check(pmenu.shown().is_empty(), "the Addons tab no longer repeats them")
+	pmenu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
+	await get_tree().process_frame
+	pmenu.addon_items = []
+	_check(ptabs.is_tab_hidden(npc_tab) and ptabs.current_tab == int(PlaygroundSpawnMenu.Tab.PROPS),
+		"losing the entries hides the tab and falls back to Props")
+	pmenu.queue_free()
+	pstack.queue_free()
 
 	# Registry discovery.
 	var reg: Object = pack_script.new()
@@ -2707,6 +2755,13 @@ func _test_spawn_providers() -> void:
 	var calls: Array = pack_script.get("custom_calls")
 	_check(called.ok and calls.size() == 1 and calls[0]["kind"] == "bot" and calls[0]["player_id"] == &"bot",
 		"a Callable entry is called with the context dictionary")
+
+	calls.clear()
+	var viafn := playground.activate_addon_item("spawn_pack/stat_npc", 0, at, &"bot")
+	_check(viafn.ok and calls.size() == 1 and calls[0]["kind"] == "npc",
+		"spawn_fn is the action when spawn is a stats Dictionary")
+	_check(not playground.activate_addon_item("spawn_pack/stat_only", 0, at, &"bot").ok,
+		"a Dictionary spawn with no spawn_fn is listed but refused")
 
 	for i in PlaygroundAddons.MAX_SCENE_SPAWNS + 2:
 		playground.activate_addon_item("spawn_pack/scene_npc", 0, at, &"bot")

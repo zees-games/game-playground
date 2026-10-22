@@ -250,11 +250,15 @@ func _add_entry(pack: String, entry: Dictionary) -> DotResult:
 	var id := str(entry.get("id", ""))
 	var kind := str(entry.get("kind", ""))
 	var spawn: Variant = entry.get("spawn", "")
+	# `spawn_fn` is the action when `spawn` carries data (an npc's stats Dictionary) for other consumers.
+	var spawn_fn: Variant = entry.get("spawn_fn")
+	if spawn_fn is Callable:
+		spawn = spawn_fn
 
 	if id.is_empty() or kind.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "an entry needs an id and a kind")
 
-	if not spawn is Callable and not spawn is String and not spawn is StringName:
+	if not spawn is Callable and not spawn is String and not spawn is StringName and not spawn is Dictionary:
 		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: spawn is a Callable or a string" % [pack, id])
 
 	var category := str(entry.get("category", ""))
@@ -298,6 +302,9 @@ func _run_entry(item: Item, spawn: Variant, ctx: Context) -> Variant:
 			"kind": item.kind, "cfg_hint": item.cfg_hint, "authoritative": true,
 		})
 		return out if out is DotResult else DotResult.success(item.key())
+
+	if spawn is Dictionary:
+		return DotResult.fail(DotError.CODE_INVALID, "%s has stats but no spawn_fn to run" % item.key())
 
 	var target := String(spawn) if not String(spawn).is_empty() else item.id
 
