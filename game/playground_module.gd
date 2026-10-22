@@ -1175,7 +1175,7 @@ func _bind_profile_edit() -> void:
 			return
 		var res := profile_link.submit(req.value)
 		ctx.reply("ok" if res.ok else "refused: " + res.error.message),
-		"Edit an NPC profile live: " + DotConsoleProfileEdit.USAGE, DotAdminFlags.CVAR)
+		"Edit an NPC or weapon profile live: " + DotConsoleProfileEdit.USAGE, DotAdminFlags.CVAR)
 
 
 ## The server's tick, which is the whole game's.

@@ -496,6 +496,9 @@ func _build_addons() -> void:
 ## A profile edit landed (here, or from the server): new spawns read the new numbers at once; live
 ## NPCs of that profile take them through [method PlaygroundEntity.re_apply].
 func _on_profile_changed(kind: String, id: String, _revision: int) -> void:
+	if kind == DotWeaponProfiles.KIND and addons != null:
+		var _n := addons.reapply_weapons(self, id)
+		return
 	if kind != DotNpcProfiles.KIND or props == null:
 		return
 	profiles.apply_npcs(props.catalogue, id)

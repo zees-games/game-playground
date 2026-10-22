@@ -55,7 +55,7 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 763
+const CHECKS := 769
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -285,6 +285,23 @@ func _test_profiles() -> void:
 	rt.send_to = old_send
 	var seen := late_set.load_profile("npc_chaser")
 	_check(seen.ok and float(seen.value.get_value("speed")) == 12.0 and float(seen.value.get_value("sight")) == 77.0, "a late joiner's snapshot carries both edited values")
+
+	# Pack weapons are one kind behind one runtime layer.
+	var fx := profiles.weapons.add_pack("zz_fixture")
+	fx.roots = fixture
+	var wreq := DotConsoleProfileEdit.parse(PackedStringArray(["set", "weapon", "fx_a", "slot", "4"]))
+	var wdenied := rt.handle_request("uid-player", wreq.value)
+	_check(not wdenied.ok and wdenied.error.code == DotError.CODE_FORBIDDEN, "a non-admin's weapon edit is refused")
+	_check(profiles.weapon_layer().is_empty(), "and the weapon layer stays empty")
+	_check(rt.handle_request("uid-admin", wreq.value).ok, "an admin's weapon edit is accepted")
+	_check(int(profiles.weapon_layer().get("fx_a", {}).get("slot", 0)) == 4, "and lands in the layer the packs rebuild from")
+	var packset := DotWeaponProfiles.make_set("zz_fixture", PlaygroundProfiles.GAME, fixture, profiles.weapon_layer())
+	_check(int(packset.load_profile("fx_a").value.get_value("slot")) == 4, "a pack's own set reads it")
+	rt.handle_request("uid-admin", DotProfileRuntime.make_request("reset", "weapon", "fx_a"))
+	_check(profiles.weapon_layer().is_empty(), "and a reset empties it")
+	fx.roots = PackedStringArray()
+	fx.clear_cache()
+	packset.clear_cache()
 
 	# Put the shared playground back for the sections after this one.
 	rt.handle_request("uid-admin", DotProfileRuntime.make_request("reset", "npc", "npc_chaser"))

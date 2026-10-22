@@ -17,9 +17,10 @@ const TUNED: PackedStringArray = ["health", "speed", "sight", "sight_angle", "he
 
 var roots := PackedStringArray()
 var npcs: DotProfileSet = null
+## Every pack's weapon profiles as the one `weapon` kind; its runtime layer is what the packs rebuild from.
+var weapons: DotWeaponProfileGroup = null
 var runtime: DotProfileRuntime = null
 
-var _packs: Dictionary = {}
 var _snap: Dictionary = {}
 var _clones: PackedStringArray = PackedStringArray()
 
@@ -30,6 +31,8 @@ func setup(p_roots: PackedStringArray = PackedStringArray()) -> void:
 	npcs = DotNpcProfiles.make_set(GAME, roots)
 	runtime = DotProfileRuntime.new()
 	runtime.add_set(npcs)
+	weapons = DotWeaponProfileGroup.make(GAME, roots)
+	runtime.add_set(weapons)
 	runtime.permit = func(actor: Variant, _flag: String) -> bool: return typeof(actor) == TYPE_STRING_NAME and actor == LOCAL_ACTOR
 
 
@@ -39,14 +42,19 @@ func release() -> void:
 		runtime.permit = Callable()
 		runtime.broadcast = Callable()
 		runtime.send_to = Callable()
-	for set: DotProfileSet in _packs.values():
-		set.clear_cache()
-	_packs.clear()
+	if weapons != null:
+		weapons.clear_cache()
+		weapons = null
 	if npcs != null:
 		npcs.clear_cache()
 	runtime = null
 	npcs = null
 	_snap.clear()
+
+
+## The runtime layer (profile id -> {path: value}) the packs rebuild their weapons from.
+func weapon_layer() -> Dictionary:
+	return weapons.runtime if weapons != null else {}
 
 
 ## Applies every NPC profile (or just [param only]) to [param catalogue]. Returns how many entries
@@ -145,10 +153,7 @@ func _apply_npc(catalogue: DotPropCatalogue, id: String, p: DotProfile, entry: D
 ## (cfg/addons/<pack>/weapon, with the game tier over them). Hidden ones are dropped; a row with
 ## no profile stays as it was. Returns the rows, not the same Array.
 func refine_weapon_entries(pack: String, entries: Array) -> Array:
-	var set: DotProfileSet = _packs.get(pack)
-	if set == null:
-		set = DotWeaponProfiles.make_set(pack, GAME, roots)
-		_packs[pack] = set
+	var set := weapons.add_pack(pack)
 	if set.list_ids().is_empty():
 		return entries
 	var menu := {}

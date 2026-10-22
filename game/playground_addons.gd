@@ -383,7 +383,7 @@ func _teach_weapon(pack: String, provider: Variant, entry: Dictionary, host: Nod
 	if weapons.any(func(d: Variant) -> bool: return d.id == game_id):
 		return
 
-	for each: Variant in (provider as Object).call("weapon_defs"):
+	for each: Variant in _defs_of(provider as Object):
 		if not each is DotWeaponDef or String((each as DotWeaponDef).id) != want:
 			continue
 		var pack_def := each as DotWeaponDef
@@ -397,6 +397,37 @@ func _teach_weapon(pack: String, provider: Variant, entry: Dictionary, host: Nod
 		return
 
 	DotLog.warn(CHANNEL, "a weapon row names a weapon its provider's weapon_defs() lacks", {"pack": pack, "weapon": want})
+
+
+## A provider's definitions; over the live profile edits when it offers `weapon_defs_with(layer)`.
+func _defs_of(provider: Object) -> Array:
+	if profiles != null and provider.has_method("weapon_defs_with"):
+		return provider.call("weapon_defs_with", profiles.weapon_layer())
+	return provider.call("weapon_defs")
+
+
+## Rebuilds the taught pack weapons of weapon profile [param profile_id] in place, so a rig that holds
+## one reads the new numbers on its next shot. Returns how many it refreshed.
+func reapply_weapons(host: Node, profile_id: String) -> int:
+	var weapons: Variant = host.get("weapons")
+	if profiles == null or weapons == null:
+		return 0
+	var fresh_by_pack := {}
+	var done := 0
+	for def: Variant in weapons:
+		var pack_def: Variant = def.meta.get("pack_def")
+		var pack := str(def.meta.get("provider", ""))
+		if not pack_def is DotWeaponDef or not _providers.has(pack):
+			continue
+		if profiles.weapons.profile_for(String((pack_def as DotWeaponDef).id)) != profile_id:
+			continue
+		if not fresh_by_pack.has(pack):
+			fresh_by_pack[pack] = _defs_of(_providers[pack] as Object)
+		for fresh: Variant in fresh_by_pack[pack]:
+			if fresh is DotWeaponDef and (fresh as DotWeaponDef).id == (pack_def as DotWeaponDef).id:
+				DotWeaponProfiles.refresh_def(pack_def, fresh)
+				done += 1
+	return done
 
 
 func _spawn_body(item: Item, target: String, ctx: Context) -> DotResult:

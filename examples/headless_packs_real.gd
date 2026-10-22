@@ -4,6 +4,7 @@ const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundPlayer := preload("../game/playground_player.gd")
 const PlaygroundZee := preload("../game/playground_zee.gd")
+const PlaygroundWeaponDef := preload("../game/weapons/playground_weapon_def.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 
@@ -21,13 +22,14 @@ const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
 const MONSTERS: Array[String] = ["trex", "tiger", "bear"]
-const CHECKS := 16
-const SECTIONS := 4
+const CHECKS := 26
+const SECTIONS := 5
 
 var _passed := 0
 var _failed := 0
 var _entered := 0
 var _completed := 0
+var _skipped := 0
 var _game: Playground = null
 var _weapon_rows: Array = []
 var _npc_rows: Array = []
@@ -68,11 +70,12 @@ func _run() -> void:
 	await _test_weapons()
 	await _test_monsters()
 	_test_override()
+	_test_live_edit()
 
 	print("")
 	print("%d sections, %d passed, %d failed" % [_completed, _passed, _failed])
-	if _completed != SECTIONS or _passed + _failed != CHECKS:
-		print("ERROR: %d of %d sections, %d of %d checks ran." % [_completed, SECTIONS, _passed + _failed, CHECKS])
+	if _completed != SECTIONS or _passed + _failed != CHECKS - _skipped:
+		print("ERROR: %d of %d sections, %d of %d checks ran." % [_completed, SECTIONS, _passed + _failed, CHECKS - _skipped])
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -218,6 +221,82 @@ func _test_override() -> void:
 	DirAccess.remove_absolute(med_dir + "/99-test.yml")
 	print("  note  medieval mace damage with a 123 override: %s (%s)" % [med, "honoured" if med == 123.0 else "IGNORED: pack bug"])
 	_done()
+
+
+## An admin's `profile_edit weapon <id> extra.damage N` reaches the next shot of a rig that already holds
+## the weapon, for both packs (one `weapon` kind); a player's is refused; a reset puts it back.
+func _test_live_edit() -> void:
+	_section("an admin's weapon edit changes the next shot")
+	if not (_game.profiles.weapons.has_id("m4") and _game.profiles.weapons.has_id("mace")):
+		print("  SKIP  link cfg/addons/zz_modern_weapons and zz_medieval_weapons (docs/profiles.md): no profile to edit")
+		_skipped = 10
+		_done()
+		return
+	var bot: PlaygroundPlayer = _game.players[&"bot"]
+	var rt := _game.profiles.runtime
+	var old_permit := rt.permit
+	rt.permit = func(actor: Variant, _flag: String) -> bool: return actor == "uid-admin"
+
+	var m4 := _game_def("zz_m4")
+	var rig := PlaygroundZee.arm(bot, m4, ZeeWeaponRig.Role.SERVER, true, 64, 0) if m4 != null else null
+	_check(rig != null, "a rig holds the modern M4")
+	if rig == null:
+		rt.permit = old_permit
+		_done()
+		return
+	var tick := [0]
+	var before := _shot_damage(rig, tick)
+	var req := DotConsoleProfileEdit.parse(PackedStringArray(["set", "weapon", "m4", "extra.damage", "77"]))
+	var denied := rt.handle_request("uid-player", req.value)
+	_check(not denied.ok and denied.error.code == DotError.CODE_FORBIDDEN, "a non-admin's weapon edit is refused")
+	_check(_shot_damage(rig, tick) == before and before > 0.0, "and the next shot is unchanged", str(before))
+	var done := rt.handle_request("uid-admin", req.value)
+	_check(done.ok, "an admin's edit is accepted", "" if done.ok else done.error.message)
+	_check(_shot_damage(rig, tick) == 77.0, "and the next shot does 77")
+
+	var mace := _game_def("mace")
+	var mace_was := (_pack_def(mace).tuning as DotWeaponBallistics).damage
+	var med := DotConsoleProfileEdit.parse(PackedStringArray(["set", "weapon", "mace", "extra.damage", "123"]))
+	_check(rt.handle_request("uid-admin", med.value).ok, "the other pack's weapon edits through the same kind")
+	_check((_pack_def(mace).tuning as DotWeaponBallistics).damage == 123.0 and mace_was != 123.0, "and its definition changed", "%s -> %s" % [mace_was, (_pack_def(mace).tuning as DotWeaponBallistics).damage])
+	_check(_shot_damage(rig, tick) == 77.0, "while the first pack's edit stays")
+
+	rt.handle_request("uid-admin", DotProfileRuntime.make_request("reset", "weapon", "m4"))
+	rt.handle_request("uid-admin", DotProfileRuntime.make_request("reset", "weapon", "mace"))
+	_check(_shot_damage(rig, tick) == before, "a reset puts the shot back")
+	_check((_pack_def(mace).tuning as DotWeaponBallistics).damage == mace_was, "and the other pack's too")
+	PlaygroundZee.disarm(bot)
+	rt.permit = old_permit
+	_done()
+
+
+func _game_def(zee_id: String) -> PlaygroundWeaponDef:
+	for def: PlaygroundWeaponDef in _game.weapons:
+		if String(def.meta.get("zee", "")) == zee_id and def.meta.has("pack_def"):
+			return def
+	return null
+
+
+func _pack_def(def: PlaygroundWeaponDef) -> DotWeaponDef:
+	return def.meta["pack_def"]
+
+
+## Holds the trigger until the rig shoots, and returns that shot's damage; -1 when it never does.
+func _shot_damage(rig: ZeeWeaponRig, tick: Array) -> float:
+	for _i in 600:
+		tick[0] += 1
+		var command := DotWeaponCommand.new()
+		command.set_button(DotWeaponCommand.BUTTON_ATTACK, true)
+		command.slot = rig.current_def().slot
+		var outcome := rig.simulate_tick(command, tick[0])
+		if outcome.used and not outcome.shots.is_empty():
+			var released := DotWeaponCommand.new()
+			released.slot = command.slot
+			for _j in 40:
+				tick[0] += 1
+				var _o := rig.simulate_tick(released, tick[0])
+			return outcome.shots[0].damage
+	return -1.0
 
 
 func _damage(script: GDScript, id: String) -> float:
