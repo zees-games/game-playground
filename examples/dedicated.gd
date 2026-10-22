@@ -47,7 +47,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
 const SECTIONS := 30
-const CHECKS := 280
+const CHECKS := 281
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -549,6 +549,7 @@ func _test_tickrate_reaches_the_timer() -> void:
 	# debugging it will actually look at.
 	var status := _run_command("pg_status")
 	_check(_said(status, "tick rate"), "pg_status reports the tick rate", str(status))
+	_check(_said(_run_command("workbench"), "workbench    off"), "the workbench is off by default and says so")
 	_section_done()
 
 

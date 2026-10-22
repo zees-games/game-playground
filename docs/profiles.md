@@ -22,3 +22,12 @@ For each spawn provider (`pack` = its folder), `DotWeaponProfiles` reads `cfg/ad
 `profile_changed` makes new spawns use the new numbers (the catalogue entry is rewritten) and calls `PlaygroundEntity.re_apply` on live NPCs of that id: perception (`sight`, `sight_angle`, `hearing`) and the copy of `meta` change at once, a spawned NPC keeps its health.
 
 Weapons: `profile_edit set weapon <id> <key> <value>`, where `<id>` is the profile id (`m4`, `mace`) and a pack's own numbers sit under `extra.` (`extra.damage`). Every pack's weapon set is one kind through dot-weapon's `DotWeaponProfileGroup` (`Playground.profiles.weapons`), whose runtime layer is handed to the pack: a provider that offers `weapon_defs_with(layer, types := {})` is rebuilt over it, and on `profile_changed` the game copies the rebuilt definition onto the one rigs already hold (`PlaygroundAddons.reapply_weapons`), so the next shot reads the new damage, rate or spread. A provider without that method keeps its file numbers. Two packs share one id space (the game and server tiers already did): the same id in both is edited together. The weapon needs a profile file, so link a pack's `cfg/` as above to edit it in development.
+
+## The admin workbench (web page and API)
+
+dot-workbench's `DotWorkbenchHttp` edits the same `Playground.profiles.runtime` over HTTP; `game/playground_workbench.gd` wires it into the server module. It is **off unless** `cfg/server.yml` has a `workbench:` block with `enabled: true` (`bind` defaults to loopback, `port` 8790, `token_file` is a path, never a value; see dot-workbench `docs/design.md`). Link it for development with `ln -s ../../dot-workbench/addons/dot_workbench addons/dot_workbench` (gitignored).
+
+- The module builds it after the console's permit is set, so a bearer token acts as the workbench token actor (`cvar` and `root`) and every other actor goes through the same admin-flag check `profile_edit` uses. An edit reaches the next shot exactly as a console edit does.
+- The module polls it from `_process` and stops it on unload. `workbench` (admin `cvar`) prints its state, from `describe()`.
+- An export that ships the page needs `*.html` in its include filter (this repository keeps no `export_presets.cfg`).
+- Checked by `headless_packs_real` ("the workbench edits a weapon over HTTP": list, authorised set, 401, 429, next shot) and `dedicated` (off by default).

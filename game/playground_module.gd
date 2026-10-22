@@ -57,6 +57,8 @@ var game: Playground = null
 var net: DotNetManager = null
 ## Carries admins' profile edits up and the edited values down. Null if the types would not register.
 var profile_link: DotNetProfileLink = null
+## The admin web page and API over the same profiles; closed unless `workbench.enabled` in cfg/server.yml.
+var workbench := preload("playground_workbench.gd").new()
 var bridge: PlaygroundNetBridge = null
 
 ## Chat, moderation and voice. Built here rather than in the game, because they are about
@@ -549,6 +551,7 @@ func _on_profile(event: DotEvent) -> void:
 
 
 func _module_unload() -> void:
+	workbench.stop()
 	if _handles_cover and server != null:
 		var env: Object = server.get(&"envelope")
 
@@ -1161,6 +1164,11 @@ func _bind_profile_edit() -> void:
 			and server.admins.uid_has_permission(actor, flag)
 	rt.actor_name = func(actor: Variant) -> String:
 		return String(actor) if actor is StringName else str(actor)
+	var wb := workbench.start(game.profiles, DotWorkbenchHttp.read_config())
+	if not wb.ok:
+		DotLog.result(CHANNEL, "the workbench", wb)
+	add_command("workbench", func(ctx: DotCmdContext) -> void: ctx.reply_lines(workbench.describe_lines()),
+		"Show the admin workbench's state", DotAdminFlags.CVAR)
 	profile_link = DotNetProfileLink.attach(net, rt)
 	if profile_link == null:
 		return
@@ -1183,6 +1191,10 @@ func _bind_profile_edit() -> void:
 ## Driven from here rather than by the game's own loop, because it has to happen between
 ## dot-net applying the inputs that arrived and building the snapshot that goes back out.
 ## `Playground.external_tick` is what stands the game's loop down.
+func _process(_delta: float) -> void:
+	workbench.poll()
+
+
 func _physics_process(_delta: float) -> void:
 	if not loaded or bridge == null:
 		return

@@ -3,10 +3,12 @@ extends Node
 const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundPlayer := preload("../game/playground_player.gd")
+const PlaygroundProfiles := preload("../game/playground_profiles.gd")
 const PlaygroundZee := preload("../game/playground_zee.gd")
 const PlaygroundWeaponDef := preload("../game/weapons/playground_weapon_def.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
+const PlaygroundWorkbench := preload("../game/playground_workbench.gd")
 
 ## The three real optional packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters) in
 ## the Q menu, not the fixture the main suite uses.
@@ -22,8 +24,8 @@ const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
 const MONSTERS: Array[String] = ["trex", "tiger", "bear"]
-const CHECKS := 26
-const SECTIONS := 5
+const CHECKS := 34
+const SECTIONS := 6
 
 var _passed := 0
 var _failed := 0
@@ -71,6 +73,7 @@ func _run() -> void:
 	await _test_monsters()
 	_test_override()
 	_test_live_edit()
+	await _test_workbench()
 
 	print("")
 	print("%d sections, %d passed, %d failed" % [_completed, _passed, _failed])
@@ -229,7 +232,7 @@ func _test_live_edit() -> void:
 	_section("an admin's weapon edit changes the next shot")
 	if not (_game.profiles.weapons.has_id("m4") and _game.profiles.weapons.has_id("mace")):
 		print("  SKIP  link cfg/addons/zz_modern_weapons and zz_medieval_weapons (docs/profiles.md): no profile to edit")
-		_skipped = 10
+		_skipped += 10
 		_done()
 		return
 	var bot: PlaygroundPlayer = _game.players[&"bot"]
@@ -268,6 +271,87 @@ func _test_live_edit() -> void:
 	PlaygroundZee.disarm(bot)
 	rt.permit = old_permit
 	_done()
+
+
+## The workbench over real HTTP on an ephemeral loopback port: a token edits a weapon and the next shot uses it.
+func _test_workbench() -> void:
+	_section("the workbench edits a weapon over HTTP")
+	var off := PlaygroundWorkbench.new()
+	_check(off.start(_game.profiles, {}).ok and not off.running, "off by default: nothing listens")
+	if not _game.profiles.weapons.has_id("m4"):
+		print("  SKIP  link cfg/addons/zz_modern_weapons (docs/profiles.md): no profile to edit")
+		_skipped += 7
+		_done()
+		return
+	var dir := "user://wb_real_test"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var tf := FileAccess.open(dir + "/workbench.token", FileAccess.WRITE)
+	tf.store_string("wb-s3cret\n")
+	tf.close()
+	var wb := PlaygroundWorkbench.new()
+	var res := wb.start(_game.profiles, {"enabled": true, "port": 0, "token_file": dir + "/workbench.token"})
+	_check(res.ok and wb.running, "enabled with a token file listens", "" if res.ok else res.error.message)
+	var bot: PlaygroundPlayer = _game.players[&"bot"]
+	var m4 := _game_def("zz_m4")
+	var rig := PlaygroundZee.arm(bot, m4, ZeeWeaponRig.Role.SERVER, true, 64, 0) if m4 != null else null
+	if not res.ok or rig == null:
+		_check(false, "a rig holds the M4 and the server runs")
+		wb.stop()
+		_done()
+		return
+	var tick := [0]
+	var before := _shot_damage(rig, tick)
+	var listed := _http(wb, "GET", "/api/profiles/weapon", "wb-s3cret")
+	_check(listed["status"] == 200 and "m4" in listed["text"], "an authorised list shows the weapon profiles", str(listed["status"]))
+	var denied_actor := _game.profiles.runtime.handle_request("uid-player", DotConsoleProfileEdit.parse(PackedStringArray(["set", "weapon", "m4", "extra.damage", "5"])).value)
+	_check(not denied_actor.ok, "the game's own permit still refuses a player")
+	var body := JSON.stringify({"op": "set", "kind": "weapon", "id": "m4", "key": "extra.damage", "value": 88})
+	var set := _http(wb, "POST", "/api", "wb-s3cret", body)
+	_check(set["status"] == 200 and set["json"].get("ok", false), "an authorised set is accepted", str(set["text"]))
+	var after := _shot_damage(rig, tick)
+	_check(after == 88.0 and before != 88.0, "and the next shot does 88", "%s -> %s" % [before, after])
+	var none := _http(wb, "POST", "/api", "", body)
+	_check(none["status"] == 401, "no token is 401", str(none["status"]))
+	for _i in 4:
+		var _bad := _http(wb, "POST", "/api", "wrong", body)
+	var locked := _http(wb, "POST", "/api", "wrong", body)
+	_check(locked["status"] == 429, "repeated bad tokens are 429", str(locked["status"]))
+	_game.profiles.runtime.handle_request(PlaygroundProfiles.LOCAL_ACTOR, DotProfileRuntime.make_request("reset", "weapon", "m4"))
+	PlaygroundZee.disarm(bot)
+	wb.stop()
+	DirAccess.remove_absolute(dir + "/workbench.token")
+	DirAccess.remove_absolute(dir)
+	_done()
+
+
+func _http(wb: PlaygroundWorkbench, method: String, path: String, token: String, body: String = "") -> Dictionary:
+	var head := "%s %s HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n" % [method, path, body.to_utf8_buffer().size()]
+	if token != "":
+		head += "Authorization: Bearer %s\r\n" % token
+	var c := StreamPeerTCP.new()
+	c.connect_to_host("127.0.0.1", wb.http.server.port())
+	var out := PackedByteArray()
+	var sent := false
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 3000:
+		c.poll()
+		if not sent and c.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			c.put_data((head + "\r\n" + body).to_utf8_buffer())
+			sent = true
+		wb.poll()
+		c.poll()
+		if c.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			var n := c.get_available_bytes()
+			if n > 0:
+				out.append_array(c.get_data(n)[1])
+		elif sent:
+			break
+		OS.delay_msec(1)
+	var text := out.get_string_from_utf8()
+	var i := text.find("\r\n\r\n")
+	var payload := text.substr(i + 4) if i >= 0 else ""
+	var parsed: Variant = JSON.parse_string(payload) if payload.begins_with("{") else null
+	return {"status": int(text.split(" ")[1]) if text.length() > 12 else -1, "json": parsed if parsed is Dictionary else {}, "text": payload}
 
 
 func _game_def(zee_id: String) -> PlaygroundWeaponDef:
