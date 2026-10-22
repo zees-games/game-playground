@@ -5,7 +5,7 @@ extends RefCounted
 ## Profiles add to or override the built-in catalogue, never replace it: an NPC profile named
 ## like a catalogue entry changes the keys it states; a new id needs `extra.base: <entry id>`
 ## to clone. A pack weapon's `menu:` (category, sort, hidden) reshapes that pack's rows.
-## Tiers: `cfg/addons/<addon>/<kind>/`, `cfg/game/game-playground/<kind>/`, `cfg/server/<kind>/`.
+## Tiers: `cfg/addons/<addon>/<kind>/`, `cfg/game/game-playground/<kind>/`, `cfg/server/addons/<addon>/<kind>/`, `cfg/server/game/game-playground/<kind>/`.
 
 const CHANNEL := "pg.profiles"
 ## The game key of the profile game tier (the repository name).
