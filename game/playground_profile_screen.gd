@@ -1,6 +1,7 @@
 extends DotScreen
 
 const PlaygroundProfiles := preload("playground_profiles.gd")
+const Readout := preload("playground_profile_readout.gd")
 
 ## The admin workbench in the game: NPC and weapon profiles edited live while the server runs.
 ##
@@ -57,6 +58,9 @@ var _title: Label = null
 var _sub: Label = null
 var _chips: HBoxContainer = null
 var _status: Label = null
+var _readout: Label = null
+var _last_weapon := ""
+var _last_npc := ""
 var _target_btn: Button = null
 var _reset_btn: Button = null
 var _save_btn: Button = null
@@ -200,6 +204,10 @@ func _build_main() -> void:
 	_status.clip_text = true
 	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	line.add_child(_status)
+
+	_readout = Label.new()
+	_readout.theme_type_variation = &"FormCaption"
+	col.add_child(_readout)
 
 	_form_slot = Control.new()
 	_form_slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -518,6 +526,27 @@ func _refresh_chips() -> void:
 			_title.text = str(e["label"])
 	_reset_btn.disabled = edited == 0
 	_save_btn.disabled = edited == 0
+	_refresh_readout()
+
+
+## DPS of the weapon last opened against the health of the NPC last opened, both as live as the form.
+func _refresh_readout() -> void:
+	if _readout == null:
+		return
+	if _kind == "weapon":
+		_last_weapon = _id
+	elif _kind == "npc":
+		_last_npc = _id
+	if _last_weapon == "":
+		_readout.text = "Open a weapon to see DPS and time to kill against %s." % (_last_npc if _last_npc != "" else "a reference target")
+		return
+	var health := Readout.FALLBACK_HEALTH
+	var target := "reference target"
+	if _last_npc != "":
+		health = float(_read(profiles.npcs, _last_npc, true).get("health", health))
+		target = _last_npc
+	var stats := Readout.weapon_stats(_read(profiles.weapons, _last_weapon, true), float(Engine.physics_ticks_per_second))
+	_readout.text = "%s:  %s" % [_last_weapon, Readout.line(stats, health, target)]
 
 
 func _chip(text: String, color: Color, solid: bool) -> Control:

@@ -40,4 +40,5 @@ dot-workbench's `DotWorkbenchHttp` edits the same `Playground.profiles.runtime` 
 - The form follows `profile_changed`, so another admin's edit shows here; the refresh waits while the mouse is held or edits are pending, so a slider drag is not fought.
 - Admin gating: there is no "am I an admin" message, so the client probes once per connection with a harmless `reset_key` on an empty id. An answer starting "profile edits need" means a player (the entry is hidden and a notice shown), anything else an admin. The probe costs one WARN line on the server per non-admin who presses F6.
 - `docs/workbench_npc.png` and `docs/workbench_weapon.png` are rendered by `tools/render_workbench.sh` (xvfb, 1280x720).
-- Checked by `headless_playground` ("the profile workbench edits live through requests").
+- A readout line under the card gives DPS (burst, and sustained with reloads) of the weapon last opened and the shots and seconds to kill the NPC last opened (100 hp until one is opened). `game/playground_profile_readout.gd` computes it from the flattened rows (`extra.damage` times `extra.pellets` or `extra.splash_damage`, `extra.rpm` or `use_interval_ticks`, `magazine`, `extra.reload_seconds` or `reload_ticks`), so it follows live edits.
+- Checked by `headless_playground` ("the profile workbench edits live through requests", DPS and TTK arithmetic included).

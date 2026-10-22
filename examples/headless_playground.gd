@@ -5,6 +5,7 @@ const Playground := preload("../game/playground.gd")
 const PlaygroundBrowser := preload("../game/client/playground_browser.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundProfileScreen := preload("../game/playground_profile_screen.gd")
+const PlaygroundReadout := preload("../game/playground_profile_readout.gd")
 const PlaygroundNetBridge := preload("../game/net/playground_net_bridge.gd")
 const PlaygroundGeometry := preload("../game/playground_geometry.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
@@ -57,7 +58,7 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 769 + 21
+const CHECKS := 775 + 21
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -384,6 +385,16 @@ func _test_profile_workbench() -> void:
 		_check(screen.form != null and screen.current_kind() == "weapon", "a weapon opens in the same form")
 	else:
 		_check(true, "no weapon profiles are loaded here, so none to open")
+
+	var m4 := {"extra.damage": 29.0, "extra.rpm": 800.0, "extra.reload_seconds": 2.1, "magazine": 30}
+	var st := PlaygroundReadout.weapon_stats(m4, 64.0)
+	_check(is_equal_approx(float(st["burst_dps"]), 29.0 * 800.0 / 60.0), "burst DPS is damage times rounds per second", str(st))
+	_check(float(st["sustained_dps"]) < float(st["burst_dps"]), "reloading lowers sustained DPS")
+	var kill := PlaygroundReadout.ttk(st, 100.0)
+	_check(int(kill["shots"]) == 4 and is_equal_approx(float(kill["seconds"]), 3.0 * 60.0 / 800.0), "100 hp takes 4 shots, 3 intervals", str(kill))
+	_check(float(PlaygroundReadout.ttk(st, 1000.0)["seconds"]) > 34.0 * 60.0 / 800.0 + 2.0, "a kill longer than a magazine pays the reload")
+	_check(PlaygroundReadout.weapon_stats({}, 64.0).is_empty(), "a weapon with no damage has no readout")
+	_check(screen._readout != null and screen._readout.text != "", "the workbench card carries a readout line")
 
 	stack.pop(&"profiles")
 	_check(not stack.is_open(&"profiles"), "it closes")
