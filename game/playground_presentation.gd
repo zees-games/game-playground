@@ -2,6 +2,7 @@ extends Node
 
 const PlaygroundBindings := preload("playground_bindings.gd")
 const PlaygroundPaths := preload("playground_paths.gd")
+const PlaygroundProfiles := preload("playground_profiles.gd")
 
 const PlaygroundServices := preload("playground_services.gd")
 const PlaygroundVote := preload("playground_vote.gd")
@@ -53,6 +54,8 @@ var ambience: DotAudioAmbience = null
 var fx: DotFxManager = null
 ## The player's console, built by [method build_console] once the client has a menu.
 var console: DotConsoleController = null
+#
+var profile_link: DotNetProfileLink = null
 var console_panel: DotConsolePanel = null
 
 ## The physics guns' beams while they are drawn, by whose (0 is this client's own offline
@@ -747,8 +750,30 @@ func adopt_console(built: DotConsoleController) -> void:
 	console.add_source(_local_commands())
 	for s in server_sources:
 		console.add_source(s)
+	bind_profile_replies()
 
 	console_panel = console.get_parent().get_node_or_null(^"ConsoleLayer/ConsolePanel") as DotConsolePanel
+
+
+## Shows the server's answers to `profile_edit` in the console, once both the link and the console exist.
+func bind_profile_replies() -> void:
+	if console != null and profile_link != null and not profile_link.reply.is_connected(_on_profile_reply):
+		profile_link.reply.connect(_on_profile_reply)
+
+
+func _on_profile_reply(ok: bool, text: String) -> void:
+	if console != null:
+		console.print_line(text if ok else "profile_edit refused: " + text)
+
+
+func _profile_submit(req: Dictionary) -> DotResult:
+	if profile_link != null:
+		return profile_link.submit(req)
+	var game: Object = client.get("playground") if client != null else null
+	var profiles: Object = game.get("profiles") if game != null else null
+	if profiles == null:
+		return DotResult.fail(DotError.CODE_STATE, "no profiles here")
+	return profiles.runtime.handle_request(PlaygroundProfiles.LOCAL_ACTOR, req)
 
 
 ## This game's own commands; the kit has `help`, `clear`, `settings` and every setting.
@@ -764,6 +789,7 @@ func _local_commands() -> DotConsoleLocal:
 		# most-requested feature every generated world gets.
 		return rng.describe_lines()
 	)
+	DotConsoleProfileEdit.register(local, _profile_submit)
 	return local
 
 

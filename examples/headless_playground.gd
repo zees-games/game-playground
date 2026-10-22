@@ -14,6 +14,7 @@ const PlaygroundBuilds := preload("../game/playground_builds.gd")
 const PlaygroundPlayer := preload("../game/playground_player.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundProp := preload("../game/playground_prop.gd")
+const PlaygroundProfiles := preload("../game/playground_profiles.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundVehicle := preload("../game/playground_vehicle.gd")
@@ -54,13 +55,13 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 739
+const CHECKS := 763
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 38
+const SECTIONS := 39
 
 ## What `_test_the_run_timer` and `_test_leaderboards` add when dot-timer is linked.
 const TIMER_SECTIONS := 2
@@ -136,6 +137,7 @@ func _run() -> void:
 	await _test_props_are_built_from_their_definitions()
 	await _test_model_props()
 	await _test_entities_run_their_scripts()
+	await _test_profiles()
 	await _test_weapons()
 	await _test_zee_weapons()
 	await _test_limits_per_kind()
@@ -193,6 +195,106 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+## The Q menu's NPCs and pack weapons come from profiles, a game profile overrides an entry, and an
+## admin's edit reaches the next spawn, a live NPC and a late joiner; a player's is refused.
+func _test_profiles() -> void:
+	_section("profiles drive the menu and edit live")
+
+	var fixture := PackedStringArray(["res://examples/fixtures/profiles"])
+	var profiles: PlaygroundProfiles = playground.profiles
+	_check(profiles != null and profiles.runtime != null, "the playground builds its profiles and runtime")
+	if profiles == null:
+		return
+
+	# The menu, derived: a scratch catalogue so nothing leaks into the sections after.
+	var scratch := PlaygroundProfiles.new()
+	scratch.setup(fixture)
+	var cat: DotPropCatalogue = playground._prop_catalogue()
+	var before := cat.props.size()
+	var touched := scratch.apply_npcs(cat)
+	_check(touched == 3, "three npc profiles touch the catalogue", str(touched))
+	var chaser := cat.get_prop(&"npc_chaser")
+	_check(chaser.display_name == "Fast Chaser", "a game-tier profile renames the entry it names")
+	_check(float(chaser.meta["speed"]) == 9.0, "and changes the key it states")
+	_check(float(chaser.meta["sight"]) == 40.0, "while a key it does not state keeps the catalogue's value")
+	_check(chaser.category == &"pursuers", "menu.category regroups it")
+	_check(bool(cat.get_prop(&"npc_hopper").meta.get("hidden", false)), "menu.hidden hides an entry")
+	var mini := cat.get_prop(&"mini_hunter")
+	_check(mini != null and cat.props.size() == before + 1, "a new id with extra.base adds an entry")
+	_check(
+		mini != null and PlaygroundSpawnables.script_of(mini) == PlaygroundSpawnables.script_of(cat.get_prop(&"npc_hunter")),
+		"cloned from its base's script"
+	)
+	_check(cat.get_prop(&"npc_soldier") != null and float(cat.get_prop(&"npc_soldier").meta["health"]) == 100.0, "entries without a profile are unchanged")
+
+	var menu := PlaygroundSpawnMenu.new()
+	menu.catalogue = cat
+	add_child(menu)
+	var names: Array = menu._catalogue_defs(PlaygroundSpawnables.Kind.ENTITY).map(func(d: DotPropDef) -> String: return String(d.id))
+	menu.free()
+	_check(names.slice(0, 2) == ["mini_hunter", "npc_chaser"], "menu.sort orders the entities", str(names.slice(0, 3)))
+	_check(not names.has("npc_hopper"), "and the hidden one is not listed")
+
+	var rows := [{"id": "zz_fx_a", "category": "Weapons"}, {"id": "zz_fx_b", "category": "Weapons"}, {"id": "zz_fx_c", "category": "Weapons"}, {"id": "plain", "category": "Weapons"}]
+	var refined := scratch.refine_weapon_entries("zz_fixture", rows)
+	_check(refined.map(func(r: Dictionary) -> String: return r["id"]) == ["zz_fx_b", "plain", "zz_fx_a"], "pack weapon rows are sorted by menu.sort and the hidden one dropped")
+	_check(refined[0]["category"] == "Heavy" and refined[1]["category"] == "Weapons", "and regrouped by menu.category")
+	scratch.release()
+
+	# Live editing, through the playground's own runtime and the console command's request.
+	profiles.npcs.roots = fixture
+	profiles.npcs.clear_cache()
+	profiles.apply_npcs(playground.props.catalogue)
+	var rt := profiles.runtime
+	var old_permit := rt.permit
+	rt.permit = func(actor: Variant, _flag: String) -> bool: return actor == "uid-admin"
+
+	playground.props.limits.spawn_interval = 0.0
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	var live := playground.props.spawn(&"npc_chaser", &"bot", Vector3(0.0, 1.2, 0.0))
+	var live_body := live.node as PlaygroundEntity if live != null else null
+	_check(live_body != null and live_body.tune(&"speed", 0.0) == 9.0, "a spawn reads the profile's speed")
+
+	var req := DotConsoleProfileEdit.parse(PackedStringArray(["set", "npc", "npc_chaser", "speed", "12"]))
+	var denied := rt.handle_request("uid-player", req.value)
+	_check(not denied.ok and denied.error.code == DotError.CODE_FORBIDDEN, "a non-admin's edit is refused")
+	_check(float(playground.props.catalogue.get_prop(&"npc_chaser").meta["speed"]) == 9.0, "and changes nothing")
+
+	var done := rt.handle_request("uid-admin", req.value)
+	_check(done.ok, "an admin's profile_edit is accepted", "" if done.ok else done.error.message)
+	var next := playground.props.spawn(&"npc_chaser", &"bot", Vector3(3.0, 1.2, 0.0))
+	var next_body := next.node as PlaygroundEntity if next != null else null
+	_check(next_body != null and next_body.tune(&"speed", 0.0) == 12.0, "the next spawn has the edited speed")
+
+	var sight := DotConsoleProfileEdit.parse(PackedStringArray(["set", "npc", "npc_chaser", "sight", "77"]))
+	_check(rt.handle_request("uid-admin", sight.value).ok, "a second edit applies")
+	_check(live_body != null and live_body.npc.def.sight_range == 77.0, "and re_apply gives the live NPC the new perception")
+	var bad := DotConsoleProfileEdit.parse(PackedStringArray(["set", "npc", "npc_chaser", "health", "-5"]))
+	_check(not rt.handle_request("uid-admin", bad.value).ok, "an out-of-range edit is refused by the schema")
+
+	# A late joiner: the snapshot, through the link's own encoding.
+	var late := DotProfileRuntime.new()
+	var late_set := DotNpcProfiles.make_set(PlaygroundProfiles.GAME, fixture)
+	late.add_set(late_set)
+	var old_send := rt.send_to
+	rt.send_to = func(_peer: Variant, row: Dictionary) -> void:
+		late.apply_row(DotNetProfileLink.decode_body(DotNetProfileLink.encode_body(row)).value)
+	rt.send_snapshot(7)
+	rt.send_to = old_send
+	var seen := late_set.load_profile("npc_chaser")
+	_check(seen.ok and float(seen.value.get_value("speed")) == 12.0 and float(seen.value.get_value("sight")) == 77.0, "a late joiner's snapshot carries both edited values")
+
+	# Put the shared playground back for the sections after this one.
+	rt.handle_request("uid-admin", DotProfileRuntime.make_request("reset", "npc", "npc_chaser"))
+	rt.permit = old_permit
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	profiles.npcs.roots = PackedStringArray()
+	profiles.npcs.clear_cache()
+	profiles.apply_npcs(playground.props.catalogue)
+	_check(float(playground.props.catalogue.get_prop(&"npc_chaser").meta["speed"]) == 5.0, "with the file gone the entry returns to the catalogue's own")
+	_done()
 
 
 ## The first-person camera's motion, through the client's own `PlaygroundPlayer.present_camera`

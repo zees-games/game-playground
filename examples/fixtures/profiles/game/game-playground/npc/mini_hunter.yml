@@ -1,0 +1,7 @@
+name: Mini Hunter
+health: 40
+extra:
+  base: npc_hunter
+menu:
+  category: pursuers
+  sort: -9

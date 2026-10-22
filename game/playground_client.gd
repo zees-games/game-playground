@@ -538,6 +538,14 @@ func _build_netcode() -> DotResult:
 	if not attached.ok:
 		return attached
 
+	# A restarted server counts revisions from 0 again, so forget the old ones first.
+	var link_up := DotNetProfileLink.attach(net, playground.profiles.runtime)
+	if link_up != null:
+		playground.profiles.runtime.begin_sync()
+		if presentation != null:
+			presentation.profile_link = link_up
+			presentation.bind_profile_replies()
+
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -2850,5 +2858,8 @@ func _present_zee() -> Vector2:
 
 
 func _exit_tree() -> void:
+	if presentation != null and presentation.profile_link != null:
+		presentation.profile_link.release()
+		presentation.profile_link = null
 	# A static outlives the game: the next one the shell loads must not look for its art here.
 	PlaygroundZee.release_art()

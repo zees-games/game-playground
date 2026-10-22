@@ -1123,12 +1123,13 @@ func _all_in_tab() -> Array:
 	if catalogue == null:
 		return []
 
-	var wanted := (
-		PlaygroundSpawnables.Kind.ENTITY
-		if _tab == Tab.ENTITIES
-		else PlaygroundSpawnables.Kind.PROP
+	return _catalogue_defs(
+		PlaygroundSpawnables.Kind.ENTITY if _tab == Tab.ENTITIES else PlaygroundSpawnables.Kind.PROP
 	)
 
+
+## The catalogue's definitions of one kind that belong on a tab, in menu order.
+func _catalogue_defs(wanted: PlaygroundSpawnables.Kind) -> Array:
 	var out: Array = []
 
 	for def in catalogue.props:
@@ -1139,6 +1140,15 @@ func _all_in_tab() -> Array:
 			and not def.meta.has("pack")
 		):
 			out.append(def)
+
+	# A profile's `menu: sort`; the catalogue's own order breaks ties.
+	var at := {}
+	for i in out.size():
+		at[out[i]] = i
+	out.sort_custom(func(a: DotPropDef, b: DotPropDef) -> bool:
+		var sa := int(a.meta.get("menu_sort", 0))
+		var sb := int(b.meta.get("menu_sort", 0))
+		return sa < sb or (sa == sb and at[a] < at[b]))
 
 	return out
 

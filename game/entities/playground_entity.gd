@@ -106,6 +106,17 @@ func _make_npc() -> DotNpcInstance:
 	return row
 
 
+## Re-reads the perception numbers from `def.meta` after a profile edit. Health and speed are read
+## from `meta` by each brain as it runs; a spawned NPC keeps the health it has.
+func re_apply() -> void:
+	if npc == null or npc.def == null:
+		return
+	npc.def.sight_range = tune(&"sight", npc.def.sight_range)
+	npc.def.sight_half_angle_deg = tune(&"sight_angle", npc.def.sight_half_angle_deg)
+	npc.def.hearing_range = tune(&"hearing", npc.def.hearing_range)
+	npc.def.meta = def.meta.duplicate(true) if def != null else {}
+
+
 ## One simulated tick. Called by [Playground], at the game's tick rate.
 func entity_tick(delta: float) -> void:
 	age += delta

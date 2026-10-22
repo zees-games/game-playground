@@ -118,6 +118,8 @@ var _hooks: Dictionary = {}
 var _skipped: PackedStringArray = PackedStringArray()
 ## pack -> the provider object, kept alive; and who -> the scene NPCs it spawned.
 var _providers: Dictionary = {}
+## Set by the game before the scan: reshapes a provider's weapon rows by its profiles.
+var profiles: Object = null
 var _scene_spawns: Dictionary = {}
 
 
@@ -245,6 +247,9 @@ func register_provider(pack: String, provider: Variant, host: Node = null) -> Do
 		return DotResult.fail(DotError.CODE_INVALID, "%s.%s() did not return an Array" % [pack, PROVIDER_ENTRIES])
 
 	var added := 0
+
+	if profiles != null:
+		entries = profiles.refine_weapon_entries(pack, entries as Array)
 
 	for entry: Variant in (entries as Array).slice(0, MAX_ENTRIES_PER_PROVIDER):
 		if not entry is Dictionary:

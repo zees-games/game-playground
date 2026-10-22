@@ -24,6 +24,7 @@ const PlaygroundWeapons := preload("playground_weapons.gd")
 const ToolPhysprop := preload("toolgun/tool_physprop.gd")
 const PlaygroundMaterials := preload("playground_materials.gd")
 const PlaygroundAddons := preload("playground_addons.gd")
+const PlaygroundProfiles := preload("playground_profiles.gd")
 
 ## The playground: a sandbox on a flat grass plate, with props you can spawn and a
 ## physics gun to move them with. Any map a server adds plays here too, surf and bunny-hop
@@ -152,6 +153,11 @@ var authoritative: bool = true
 ## chosen entry runs. Built in [method _ready] after the world exists. See
 ## [PlaygroundAddons].
 var addons: PlaygroundAddons = null
+
+## The NPC and pack-weapon menu derived from profiles, and their live edit. See [PlaygroundProfiles].
+var profiles: PlaygroundProfiles = null
+## Replaces the profile config roots (tests); empty uses `res://cfg`, `user://cfg` and `--config`.
+var profile_roots := PackedStringArray()
 
 ## An addon's callback has something every client must be told; the net bridge sends it.
 signal addon_message(addon: String, body: Dictionary)
@@ -477,9 +483,25 @@ func _build_addons() -> void:
 	addons.message.connect(func(addon: String, body: Dictionary) -> void:
 		addon_message.emit(addon, body)
 	)
+	profiles = PlaygroundProfiles.new()
+	profiles.setup(profile_roots)
+	profiles.apply_npcs(props.catalogue)
+	profiles.runtime.profile_changed.connect(_on_profile_changed)
+	addons.profiles = profiles
 	var count := addons.scan(self, authoritative)
 	var providers := addons.scan_providers(self)
 	DotLog.info(CHANNEL, "addons folder scanned", {"hooks": count, "providers": providers, "plain": addons.skipped().size()})
+
+
+## A profile edit landed (here, or from the server): new spawns read the new numbers at once; live
+## NPCs of that profile take them through [method PlaygroundEntity.re_apply].
+func _on_profile_changed(kind: String, id: String, _revision: int) -> void:
+	if kind != DotNpcProfiles.KIND or props == null:
+		return
+	profiles.apply_npcs(props.catalogue, id)
+	for entity in entities:
+		if is_instance_valid(entity) and entity.def != null and String(entity.def.id) == id:
+			entity.re_apply()
 
 
 ## Runs a menu entry an addon registered, as [param player_id] looking at [param at].
@@ -3356,6 +3378,8 @@ func _exit_tree() -> void:
 	DotRegistry.unregister_instance(DotRegistry.scoped_name(SERVICE, service_scope), self)
 	if addons != null:
 		addons.release()
+	if profiles != null:
+		profiles.release()
 
 
 ## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at

@@ -3,6 +3,7 @@ extends DotModule
 const PlaygroundPaths := preload("playground_paths.gd")
 
 const Playground := preload("playground.gd")
+const PlaygroundProfiles := preload("playground_profiles.gd")
 const PlaygroundArena := preload("playground_arena.gd")
 const PlaygroundDowns := preload("playground_downs.gd")
 const PlaygroundModTools := preload("playground_mod_tools.gd")
@@ -54,6 +55,8 @@ var game: Playground = null
 ## what a dedicated server loads and unloads, so the netcode goes away with the game
 ## rather than outliving it.
 var net: DotNetManager = null
+## Carries admins' profile edits up and the edited values down. Null if the types would not register.
+var profile_link: DotNetProfileLink = null
 var bridge: PlaygroundNetBridge = null
 
 ## Chat, moderation and voice. Built here rather than in the game, because they are about
@@ -1136,6 +1139,7 @@ func _build_netcode() -> DotResult:
 	# A bag belongs to the person, and dot-server's userid is a new number every time
 	# somebody connects. See `_bag_key_for`.
 	bridge.inventory_key_fn = _bag_key_for
+	_bind_profile_edit()
 
 	net.messages.seal()
 	# [b]A client whose game messages cannot work with this server's is dropped, in words.[/b]
@@ -1144,6 +1148,34 @@ func _build_netcode() -> DotResult:
 	# The same line DotGameNetcode.refuse_peer is for games built on dot-game.
 	net.peer_schema_refused.connect(_refuse_peer)
 	return net.start()
+
+
+## Admins edit profiles live: the permission is dot-server's admin flags by account uid, the server
+## console edits as the process itself. Before the types seal.
+func _bind_profile_edit() -> void:
+	var rt := game.profiles.runtime
+	rt.permit = func(actor: Variant, flag: String) -> bool:
+		if typeof(actor) == TYPE_STRING_NAME and actor == PlaygroundProfiles.LOCAL_ACTOR:
+			return true
+		return server != null and server.admins != null and actor is String \
+			and server.admins.uid_has_permission(actor, flag)
+	rt.actor_name = func(actor: Variant) -> String:
+		return String(actor) if actor is StringName else str(actor)
+	profile_link = DotNetProfileLink.attach(net, rt)
+	if profile_link == null:
+		return
+	profile_link.local_actor = PlaygroundProfiles.LOCAL_ACTOR
+	profile_link.actor_of = func(peer: int) -> Variant:
+		var session := server.session_of(peer) if server != null else null
+		return session.uid() if session != null else ""
+	add_command("profile_edit", func(ctx: DotCmdContext) -> void:
+		var req := DotConsoleProfileEdit.parse(ctx.args)
+		if not req.ok:
+			ctx.reply(req.error.message)
+			return
+		var res := profile_link.submit(req.value)
+		ctx.reply("ok" if res.ok else "refused: " + res.error.message),
+		"Edit an NPC profile live: " + DotConsoleProfileEdit.USAGE, DotAdminFlags.CVAR)
 
 
 ## The server's tick, which is the whole game's.
@@ -1255,6 +1287,8 @@ func _on_peer_admitted(peer_id: int) -> void:
 	var session := server.session_of(peer_id) if server != null else null
 	if session == null or not _joined.has(session.userid):
 		return
+	if profile_link != null:
+		profile_link.peer_joined(peer_id)
 	_welcome(session)
 
 

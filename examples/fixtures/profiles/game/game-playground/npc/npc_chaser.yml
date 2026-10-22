@@ -1,0 +1,5 @@
+name: Fast Chaser
+speed: 9.0
+menu:
+  category: pursuers
+  sort: -5
