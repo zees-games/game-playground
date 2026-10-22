@@ -119,6 +119,8 @@ func playground_receive(msg: Dictionary) -> void: ...   # optional: a client's h
 
 `addons/pg_natural_disasters/playground_hook.gd` is the adapter for natural-disasters (which knows nothing of the playground): one entry per registered kind, started where the player looks. It loads the manager by path, so a checkout without `addons/natural_disasters` (an optional symlink) simply has no entries. Not yet: a late joiner is not told about a disaster already running (the addon offers `snapshot()`; the hook does not send it).
 
+A pack that offers weapons, NPCs or bots rather than actions ships `spawn_provider.gd` instead: see [spawn-providers.md](spawn-providers.md).
+
 ## NPC tools
 
 Two tool-gun modes and two entities, all inside this repository.

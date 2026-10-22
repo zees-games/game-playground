@@ -478,11 +478,14 @@ func _build_addons() -> void:
 		addon_message.emit(addon, body)
 	)
 	var count := addons.scan(self, authoritative)
-	DotLog.info(CHANNEL, "addons folder scanned", {"hooks": count, "plain": addons.skipped().size()})
+	var providers := addons.scan_providers(self)
+	DotLog.info(CHANNEL, "addons folder scanned", {"hooks": count, "providers": providers, "plain": addons.skipped().size()})
 
 
 ## Runs a menu entry an addon registered, as [param player_id] looking at [param at].
-func activate_addon_item(key: String, player_id: int = 0, at: Vector3 = Vector3.ZERO) -> DotResult:
+func activate_addon_item(
+	key: String, player_id: int = 0, at: Vector3 = Vector3.ZERO, who: StringName = &""
+) -> DotResult:
 	if addons == null:
 		return DotResult.fail(DotError.CODE_STATE, "the addons are not built yet")
 
@@ -494,6 +497,8 @@ func activate_addon_item(key: String, player_id: int = 0, at: Vector3 = Vector3.
 	ctx.world = world
 	ctx.player_id = player_id
 	ctx.at = at
+	ctx.game = self
+	ctx.who = who
 	return addons.activate(key, ctx)
 
 

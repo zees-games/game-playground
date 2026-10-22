@@ -2491,7 +2491,7 @@ func _on_addon_item_chosen(key: String) -> void:
 	if bridge != null:
 		bridge.ask_addon_item(key, at)
 	else:
-		var started := playground.activate_addon_item(key, 0, at)
+		var started := playground.activate_addon_item(key, 0, at, player_id)
 		DotLog.result(CHANNEL, "starting an addon item", started)
 
 

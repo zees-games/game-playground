@@ -1491,7 +1491,7 @@ func _on_request(message: DotNetMessage) -> void:
 					var at := Vector3.ZERO
 					if looked is Array and (looked as Array).size() == 3:
 						at = Vector3(float(looked[0]), float(looked[1]), float(looked[2]))
-					var started := game.activate_addon_item(String(arm["id"]), session_id, at)
+					var started := game.activate_addon_item(String(arm["id"]), session_id, at, id)
 					DotLog.result(CHANNEL, "an addon item was asked for", started)
 					if not started.ok:
 						_tell(peer_id, PlaygroundEvents.Kind.NOTICE,

@@ -27,6 +27,18 @@ const HOOK_FILE := "playground_hook.gd"
 const REGISTER := "playground_register"
 const RECEIVE := "playground_receive"
 
+## The spawn provider contract: `res://addons/<pack>/spawn_provider.gd`, or any object registered
+## in [DotRegistry] under a name starting with [constant REGISTRY_PREFIX]. See docs/spawn-providers.md.
+const PROVIDER_FILE := "spawn_provider.gd"
+const PROVIDER_ENTRIES := "spawn_entries"
+const REGISTRY_PREFIX := "playground.spawn_provider"
+
+## Provider-made scene NPCs one player may have alive at once. A catalogue prop is limited by the
+## prop spawner; a scene path is not in the catalogue, so this is its only limit.
+const MAX_SCENE_SPAWNS := 16
+const MAX_ENTRIES_PER_PROVIDER := 256
+const MAX_COUNT := 8
+
 ## The most one message may carry once encoded, matched by the event's field.
 const MESSAGE_BYTES := 900
 
@@ -39,6 +51,10 @@ class Item:
 	var category: String = ""
 	var hint: String = ""
 	var callback: Callable = Callable()
+	## Set only on a spawn provider's entries: "weapon", "npc", "bot", ... and the optional icon path.
+	var kind: String = ""
+	var icon: String = ""
+	var cfg_hint: Dictionary = {}
 
 	func key() -> String:
 		return "%s/%s" % [addon, id]
@@ -55,6 +71,11 @@ class Context:
 	var player_id: int = 0
 	## Where they are looking, or the world origin when unknown.
 	var at: Vector3 = Vector3.ZERO
+	## The simulation (a [Playground]), for provider entries that give or spawn through it. Typed
+	## [Object] because this file is preloaded by Playground itself.
+	var game: Object = null
+	## The player's id in the simulation, where [member player_id] is the network session.
+	var who: StringName = &""
 	var _sender: Callable = Callable()
 
 	## Tells every client, as a dictionary. The hook's `playground_receive` gets it there.
@@ -93,6 +114,9 @@ signal message(addon: String, body: Dictionary)
 var _items: Array[Item] = []
 var _hooks: Dictionary = {}
 var _skipped: PackedStringArray = PackedStringArray()
+## pack -> the provider object, kept alive; and who -> the scene NPCs it spawned.
+var _providers: Dictionary = {}
+var _scene_spawns: Dictionary = {}
 
 
 ## Finds and loads every hook under [param root] (a `res://addons`-shaped directory) and
@@ -148,6 +172,211 @@ func load_hook(host: Node, authoritative: bool, addon: String, path: String) -> 
 	return DotResult.success(addon)
 
 
+## Finds every spawn provider: `spawn_provider.gd` under each directory of [param root] and every
+## object in [DotRegistry] named `playground.spawn_provider*`. Returns how many provided entries.
+## A pack with neither is not an error: the menu simply has nothing from it.
+func scan_providers(host: Node, root: String = "res://addons") -> int:
+	var found := 0
+
+	for dir_name in DirAccess.get_directories_at(root):
+		var path := "%s/%s/%s" % [root, dir_name, PROVIDER_FILE]
+
+		if not FileAccess.file_exists(path) and not ResourceLoader.exists(path):
+			continue
+
+		var script: Variant = load(path)
+
+		if not script is GDScript or not (script as GDScript).can_instantiate():
+			DotLog.warn(CHANNEL, "a spawn provider does not compile", {"path": path})
+			continue
+
+		var provider: Variant = (script as GDScript).new()
+
+		if register_provider(dir_name, provider, host).ok:
+			found += 1
+
+	for reg_name in DotRegistry.names():
+		if not String(reg_name).begins_with(REGISTRY_PREFIX):
+			continue
+
+		var pack := String(reg_name).trim_prefix(REGISTRY_PREFIX).trim_prefix(".")
+		pack = pack if not pack.is_empty() else "registry"
+
+		if _providers.has(pack):
+			continue
+
+		if register_provider(pack, DotRegistry.get_service(reg_name), host).ok:
+			found += 1
+
+	return found
+
+
+## Takes one provider (duck-typed: it only needs `spawn_entries()`) and adds its entries. A bad
+## entry is skipped and logged; the rest of the pack still shows.
+func register_provider(pack: String, provider: Variant, host: Node = null) -> DotResult:
+	if not provider is Object or not (provider as Object).has_method(PROVIDER_ENTRIES):
+		if provider is Node:
+			(provider as Node).free()
+
+		return DotResult.fail(DotError.CODE_INVALID, "%s has no %s()" % [pack, PROVIDER_ENTRIES])
+
+	if provider is Node and host != null and (provider as Node).get_parent() == null:
+		(provider as Node).name = "Provider_%s" % pack
+		host.add_child(provider as Node)
+
+	var entries: Variant = (provider as Object).call(PROVIDER_ENTRIES)
+
+	if not entries is Array:
+		return DotResult.fail(DotError.CODE_INVALID, "%s.%s() did not return an Array" % [pack, PROVIDER_ENTRIES])
+
+	var added := 0
+
+	for entry: Variant in (entries as Array).slice(0, MAX_ENTRIES_PER_PROVIDER):
+		if not entry is Dictionary:
+			continue
+
+		var made := _add_entry(pack, entry as Dictionary)
+
+		if made.ok:
+			added += 1
+		else:
+			DotLog.warn(CHANNEL, "a spawn entry was refused", {"pack": pack, "why": made.error.message})
+
+	_providers[pack] = provider
+	return DotResult.success(added)
+
+
+func _add_entry(pack: String, entry: Dictionary) -> DotResult:
+	var id := str(entry.get("id", ""))
+	var kind := str(entry.get("kind", ""))
+	var spawn: Variant = entry.get("spawn", "")
+
+	if id.is_empty() or kind.is_empty():
+		return DotResult.fail(DotError.CODE_INVALID, "an entry needs an id and a kind")
+
+	if not spawn is Callable and not spawn is String and not spawn is StringName:
+		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: spawn is a Callable or a string" % [pack, id])
+
+	var category := str(entry.get("category", ""))
+	var hint: Variant = entry.get("cfg_hint", {})
+	var item_ref: Array = []
+	var made := _add(
+		pack, id, str(entry.get("name", "")),
+		func(ctx: Context) -> Variant: return _run_entry(item_ref[0], spawn, ctx),
+		category if not category.is_empty() else kind.capitalize() + "s", ""
+	)
+
+	if not made.ok:
+		return made
+
+	var item: Item = made.value
+	item_ref.append(item)
+	item.kind = kind
+	item.icon = str(entry.get("icon", ""))
+	item.cfg_hint = (hint as Dictionary) if hint is Dictionary else {}
+	item.hint = "%s - %s from %s%s" % [
+		item.label, kind, pack, "" if item.cfg_hint.is_empty() else "\n" + str(item.cfg_hint)
+	]
+	return made
+
+
+## Runs one provider entry on the authority. A Callable spawn is called with a context dictionary;
+## a string spawns by [param item]'s kind through the game's own paths, so limits, charging and
+## entitlement checks are the game's, not the pack's.
+func _run_entry(item: Item, spawn: Variant, ctx: Context) -> Variant:
+	var game := ctx.game
+
+	if not ctx.authoritative or game == null:
+		return DotResult.fail(DotError.CODE_STATE, "only the authority gives or spawns")
+
+	if ctx.who == &"" or not (game.get("players") as Dictionary).has(ctx.who):
+		return DotResult.fail(DotError.CODE_STATE, "no such player")
+
+	if spawn is Callable:
+		var out: Variant = (spawn as Callable).call({
+			"game": game, "world": ctx.world, "player_id": ctx.who, "at": ctx.at,
+			"kind": item.kind, "cfg_hint": item.cfg_hint, "authoritative": true,
+		})
+		return out if out is DotResult else DotResult.success(item.key())
+
+	var target := String(spawn) if not String(spawn).is_empty() else item.id
+
+	if item.kind == "weapon":
+		if game.call("weapon_def", StringName(target)) == null:
+			return DotResult.fail(DotError.CODE_INVALID, "the weapon catalogue has no %s" % target)
+
+		# The same event a pickup raises: on a server the bridge charges and arms it, offline the
+		# client equips it. Not a second way to hold a weapon.
+		game.call("pick_up_weapon", ctx.who, StringName(target))
+		return DotResult.success(item.key())
+
+	if item.kind == "npc" or item.kind == "bot":
+		return _spawn_body(item, target, ctx)
+
+	return DotResult.fail(DotError.CODE_INVALID, "kind %s needs a Callable spawn" % item.kind)
+
+
+func _spawn_body(item: Item, target: String, ctx: Context) -> DotResult:
+	var game := ctx.game
+	var count := clampi(int(item.cfg_hint.get("count", 1)), 1, MAX_COUNT)
+	var weapon := StringName(str(item.cfg_hint.get("weapon", "")))
+	var spawned := 0
+	var catalogue: Object = (game.get("props") as Object).get("catalogue")
+
+	for i in count:
+		var angle := TAU * float(i) / float(count)
+		var at := ctx.at + Vector3.UP + (Vector3(cos(angle), 0.0, sin(angle)) * 1.2 if count > 1 else Vector3.ZERO)
+		var body: Node = null
+
+		if catalogue != null and catalogue.call("get_prop", StringName(target)) != null:
+			# Through the prop spawner: the NPC limit, the cost budget and creative mode apply.
+			var prop: Variant = (game.get("props") as Object).call("spawn", StringName(target), ctx.who, at)
+			body = prop.node if prop != null else null
+		elif target.begins_with("res://") and (target.ends_with(".tscn") or target.ends_with(".scn")):
+			body = _spawn_scene(target, ctx, at)
+
+		if body == null:
+			break
+
+		spawned += 1
+
+		if weapon != &"" and body.has_method("arm_with"):
+			body.call("arm_with", weapon)
+
+	if spawned == 0:
+		return DotResult.fail(DotError.CODE_QUOTA, "%s could not be spawned (limit, or no such NPC)" % item.label)
+
+	return DotResult.success(spawned)
+
+
+func _spawn_scene(path: String, ctx: Context, at: Vector3) -> Node:
+	var alive: Array = _scene_spawns.get(ctx.who, [])
+	alive = alive.filter(func(n: Variant) -> bool: return is_instance_valid(n))
+	_scene_spawns[ctx.who] = alive
+
+	if alive.size() >= MAX_SCENE_SPAWNS or ctx.world == null:
+		return null
+
+	var scene: Variant = load(path)
+
+	if not scene is PackedScene:
+		return null
+
+	var node: Node = (scene as PackedScene).instantiate()
+	node.set_meta(&"spawn_provider_owner", ctx.who)
+	ctx.world.add_child(node)
+
+	if node is Node3D:
+		(node as Node3D).global_position = at
+
+	alive.append(node)
+	return node
+
+
+func provider_count() -> int:
+	return _providers.size()
+
+
 func _add(
 	addon: String, id: String, label: String, callback: Callable, category: String, hint: String
 ) -> DotResult:
@@ -196,6 +425,7 @@ func describe_items() -> Array[Dictionary]:
 	for item in _items:
 		out.append({
 			"key": item.key(), "label": item.label, "category": item.category, "hint": item.hint,
+			"kind": item.kind, "icon": item.icon,
 		})
 
 	return out

@@ -134,6 +134,10 @@ pg_limits u3                 // what player u3 is using against their limits
 ### Adding the run timer
 The game does not ship a run timer. A server that wants timed courses adds [dot-timer](https://github.com/modcommunity/dot-timer): put its `addons/dot_timer` folder in the project (a link or a copy), run `godot --headless --path . --import` once, and start the server. The playground's own `addons/pg_timer` notices it and turns timing on: zones from a map's zone file, records and leaderboards, `pg_timer`, `pg_track`, `pg_top`, `pg_cp`, `pg_tp` and `pg_cp_clear`, and the T and checkpoint keys. Details in [docs/timer.md](docs/timer.md).
 
+### Spawn providers
+
+An optional pack can add weapons, NPCs and bots to the Q menu by shipping `addons/<pack>/spawn_provider.gd` with `spawn_entries() -> Array[Dictionary]` (`category`, `id`, `name`, `icon`, `kind`, `spawn`, `cfg_hint`). It is found at start, the server gives and spawns through the game's own limits, and with no pack installed nothing changes. Contract: [docs/spawn-providers.md](docs/spawn-providers.md).
+
 ### Admin commands
 These come from [dot-moderation](https://github.com/modcommunity/dot-moderation): `!noclip`, `!freeze`, `!slay`, `!bring` and the rest. `blind <player>` blacks out that player's screen, and `beacon <player>` puts a ring and a ping on them for everybody to see.
 

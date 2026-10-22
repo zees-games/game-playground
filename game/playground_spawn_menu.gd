@@ -622,7 +622,10 @@ func _rebuild_categories() -> void:
 	for category_name in _categories_for_tab():
 		var id := StringName(category_name)
 		_add_category(
-			id, "%s (%d)" % [category_name.capitalize(), _count_in_category(id)]
+			# A pack names its own categories ("NPCs"), which capitalize() would break into "Np Cs".
+			id, "%s (%d)" % [
+				category_name if _tab == Tab.ADDONS else category_name.capitalize(), _count_in_category(id)
+			]
 		)
 
 
@@ -852,7 +855,11 @@ func _build_card(entry: Dictionary) -> Button:
 ## One entry an addon registered. The tooltip is the addon's own hint.
 func _addon_card(entry: Dictionary) -> Button:
 	var key := str(entry.get("key", ""))
-	var card := _card(null, str(entry.get("label", key)), str(entry.get("hint", "")))
+	var icon_path := str(entry.get("icon", ""))
+	var icon: Texture2D = null
+	if icon_path != "" and ResourceLoader.exists(icon_path):
+		icon = load(icon_path) as Texture2D
+	var card := _card(icon, str(entry.get("label", key)), str(entry.get("hint", "")))
 	card.pressed.connect(func() -> void: addon_item_chosen.emit(key))
 	card.set_meta(&"entry", StringName(key))
 	return card

@@ -6,6 +6,7 @@ The detail behind [CLAUDE.md](../CLAUDE.md). One subject per file; open the one 
 | --- | --- |
 | [simulation.md](simulation.md) | touching the tick loop, the player, styles, `post_move_fn`, teleports and spawns, the movement tunables, the tick rate, or the module and its console commands |
 | [sandbox.md](sandbox.md) | touching props, entities and NPC perception, armed NPCs, weapons and zee-dot-weapons, projectiles, the Q menu and its icons, the tools, the tool gun, limits, machines, breaking, picking players up, creative mode, prop surfing, or saved builds |
+| [spawn-providers.md](spawn-providers.md) | a pack that should add weapons, NPCs or bots to the Q menu: the `spawn_provider.gd` contract |
 | [maps.md](maps.md) | changing a map, the zone export, the survey, custom map documents and their props, materials, liquids and panes, or `pg_generated` |
 | [timer.md](timer.md) | the run timer: why it does not ship, how a server adds dot-timer, what `addons/pg_timer` does and what it dropped |
 | [vehicles.md](vehicles.md) | touching vehicles, seats, the circuit, or what a driver feels over the wire |

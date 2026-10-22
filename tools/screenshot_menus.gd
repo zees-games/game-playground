@@ -124,6 +124,14 @@ func _initialize() -> void:
 			{"key": "pg_natural_disasters/blizzard", "label": "Blizzard", "category": "Disasters", "hint": ""},
 			{"key": "pg_natural_disasters/wind", "label": "Wind", "category": "Disasters", "hint": ""},
 		]},
+		# The Addons tab as a spawn provider fills it: weapons, NPCs and bots grouped by category.
+		{"id": &"spawn_menu", "file": "menu_spawn_provider.png", "tab": PlaygroundSpawnMenu.Tab.ADDONS, "addons": [
+			{"key": "demo_pack/rifle", "label": "Rifle", "category": "Weapons", "hint": "Rifle - weapon from demo_pack", "kind": "weapon"},
+			{"key": "demo_pack/pistol", "label": "Pistol", "category": "Weapons", "hint": "", "kind": "weapon"},
+			{"key": "demo_pack/guard", "label": "Guard", "category": "NPCs", "hint": "", "kind": "npc"},
+			{"key": "demo_pack/patrol", "label": "Patrol x4", "category": "NPCs", "hint": "", "kind": "npc"},
+			{"key": "demo_pack/sparring_bot", "label": "Sparring bot", "category": "Bots", "hint": "", "kind": "bot"},
+		]},
 		{"id": &"spawn_menu", "file": "menu_tools_waypoint.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"waypoint"},
 		{"id": &"spawn_menu", "file": "menu_tools_npc.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"npc_spawn"},
 		{"id": &"game_menu", "file": "menu_general.png", "page": &"general"},
@@ -193,6 +201,7 @@ func _process(_delta: float) -> bool:
 			if shot.has("builds"):
 				_menu.builds = shot["builds"]
 			_menu.show_tab(shot["tab"])
+			_menu.refresh()
 			if shot.has("category"):
 				_menu.set("_category", shot["category"])
 			# The grid too: two frames on one tab do not change tab, and the card picked for

@@ -54,13 +54,13 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 714
+const CHECKS := 728
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 37
+const SECTIONS := 38
 
 ## What `_test_the_run_timer` and `_test_leaderboards` add when dot-timer is linked.
 const TIMER_SECTIONS := 2
@@ -142,6 +142,7 @@ func _run() -> void:
 	await _test_the_tool_gun()
 	await _test_armed_npcs()
 	await _test_addon_hook_and_npc_tools()
+	await _test_spawn_providers()
 	await _test_grenades()
 	await _test_spawn_menu()
 	await _test_workshop()
@@ -2639,6 +2640,91 @@ func playground_receive(msg: Dictionary) -> void:
 
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	DirAccess.remove_absolute("%s/fake_with_hook/playground_hook.gd" % root)
+	_done()
+
+
+## Spawn providers: a pack's `spawn_provider.gd` fills the Addons tab; server-side gives and spawns.
+func _test_spawn_providers() -> void:
+	_section("spawn providers")
+	await _sandbox_floor()
+	var fixtures := "res://examples/fixtures"
+	var pack_script: GDScript = load(fixtures + "/spawn_pack/spawn_provider.gd")
+	pack_script.set("weapon_id", String(playground.weapons[0].id))
+	pack_script.set("custom_calls", [])
+
+	# No pack installed: nothing found, nothing breaks.
+	var none := PlaygroundAddons.new()
+	_check(none.scan_providers(playground, "res://examples/fixtures/spawn_pack_none") == 0
+		and none.items().is_empty(), "with no provider anywhere the menu is simply empty")
+
+	var addons := PlaygroundAddons.new()
+	var found := addons.scan_providers(playground, fixtures)
+	_check(found == 1 and addons.provider_count() == 1,
+		"one valid provider is found, the one without spawn_entries is refused", str(found))
+	_check(addons.items().size() == 5, "bad entries (no id, bad spawn, not a dictionary) are skipped",
+		str(addons.items().size()))
+	var rows := addons.describe_items()
+	var cats := {}
+	for row in rows:
+		cats[row["category"]] = true
+	_check(cats.has("Weapons") and cats.has("NPCs") and cats.has("Bots"),
+		"the menu rows carry the pack's categories", str(cats.keys()))
+	_check(addons.find("spawn_pack/test_guard").kind == "npc", "and the kind")
+
+	# Registry discovery.
+	var reg: Object = pack_script.new()
+	DotRegistry.register(&"playground.spawn_provider.reg_pack", reg)
+	var via := PlaygroundAddons.new()
+	via.scan_providers(playground, fixtures + "/spawn_pack_none")
+	DotRegistry.unregister(&"playground.spawn_provider.reg_pack")
+	_check(via.find("reg_pack/test_gun") != null, "a provider registered in DotRegistry is found too")
+
+	# Activation: server-authoritative.
+	var bot: PlaygroundPlayer = playground.players[&"bot"]
+	var at := bot.global_position + Vector3(0, 0, -6)
+	playground.addons = addons
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	var picked: Array = []
+	var on_pick := func(who: StringName, w: StringName) -> void: picked.append([who, w])
+	playground.weapon_picked_up.connect(on_pick)
+	var gave := playground.activate_addon_item("spawn_pack/test_gun", 0, at, &"bot")
+	_check(gave.ok and picked.size() == 1 and picked[0][1] == playground.weapons[0].id,
+		"a weapon entry goes through the pickup path (the bridge charges and arms it)")
+	_check(not playground.activate_addon_item("spawn_pack/unknown_gun", 0, at, &"bot").ok,
+		"a weapon the catalogue does not know is refused")
+	_check(not playground.activate_addon_item("spawn_pack/test_gun", 0, at, &"nobody").ok
+		and picked.size() == 1, "an unknown player is refused")
+	playground.weapon_picked_up.disconnect(on_pick)
+
+	var guards := playground.activate_addon_item("spawn_pack/test_guard", 0, at, &"bot")
+	var soldiers := 0
+	for prop in playground.props.all_props():
+		if prop.def != null and String(prop.def.id) == "npc_soldier":
+			soldiers += 1
+	_check(guards.ok and soldiers == 2, "an npc entry spawns through the prop spawner, count 2", str(soldiers))
+
+	var called := playground.activate_addon_item("spawn_pack/test_bot", 0, at, &"bot")
+	var calls: Array = pack_script.get("custom_calls")
+	_check(called.ok and calls.size() == 1 and calls[0]["kind"] == "bot" and calls[0]["player_id"] == &"bot",
+		"a Callable entry is called with the context dictionary")
+
+	for i in PlaygroundAddons.MAX_SCENE_SPAWNS + 2:
+		playground.activate_addon_item("spawn_pack/scene_npc", 0, at, &"bot")
+	var scene_made := 0
+	for child in playground.world.get_children():
+		if child.has_meta(&"spawn_provider_owner"):
+			scene_made += 1
+	_check(scene_made == PlaygroundAddons.MAX_SCENE_SPAWNS, "scene spawns are capped per player", str(scene_made))
+	for child in playground.world.get_children():
+		if child.has_meta(&"spawn_provider_owner"):
+			child.free()
+
+	var client_side := playground.authoritative
+	playground.authoritative = false
+	_check(not playground.activate_addon_item("spawn_pack/test_guard", 0, at, &"bot").ok,
+		"a client never runs an entry")
+	playground.authoritative = client_side
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	_done()
 
 
