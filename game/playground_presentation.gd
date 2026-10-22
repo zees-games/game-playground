@@ -56,6 +56,8 @@ var fx: DotFxManager = null
 var console: DotConsoleController = null
 #
 var profile_link: DotNetProfileLink = null
+## True while the profile workbench or its admin probe owns the link's answers (no console lines).
+var mute_profile_replies := false
 var console_panel: DotConsolePanel = null
 
 ## The physics guns' beams while they are drawn, by whose (0 is this client's own offline
@@ -762,11 +764,11 @@ func bind_profile_replies() -> void:
 
 
 func _on_profile_reply(ok: bool, text: String) -> void:
-	if console != null:
+	if console != null and not mute_profile_replies:
 		console.print_line(text if ok else "profile_edit refused: " + text)
 
 
-func _profile_submit(req: Dictionary) -> DotResult:
+func profile_submit(req: Dictionary) -> DotResult:
 	if profile_link != null:
 		return profile_link.submit(req)
 	var game: Object = client.get("playground") if client != null else null
@@ -789,7 +791,7 @@ func _local_commands() -> DotConsoleLocal:
 		# most-requested feature every generated world gets.
 		return rng.describe_lines()
 	)
-	DotConsoleProfileEdit.register(local, _profile_submit)
+	DotConsoleProfileEdit.register(local, profile_submit)
 	return local
 
 

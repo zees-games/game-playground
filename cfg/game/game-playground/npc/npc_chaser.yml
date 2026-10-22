@@ -1,0 +1,6 @@
+name: Chaser
+cost: 4
+speed: 5.0
+sight: 40.0
+sight_angle: 150.0
+hearing: 14.0

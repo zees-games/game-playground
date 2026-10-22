@@ -1,0 +1,6 @@
+name: Hopper
+cost: 2
+speed: 2.5
+extra:
+  hop: 4.5
+  turn_seconds: 1.2

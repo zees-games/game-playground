@@ -1,0 +1,8 @@
+name: Hunter
+cost: 6
+speed: 5.4
+sight: 45.0
+sight_angle: 140.0
+hearing: 16.0
+extra:
+  give_up_seconds: 3.0

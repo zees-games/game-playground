@@ -11,6 +11,7 @@ const PlaygroundPlayer := preload("playground_player.gd")
 const PlaygroundPresentation := preload("playground_presentation.gd")
 const PlaygroundIcons := preload("playground_icons.gd")
 const PlaygroundServices := preload("playground_services.gd")
+const PlaygroundProfileScreen := preload("playground_profile_screen.gd")
 const PlaygroundSpawnMenu := preload("playground_spawn_menu.gd")
 const PlaygroundVoice := preload("client/playground_voice.gd")
 const PlaygroundWeapon := preload("weapons/playground_weapon.gd")
@@ -146,6 +147,11 @@ var menu: PlaygroundSpawnMenu = null
 
 ## The server list, on the same stack as the spawn menu.
 var browser: PlaygroundBrowser = null
+
+## The admin workbench (F6): live NPC and weapon profile edits. Only an admin is let in.
+var profile_screen: PlaygroundProfileScreen = null
+var _profile_admin := false
+var _profile_probing := false
 
 ## Settings, randomness, audio, effects and the console.
 var presentation: PlaygroundPresentation = null
@@ -542,6 +548,9 @@ func _build_netcode() -> DotResult:
 	var link_up := DotNetProfileLink.attach(net, playground.profiles.runtime)
 	if link_up != null:
 		playground.profiles.runtime.begin_sync()
+		link_up.reply.connect(_on_profile_reply)
+		_profile_admin = false
+		_sync_profiles_entry()
 		if presentation != null:
 			presentation.profile_link = link_up
 			presentation.bind_profile_replies()
@@ -1096,6 +1105,17 @@ func _build_screens() -> void:
 		CHANNEL, "registering the server browser", screens.register(browser)
 	)
 
+	profile_screen = PlaygroundProfileScreen.new()
+	profile_screen.name = "ProfileWorkbench"
+	profile_screen.profiles = playground.profiles
+	profile_screen.submit = func(req: Dictionary) -> DotResult:
+		return presentation.profile_submit(req) if presentation != null \
+			else DotResult.fail(DotError.CODE_STATE, "no presentation")
+	profile_screen.target_requested.connect(_on_profile_target)
+	profile_screen.pushed.connect(func() -> void: _mute_profile_replies(true))
+	profile_screen.popped.connect(func() -> void: _mute_profile_replies(false))
+	DotLog.result(CHANNEL, "registering the profile workbench", screens.register(profile_screen))
+
 	_build_pause()
 
 
@@ -1165,6 +1185,7 @@ func _build_pause() -> void:
 	_follow_hud()
 	game_menu.screen.actions.insert(0, {"id": &"servers", "text": "Servers"})
 	game_menu.screen.restyle(game_menu.kit)
+	_sync_profiles_entry()
 
 	# M: the maps (dot-menu's map menu, on the table's MAP row). Solo a choice changes the map
 	# here at once; connected the server decides, by the owner's `sv_map_menu_flag`, and
@@ -1243,6 +1264,9 @@ func _on_menu_action_chosen(id: StringName) -> void:
 		&"servers":
 			game_menu.close()
 			screens.push(&"servers")
+		&"profiles":
+			game_menu.close()
+			_open_profiles()
 		&"leave":
 			# Closed first, so a host with nowhere to send the player is not left showing a
 			# menu over a game that carried on behind it.
@@ -1578,6 +1602,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_menu_key(key)
 		return
 
+	if key.is_action(PlaygroundBindings.PROFILES):
+		if key.pressed and not key.is_echo():
+			_toggle_profiles()
+		return
+
 	# The Tab board, held: shown while the key is down, released when it comes up.
 	if key.is_action(PlaygroundBindings.SCOREBOARD) and not key.is_echo():
 		if game_menu != null:
@@ -1678,7 +1707,8 @@ func key_for(action: StringName) -> String:
 
 ## The spawn-menu key (Q) is the one key that still means something while the menu is open.
 func _is_menu_key(event: InputEvent) -> bool:
-	return event is InputEventKey and event.is_action(PlaygroundBindings.SPAWN_MENU)
+	return event is InputEventKey and (event.is_action(PlaygroundBindings.SPAWN_MENU) \
+		or (event.is_action(PlaygroundBindings.PROFILES) and screens != null and screens.is_open(&"profiles")))
 
 
 func _on_mouse_motion(event: InputEventMouseMotion) -> void:
@@ -1822,6 +1852,115 @@ func _on_menu_key(key: InputEventKey) -> void:
 		return
 
 	_menu_pinned = true
+
+
+# --- The profile workbench -------------------------------------------------
+
+## Offline this process is the server, so it is an admin; connected, the server decides and
+## the answer to [method _probe_profile_admin] is remembered for the connection.
+func _may_edit_profiles() -> bool:
+	return bridge == null or _profile_admin
+
+
+func _toggle_profiles() -> void:
+	if screens == null or profile_screen == null:
+		return
+	if screens.is_open(&"profiles"):
+		screens.pop(&"profiles")
+	elif not _menu_is_open():
+		_open_profiles()
+
+
+func _open_profiles() -> void:
+	if not _may_edit_profiles():
+		_probe_profile_admin()
+		return
+	if screens == null:
+		return
+	_primary_up()
+	_secondary_up()
+	_rotating = false
+	var _pushed := screens.push(&"profiles")
+
+
+## The server answers a harmless request by who asked: an unknown profile for an admin, "needs
+## cvar" for anybody else. There is no "am I an admin" message, and this is the cheapest honest one.
+func _probe_profile_admin() -> void:
+	var link: DotNetProfileLink = presentation.profile_link if presentation != null else null
+	if link == null:
+		if hud != null:
+			hud.notice("Profile editing is not available on this server.")
+		return
+	if _profile_probing:
+		return
+	_profile_probing = true
+	_mute_profile_replies(true)
+	var sent := link.submit(DotProfileRuntime.make_request("reset_key", "npc", "", ""))
+	if not sent.ok:
+		_profile_probing = false
+		_mute_profile_replies(false)
+
+
+func _on_profile_reply(ok: bool, text: String) -> void:
+	if not _profile_probing:
+		if profile_screen != null:
+			profile_screen.on_reply(ok, text)
+		return
+	_profile_probing = false
+	_profile_admin = not text.begins_with("profile edits need")
+	_mute_profile_replies(screens != null and screens.is_open(&"profiles"))
+	if _profile_admin:
+		_sync_profiles_entry()
+		_open_profiles()
+	elif hud != null:
+		hud.notice("Editing profiles needs the server's cvar admin flag.")
+
+
+func _mute_profile_replies(on: bool) -> void:
+	if presentation != null:
+		presentation.mute_profile_replies = on
+
+
+## The Escape menu's entry, there only for somebody who may use it.
+func _sync_profiles_entry() -> void:
+	if game_menu == null or game_menu.screen == null:
+		return
+	var actions: Array = game_menu.screen.actions
+	var at := -1
+	for i in actions.size():
+		if (actions[i] as Dictionary).get("id") == &"profiles":
+			at = i
+	if _may_edit_profiles() and at < 0:
+		actions.insert(1, {"id": &"profiles", "text": "Profile workbench"})
+	elif not _may_edit_profiles() and at >= 0:
+		actions.remove_at(at)
+	else:
+		return
+	game_menu.screen.restyle(game_menu.kit)
+
+
+## The workbench's test-target buttons, through the paths the Q menu uses.
+func _on_profile_target(kind: String, id: String) -> void:
+	var rows: Array = playground.addons.describe_items() if playground.addons != null else []
+	if kind == "npc":
+		if playground.props.catalogue.get_prop(StringName(id)) != null:
+			_on_prop_chosen(StringName(id))
+			return
+		for r: Dictionary in rows:
+			if str(r.get("kind")) in ["npc", "bot"] and str(r.get("key")).ends_with("/" + id):
+				_on_addon_item_chosen(str(r["key"]))
+				return
+		return
+	if playground.weapon_def(StringName(id)) != null:
+		_on_weapon_chosen(StringName(id))
+		return
+	var best := ""
+	for r: Dictionary in rows:
+		var key := str(r.get("key"))
+		if str(r.get("kind")) == "weapon" and key.get_slice("/", 1).ends_with(id) and (best == "" or key.length() < best.length()):
+			best = key
+	if best != "":
+		_on_addon_item_chosen(best)
 
 
 ## Wall-clock seconds. Presentation only — nothing here is timed, compared or ranked,

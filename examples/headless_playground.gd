@@ -4,6 +4,8 @@ const PlaygroundBindings := preload("../game/playground_bindings.gd")
 const Playground := preload("../game/playground.gd")
 const PlaygroundBrowser := preload("../game/client/playground_browser.gd")
 const PlaygroundClient := preload("../game/playground_client.gd")
+const PlaygroundProfileScreen := preload("../game/playground_profile_screen.gd")
+const PlaygroundNetBridge := preload("../game/net/playground_net_bridge.gd")
 const PlaygroundGeometry := preload("../game/playground_geometry.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundEntity := preload("../game/entities/playground_entity.gd")
@@ -55,13 +57,13 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 769
+const CHECKS := 769 + 21
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 39
+const SECTIONS := 40
 
 ## What `_test_the_run_timer` and `_test_leaderboards` add when dot-timer is linked.
 const TIMER_SECTIONS := 2
@@ -138,6 +140,7 @@ func _run() -> void:
 	await _test_model_props()
 	await _test_entities_run_their_scripts()
 	await _test_profiles()
+	await _test_profile_workbench()
 	await _test_weapons()
 	await _test_zee_weapons()
 	await _test_limits_per_kind()
@@ -311,6 +314,101 @@ func _test_profiles() -> void:
 	profiles.npcs.clear_cache()
 	profiles.apply_npcs(playground.props.catalogue)
 	_check(float(playground.props.catalogue.get_prop(&"npc_chaser").meta["speed"]) == 5.0, "with the file gone the entry returns to the catalogue's own")
+	_done()
+
+
+## The admin workbench: opens and closes on the screen stack, edits go out as requests and come
+## back through the runtime, another admin's edit refreshes the open form, and only an admin gets in.
+func _test_profile_workbench() -> void:
+	_section("the profile workbench edits live through requests")
+	var fixture := PackedStringArray(["res://examples/fixtures/profiles"])
+	var profiles: PlaygroundProfiles = playground.profiles
+	var rt := profiles.runtime
+	var old_permit := rt.permit
+	rt.permit = func(actor: Variant, _flag: String) -> bool: return actor == "uid-admin"
+	profiles.npcs.roots = fixture
+	profiles.npcs.clear_cache()
+
+	var stack := DotScreenStack.new()
+	stack.register_service = false
+	stack.manage_mouse = false
+	add_child(stack)
+	stack.setup()
+	var screen := PlaygroundProfileScreen.new()
+	screen.profiles = profiles
+	var sent: Array[Dictionary] = []
+	screen.submit = func(req: Dictionary) -> DotResult:
+		sent.append(req)
+		var wire := DotNetProfileLink.decode_body(DotNetProfileLink.encode_body(req))
+		if not wire.ok:
+			return wire
+		return rt.handle_request("uid-admin", wire.value)
+	var targets: Array[String] = []
+	screen.target_requested.connect(func(kind: String, id: String) -> void: targets.append(kind + "/" + id))
+	_check(stack.register(screen).ok, "the screen registers")
+	_check(stack.push(&"profiles").ok and stack.is_open(&"profiles"), "it opens")
+	_check(screen.ids("npc").has("npc_chaser"), "it lists the NPC profiles the runtime can edit", str(screen.ids("npc")))
+
+	screen.open_profile("npc", "npc_chaser")
+	_check(screen.form != null and screen.form.row("speed") != null, "an NPC opens as a schema form")
+
+	var spawn_at := rt.revision("npc", "npc_chaser")
+	var _r := screen.form.set_value("speed", 12.0)
+	screen.flush()
+	_check(sent.size() == 1 and sent[0]["op"] == "set" and sent[0]["key"] == "speed", "a form edit is sent as a set request", str(sent))
+	var seen := profiles.npcs.load_profile("npc_chaser")
+	_check(seen.ok and float(seen.value.get_value("speed")) == 12.0, "and the runtime layer holds the new value")
+	_check(rt.revision("npc", "npc_chaser") > spawn_at, "the revision moves")
+	_check(screen._edited_count("npc", "npc_chaser") == 1, "the profile is marked edited live")
+
+	var other := DotProfileRuntime.make_request("set", "npc", "npc_chaser", "sight", 55.0)
+	_check(rt.handle_request("uid-admin", other).ok, "another admin edits the same profile")
+	screen._process(0.0)
+	_check(float(screen.form.values().get("sight", 0.0)) == 55.0, "the open form follows it", str(screen.form.values().get("sight")))
+	_check(float(screen.form.values().get("speed", 0.0)) == 12.0, "and keeps the edit already there")
+
+	screen.form.reset_key("speed")
+	screen.flush()
+	_check(sent.back()["op"] == "reset_key" and float(profiles.npcs.load_profile("npc_chaser").value.get_value("speed")) == 9.0, "a per-key reset goes back to the file's number")
+	screen.reset_all()
+	_check(screen._edited_count("npc", "npc_chaser") == 0, "reset all clears every live edit")
+	var count := sent.size()
+	screen.save()
+	_check(sent.size() == count + 1 and sent.back()["op"] == "save", "save is its own request to the server layer")
+	screen.request_target()
+	_check(targets == ["npc/npc_chaser"], "the test-target button asks the client to spawn it", str(targets))
+
+	var weapons := screen.ids("weapon")
+	if not weapons.is_empty():
+		screen.open_profile("weapon", weapons[0])
+		_check(screen.form != null and screen.current_kind() == "weapon", "a weapon opens in the same form")
+	else:
+		_check(true, "no weapon profiles are loaded here, so none to open")
+
+	stack.pop(&"profiles")
+	_check(not stack.is_open(&"profiles"), "it closes")
+
+	var client := PlaygroundClient.new()
+	_check(client._may_edit_profiles(), "offline the player is the server and may edit")
+	var bridge := PlaygroundNetBridge.new()
+	client.bridge = bridge
+	_check(not client._may_edit_profiles(), "connected, nobody may edit until the server says so")
+	client._profile_probing = true
+	client._on_profile_reply(false, "profile edits need 'cvar'")
+	_check(not client._may_edit_profiles(), "a refusal keeps a player out")
+	client._profile_probing = true
+	client._on_profile_reply(false, "no such profile")
+	_check(client._may_edit_profiles(), "any other answer means an admin asked")
+	client.bridge = null
+	if bridge is Node:
+		bridge.free()
+	client.free()
+
+	rt.permit = old_permit
+	rt.handle_request("uid-admin", DotProfileRuntime.make_request("reset", "npc", "npc_chaser"))
+	profiles.npcs.roots = PackedStringArray()
+	profiles.npcs.clear_cache()
+	stack.queue_free()
 	_done()
 
 

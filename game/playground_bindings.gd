@@ -41,6 +41,8 @@ const CHECKPOINT_LOAD := &"pg_checkpoint_load"
 const CHECKPOINT_NEXT := &"pg_checkpoint_next"
 const CHECKPOINT_CLEAR := &"pg_checkpoint_clear"
 const VIEW := &"pg_view"
+## The admin workbench (live NPC and weapon profile edits); only an admin is let in.
+const PROFILES := &"pg_profiles"
 const SCOREBOARD := &"pg_scoreboard"
 ## The chat box's own actions (`PlaygroundPresentation`'s `DotChatWindow`).
 const CHAT := &"playground_chat"
@@ -75,6 +77,7 @@ static func make() -> DotMenuBindings:
 	keys.add(TRACK, &"bind_track", "Next timed track on this map", "T", "Running")
 
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
+	keys.add(PROFILES, &"bind_profiles", "Profile workbench (admins): edit NPCs and weapons live", "F6", "General")
 	keys.add(MAP, &"bind_map", "Change map", "M", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# The chat keys keep the settings they were stored under before this table existed

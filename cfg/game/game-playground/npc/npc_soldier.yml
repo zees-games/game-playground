@@ -1,0 +1,10 @@
+name: Soldier
+cost: 6
+speed: 4.6
+sight: 50.0
+sight_angle: 150.0
+hearing: 18.0
+extra:
+  near: 8.0
+  far: 18.0
+  reach: 1.6

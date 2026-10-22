@@ -31,3 +31,13 @@ dot-workbench's `DotWorkbenchHttp` edits the same `Playground.profiles.runtime` 
 - The module polls it from `_process` and stops it on unload. `workbench` (admin `cvar`) prints its state, from `describe()`.
 - An export that ships the page needs `*.html` in its include filter (this repository keeps no `export_presets.cfg`).
 - Checked by `headless_packs_real` ("the workbench edits a weapon over HTTP": list, authorised set, 401, 429, next shot) and `dedicated` (off by default).
+
+## The in-game workbench (F6)
+
+`game/playground_profile_screen.gd` is an admin-only screen on the client's screen stack: the `pg_profiles` action (default F6, rebindable under General) or the Escape menu's "Profile workbench" entry. The sidebar lists NPC and weapon profiles in the Q menu's grouping (a dot marks an edited profile); the card shows `kind / id`, an "EDITED LIVE" chip with the key count, the revision, and the buttons Spawn in front of me / Give me this weapon (the Q menu's own paths), Reset all and Save to server. The body is a `DotUiForm` over the profile schema; a weapon's `extra.*` numbers are synthesised as sliders and toggles.
+
+- Edits are debounced (0.12 s) and sent as requests through `DotNetProfileLink` (`PlaygroundPresentation.profile_submit`), never applied locally, so everyone sees them. Offline the process is the server and edits its own runtime. A per-key Reset is `reset_key`; Save is the `save` op (admin `root`).
+- The form follows `profile_changed`, so another admin's edit shows here; the refresh waits while the mouse is held or edits are pending, so a slider drag is not fought.
+- Admin gating: there is no "am I an admin" message, so the client probes once per connection with a harmless `reset_key` on an empty id. An answer starting "profile edits need" means a player (the entry is hidden and a notice shown), anything else an admin. The probe costs one WARN line on the server per non-admin who presses F6.
+- `docs/workbench_npc.png` and `docs/workbench_weapon.png` are rendered by `tools/render_workbench.sh` (xvfb, 1280x720).
+- Checked by `headless_playground` ("the profile workbench edits live through requests").
