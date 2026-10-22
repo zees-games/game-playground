@@ -91,7 +91,11 @@ func _test_menu() -> void:
 		match str(row["kind"]):
 			"weapon": _weapon_rows.append(row)
 			"npc": _npc_rows.append(row)
-	_check(_weapon_rows.size() == 7 + 8, "seven modern and eight medieval weapon rows", str(_weapon_rows.size()))
+	var declared := 0
+	for pack in ["zz_modern_weapons", "zz_medieval_weapons"]:
+		var provider: GDScript = load("res://addons/%s/spawn_provider.gd" % pack)
+		declared += provider.call("spawn_entries").size()
+	_check(declared > 0 and _weapon_rows.size() == declared, "one weapon row per entry the weapon packs declare", "%d of %d" % [_weapon_rows.size(), declared])
 	_check(_npc_rows.size() == 3, "three monsters", str(_npc_rows.size()))
 
 	var menu := PlaygroundSpawnMenu.new()
