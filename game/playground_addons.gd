@@ -22,6 +22,8 @@ extends RefCounted
 ##
 ## Both ends scan, so both ends list the same entries without a wire message for the list.
 
+const PlaygroundWeaponDefScript := preload("weapons/playground_weapon_def.gd")
+const PlaygroundZeeScript := preload("playground_zee.gd")
 const CHANNEL := "pg.addons"
 const HOOK_FILE := "playground_hook.gd"
 const REGISTER := "playground_register"
@@ -117,6 +119,19 @@ var _skipped: PackedStringArray = PackedStringArray()
 ## pack -> the provider object, kept alive; and who -> the scene NPCs it spawned.
 var _providers: Dictionary = {}
 var _scene_spawns: Dictionary = {}
+
+
+## Lets go of everything. An item's callback is a lambda that captures the item and this object,
+## and a provider entry's `spawn` is a Callable bound to the provider's script: a reference
+## cycle the engine reports as leaked at exit, with every linked pack's script in it. Called when
+## the game leaves the tree.
+func release() -> void:
+	for item in _items:
+		item.callback = Callable()
+	_items.clear()
+	_hooks.clear()
+	_providers.clear()
+	_scene_spawns.clear()
 
 
 ## Finds and loads every hook under [param root] (a `res://addons`-shaped directory) and
@@ -238,6 +253,9 @@ func register_provider(pack: String, provider: Variant, host: Node = null) -> Do
 		var made := _add_entry(pack, entry as Dictionary)
 
 		if made.ok:
+			_teach_weapon(pack, provider, entry as Dictionary, host)
+
+		if made.ok:
 			added += 1
 		else:
 			DotLog.warn(CHANNEL, "a spawn entry was refused", {"pack": pack, "why": made.error.message})
@@ -303,10 +321,15 @@ func _run_entry(item: Item, spawn: Variant, ctx: Context) -> Variant:
 		})
 		return out if out is DotResult else DotResult.success(item.key())
 
-	if spawn is Dictionary:
+	if spawn is Dictionary and item.kind != "weapon":
 		return DotResult.fail(DotError.CODE_INVALID, "%s has stats but no spawn_fn to run" % item.key())
 
-	var target := String(spawn) if not String(spawn).is_empty() else item.id
+	var target := item.id if spawn is Dictionary or String(spawn).is_empty() else String(spawn)
+
+	if spawn is Dictionary:
+		# A weapon pack's data row ({weapon_id} or {weapon}): the game's id for it is the one
+		# [method _teach_weapon] gave it.
+		target = pack_weapon_id(item.addon, _weapon_name(spawn as Dictionary, item.id))
 
 	if item.kind == "weapon":
 		if game.call("weapon_def", StringName(target)) == null:
@@ -321,6 +344,54 @@ func _run_entry(item: Item, spawn: Variant, ctx: Context) -> Variant:
 		return _spawn_body(item, target, ctx)
 
 	return DotResult.fail(DotError.CODE_INVALID, "kind %s needs a Callable spawn" % item.kind)
+
+
+## The weapon id a data row names: `weapon_id`, else `weapon`, else the row's own id.
+func _weapon_name(spawn: Dictionary, row_id: String) -> String:
+	for key in ["weapon_id", "weapon"]:
+		if not str(spawn.get(key, "")).is_empty():
+			return str(spawn[key])
+	return row_id
+
+
+## The game's id for a provider's weapon. Prefixed with the pack, so a pack can never replace one
+## of the game's own and two packs can both have a `pistol`.
+static func pack_weapon_id(pack: String, weapon: String) -> StringName:
+	return StringName("pk_%s_%s" % [pack, weapon])
+
+
+## A weapon row whose `spawn` is data (a Dictionary) is a dot-weapon definition behind the
+## provider's static `weapon_defs()`. Adds it to the host's weapon list as a rig-held weapon
+## (`meta.zee` + `meta.pack_def`, the shape the Workshop's weapons have), so the pickup path, the
+## bridge and the rigs find it the way they find any other. Both ends scan, so both know it.
+func _teach_weapon(pack: String, provider: Variant, entry: Dictionary, host: Node) -> void:
+	var spawn: Variant = entry.get("spawn")
+	if str(entry.get("kind", "")) != "weapon" or not spawn is Dictionary or host == null:
+		return
+	if not (provider as Object).has_method("weapon_defs") or host.get("weapons") == null:
+		DotLog.warn(CHANNEL, "a weapon row has data and its provider has no weapon_defs()", {"pack": pack, "id": str(entry.get("id", ""))})
+		return
+
+	var want := _weapon_name(spawn as Dictionary, str(entry.get("id", "")))
+	var game_id := pack_weapon_id(pack, want)
+	var weapons: Array = host.get("weapons")
+	if weapons.any(func(d: Variant) -> bool: return d.id == game_id):
+		return
+
+	for each: Variant in (provider as Object).call("weapon_defs"):
+		if not each is DotWeaponDef or String((each as DotWeaponDef).id) != want:
+			continue
+		var pack_def := each as DotWeaponDef
+		var def := PlaygroundWeaponDefScript.make(game_id, str(entry.get("name", pack_def.display_name)), "")
+		def.description = pack_def.description
+		def.category = &"pack"
+		def.colour = PlaygroundZeeScript.SLOT_COLOURS.get(pack_def.slot, Color(0.62, 0.68, 0.78))
+		def.meta = {"zee": want, "slot": pack_def.slot, "provider": pack, "pack_def": pack_def}
+		weapons.append(def)
+		PlaygroundZeeScript.add_provider_def(def)
+		return
+
+	DotLog.warn(CHANNEL, "a weapon row names a weapon its provider's weapon_defs() lacks", {"pack": pack, "weapon": want})
 
 
 func _spawn_body(item: Item, target: String, ctx: Context) -> DotResult:

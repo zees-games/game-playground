@@ -3507,7 +3507,9 @@ func _test_weapons() -> void:
 
 	_check(defs.size() >= 3, "the build ships an arsenal", "%d" % defs.size())
 	_check(
-		playground.weapons.size() == defs.size() + PlaygroundZee.defs().size(),
+		# Not the weapons a linked spawn provider taught the game (`meta.provider`).
+		playground.weapons.filter(func(d: Variant) -> bool: return not d.meta.has("provider")).size()
+			== defs.size() + PlaygroundZee.defs().size(),
 		"and the game offers it, with zee-dot-weapons after it"
 	)
 

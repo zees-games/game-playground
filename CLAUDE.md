@@ -30,7 +30,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | --- | --- |
 | `game/` | `playground.gd` (the simulation, headless), the player, the server module and services, props, `entities/`, `weapons/` and `toolgun/`, the modes, the bag, the client (not headless), `net/`, the maps' base, geometry and lighting. File by file: [docs](docs/README.md#where-the-code-is) |
 | `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (a JSON map), `custom/` (game-playground-maps, linked) |
-| `examples/` | the five suites |
+| `examples/` | the six suites |
 | `tools/` | `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd` |
 | `addons/pg_timer/` | the optional run-timer adapter: does nothing unless `addons/dot_timer` is linked ([timer](docs/timer.md)) |
 | `assets/`, `scenes/fx/` | vendored CC0 art (zee weapons and arms, the character kit, Kenney's grid); the two effect scenes |
@@ -38,7 +38,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 
 ## Running and testing
 
-- `./game.sh` plays offline (`godot --path .` also works); `./game.sh online` runs a local server and client; `./game.sh test` parses everything and runs all five suites; `./game.sh help` lists the rest.
+- `./game.sh` plays offline (`godot --path .` also works); `./game.sh online` runs a local server and client; `./game.sh test` parses everything and runs all six suites; `./game.sh help` lists the rest.
 - `headless_playground -- --only=<method>` runs one section; it is then on whatever map the boot left. [testing](docs/testing.md#the-suites)
 - **Add a `headless_net` test at the end of the connected-player sequence**: both halves share one physics space and the suite is order-sensitive. [testing](docs/testing.md#traps-the-suites-have-hit)
 - A suite or tool that builds a presentation or client calls `PlaygroundPresentation.use_scratch_settings` first: never the player's file. [testing](docs/testing.md#traps-the-suites-have-hit)

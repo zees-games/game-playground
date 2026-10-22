@@ -79,3 +79,6 @@ Thumbs.db
 # "ci" asks dot-ci (v1.3.0+) to link them on the runner too: the suites load all of them.
 # bootstrap-link: game-playground-maps/maps ci
 /maps/custom
+/addons/zz_modern_weapons
+/addons/zz_medieval_weapons
+/addons/zz_historical_monsters

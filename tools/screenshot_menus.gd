@@ -2,6 +2,7 @@ extends SceneTree
 
 const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
+const PlaygroundAddons := preload("../game/playground_addons.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 const PlaygroundWorkshop := preload("../game/playground_workshop.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
@@ -40,6 +41,15 @@ var _shots: Array[Dictionary] = []
 var _at := 0
 var _wait := SETTLE
 var _done := false
+
+
+## What the real linked packs (`addons/zz_*`, gitignored symlinks) put in the Q menu: the rows
+## PlaygroundAddons builds from their own providers. Empty when none is linked, and the two shots
+## then show the tabs falling back to Props, which is the honest picture of "no pack".
+func _real_pack_rows() -> Array:
+	var found := PlaygroundAddons.new()
+	found.scan_providers(null)
+	return found.describe_items()
 
 
 func _initialize() -> void:
@@ -136,6 +146,8 @@ func _initialize() -> void:
 		]},
 		{"id": &"spawn_menu", "file": "menu_provider_weapons.png", "tab": PlaygroundSpawnMenu.Tab.PACK_WEAPONS, "addons": PROVIDER_ROWS},
 		{"id": &"spawn_menu", "file": "menu_provider_npcs.png", "tab": PlaygroundSpawnMenu.Tab.NPCS, "addons": PROVIDER_ROWS},
+		{"id": &"spawn_menu", "file": "menu_real_packs_weapons.png", "tab": PlaygroundSpawnMenu.Tab.PACK_WEAPONS, "addons": _real_pack_rows()},
+		{"id": &"spawn_menu", "file": "menu_real_packs_npcs.png", "tab": PlaygroundSpawnMenu.Tab.NPCS, "addons": _real_pack_rows()},
 		{"id": &"spawn_menu", "file": "menu_tools_waypoint.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"waypoint"},
 		{"id": &"spawn_menu", "file": "menu_tools_npc.png", "tab": PlaygroundSpawnMenu.Tab.TOOLS, "mode": &"npc_spawn"},
 		{"id": &"game_menu", "file": "menu_general.png", "page": &"general"},

@@ -3354,6 +3354,8 @@ func time_left_text() -> String:
 
 func _exit_tree() -> void:
 	DotRegistry.unregister_instance(DotRegistry.scoped_name(SERVICE, service_scope), self)
+	if addons != null:
+		addons.release()
 
 
 ## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at

@@ -63,6 +63,19 @@ static func catalogue() -> DotWeaponCatalogue:
 ## Pack weapons ([PlaygroundWorkshop]) by zee id, and the catalogue that holds them besides the pack's own.
 static var _pack_defs: Dictionary = {}
 static var _with_packs: DotWeaponCatalogue = null
+## Weapons a spawn provider's `weapon_defs()` gave ([PlaygroundAddons]), by zee id. Kept apart from
+## [member _pack_defs] because [method set_pack_defs] replaces that one on every Workshop sync, and
+## a provider's weapons are not the Workshop's to drop.
+static var _provider_defs: Dictionary = {}
+
+
+## Teaches the rigs a weapon a spawn provider ships. [param def] is a [PlaygroundWeaponDef] whose
+## `meta.pack_def` is the pack's [DotWeaponDef].
+static func add_provider_def(def: PlaygroundWeaponDef) -> void:
+	var pack_def: Variant = def.meta.get("pack_def")
+	if pack_def is DotWeaponDef:
+		_provider_defs[zee_id(def)] = pack_def
+		_with_packs = null
 
 
 ## Replaces the Workshop weapons the rigs may be given. [param defs] are [PlaygroundWeaponDef]s whose
@@ -84,9 +97,10 @@ static func catalogue_for(def: PlaygroundWeaponDef) -> DotWeaponCatalogue:
 		return catalogue()
 	if _with_packs == null:
 		_with_packs = ZeeWeaponPack.catalogue()
-		for id: StringName in _pack_defs:
-			if not _with_packs.has(id):
-				_with_packs.add(_pack_defs[id])
+		for table: Dictionary in [_pack_defs, _provider_defs]:
+			for id: StringName in table:
+				if not _with_packs.has(id):
+					_with_packs.add(table[id])
 	return _with_packs
 
 
