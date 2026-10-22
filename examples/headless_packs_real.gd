@@ -24,7 +24,7 @@ const PlaygroundWorkbench := preload("../game/playground_workbench.gd")
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
 const MONSTERS: Array[String] = ["trex", "tiger", "bear"]
-const CHECKS := 34
+const CHECKS := 37
 const SECTIONS := 6
 
 var _passed := 0
@@ -216,8 +216,6 @@ func _test_override() -> void:
 	_check(before != 51.0 and after == 51.0, "a one-key file overrides the M4's damage in weapon_defs()", "%s -> %s" % [before, after])
 	_check(restored == before, "and removing it restores the shipped value")
 
-	# Known pack bug (zz-medieval-weapons): its provider builds from defaults(), not load_all(),
-	# so its yml never reaches the definitions a game is handed. Printed, not asserted.
 	var med_dir := "user://cfg/addons/zz_medieval_weapons"
 	DirAccess.make_dir_recursive_absolute(med_dir)
 	var mscript: GDScript = load("res://addons/zz_medieval_weapons/spawn_provider.gd")
@@ -226,8 +224,28 @@ func _test_override() -> void:
 	mfile.close()
 	var med := _damage(mscript, "mace")
 	DirAccess.remove_absolute(med_dir + "/99-test.yml")
-	print("  note  medieval mace damage with a 123 override: %s (%s)" % [med, "honoured" if med == 123.0 else "IGNORED: pack bug"])
+	_check(med == 123.0, "a one-key file overrides the medieval mace's damage in weapon_defs()", str(med))
+
+	var mon_dir := "user://cfg/addons/zz_historical_monsters"
+	DirAccess.make_dir_recursive_absolute(mon_dir)
+	var nscript: GDScript = load("res://addons/zz_historical_monsters/spawn_provider.gd")
+	var hp_before := _monster_health(nscript, "trex")
+	var nfile := FileAccess.open(mon_dir + "/99-test.yml", FileAccess.WRITE)
+	nfile.store_string("trex:\n  health: 1234.0\n")
+	nfile.close()
+	var hp_after := _monster_health(nscript, "trex")
+	DirAccess.remove_absolute(mon_dir + "/99-test.yml")
+	var hp_restored := _monster_health(nscript, "trex")
+	_check(hp_before != 1234.0 and hp_after == 1234.0, "a one-key file overrides the T-Rex's health in spawn_entries()", "%s -> %s" % [hp_before, hp_after])
+	_check(hp_restored == hp_before, "and removing it restores the monster's shipped value")
 	_done()
+
+
+func _monster_health(script: GDScript, species: String) -> float:
+	for entry: Dictionary in script.spawn_entries():
+		if str(entry.get("id", "")).ends_with(species) and entry.get("spawn") is Dictionary:
+			return float(entry["spawn"].get("health", -1.0))
+	return -2.0
 
 
 ## An admin's `profile_edit weapon <id> extra.damage N` reaches the next shot of a rig that already holds
