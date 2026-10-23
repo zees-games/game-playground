@@ -1239,6 +1239,10 @@ func _follow_hud() -> void:
 ## Static so `tools/screenshot_menus` draws the page the client builds rather than a copy.
 static func add_general_rows(game_menu: DotMenu) -> void:
 	var settings := game_menu.settings
+	var video := game_menu.page(&"video")
+	if video != null:
+		video.section("Image").add(DotMenuRow.toggle(&"gore", "Blood splatters",
+			"Blood on the walls and floor behind a body you hit. Off draws none."))
 	var general := game_menu.page(&"general")
 	if general != null:
 		general.section("Playground") \

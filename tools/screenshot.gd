@@ -374,6 +374,8 @@ func _process(_delta: float) -> bool:
 	if _blood_from != null:
 		_blood_delay -= 1
 		if _blood_delay <= 0:
+			if OS.get_cmdline_user_args().has("--nogore"):
+				_blood_from.settings.set_value(&"gore", false)
 			var npc := DotEntity.make_id(DotEntity.KIND_NPC, 1)
 			for i in 6:
 				var at := Vector3(-2.5 + i * 1.0, 1.2 + (i % 3) * 0.5, -1.0)
