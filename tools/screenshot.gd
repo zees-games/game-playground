@@ -28,6 +28,8 @@ const MAPS := {
 var _shots: Array[Dictionary] = []
 var _index := 0
 var _camera: Camera3D = null
+var _blood_from: PlaygroundPresentation = null
+var _blood_delay := 0
 
 
 func _initialize() -> void:
@@ -317,6 +319,25 @@ func _stage_fx() -> Array[Dictionary]:
 	root.add_child(crate)
 	crate.global_position = held_at
 
+	if OS.get_cmdline_user_args().has("--blood"):
+		# A wall to bleed on; the hits land a few frames later, once the physics server has it.
+		var wall := StaticBody3D.new()
+		var wall_shape := CollisionShape3D.new()
+		var wall_box := BoxShape3D.new()
+		wall_box.size = Vector3(12, 6, 0.5)
+		wall_shape.shape = wall_box
+		wall.add_child(wall_shape)
+		var wall_mesh := MeshInstance3D.new()
+		var wall_visual := BoxMesh.new()
+		wall_visual.size = wall_box.size
+		wall_mesh.mesh = wall_visual
+		wall.add_child(wall_mesh)
+		root.add_child(wall)
+		wall.global_position = Vector3(0, 2, -4)
+		_blood_from = presentation
+		_blood_delay = 4
+		_wait = 8
+
 	presentation.present(0.016, eye, aim)
 	presentation.fx.spawned.connect(func(fx_id: StringName, node: Node, why: StringName) -> void:
 		print("fx: %s %s" % [fx_id, "drawn" if node != null else "refused (%s)" % why])
@@ -349,6 +370,16 @@ func _process(_delta: float) -> bool:
 		var _built := _toy_box.build(_toy_placements)
 		_toy_placements = []
 		_wait = maxi(_wait, 2)
+
+	if _blood_from != null:
+		_blood_delay -= 1
+		if _blood_delay <= 0:
+			var npc := DotEntity.make_id(DotEntity.KIND_NPC, 1)
+			for i in 6:
+				var at := Vector3(-2.5 + i * 1.0, 1.2 + (i % 3) * 0.5, -1.0)
+				var _s := _blood_from.on_body_hit(npc, at, Vector3(at.x * 0.3, 1.7, 8.0), 8.0)
+			print("blood: %d splatters" % _blood_from.decals.blood_count())
+			_blood_from = null
 
 	if _fx_pending:
 		_fx_pending = false

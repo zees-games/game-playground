@@ -52,6 +52,8 @@ var audio: DotAudioManager = null
 var steps: DotAudioFootsteps = null
 var ambience: DotAudioAmbience = null
 var fx: DotFxManager = null
+## Blood on the surface behind a hit body. Visual only; the player's `gore` setting and `fx_quality` scale it.
+var decals: DotFxDecals = null
 ## The player's console, built by [method build_console] once the client has a menu.
 var console: DotConsoleController = null
 #
@@ -149,6 +151,9 @@ static func schema() -> DotSettingsSchema:
 		DotSettingsDef.Scope.SERVER_CLAMPED
 	))
 	s.add(DotSettingsDef.integer(&"fx_quality", 3, 0, 3, &"video"))
+	s.add(DotSettingsDef.boolean(&"gore", true, &"video").with_description(
+		"Blood splatters on the walls behind a hit player or NPC."
+	))
 
 	s.add(DotSettingsDef.number(&"shake_scale", 1.0, 0.0, 2.0, &"accessibility")
 		.with_description("Zero turns camera shake off entirely."))
@@ -260,6 +265,9 @@ func _on_setting_changed(key: StringName, value: Variant, _why: StringName) -> v
 			fx.config.allow_flashes = bool(value)
 		&"fx_quality":
 			fx.config.quality = int(value)
+			_apply_decal_config()
+		&"gore":
+			_apply_decal_config()
 		&"chat_window":
 			_apply_chat_visibility()
 		&"camera_landing_dip", &"camera_strafe_roll", &"camera_speed_fov":
@@ -610,6 +618,17 @@ static func fx_catalogue() -> DotFxCatalogue:
 	return c
 
 
+## Pushes the player's `gore` and `fx_quality` into the decals; env and command line
+## (`DOT_FX_DECAL_*`, `--decal-*`) layer under them through the config's own loader.
+func _apply_decal_config() -> void:
+	if decals == null:
+		return
+	var cfg := DotFxDecalConfig.new()
+	cfg.gore = settings.get_bool(&"gore", true)
+	cfg.quality = settings.get_int(&"fx_quality", 3)
+	decals.apply_config(cfg)
+
+
 func _build_fx() -> DotResult:
 	fx = DotFxManager.new()
 	fx.name = "Fx"
@@ -622,6 +641,11 @@ func _build_fx() -> DotResult:
 	# geometry is generated is a hole in a wall that will not exist next map.
 	fx.config.max_decals = 0
 	add_child(fx)
+
+	decals = DotFxDecals.new()
+	decals.name = "Decals"
+	add_child(decals)
+	_apply_decal_config()
 
 	var res := fx.setup()
 	if not res.ok:
@@ -802,6 +826,7 @@ func present(delta: float, eye: Vector3, forward: Vector3) -> void:
 	fx.viewer_position = eye
 	fx.viewer_forward = forward
 	fx.advance(delta)
+	decals.advance(delta)
 
 
 func camera_shake() -> Vector3:
@@ -890,6 +915,24 @@ func on_splash(at: Vector3) -> void:
 	fx.spawn(&"prop_spawn", t)
 
 
+## A player or NPC took a hit at [param point], seen from [param from]: blood on the first
+## surface behind it along that line, within [param reach] metres. Returns the splatter, or
+## null when there is no victim of that kind, no surface, or gore is off.
+func on_body_hit(victim: int, point: Vector3, from: Vector3, reach: float = 4.0) -> Node3D:
+	var kind := DotEntity.kind_of(victim)
+	if kind != DotEntity.KIND_PLAYER and kind != DotEntity.KIND_NPC:
+		return null
+	var space := get_viewport().find_world_3d().direct_space_state if get_viewport() != null else null
+	var along := point - from
+	if space == null or along.length() < 0.01:
+		return null
+	var query := PhysicsRayQueryParameters3D.create(point, point + along.normalized() * reach)
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	return decals.splatter(hit["position"], hit["normal"])
+
+
 func on_pane_broken(at: Vector3) -> void:
 	audio.play_at(&"glass_break", at)
 
@@ -960,6 +1003,7 @@ func on_wave_incoming() -> void:
 
 func on_map_changed(map_id: StringName = &"") -> void:
 	fx.clear()
+	decals.clear_blood()
 	if ambience != null:
 		ambience.set_map_bed(bed_for(map_id))
 

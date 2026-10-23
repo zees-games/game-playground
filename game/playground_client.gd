@@ -923,6 +923,9 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 	if hud != null:
 		hud.confirm_hit(victim, amount, point, killed, headshot)
 	_draw_body_hit(_zee_rig(), point)
+	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
+	if presentation != null and presentation.decals != null and camera != null:
+		var _blood := presentation.on_body_hit(victim, point, camera.global_position)
 
 
 ## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a

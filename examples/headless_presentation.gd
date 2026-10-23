@@ -26,7 +26,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 126
+const CHECKS := 134
 
 var _passed := 0
 var _failed := 0
@@ -64,6 +64,7 @@ func _run() -> void:
 	_test_carrying_is_a_refusal()
 	_test_sounds_and_effects()
 	_test_effects_draw()
+	await _test_blood()
 	_test_console()
 	_test_party_does_not_migrate()
 	await _test_party_over_http()
@@ -470,6 +471,53 @@ func _test_effects_draw() -> void:
 		"and a beam past its ceiling is replaced in the same frame, so a hold never flickers"
 	)
 
+	p.queue_free()
+	_done()
+
+
+func _test_blood() -> void:
+	_section("A hit on a body leaves blood on the wall behind it")
+
+	var p := _make()
+	var wall := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(10, 10, 0.5)
+	shape.shape = box
+	wall.add_child(shape)
+	wall.position = Vector3(0, 0, -5)
+	add_child(wall)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+	var npc := DotEntity.make_id(DotEntity.KIND_NPC, 1)
+	var prop := DotEntity.make_id(DotEntity.KIND_PROP, 1)
+	var eye := Vector3(0, 1, 0)
+	var at := Vector3(0, 1, -3)
+
+	_check(p.decals.blood_count() == 0, "no blood to begin with")
+	var s := p.on_body_hit(npc, at, eye)
+	_check(s != null and p.decals.blood_count() == 1, "an NPC hit leaves one splatter")
+	_check(
+		s != null and absf(s.global_position.z - (-4.75)) < 0.3,
+		"on the wall's face, not the victim",
+		str(s.global_position) if s != null else "null"
+	)
+	_check(p.on_body_hit(prop, at, eye) == null, "a prop is not bled on")
+	_check(p.on_body_hit(npc, at, at) == null, "no line, no splatter")
+
+	var cfg := DotFxDecalConfig.new()
+	cfg.max_blood = 4
+	p.decals.apply_config(cfg)
+	for i in 10:
+		p.on_body_hit(npc, at, eye)
+	_check(p.decals.blood_count() <= 4, "the cap holds (%d of 4)" % p.decals.blood_count())
+
+	p.settings.set_value(&"gore", false)
+	_check(p.decals.blood_count() == 0, "gore off clears the blood")
+	_check(p.on_body_hit(npc, at, eye) == null and p.decals.blood_count() == 0, "and draws none")
+
+	wall.queue_free()
 	p.queue_free()
 	_done()
 
