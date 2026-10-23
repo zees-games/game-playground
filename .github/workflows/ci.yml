@@ -19,7 +19,7 @@ on:
 
 jobs:
     validate:
-        uses: modcommunity/dot-ci/.github/workflows/validate.yml@v1.3.0
+        uses: modcommunity/dot-ci/.github/workflows/validate.yml@v1
         with:
             suite-timeout: 900
             profiles: true
