@@ -805,6 +805,11 @@ func _build_client_services() -> void:
 	voice.setup(not DotPlatform.is_headless())
 	bridge.voice_arrived.connect(voice.receive)
 
+	platform.look_voice = voice.manager
+	platform.look_chat = chat
+	platform.look_position_fn = _look_position
+	platform.build_look_mute()
+
 
 # --- Chat ------------------------------------------------------------------
 
@@ -3024,3 +3029,13 @@ func _exit_tree() -> void:
 		presentation.profile_link = null
 	# A static outlives the game: the next one the shell loads must not look for its art here.
 	PlaygroundZee.release_art()
+
+
+## Where a roster row's player stands, for dot-game's look-to-gag key (J, L).
+func _look_position(row: Dictionary) -> Variant:
+	if playground == null:
+		return null
+	for who: PlaygroundPlayer in playground.players.values():
+		if who != player and who.display_name == row["name"]:
+			return who.global_position + Vector3.UP * 1.5
+	return null

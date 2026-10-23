@@ -40,6 +40,8 @@ const CHECKPOINT_SAVE := &"pg_checkpoint_save"
 const CHECKPOINT_LOAD := &"pg_checkpoint_load"
 const CHECKPOINT_NEXT := &"pg_checkpoint_next"
 const CHECKPOINT_CLEAR := &"pg_checkpoint_clear"
+const VOICE_GAG := &"voice_gag"
+const VOICE_MUTE := &"voice_mute"
 const VIEW := &"pg_view"
 ## The admin workbench (live NPC and weapon profile edits); only an admin is let in.
 const PROFILES := &"pg_profiles"
@@ -86,6 +88,9 @@ static func make() -> DotMenuBindings:
 	keys.add(CHAT_NEAR, &"chat_near_key", "Chat with nearby players", "U", "General", DotSettingsDef.Scope.ACCOUNT)
 	# dot-voice's talk action (DotVoiceManager.TALK_ACTION), on K because V is the checkpoint.
 	keys.add_voice("General", "K")
+	# Look at a player and press (dot-game's DotGameClient): G clears checkpoints, H is help.
+	keys.add(VOICE_GAG, &"bind_voice_gag", "Look at a player: stop (or resume) hearing them", "J", "General")
+	keys.add(VOICE_MUTE, &"bind_voice_mute", "Look at a player: mute (or unmute) their voice and chat", "L", "General")
 	keys.add_help("General")
 	# B is the arena's loadout (dot-menu's `dot_menu_loadout`), where the host has it (API 6).
 	if DotAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):
