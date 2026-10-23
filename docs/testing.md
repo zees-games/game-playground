@@ -25,6 +25,7 @@ Every check here was armed (the guard removed or the old code put back, and the 
 
 ## Traps the suites have hit
 
+- **A suite that leaves objects alive fails.** `game.sh` rejects a log with "resources still in use at exit", "ObjectDB instances were leaked" or leaked RIDs. Name the culprit with `godot --headless --verbose --path . res://examples/headless_playground.tscn -- --only=<section>` (the "Leaked instance" ids match the ids of nodes you print from a frame loop). It found a `Control` built per sidebar caption and added only for some, and `PlaygroundAddons` scanners whose callback lambdas capture their own item, which need `release()`.
 - **`headless_net` is order-sensitive, not flaky.** Both halves are plain nodes in one scene tree and share one physics space, so the vehicle test's velocity and the lossy test's distance depend on where every body is. **Add a test at the END of the connected-player sequence**, and treat a vehicle or lossy failure after inserting one as a schedule change until proved otherwise. "Run it again" is the advice that hides a real regression: the second run is the one that gets believed. (A prop's server body and client mirror are in different `World3D`s, so it is not the two copies touching.)
 - **A bot keeps the last command it was given.** `DotFpsController.apply_command` stays set, so a bot from an earlier section keeps running and hopping. A test that stops driving a bot still has a bot that is driving.
 - **A settle drive's empty command turns the bot to yaw 0.** Aim after settling.

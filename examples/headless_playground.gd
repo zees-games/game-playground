@@ -2970,6 +2970,7 @@ func _test_spawn_providers() -> void:
 	# Activation: server-authoritative.
 	var bot: PlaygroundPlayer = playground.players[&"bot"]
 	var at := bot.global_position + Vector3(0, 0, -6)
+	var prior_addons := playground.addons
 	playground.addons = addons
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	var picked: Array = []
@@ -3020,6 +3021,12 @@ func _test_spawn_providers() -> void:
 		"a client never runs an entry")
 	playground.authoritative = client_side
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	# A static on the fixture's script outlives the suite; what it recorded points back into the game.
+	pack_script.set("custom_calls", [])
+	# Each scan builds lambdas that capture their item and the scanner: release() breaks that cycle.
+	playground.addons = prior_addons
+	for scanner: PlaygroundAddons in [none, addons, via]:
+		scanner.release()
 	_done()
 
 

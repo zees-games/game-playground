@@ -341,9 +341,9 @@ func _caption(text: String, major: bool) -> Label:
 	l.text = text
 	l.theme_type_variation = &"FormCaption"
 	l.add_theme_color_override("font_color", tokens.accent if major else tokens.text_faint)
-	var top := Control.new()
-	top.custom_minimum_size.y = tokens.sp(2 if major else 1)
 	if major:
+		var top := Control.new()
+		top.custom_minimum_size.y = tokens.sp(2)
 		_side.add_child(top)
 	return l
 
