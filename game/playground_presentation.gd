@@ -53,6 +53,8 @@ var steps: DotAudioFootsteps = null
 var ambience: DotAudioAmbience = null
 var fx: DotFxManager = null
 ## Blood on the surface behind a hit body. Visual only; the player's `gore` setting and `fx_quality` scale it.
+var blood: DotFxBlood = null
+## [member blood]'s decal pool.
 var decals: DotFxDecals = null
 ## The player's console, built by [method build_console] once the client has a menu.
 var console: DotConsoleController = null
@@ -621,12 +623,8 @@ static func fx_catalogue() -> DotFxCatalogue:
 ## Pushes the player's `gore` and `fx_quality` into the decals; env and command line
 ## (`DOT_FX_DECAL_*`, `--decal-*`) layer under them through the config's own loader.
 func _apply_decal_config() -> void:
-	if decals == null:
-		return
-	var cfg := DotFxDecalConfig.new()
-	cfg.gore = settings.get_bool(&"gore", true)
-	cfg.quality = settings.get_int(&"fx_quality", 3)
-	decals.apply_config(cfg)
+	if blood != null:
+		blood.apply_settings(settings)
 
 
 func _build_fx() -> DotResult:
@@ -642,9 +640,9 @@ func _build_fx() -> DotResult:
 	fx.config.max_decals = 0
 	add_child(fx)
 
-	decals = DotFxDecals.new()
-	decals.name = "Decals"
-	add_child(decals)
+	blood = DotFxBlood.new()
+	add_child(blood)
+	decals = blood.decals
 	_apply_decal_config()
 
 	var res := fx.setup()
@@ -826,7 +824,7 @@ func present(delta: float, eye: Vector3, forward: Vector3) -> void:
 	fx.viewer_position = eye
 	fx.viewer_forward = forward
 	fx.advance(delta)
-	decals.advance(delta)
+	blood.advance(delta)
 
 
 func camera_shake() -> Vector3:
@@ -922,15 +920,7 @@ func on_body_hit(victim: int, point: Vector3, from: Vector3, reach: float = 4.0)
 	var kind := DotEntity.kind_of(victim)
 	if kind != DotEntity.KIND_PLAYER and kind != DotEntity.KIND_NPC:
 		return null
-	var space := get_viewport().find_world_3d().direct_space_state if get_viewport() != null else null
-	var along := point - from
-	if space == null or along.length() < 0.01:
-		return null
-	var query := PhysicsRayQueryParameters3D.create(point, point + along.normalized() * reach)
-	var hit := space.intersect_ray(query)
-	if hit.is_empty():
-		return null
-	return decals.splatter(hit["position"], hit["normal"])
+	return blood.splat_behind(from, point, reach)
 
 
 func on_pane_broken(at: Vector3) -> void:
@@ -1003,7 +993,7 @@ func on_wave_incoming() -> void:
 
 func on_map_changed(map_id: StringName = &"") -> void:
 	fx.clear()
-	decals.clear_blood()
+	blood.clear()
 	if ambience != null:
 		ambience.set_map_bed(bed_for(map_id))
 
