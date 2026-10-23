@@ -23,8 +23,8 @@ const PlaygroundWorkbench := preload("../game/playground_workbench.gd")
 ## static `weapon_defs()`, and nothing but running them showed the playground refused every one.
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const MONSTERS: Array[String] = ["trex", "tiger", "bear"]
-const CHECKS := 44
+const MONSTERS: Array[String] = ["trex", "allosaurus", "raptor", "tiger", "thylacine", "bear"]
+const CHECKS := 49
 const SECTIONS := 7
 
 var _passed := 0
@@ -97,7 +97,7 @@ func _test_menu() -> void:
 		var provider: GDScript = load("res://addons/%s/spawn_provider.gd" % pack)
 		declared += provider.call("spawn_entries").size()
 	_check(declared > 0 and _weapon_rows.size() == declared, "one weapon row per entry the weapon packs declare", "%d of %d" % [_weapon_rows.size(), declared])
-	_check(_npc_rows.size() == 3, "three monsters", str(_npc_rows.size()))
+	_check(_npc_rows.size() == MONSTERS.size(), "one NPC row per species the monster pack ships", str(_npc_rows.size()))
 
 	var menu := PlaygroundSpawnMenu.new()
 	menu.catalogue = _game.props.catalogue
@@ -120,7 +120,7 @@ func _test_menu() -> void:
 	_check(all_cards, "each has a card")
 	menu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
 	await get_tree().process_frame
-	_check(menu.shown().size() == 3, "NPCs shows the three monsters", str(menu.shown()))
+	_check(menu.shown().size() == MONSTERS.size(), "NPCs shows every monster", str(menu.shown()))
 	for row in _npc_rows:
 		_check(menu.card_for(StringName(row["key"])) != null, "a card for %s" % row["key"])
 	menu.queue_free()
@@ -364,8 +364,34 @@ func _test_workbench_identity() -> void:
 	_check(_http(wb, "GET", "/api/profiles/weapon", "t-nobody")["status"] == 401, "an account not listed is refused")
 	var denied := _http(wb, "POST", "/api", "t-nocvar", JSON.stringify({"op": "reset", "kind": "weapon", "id": "m4"}))
 	_check(denied["status"] != 200, "a listed account without the game's flag cannot edit", str(denied["status"]))
+	_check_ticket_gate()
 	wb.stop()
 	_done()
+
+
+## The offline ticket verifier behind the resolver: only a fresh, signed, this-server, expiring ticket gives an identity.
+func _check_ticket_gate() -> void:
+	var crypto := Crypto.new()
+	var key := crypto.generate_rsa(2048)
+	var priv := key.save_to_string(false)
+	var pub := key.save_to_string(true)
+	var who := DotAuthIdentity.new()
+	who.uid = "backbone:boss"
+	who.display_name = "Boss"
+	who.provider = "backbone"
+	var good := DotAuthTicket.issue(who, "srv", priv, "iss", 60)
+	var got: Variant = PlaygroundWorkbench.identity_of_ticket(good.value, pub, "srv", 0)
+	_check(got != null and got.uid == "backbone:boss", "a fresh ticket for this server resolves")
+	_check(PlaygroundWorkbench.identity_of_ticket(good.value, pub, "other", 0) == null, "a ticket for another server is refused")
+	var stale := DotAuthTicket.issue(who, "srv", priv, "iss", -120)
+	_check(PlaygroundWorkbench.identity_of_ticket(stale.value, pub, "srv", 0) == null, "an expired ticket is refused")
+	var claims := DotJwt.base_claims("iss", "backbone:boss", "srv", 60)
+	claims.erase("exp")
+	var forever := DotJwt.encode_rs256(claims, priv)
+	_check(PlaygroundWorkbench.identity_of_ticket(forever.value, pub, "srv", 0) == null, "a ticket with no expiry is refused")
+	var parts := String(good.value).split(".")
+	var forged := "%s.%s.%s" % [parts[0], parts[1], parts[2].reverse()]
+	_check(PlaygroundWorkbench.identity_of_ticket(forged, pub, "srv", 0) == null, "a tampered signature is refused")
 
 
 func _http(wb: PlaygroundWorkbench, method: String, path: String, token: String, body: String = "") -> Dictionary:

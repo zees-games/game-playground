@@ -47,9 +47,22 @@ func start(profiles: RefCounted, cfg: Dictionary) -> DotResult:
 static func ticket_resolver(auth: DotAuthServer) -> Callable:
 	if auth == null or auth.config == null or auth.config.ticket_public_key.is_empty():
 		return Callable()
-	return func(token: String) -> Variant:
-		var res := DotAuthTicket.verify(token, auth.config.ticket_public_key, auth.config.server_id, auth.config.ticket_leeway_sec)
-		return (res.value as Dictionary).get("identity") if res.ok else null
+	# An empty server_id makes verify skip the audience check, so any server's ticket would pass.
+	if auth.config.server_id.strip_edges().is_empty():
+		return Callable()
+	var key: String = auth.config.ticket_public_key
+	var sid: String = auth.config.server_id
+	var leeway: int = auth.config.ticket_leeway_sec
+	return func(token: String) -> Variant: return identity_of_ticket(token, key, sid, leeway)
+
+
+## The identity in a verified ticket, or null. A ticket with no expiry is refused: verify only checks `exp` when present.
+static func identity_of_ticket(token: String, public_key: String, server_id: String, leeway: int) -> Variant:
+	var res := DotAuthTicket.verify(token, public_key, server_id, leeway)
+	if not res.ok:
+		return null
+	var who: DotAuthIdentity = (res.value as Dictionary).get("identity")
+	return who if who != null and who.expires_at > 0 else null
 
 
 ## Call from the host's _process.
