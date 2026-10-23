@@ -1,6 +1,7 @@
 extends DotModule
 
 const PlaygroundPaths := preload("playground_paths.gd")
+const PlaygroundMapConfig := preload("playground_map_config.gd")
 
 const Playground := preload("playground.gd")
 const PlaygroundWorkbench := preload("playground_workbench.gd")
@@ -444,10 +445,18 @@ class PlaygroundQueryProvider extends DotQueryProvider:
 			snapshot.game[key] = values[key]
 
 
+## The running map's per-map cvars (dot-game's [DotGameMapConfig]); the previous map's values return on each change and on unload.
+var map_config: DotGameMapConfig = null
+
+
 ## Tells dot-server which map is running, so A2S and DQP print it in their map field (and
 ## the backbone report does too) rather than this game's content id. On every change
 ## through the session's own signal, which every route to a new map ends at.
 func _report_map(map: DotMapDef, _world: Node = null) -> void:
+	if map_config == null and console != null:
+		map_config = PlaygroundMapConfig.build(console)
+	if map_config != null and map != null:
+		var _applied := map_config.apply(String(map.id))
 	if server != null and server.games != null:
 		server.games.set_current_map(String(map.id) if map != null else "")
 
@@ -552,6 +561,9 @@ func _on_profile(event: DotEvent) -> void:
 
 
 func _module_unload() -> void:
+	if map_config != null:
+		map_config.restore()
+		map_config = null
 	workbench.stop()
 	if _handles_cover and server != null:
 		var env: Object = server.get(&"envelope")

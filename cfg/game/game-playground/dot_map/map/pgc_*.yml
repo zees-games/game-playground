@@ -1,0 +1,5 @@
+# Per-map cvars for every community map (pgc_*). Nothing is set by default; uncomment a line, or add a file named for one map (pgc_town.yml).
+# Keys the game accepts: pg_destruction, pg_breakable_glass, pg_prop_surf, pg_creative, mp_solidplayers.
+# pg_destruction: 0
+# pg_breakable_glass: 1
+# pg_prop_surf: 1
