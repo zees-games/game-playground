@@ -3,6 +3,7 @@ extends DotModule
 const PlaygroundPaths := preload("playground_paths.gd")
 
 const Playground := preload("playground.gd")
+const PlaygroundWorkbench := preload("playground_workbench.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
 const PlaygroundArena := preload("playground_arena.gd")
 const PlaygroundDowns := preload("playground_downs.gd")
@@ -58,7 +59,7 @@ var net: DotNetManager = null
 ## Carries admins' profile edits up and the edited values down. Null if the types would not register.
 var profile_link: DotNetProfileLink = null
 ## The admin web page and API over the same profiles; closed unless `workbench.enabled` in cfg/server.yml.
-var workbench := preload("playground_workbench.gd").new()
+var workbench := PlaygroundWorkbench.new()
 var bridge: PlaygroundNetBridge = null
 
 ## Chat, moderation and voice. Built here rather than in the game, because they are about
@@ -1164,6 +1165,9 @@ func _bind_profile_edit() -> void:
 			and server.admins.uid_has_permission(actor, flag)
 	rt.actor_name = func(actor: Variant) -> String:
 		return String(actor) if actor is StringName else str(actor)
+	workbench.resolver = PlaygroundWorkbench.ticket_resolver(DotRegistry.get_node_service(DotAuthServer.SERVICE) as DotAuthServer)
+	if server != null and server.admins != null:
+		workbench.admin_permit = server.admins.uid_has_permission
 	var wb := workbench.start(game.profiles, DotWorkbenchHttp.read_config())
 	if not wb.ok:
 		DotLog.result(CHANNEL, "the workbench", wb)

@@ -24,8 +24,8 @@ const PlaygroundWorkbench := preload("../game/playground_workbench.gd")
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
 const MONSTERS: Array[String] = ["trex", "tiger", "bear"]
-const CHECKS := 37
-const SECTIONS := 6
+const CHECKS := 44
+const SECTIONS := 7
 
 var _passed := 0
 var _failed := 0
@@ -74,6 +74,7 @@ func _run() -> void:
 	_test_override()
 	_test_live_edit()
 	await _test_workbench()
+	await _test_workbench_identity()
 
 	print("")
 	print("%d sections, %d passed, %d failed" % [_completed, _passed, _failed])
@@ -343,6 +344,27 @@ func _test_workbench() -> void:
 	wb.stop()
 	DirAccess.remove_absolute(dir + "/workbench.token")
 	DirAccess.remove_absolute(dir)
+	_done()
+
+
+## No token file: an account resolved by the resolver gets in only when listed, and the game's flags still apply.
+func _test_workbench_identity() -> void:
+	_section("the workbench admits a dot-auth account")
+	var wb := PlaygroundWorkbench.new()
+	wb.resolver = func(token: String) -> Variant:
+		return {"uid": token.trim_prefix("t-")} if token.begins_with("t-") else null
+	wb.admin_permit = func(uid: String, flag: String) -> bool: return uid == "boss" and flag == "cvar"
+	var res := wb.start(_game.profiles, {"enabled": true, "port": 0, "admin_uids": ["boss", "nocvar"]})
+	_check(res.ok and wb.running, "an identity resolver alone is enough to start", "" if res.ok else res.error.message)
+	if not wb.running:
+		_done()
+		return
+	var listed := _http(wb, "GET", "/api/profiles/weapon", "t-boss")
+	_check(listed["status"] == 200, "a listed admin account reads", str(listed["status"]))
+	_check(_http(wb, "GET", "/api/profiles/weapon", "t-nobody")["status"] == 401, "an account not listed is refused")
+	var denied := _http(wb, "POST", "/api", "t-nocvar", JSON.stringify({"op": "reset", "kind": "weapon", "id": "m4"}))
+	_check(denied["status"] != 200, "a listed account without the game's flag cannot edit", str(denied["status"]))
+	wb.stop()
 	_done()
 
 
