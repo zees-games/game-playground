@@ -26,7 +26,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 134
+const CHECKS := 135
 
 var _passed := 0
 var _failed := 0
@@ -1149,6 +1149,19 @@ func _test_escape_menu() -> void:
 	screen.name = "Settings"
 	_check(screen.build(p.settings).ok, "and a settings screen onto the real settings")
 	stack.register(screen)
+
+	var gm := DotMenu.new()
+	gm.settings = p.settings
+	gm.open_on_escape = false
+	gm.manage_pointer = false
+	add_child(gm)
+	var gm_set: DotResult = gm.setup()
+	PlaygroundClient.add_general_rows(gm)
+	var gm_image := gm.page(&"video").find_section(&"image")
+	var gm_gore: DotMenuRow = gm_image.find_row(&"gore") if gm_image != null else null
+	_check(gm_gore != null and gm_gore.row_id() == &"gore" and p.settings.schema.has(&"gore"),
+		"the Video page's Image section has a Blood splatters row on the gore setting",
+		"%s %s %s" % [gm_set.ok, gm_image, gm_gore])
 
 	stack.push(&"pause")
 	await get_tree().process_frame
