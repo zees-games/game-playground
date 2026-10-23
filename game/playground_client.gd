@@ -1194,6 +1194,7 @@ func _build_pause() -> void:
 	if game_menu.has_method(&"use_maps"):
 		var _maps: Variant = game_menu.call(&"use_maps", map_menu_rows, change_from_menu)
 	_use_loadout_menu()
+	_use_mods_menu()
 	game_menu.action_requested.connect(_on_menu_action_chosen)
 	game_menu.overlays_changed.connect(func(_open: bool) -> void:
 		# At once, not at the platform's next poll: the keys are given back or taken the
@@ -2848,6 +2849,27 @@ var arena_on: bool = false
 ## answers (dot-loadout's `/loadout`); the menu is enabled only while the arena is on, and
 ## outside it B says "Loadouts are in the arena" (the lead's call, 2026-10-12). Guarded on the
 ## host's dot-menu and dot-loadout levels.
+## Escape's Mods action: the player's own override of the console's look, solo or listen host only
+## (the platform turns the user tier on). By name, so an older client shell just has no action.
+func _use_mods_menu() -> void:
+	if platform == null or not platform.user_tier_on or game_menu == null or not game_menu.has_method(&"use_mods"):
+		return
+	var console_node: Object = platform.console
+	if console_node != null and console_node.get(&"config") is DotConsoleConfig:
+		var _applied := (console_node.get(&"config") as DotConsoleConfig).apply_cfg_file()
+	var base := DotConsoleConfig.new()
+	var schema: Array = [
+		DotProfileSet.field("height_fraction", "float", base.height_fraction, {"min": 0.1, "max": 1.0}),
+		DotProfileSet.field("background_opacity", "float", base.background_opacity, {"min": 0.0, "max": 1.0}),
+		DotProfileSet.field("font_size", "int", base.font_size, {"min": 6, "max": 48}),
+	]
+	var editor := DotAddonConfigEditorScreen.new()
+	editor.add_file(DotConsoleConfig.CFG_ADDON, "console.yml", schema, "Console")
+	game_menu.call(&"use_mods", editor)
+	# After use_mods: a form built while the editor is outside the tree leaks at exit.
+	var _opened := editor.open(DotConsoleConfig.CFG_ADDON, "console.yml")
+
+
 func _use_loadout_menu() -> void:
 	if DotAddonApi.build_level("dot_menu") < 6 or DotAddonApi.build_level("dot_loadout") < 2:
 		return

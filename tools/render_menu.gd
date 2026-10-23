@@ -42,6 +42,11 @@ func _run() -> void:
 	await _frames(10)
 	print("menu open: ", _client.game_menu.is_open(), " blocked: ", _client.platform.is_input_blocked())
 	await _shot("escape_menu")
+	print("mods action: ", _client.game_menu.mods_screen != null)
+	if _client.game_menu.mods_screen != null:
+		_client.game_menu.open_mods()
+		await _frames(5)
+		await _shot("mods")
 	_client.game_menu.close_all()
 	await _frames(5)
 	var _opened := _client.presentation.console.open()
