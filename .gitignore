@@ -80,7 +80,12 @@ Thumbs.db
 # "ci" asks dot-ci (v1.3.0+) to link them on the runner too: the suites load all of them.
 # bootstrap-link: game-playground-maps/maps ci
 /maps/custom
+# Optional packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters): dot-bootstrap links
+# them by default and skips them under --min; the game runs without.
+# bootstrap-optional
 /addons/zz_modern_weapons
+# bootstrap-optional
 /addons/zz_medieval_weapons
+# bootstrap-optional
 /addons/zz_historical_monsters
 /cfg/addons
