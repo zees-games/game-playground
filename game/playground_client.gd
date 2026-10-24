@@ -555,6 +555,8 @@ func _build_netcode() -> DotResult:
 			presentation.profile_link = link_up
 			presentation.bind_profile_replies()
 
+	# Before the seal and in the server's order (after the bridge), or the actions stay local.
+	DotLog.result("playground.client", "avatar action message", DotGameAvatarActionMessage.register(net))
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -1189,6 +1191,8 @@ func _build_pause() -> void:
 	platform.board_prepare_fn = _prepare_board
 	platform.adopt_menu(game_menu)
 	var _platform_up := platform.setup()
+	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
+	DotLog.result("playground.client", "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	_add_noblock_and_workbench()
 	if presentation != null:
 		presentation.adopt_console(platform.add_console(presentation.settings) as DotConsoleController)
@@ -3054,6 +3058,18 @@ func _present_zee() -> Vector2:
 	var state := player.controller.state
 	rig.drive_view(Vector2.ZERO, player.speed(), state.is_grounded(), state.is_crouched())
 	return rig.view_punch()
+
+
+## The figure an avatar action plays on: that peer's player, or the local one offline.
+func _avatar_figure(peer_id: int) -> Object:
+	var who: PlaygroundPlayer = null
+	if bridge != null and peer_id != 0:
+		who = playground.players.get(StringName("u%d" % bridge.player_for_peer(peer_id)), null)
+	if who == null and player != null and (net == null or peer_id == net.local_peer_id):
+		who = player
+	if who == null or who.character == null or who.character.body() == null:
+		return null
+	return who.character.body().get_node_or_null(^"Figure")
 
 
 func _exit_tree() -> void:

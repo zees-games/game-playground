@@ -2,6 +2,7 @@
 # Renders a playground map to screenshots/<map>_*.png so a person can look at it.
 #
 #   tools/screenshot.sh pg_flatgrass
+#   tools/screenshot.sh pg_flatgrass --action emote dance   # a person playing an avatar action
 #
 # Uses xvfb-run because this needs a rendering context and the machines this runs on
 # have no display. Nothing here is headless-safe: `--headless` gives a null renderer and

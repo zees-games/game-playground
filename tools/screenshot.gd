@@ -1,6 +1,7 @@
 extends SceneTree
 
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
+const PlaygroundFigure := preload("../game/playground_figure.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 
 ## Renders a playground map to PNGs so a person can look at it.
@@ -83,6 +84,13 @@ func _initialize() -> void:
 		_fx_pending = true
 		return
 
+	var action_at := args.find("--action")
+	if action_at >= 0 and action_at + 2 < args.size():
+		# Staged from the first frame for the same reason as --fx.
+		_action_args = [StringName(args[action_at + 1]), args[action_at + 2]]
+		_action_id = id
+		return
+
 	_shots = _shots_for(id)
 
 
@@ -125,6 +133,9 @@ func _draw_toys(placements: Array) -> void:
 
 
 var _toy_box: DotPropToyBox = null
+var _action_args: Array = []
+var _action_id := ""
+var _action_figure: DotHumanoidFigure = null
 var _toy_placements: Array = []
 
 
@@ -283,6 +294,31 @@ var _armed := false
 var _fx_pending := false
 
 
+# --- --action --------------------------------------------------------------
+
+## `--action <kind> <id>` (`--action emote dance`): a person playing an avatar action from the
+## front, early and later in the clip. The id goes through dot-user-avatar's own list.
+func _stage_action(id: String, kind: StringName, action: String) -> Array[Dictionary]:
+	var figure := PlaygroundFigure.build(1.8, PackedInt32Array(), "actor") as DotHumanoidFigure
+	if figure == null:
+		push_error("no people art in this build")
+		return []
+	root.add_child(figure)
+	figure.global_position = Vector3(0.0, 0.0, 0.0)
+	figure.rotation.y = PI
+	_action_figure = figure
+	var entry := DotAvatarActions.defaults().find(kind, action)
+	var play := func() -> void:
+		var ok := figure.play_action(StringName(action), bool(entry.get("loop", false)), 0.0)
+		print("action %s/%s: played=%s" % [kind, action, ok])
+	var from := Vector3(0.0, 1.5, 3.2)
+	var at := Vector3(0.0, 1.0, 0.0)
+	return [
+		{"name": "%s_action_%s_a" % [id, action], "from": from, "at": at, "arm": play, "wait": 12},
+		{"name": "%s_action_%s_b" % [id, action], "from": from, "at": at, "wait": 30},
+	]
+
+
 # --- --fx -------------------------------------------------------------------
 
 ## A prop spawning and a prop on the end of the physics gun, drawn by the real presentation
@@ -388,6 +424,16 @@ func _process(_delta: float) -> bool:
 		_shots = _stage_fx()
 		return false
 
+	if not _action_args.is_empty():
+		_shots = _stage_action(_action_id, _action_args[0], _action_args[1])
+		_action_args = []
+		return false
+
+	# A body in this stage is not presented as a client's is, so the figure is driven here.
+	if _action_figure != null:
+		_action_figure.set_motion({"on_floor": true, "vertical": 0.0, "crouched": false, "alive": true, "aim": 0.0, "speed": 0.0})
+		_action_figure.animate(0.0, _delta)
+
 	if _index >= _shots.size():
 		return true
 
@@ -400,11 +446,13 @@ func _process(_delta: float) -> bool:
 		_camera.position = shot["from"]
 		_camera.look_at(shot["at"], Vector3.UP)
 		_armed = true
+		if shot.has("arm"):
+			(shot["arm"] as Callable).call()
 		# Three frames before grabbing. The viewport's texture is the last COMPLETED
 		# frame, so grabbing in the same frame the camera moved saves the previous shot
 		# under the new shot's name — which looks exactly like a camera that did not
 		# move.
-		_wait = 3
+		_wait = int(shot.get("wait", 3))
 		return false
 
 	var image := root.get_texture().get_image()
