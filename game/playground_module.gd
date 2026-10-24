@@ -1172,6 +1172,11 @@ func _build_netcode() -> DotResult:
 	bridge.inventory_key_fn = _bag_key_for
 	_bind_profile_edit()
 
+	# Avatar actions: the relay, and the loadouts the join/leave handlers below tell.
+	var avatar := DotGameAvatarActionRelay.serve(net, self, server)
+	if not avatar.ok:
+		log_warn("avatar actions not served", {"why": avatar.error.message})
+
 	net.messages.seal()
 	# [b]A client whose game messages cannot work with this server's is dropped, in words.[/b]
 	# dot-net compares the two schema tables and refuses a pair where either lacks a type
@@ -1352,6 +1357,10 @@ func _on_client_spawn(event: DotEvent) -> void:
 
 	_joined[session.userid] = true
 
+	var loadouts := DotGameAvatarActionRelay.loadouts_of(net)
+	if loadouts != null:
+		loadouts.add_peer(session.peer_id)
+
 	if loading != null:
 		var _seated := loading.add(session)
 
@@ -1501,6 +1510,10 @@ func _on_client_disconnected(session: DotClientSession, _reason: String = "") ->
 		progress.end(PlaygroundPlatform.key_for_session(server, session))
 
 	_joined.erase(session.userid)
+
+	var loadouts := DotGameAvatarActionRelay.loadouts_of(net)
+	if loadouts != null:
+		loadouts.remove_peer(session.peer_id)
 
 	# The bridge releases the entity, tells every other client, and forgets the peer.
 	# Removing them from the game alone would leave a replicated entity pointing at a
