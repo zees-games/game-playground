@@ -8,7 +8,6 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 const PlaygroundWeaponDef := preload("../game/weapons/playground_weapon_def.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
-const PlaygroundWorkbenchAuth := preload("../game/playground_workbench_auth.gd")
 
 ## The three real optional packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters) in
 ## the Q menu, not the fixture the main suite uses.
@@ -356,7 +355,7 @@ func _test_workbench_identity() -> void:
 	var resolver := func(token: String) -> Variant:
 		return {"uid": token.trim_prefix("t-")} if token.begins_with("t-") else null
 	var admin_permit := func(uid: String, flag: String) -> bool: return uid == "boss" and flag == "cvar"
-	var _gate := PlaygroundWorkbenchAuth.attach(wb, resolver, admin_permit)
+	var _gate := DotGameWorkbenchAuth.attach(wb, resolver, admin_permit)
 	_check(res.ok and wb.running_http, "an identity resolver alone is enough to start", "" if res.ok else res.error.message)
 	if not wb.running_http:
 		_done()
@@ -382,18 +381,18 @@ func _check_ticket_gate() -> void:
 	who.display_name = "Boss"
 	who.provider = "backbone"
 	var good := DotAuthTicket.issue(who, "srv", priv, "iss", 60)
-	var got: Variant = PlaygroundWorkbenchAuth.identity_of_ticket(good.value, pub, "srv", 0)
+	var got: Variant = DotGameWorkbenchAuth.identity_of_ticket(good.value, pub, "srv", 0)
 	_check(got != null and got.uid == "backbone:boss", "a fresh ticket for this server resolves")
-	_check(PlaygroundWorkbenchAuth.identity_of_ticket(good.value, pub, "other", 0) == null, "a ticket for another server is refused")
+	_check(DotGameWorkbenchAuth.identity_of_ticket(good.value, pub, "other", 0) == null, "a ticket for another server is refused")
 	var stale := DotAuthTicket.issue(who, "srv", priv, "iss", -120)
-	_check(PlaygroundWorkbenchAuth.identity_of_ticket(stale.value, pub, "srv", 0) == null, "an expired ticket is refused")
+	_check(DotGameWorkbenchAuth.identity_of_ticket(stale.value, pub, "srv", 0) == null, "an expired ticket is refused")
 	var claims := DotJwt.base_claims("iss", "backbone:boss", "srv", 60)
 	claims.erase("exp")
 	var forever := DotJwt.encode_rs256(claims, priv)
-	_check(PlaygroundWorkbenchAuth.identity_of_ticket(forever.value, pub, "srv", 0) == null, "a ticket with no expiry is refused")
+	_check(DotGameWorkbenchAuth.identity_of_ticket(forever.value, pub, "srv", 0) == null, "a ticket with no expiry is refused")
 	var parts := String(good.value).split(".")
 	var forged := "%s.%s.%s" % [parts[0], parts[1], parts[2].reverse()]
-	_check(PlaygroundWorkbenchAuth.identity_of_ticket(forged, pub, "srv", 0) == null, "a tampered signature is refused")
+	_check(DotGameWorkbenchAuth.identity_of_ticket(forged, pub, "srv", 0) == null, "a tampered signature is refused")
 
 
 ## A workbench with no panel over [param config], in the tree so it polls.

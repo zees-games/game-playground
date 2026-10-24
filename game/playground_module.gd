@@ -4,7 +4,6 @@ const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundMapConfig := preload("playground_map_config.gd")
 
 const Playground := preload("playground.gd")
-const PlaygroundWorkbenchAuth := preload("playground_workbench_auth.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
 const PlaygroundArena := preload("playground_arena.gd")
 const PlaygroundDowns := preload("playground_downs.gd")
@@ -1228,8 +1227,6 @@ func _start_workbench(rt: DotProfileRuntime) -> void:
 		DotLog.result(CHANNEL, "the workbench", started)
 		return
 	game.config_binder.attach(rt)
-	var auth := DotRegistry.get_node_service(DotAuthServer.SERVICE) as DotAuthServer
-	var _gate := PlaygroundWorkbenchAuth.attach(workbench, PlaygroundWorkbenchAuth.ticket_resolver(auth), admin_permit)
 
 
 func _workbench_lines() -> PackedStringArray:
