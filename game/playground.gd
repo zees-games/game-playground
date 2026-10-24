@@ -203,6 +203,11 @@ var props: DotPropSpawner = null
 ## one field of `meta` that joins them.
 var vehicles: DotVehicleSpawner = null
 var boards: DotLeaderboardManager = null
+## Where the boards live; null builds one layered from [constant BOARDS_CONFIG_PATH].
+var boards_config: PlaygroundBoardsConfig = null
+
+const BOARDS_CONFIG_PATH := "user://playground_boards.json"
+
 
 ## The scripted spawnables in the world, ticked every simulated tick.
 ##
@@ -759,7 +764,15 @@ func _build_styles() -> void:
 func _build_leaderboards() -> void:
 	boards = DotLeaderboardManager.new()
 	boards.name = "Leaderboards"
-	boards.store = DotLeaderboardStoreMemory.new()
+	if boards_config == null:
+		boards_config = PlaygroundBoardsConfig.new()
+		var layered := boards_config.load_layered(BOARDS_CONFIG_PATH)
+		if not layered.ok:
+			DotLog.warn(CHANNEL, "the boards configuration is not usable, using memory", {
+				"why": str(layered.error),
+			})
+			boards_config = PlaygroundBoardsConfig.new()
+	boards.backend = boards_config.backend
 	# Off by default: publishing sends player names and times off the server, and
 	# that is an operator's decision rather than a default.
 	boards.report_to_backbone = config.report_to_backbone

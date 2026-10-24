@@ -1315,17 +1315,17 @@ func _test_leaderboards() -> void:
 		"style": "normal",
 	}
 
-	var page: DotResult = await playground.boards.page(&"fastest", scope)
+	var page: DotResult = await playground.boards.page_async(&"fastest", scope)
 	var rows: Array = page.value
 
 	# The run above may or may not have been fast enough to clear the style's
 	# minimum time, so this files one directly — what is under test is the path from
 	# a record to a board, not the bot's driving.
 	if rows.is_empty():
-		await playground.boards.submit(
+		await playground.boards.submit_async(
 			&"fastest", scope, &"bot", "Bot", 42.5
 		)
-		page = await playground.boards.page(&"fastest", scope)
+		page = await playground.boards.page_async(&"fastest", scope)
 		rows = page.value
 
 	_check(rows.size() >= 1, "there is a time on the board")
@@ -1338,9 +1338,9 @@ func _test_leaderboards() -> void:
 	# pass or fail on the bot's driving instead of on the board's ordering.
 	var beat := (rows[0] as DotLeaderboardEntry).value - 1.0
 
-	await playground.boards.submit(&"fastest", scope, &"other", "Other", beat)
+	await playground.boards.submit_async(&"fastest", scope, &"other", "Other", beat)
 
-	page = await playground.boards.page(&"fastest", scope)
+	page = await playground.boards.page_async(&"fastest", scope)
 	rows = page.value
 
 	_check(
@@ -1358,7 +1358,7 @@ func _test_leaderboards() -> void:
 	var other_scope := scope.duplicate()
 	other_scope["style"] = "sideways"
 
-	var other: DotResult = await playground.boards.page(&"fastest", other_scope)
+	var other: DotResult = await playground.boards.page_async(&"fastest", other_scope)
 	_check(
 		(other.value as Array).is_empty(),
 		"and another style's board is separate"
@@ -1368,7 +1368,7 @@ func _test_leaderboards() -> void:
 	var reordered := {
 		"style": "normal", "map": "pg_flatgrass", "track": "0",
 	}
-	var same: DotResult = await playground.boards.page(&"fastest", reordered)
+	var same: DotResult = await playground.boards.page_async(&"fastest", reordered)
 	_check(
 		(same.value as Array).size() == rows.size(),
 		"while the same scope in a different order is the same board",
