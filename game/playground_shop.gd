@@ -91,7 +91,7 @@ func _rules() -> DotEconomyRules:
 	rules.allow_buying_while_dead = true
 	rules.refund_ticks = 10 * game.tick_rate
 	rules.refund_within_buy_time = false
-	rules.kill_award = ARENA_KILL
+	rules.kill_award = game.config.arena_kill_reward
 	rules.teamkill_penalty = 0      # No teams, so nothing is a team kill.
 	rules.win_award = 0
 	rules.loss_bonus_base = 0
@@ -218,7 +218,7 @@ func on_player_removed(player_id: StringName) -> void:
 func on_wave_kill(player_id: StringName) -> void:
 	if player_id == &"":
 		return
-	var _paid := award(player_id, WAVE_KILL, &"wave")
+	var _paid := award(player_id, game.config.wave_kill_reward, &"wave")
 
 
 func on_arena_kill(killer: StringName, victim: StringName) -> void:

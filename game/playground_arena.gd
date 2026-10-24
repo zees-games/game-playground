@@ -202,7 +202,7 @@ func _build_combat() -> DotResult:
 	var rules := DotDamageRules.new()
 	# A sandbox has no teams, so nothing is friendly — said explicitly rather than left,
 	# because a mode that adds teams changes exactly this line.
-	rules.friendly_fire = true
+	rules.friendly_fire = game.config.arena_friendly_fire
 	rules.friendly_scale = 1.0
 	# [b]On, and scaled by the damage type.[/b] Launching a boulder at your own feet
 	# hurting you is the joke the weapon exists for; it hurting you as much as it hurts
@@ -285,9 +285,9 @@ func _build_match() -> DotResult:
 	var rules := DotMatchRules.new()
 	rules.id = &"pg_arena"
 	rules.display_name = "Sandbox arena"
-	rules.score_limit = SCORE_LIMIT
-	rules.time_limit_sec = ROUND_SECONDS
-	rules.respawn_delay_sec = 3.0
+	rules.score_limit = game.config.arena_score_limit
+	rules.time_limit_sec = game.config.arena_round_sec
+	rules.respawn_delay_sec = game.config.arena_respawn_sec
 	rules.warmup_sec = 10.0
 	rules.countdown_sec = 3.0
 	rules.min_players = 1
@@ -395,12 +395,12 @@ func admit(id: StringName, display_name: String) -> void:
 
 	var health := DotHealth.new()
 	health.name = "Health_%s" % String(id)
-	health.max_health = MAX_HEALTH
-	health.max_armour = MAX_ARMOUR
+	health.max_health = game.config.arena_health
+	health.max_armour = game.config.arena_armour
 	health.regen_per_second = 0.0
 	# Three seconds of protection on spawn, counted in ticks. A player shot on the tick
 	# they appear has not had a game.
-	health.spawn_protection_ticks = game.tick_rate * 3
+	health.spawn_protection_ticks = roundi(game.tick_rate * game.config.arena_spawn_protection_sec)
 	add_child(health)
 
 	health.set_tick_rate(game.tick_rate)

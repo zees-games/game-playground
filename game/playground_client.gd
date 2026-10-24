@@ -1185,6 +1185,7 @@ func _build_pause() -> void:
 	platform.board_prepare_fn = _prepare_board
 	platform.adopt_menu(game_menu)
 	var _platform_up := platform.setup()
+	_add_noblock_and_workbench()
 	if presentation != null:
 		presentation.adopt_console(platform.add_console(presentation.settings) as DotConsoleController)
 
@@ -1219,6 +1220,26 @@ func _build_pause() -> void:
 		var _applied := applier.setup()
 		_bind_look()
 
+
+
+## dot-team's block rules followed from the server, and the F9 tuning panel where this process hosts the game.
+func _add_noblock_and_workbench() -> void:
+	if link != null:
+		DotLog.result(CHANNEL, "noblock", platform.add_noblock(playground, Callable(playground, "team_of_side")))
+		return
+	var wb := DotGameWorkbench.new()
+	wb.name = "Workbench"
+	wb.listen_host_fn = func() -> bool: return true
+	wb.add_set(playground.profiles.npcs, "NPCs")
+	wb.add_set(playground.profiles.weapons, "Weapons")
+	if playground.config_binder != null:
+		wb.add_set(playground.config_binder.profile_set(), "Game settings")
+	add_child(wb)
+	var started := wb.start(playground.profiles.runtime)
+	DotLog.result(CHANNEL, "the workbench", started)
+	if started.ok and playground.config_binder != null:
+		playground.config_binder.attach(playground.profiles.runtime)
+	platform.add_workbench(wb)
 
 
 ## The HUD in the menu's theme and at the player's HUD size, live (dot-menu's `follow_hud`,

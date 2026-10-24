@@ -4,7 +4,7 @@ const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundMapConfig := preload("playground_map_config.gd")
 
 const Playground := preload("playground.gd")
-const PlaygroundWorkbench := preload("playground_workbench.gd")
+const PlaygroundWorkbenchAuth := preload("playground_workbench_auth.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
 const PlaygroundArena := preload("playground_arena.gd")
 const PlaygroundDowns := preload("playground_downs.gd")
@@ -60,7 +60,9 @@ var net: DotNetManager = null
 ## Carries admins' profile edits up and the edited values down. Null if the types would not register.
 var profile_link: DotNetProfileLink = null
 ## The admin web page and API over the same profiles; closed unless `workbench.enabled` in cfg/server.yml.
-var workbench := PlaygroundWorkbench.new()
+var workbench: DotGameWorkbench = null
+## dot-team's block rules (`!block`, `!noblock`); null when dot-team is not in the build.
+var noblock: DotGameNoblock = null
 var bridge: PlaygroundNetBridge = null
 
 ## Chat, moderation and voice. Built here rather than in the game, because they are about
@@ -354,6 +356,10 @@ func _module_load() -> DotResult:
 	_bind_pickup()
 	_bind_creative()
 	_bind_props_feel()
+	var blocked := _bind_noblock()
+	if not blocked.ok:
+		return blocked
+	_bind_config()
 
 	server.client_disconnected.connect(_on_client_disconnected)
 	game.maps.map_over.connect(_on_map_over)
@@ -564,7 +570,12 @@ func _module_unload() -> void:
 	if map_config != null:
 		map_config.restore()
 		map_config = null
-	workbench.stop()
+	if workbench != null:
+		workbench.queue_free()
+		workbench = null
+	if game != null:
+		game.block_rules = null
+	noblock = null
 	if _handles_cover and server != null:
 		var env: Object = server.get(&"envelope")
 
@@ -775,7 +786,7 @@ func _build_extras() -> DotResult:
 	downs.revived.connect(func(player_id: StringName, _by: StringName, health: float) -> void:
 		var record := arena.health_of(player_id)
 		if record != null:
-			record.revive(clampf(health / PlaygroundArena.MAX_HEALTH, 0.05, 1.0))
+			record.revive(clampf(health / game.config.arena_health, 0.05, 1.0))
 	)
 
 	# Being killed by a wave is what being downed is FOR, so the two switch together.
@@ -1177,13 +1188,8 @@ func _bind_profile_edit() -> void:
 			and server.admins.uid_has_permission(actor, flag)
 	rt.actor_name = func(actor: Variant) -> String:
 		return String(actor) if actor is StringName else str(actor)
-	workbench.resolver = PlaygroundWorkbench.ticket_resolver(DotRegistry.get_node_service(DotAuthServer.SERVICE) as DotAuthServer)
-	if server != null and server.admins != null:
-		workbench.admin_permit = server.admins.uid_has_permission
-	var wb := workbench.start(game.profiles, DotWorkbenchHttp.read_config())
-	if not wb.ok:
-		DotLog.result(CHANNEL, "the workbench", wb)
-	add_command("workbench", func(ctx: DotCmdContext) -> void: ctx.reply_lines(workbench.describe_lines()),
+	_start_workbench(rt)
+	add_command("workbench", func(ctx: DotCmdContext) -> void: ctx.reply_lines(_workbench_lines()),
 		"Show the admin workbench's state", DotAdminFlags.CVAR)
 	profile_link = DotNetProfileLink.attach(net, rt)
 	if profile_link == null:
@@ -1202,15 +1208,74 @@ func _bind_profile_edit() -> void:
 		"Edit an NPC or weapon profile live: " + DotConsoleProfileEdit.USAGE, DotAdminFlags.CVAR)
 
 
+## dot-workbench over the profiles and the config: the F9 panel off a dedicated server, the HTTP page only with `workbench.enabled` in cfg/server.yml.
+func _start_workbench(rt: DotProfileRuntime) -> void:
+	workbench = DotGameWorkbench.new()
+	workbench.name = "Workbench"
+	workbench.dedicated = DisplayServer.get_name() == "headless"
+	workbench.listen_host_fn = func() -> bool: return DisplayServer.get_name() != "headless"
+	var admin_permit := Callable()
+	if server != null and server.admins != null:
+		admin_permit = server.admins.uid_has_permission
+	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
+		return admin_permit.is_valid() and actor is String and bool(admin_permit.call(actor, flag))
+	workbench.add_set(game.profiles.npcs, "NPCs")
+	workbench.add_set(game.profiles.weapons, "Weapons")
+	workbench.add_set(game.config_binder.profile_set(), "Game settings")
+	add_child(workbench)
+	var started := workbench.start(rt)
+	if not started.ok:
+		DotLog.result(CHANNEL, "the workbench", started)
+		return
+	game.config_binder.attach(rt)
+	var auth := DotRegistry.get_node_service(DotAuthServer.SERVICE) as DotAuthServer
+	var _gate := PlaygroundWorkbenchAuth.attach(workbench, PlaygroundWorkbenchAuth.ticket_resolver(auth), admin_permit)
+
+
+func _workbench_lines() -> PackedStringArray:
+	if workbench == null:
+		return PackedStringArray(["workbench    off"])
+	if workbench.running_http:
+		return PackedStringArray(["workbench    http " + JSON.stringify(workbench.http.call("describe"))])
+	return PackedStringArray(["workbench    off (workbench.enabled in cfg/server.yml)"])
+
+
+## dot-team's block rules through dot-game's [DotGameNoblock]: `mp_teamblock` (0) and `mp_enemyblock` (1), `!block` and `!noblock`. A sandbox has no sides, so everybody is an enemy and blocks until they ask to pass.
+func _bind_noblock() -> DotResult:
+	if not DotGameNoblock.available():
+		DotLog.warn(CHANNEL, "dot-team is not in this build: players block each other")
+		return DotResult.success(null)
+	var made := DotGameNoblock.create("game-playground", Callable(game, "team_of_side"))
+	if not made.ok:
+		return made
+	var built: DotGameNoblock = made.value
+	var bound := built.bind(add_cvar, self, game.profiles.runtime)
+	if not bound.ok:
+		return bound.wrap("noblock")
+	built.feed(game.body_rules)
+	game.block_rules = built.rules
+	if built.commands != null:
+		built.commands.set(&"key_fn", func(ctx: Object) -> Variant:
+			var session: Variant = ctx.get("session")
+			return StringName("u%d" % int(session.get("userid"))) if session is Object else null)
+	noblock = built
+	return DotResult.success(built)
+
+
+## Every [PlaygroundConfig] field as a `pg_<field>` cvar, for the ones with no hand-written cvar.
+func _bind_config() -> void:
+	# pg_creative and pg_prop_surf are the hand-written cvars of these two fields.
+	var hand := PackedStringArray(["pg_allow_creative", "pg_prop_surfing"])
+	game.config_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(name: String) -> bool:
+		return hand.has(name) or console.has_name(name))
+	game.config_binder.bind_commands(add_command)
+
+
 ## The server's tick, which is the whole game's.
 ##
 ## Driven from here rather than by the game's own loop, because it has to happen between
 ## dot-net applying the inputs that arrived and building the snapshot that goes back out.
 ## `Playground.external_tick` is what stands the game's loop down.
-func _process(_delta: float) -> void:
-	workbench.poll()
-
-
 func _physics_process(_delta: float) -> void:
 	if not loaded or bridge == null:
 		return

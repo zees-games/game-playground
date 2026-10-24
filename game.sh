@@ -32,7 +32,7 @@
 GAME_NAME="Playground"
 PACK="playground"
 EXTRA_PACKS=""
-SUITES="headless_playground headless_net headless_presentation headless_stack headless_packs_real dedicated headless_mapcfg"
+SUITES="headless_config headless_playground headless_net headless_presentation headless_stack headless_packs_real dedicated headless_mapcfg"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail

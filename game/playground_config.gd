@@ -149,6 +149,42 @@ extends DotConfig
 ## operator who is being spammed can tighten it without a build.
 @export_range(0.0, 10.0, 0.01) var prop_spawn_interval: float = 0.1
 
+@export_group("Arena")
+
+## Seconds one arena round lasts.
+@export_range(10.0, 7200.0, 10.0) var arena_round_sec: float = 240.0
+
+## Kills that end an arena round.
+@export_range(1, 1000, 1) var arena_score_limit: int = 25
+
+## Health an arena player spawns with, and the ceiling.
+@export_range(1.0, 1000.0, 1.0) var arena_health: float = 100.0
+
+## Armour ceiling in the arena.
+@export_range(0.0, 1000.0, 1.0) var arena_armour: float = 100.0
+
+## Seconds a killed arena player waits before respawning.
+@export_range(0.0, 60.0, 0.5) var arena_respawn_sec: float = 3.0
+
+## Seconds of protection after an arena spawn.
+@export_range(0.0, 30.0, 0.5) var arena_spawn_protection_sec: float = 3.0
+
+## Whether arena shots hurt everybody (true) or only players on other teams (false, once teams exist).
+@export var arena_friendly_fire: bool = true
+
+@export_group("Economy")
+
+## Credits for killing something the wave director sent.
+@export_range(0, 10000, 1) var wave_kill_reward: int = 60
+
+## Credits for an arena kill.
+@export_range(0, 10000, 1) var arena_kill_reward: int = 100
+
+@export_group("Server")
+
+## Player slots. Read when the roster is built, so a change takes a restart.
+@export_range(1, 128, 1) var max_players: int = 32
+
 
 func env_prefix() -> String:
 	return "PLAYGROUND_"

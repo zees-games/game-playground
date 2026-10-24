@@ -399,6 +399,19 @@ signal toys_built()
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
+## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by `_ready`.
+var config_binder: DotGameConfigBinder = null
+
+## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or
+## `DotGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.
+var block_rules: Object = null:
+	set(value):
+		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
+			block_rules.disconnect(&"changed", body_rules.refresh)
+		block_rules = value
+		if block_rules != null and block_rules.has_signal(&"changed"):
+			block_rules.connect(&"changed", body_rules.refresh)
+
 var players: Dictionary = {}
 
 ## The movement styles, by id: dot-player-controller's own set.
@@ -426,13 +439,14 @@ func _ready() -> void:
 	if not body_rules.changed.is_connected(_on_body_rules_changed):
 		body_rules.changed.connect(_on_body_rules_changed)
 
-	# Layered before anything reads it: a file, then the environment, then argv.
-	var loaded := config.load_layered(config_file)
+	# Layered before anything reads it: a file, cfg/ yml, the environment, then argv. Strict
+	# (a typo or bad value stops the boot) on a dedicated or headless server.
+	config_binder = DotGameConfigBinder.create(config, "game-playground", "pg", config_file)
+	var loaded := config_binder.load_layers()
 
 	if not loaded.ok:
-		DotLog.error(CHANNEL, "the playground configuration is not usable", {
-			"why": loaded.error.message
-		})
+		DotGameConfigBinder.fail_boot(get_tree(), loaded)
+		return
 
 	authoritative = config.authoritative
 	tick_rate = _resolve_tick_rate()
@@ -2363,6 +2377,7 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 	# After the player is fully built and in the dictionary: a listener answers this
 	# by replicating them, and an entity built over a half-constructed player would
 	# replicate a controller that has no style and no timer.
+	apply_pass_through()
 	player_added.emit(id)
 
 	return player
@@ -2417,6 +2432,9 @@ func remove_player(id: StringName) -> void:
 	(players[id] as PlaygroundPlayer).queue_free()
 
 	players.erase(id)
+	if block_rules != null:
+		block_rules.call(&"forget", id)
+	apply_pass_through()
 	_release_record_key(id)
 
 
@@ -3417,4 +3435,21 @@ func _apply_body_mask(player: PlaygroundPlayer) -> void:
 func _on_body_rules_changed() -> void:
 	for id in players:
 		_apply_body_mask(players[id] as PlaygroundPlayer)
+	apply_pass_through()
+
+
+## The side a player is on for dot-team's block rules. A sandbox has none, so everybody is an enemy and blocks until they ask to pass (`!noblock`).
+func team_of_side(_id: Variant) -> Variant:
+	return ""
+
+
+## Hands every controller the bodies it passes through under `block_rules` (teammates and
+## `!noblock` requests); the same call on every machine, or a client predicts a wall.
+func apply_pass_through() -> void:
+	var entries := {}
+	for id: Variant in players:
+		var who := players[id] as PlaygroundPlayer
+		if who != null and who.controller != null:
+			entries[id] = {"body": who, "controller": who.controller}
+	body_rules.apply_exceptions(entries)
 

@@ -182,7 +182,7 @@ func _build_roster() -> void:
 
 	var config := DotPlayerConfig.new()
 	config.tick_rate = game.tick_rate
-	config.max_players = 32
+	config.max_players = game.config.max_players
 	# Ten minutes. Somebody who has spent an hour building and drops out for a moment
 	# should come back to their own props rather than to a stranger's slot.
 	config.reconnect_window_sec = 600.0

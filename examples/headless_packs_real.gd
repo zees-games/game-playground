@@ -8,7 +8,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 const PlaygroundWeaponDef := preload("../game/weapons/playground_weapon_def.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
-const PlaygroundWorkbench := preload("../game/playground_workbench.gd")
+const PlaygroundWorkbenchAuth := preload("../game/playground_workbench_auth.gd")
 
 ## The three real optional packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters) in
 ## the Q menu, not the fixture the main suite uses.
@@ -299,8 +299,9 @@ func _test_live_edit() -> void:
 ## The workbench over real HTTP on an ephemeral loopback port: a token edits a weapon and the next shot uses it.
 func _test_workbench() -> void:
 	_section("the workbench edits a weapon over HTTP")
-	var off := PlaygroundWorkbench.new()
-	_check(off.start(_game.profiles, {}).ok and not off.running, "off by default: nothing listens")
+	var off := _new_workbench({"enabled": false})
+	_check(off.start(_game.profiles.runtime).ok and not off.running_http, "off by default: nothing listens")
+	off.free()
 	if not _game.profiles.weapons.has_id("m4"):
 		print("  SKIP  link cfg/addons/zz_modern_weapons (docs/profiles.md): no profile to edit")
 		_skipped += 7
@@ -311,15 +312,15 @@ func _test_workbench() -> void:
 	var tf := FileAccess.open(dir + "/workbench.token", FileAccess.WRITE)
 	tf.store_string("wb-s3cret\n")
 	tf.close()
-	var wb := PlaygroundWorkbench.new()
-	var res := wb.start(_game.profiles, {"enabled": true, "port": 0, "token_file": dir + "/workbench.token"})
-	_check(res.ok and wb.running, "enabled with a token file listens", "" if res.ok else res.error.message)
+	var wb := _new_workbench({"enabled": true, "port": 0, "token_file": dir + "/workbench.token"})
+	var res := wb.start(_game.profiles.runtime)
+	_check(res.ok and wb.running_http, "enabled with a token file listens", "" if res.ok else res.error.message)
 	var bot: PlaygroundPlayer = _game.players[&"bot"]
 	var m4 := _game_def("zz_m4")
 	var rig := PlaygroundZee.arm(bot, m4, ZeeWeaponRig.Role.SERVER, true, 64, 0) if m4 != null else null
 	if not res.ok or rig == null:
 		_check(false, "a rig holds the M4 and the server runs")
-		wb.stop()
+		wb.queue_free()
 		_done()
 		return
 	var tick := [0]
@@ -341,7 +342,7 @@ func _test_workbench() -> void:
 	_check(locked["status"] == 429, "repeated bad tokens are 429", str(locked["status"]))
 	_game.profiles.runtime.handle_request(PlaygroundProfiles.LOCAL_ACTOR, DotProfileRuntime.make_request("reset", "weapon", "m4"))
 	PlaygroundZee.disarm(bot)
-	wb.stop()
+	wb.queue_free()
 	DirAccess.remove_absolute(dir + "/workbench.token")
 	DirAccess.remove_absolute(dir)
 	_done()
@@ -350,13 +351,14 @@ func _test_workbench() -> void:
 ## No token file: an account resolved by the resolver gets in only when listed, and the game's flags still apply.
 func _test_workbench_identity() -> void:
 	_section("the workbench admits a dot-auth account")
-	var wb := PlaygroundWorkbench.new()
-	wb.resolver = func(token: String) -> Variant:
+	var wb := _new_workbench({"enabled": true, "port": 0, "admin_uids": ["boss", "nocvar"], "token_file": "user://wb_identity.token"})
+	var res := wb.start(_game.profiles.runtime)
+	var resolver := func(token: String) -> Variant:
 		return {"uid": token.trim_prefix("t-")} if token.begins_with("t-") else null
-	wb.admin_permit = func(uid: String, flag: String) -> bool: return uid == "boss" and flag == "cvar"
-	var res := wb.start(_game.profiles, {"enabled": true, "port": 0, "admin_uids": ["boss", "nocvar"]})
-	_check(res.ok and wb.running, "an identity resolver alone is enough to start", "" if res.ok else res.error.message)
-	if not wb.running:
+	var admin_permit := func(uid: String, flag: String) -> bool: return uid == "boss" and flag == "cvar"
+	var _gate := PlaygroundWorkbenchAuth.attach(wb, resolver, admin_permit)
+	_check(res.ok and wb.running_http, "an identity resolver alone is enough to start", "" if res.ok else res.error.message)
+	if not wb.running_http:
 		_done()
 		return
 	var listed := _http(wb, "GET", "/api/profiles/weapon", "t-boss")
@@ -365,7 +367,7 @@ func _test_workbench_identity() -> void:
 	var denied := _http(wb, "POST", "/api", "t-nocvar", JSON.stringify({"op": "reset", "kind": "weapon", "id": "m4"}))
 	_check(denied["status"] != 200, "a listed account without the game's flag cannot edit", str(denied["status"]))
 	_check_ticket_gate()
-	wb.stop()
+	wb.queue_free()
 	_done()
 
 
@@ -380,21 +382,32 @@ func _check_ticket_gate() -> void:
 	who.display_name = "Boss"
 	who.provider = "backbone"
 	var good := DotAuthTicket.issue(who, "srv", priv, "iss", 60)
-	var got: Variant = PlaygroundWorkbench.identity_of_ticket(good.value, pub, "srv", 0)
+	var got: Variant = PlaygroundWorkbenchAuth.identity_of_ticket(good.value, pub, "srv", 0)
 	_check(got != null and got.uid == "backbone:boss", "a fresh ticket for this server resolves")
-	_check(PlaygroundWorkbench.identity_of_ticket(good.value, pub, "other", 0) == null, "a ticket for another server is refused")
+	_check(PlaygroundWorkbenchAuth.identity_of_ticket(good.value, pub, "other", 0) == null, "a ticket for another server is refused")
 	var stale := DotAuthTicket.issue(who, "srv", priv, "iss", -120)
-	_check(PlaygroundWorkbench.identity_of_ticket(stale.value, pub, "srv", 0) == null, "an expired ticket is refused")
+	_check(PlaygroundWorkbenchAuth.identity_of_ticket(stale.value, pub, "srv", 0) == null, "an expired ticket is refused")
 	var claims := DotJwt.base_claims("iss", "backbone:boss", "srv", 60)
 	claims.erase("exp")
 	var forever := DotJwt.encode_rs256(claims, priv)
-	_check(PlaygroundWorkbench.identity_of_ticket(forever.value, pub, "srv", 0) == null, "a ticket with no expiry is refused")
+	_check(PlaygroundWorkbenchAuth.identity_of_ticket(forever.value, pub, "srv", 0) == null, "a ticket with no expiry is refused")
 	var parts := String(good.value).split(".")
 	var forged := "%s.%s.%s" % [parts[0], parts[1], parts[2].reverse()]
-	_check(PlaygroundWorkbench.identity_of_ticket(forged, pub, "srv", 0) == null, "a tampered signature is refused")
+	_check(PlaygroundWorkbenchAuth.identity_of_ticket(forged, pub, "srv", 0) == null, "a tampered signature is refused")
 
 
-func _http(wb: PlaygroundWorkbench, method: String, path: String, token: String, body: String = "") -> Dictionary:
+## A workbench with no panel over [param config], in the tree so it polls.
+func _new_workbench(config: Dictionary) -> DotGameWorkbench:
+	var wb := DotGameWorkbench.new()
+	wb.panel_mode = 1
+	wb.config = config
+	wb.add_set(_game.profiles.npcs)
+	wb.add_set(_game.profiles.weapons)
+	add_child(wb)
+	return wb
+
+
+func _http(wb: DotGameWorkbench, method: String, path: String, token: String, body: String = "") -> Dictionary:
 	var head := "%s %s HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n" % [method, path, body.to_utf8_buffer().size()]
 	if token != "":
 		head += "Authorization: Bearer %s\r\n" % token
@@ -408,7 +421,7 @@ func _http(wb: PlaygroundWorkbench, method: String, path: String, token: String,
 		if not sent and c.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			c.put_data((head + "\r\n" + body).to_utf8_buffer())
 			sent = true
-		wb.poll()
+		wb.http.call("poll")
 		c.poll()
 		if c.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			var n := c.get_available_bytes()

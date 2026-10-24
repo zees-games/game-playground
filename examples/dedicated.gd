@@ -46,8 +46,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 30
-const CHECKS := 281
+const SECTIONS := 31
+const CHECKS := 287
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -139,6 +139,7 @@ func _run() -> void:
 		await _test_blind_and_beacon()
 		await _test_loading_cover()
 		_test_creative()
+		_test_noblock()
 		_test_saved_builds()
 		_test_inventory_commands()
 		_test_welcome_waits_for_ready()
@@ -2147,6 +2148,37 @@ func _run_as(session: DotClientSession, line: String) -> PackedStringArray:
 	template.reply_sink = func(text: String) -> void: captured.append(text)
 	server.console.execute(line, template)
 	return PackedStringArray(captured)
+
+
+## dot-team's block rules through dot-game's DotGameNoblock: strangers block by default, `!noblock` lets the caller's pairs pass, `!block` takes it back, and the cvars decide.
+func _test_noblock() -> void:
+	print("")
+	print("[noblock]")
+	var teamblock := server.console.find_cvar("mp_teamblock")
+	var enemyblock := server.console.find_cvar("mp_enemyblock")
+	_check(teamblock != null and teamblock.get_string() == "0" and enemyblock != null and enemyblock.get_string() == "1",
+		"mp_teamblock is 0 and mp_enemyblock is 1 by default")
+	_check(server.console.find_cvar("mp_blockstate") != null and server.console.has_name("pg_arena_round_sec"),
+		"mp_blockstate and the config cvars are bound")
+	var _a := game.add_player(&"u81", "Walker")
+	var _b := game.add_player(&"u82", "Other")
+	var session := DotClientSession.new()
+	session.peer_id = 8109
+	session.userid = 81
+	session.display_name = "Walker"
+	var _adopted := server.adopt_session(session)
+	_check(game.body_rules.blocks(&"u81", &"u82"), "two players with no side block each other")
+	var said := _run_as(session, "noblock")
+	_check(not game.body_rules.blocks(&"u81", &"u82") and not game.body_rules.blocks(&"u82", &"u81"), "`!noblock` lets the pair pass, both ways", " | ".join(said))
+	said = _run_as(session, "block")
+	_check(game.body_rules.blocks(&"u81", &"u82"), "`!block` takes the request back", " | ".join(said))
+	enemyblock.set_value("0")
+	_check(not game.body_rules.blocks(&"u81", &"u82"), "mp_enemyblock 0 lets everybody pass")
+	enemyblock.set_value("1")
+	var _released := server.release_session(session.peer_id)
+	game.remove_player(&"u81")
+	game.remove_player(&"u82")
+	_section_done()
 
 
 ## Creative mode: `!creative` from a player, their props protected, out of the fight both

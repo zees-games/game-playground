@@ -25,10 +25,10 @@ Weapons: `profile_edit set weapon <id> <key> <value>`, where `<id>` is the profi
 
 ## The admin workbench (web page and API)
 
-dot-workbench's `DotWorkbenchHttp` edits the same `Playground.profiles.runtime` over HTTP; `game/playground_workbench.gd` wires it into the server module. It is **off unless** `cfg/server.yml` has a `workbench:` block with `enabled: true` (`bind` defaults to loopback, `port` 8790, `token_file` is a path, never a value; see dot-workbench `docs/design.md`). Link it for development with `ln -s ../../dot-workbench/addons/dot_workbench addons/dot_workbench` (gitignored).
+dot-workbench's `DotWorkbenchHttp` edits the same `Playground.profiles.runtime` over HTTP; dot-game's `DotGameWorkbench` (wired by `PlaygroundModule._start_workbench`, with `game/playground_workbench_auth.gd` for dot-auth admission) serves it, and the same page edits the game's config. It is **off unless** `cfg/server.yml` has a `workbench:` block with `enabled: true` (`bind` defaults to loopback, `port` 8790, `token_file` is a path, never a value; see dot-workbench `docs/design.md`). Link it for development with `ln -s ../../dot-workbench/addons/dot_workbench addons/dot_workbench` (gitignored).
 
 - The module builds it after the console's permit is set, so a bearer token acts as the workbench token actor (`cvar` and `root`) and every other actor goes through the same admin-flag check `profile_edit` uses. An edit reaches the next shot exactly as a console edit does.
-- **Accounts**: with dot-auth running a ticket key, a connect ticket is also accepted as the bearer (`PlaygroundWorkbench.ticket_resolver`, verified offline, audience-checked, not burned). Only `admin_uids` and `admin_groups` in the `workbench:` block are let in, and `server.admins.uid_has_permission` still decides `cvar` and `root`. With neither listed nobody is admitted. `token_file` becomes optional when an account resolver exists. Checked by "the workbench admits a dot-auth account".
+- **Accounts**: with dot-auth running a ticket key, a connect ticket is also accepted as the bearer (`PlaygroundWorkbenchAuth.ticket_resolver`, verified offline, audience-checked, not burned). Only `admin_uids` and `admin_groups` in the `workbench:` block are let in, and `server.admins.uid_has_permission` still decides `cvar` and `root`. With neither listed nobody is admitted. `token_file` becomes optional when an account resolver exists. Checked by "the workbench admits a dot-auth account".
 - The module polls it from `_process` and stops it on unload. `workbench` (admin `cvar`) prints its state, from `describe()`.
 - An export that ships the page needs `*.html` in its include filter (this repository keeps no `export_presets.cfg`).
 - Checked by `headless_packs_real` ("the workbench edits a weapon over HTTP": list, authorised set, 401, 429, next shot) and `dedicated` (off by default).
@@ -43,3 +43,10 @@ dot-workbench's `DotWorkbenchHttp` edits the same `Playground.profiles.runtime` 
 - `docs/workbench_npc.png` and `docs/workbench_weapon.png` are rendered by `tools/render_workbench.sh` (xvfb, 1280x720).
 - A readout line under the card gives DPS (burst, and sustained with reloads) of the weapon last opened and the shots and seconds to kill the NPC last opened (100 hp until one is opened). `game/playground_profile_readout.gd` computes it from the flattened rows (`extra.damage` times `extra.pellets` or `extra.splash_damage`, `extra.rpm` or `use_interval_ticks`, `magazine`, `extra.reload_seconds` or `reload_ticks`), so it follows live edits.
 - Checked by `headless_playground` ("the profile workbench edits live through requests", DPS and TTK arithmetic included).
+
+
+## Config and noblock
+
+`PlaygroundConfig` is bound by dot-game's `DotGameConfigBinder` (`Playground.config_binder`, prefix `pg`): every field is a `pg_<field>` cvar, a `cfg/game/game-playground/config/game.yml` key (operators override under `cfg/server/game/game-playground/config/game.yml`), an environment or command-line value, and a workbench "Game settings" set. Unknown keys fail the boot. The arena (`arena_*`), kill rewards and `max_players` are fields now. Movement constants in `playground_map.gd` stay fixed because the map survey reads them. Checked by `headless_config`.
+
+`!block` and `!noblock` come from `DotGameNoblock` (`mp_teamblock` 0, `mp_enemyblock` 1); the module feeds `block_rules` into `Playground.apply_pass_through`, and a solo or connected client adds it with `platform.add_noblock`. Checked by `dedicated`.

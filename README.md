@@ -97,7 +97,7 @@ On Windows, run `bootstrap.ps1` instead and open the project in Godot.
 `online` and `server` use [dot-server-deploy](https://github.com/modcommunity/dot-server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
-Settings are cvars. Set them in the server's config, on the command line, or live from the console. `cvarlist pg_` lists them all.
+Settings are cvars. Set them in the server's config, on the command line, or live from the console. `cvarlist pg_` lists them all. Every game setting is also a key in `cfg/game/game-playground/config/game.yml` (unknown keys stop the boot) and editable live in the admin workbench; `!block` and `!noblock` toggle player collision.
 
 ```
 pg_map_seconds 1800          // how long a map runs before the vote (0 = forever)

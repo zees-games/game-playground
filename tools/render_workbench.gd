@@ -46,6 +46,13 @@ func _run() -> void:
 		await _frames(5)
 		var _r := screen.form.set_value("extra.damage", 99)
 	await _shot("workbench_weapon")
+	# dot-workbench's F9 panel (DotGameWorkbench) over the same profiles and the game settings.
+	_client.screens.close_all() if _client.screens.has_method("close_all") else null
+	var panel := _client.get_node_or_null("Workbench") as DotGameWorkbench
+	if panel != null:
+		panel.open()
+		await _frames(10)
+		await _shot("workbench_panel")
 	get_tree().quit()
 
 
