@@ -6,6 +6,7 @@
 #   ln -s ../../dot-core/addons/dot_core addons/dot_core
 # A shipped build copies them in instead.
 /addons/dot_core
+/addons/dot_profile
 /addons/dot_entity
 /addons/dot_map
 /addons/dot_props
