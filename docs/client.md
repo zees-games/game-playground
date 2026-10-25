@@ -101,7 +101,7 @@ dot-ui's `DotChatWindow` beside the console. **The channels come from `Playgroun
 
 ## Footsteps and the bed
 
-- **Footsteps and a bed per map are dot-audio's stock** (`PlaygroundPresentation.keep_walkers`; a step's surface is the box's `dot_fps_surface`, the one the movement reads; `bed_for` by map prefix). Levels are measured with `addons/dot_audio/tools/loudness.sh --warmup=6` (−17 LUFS band, `loudness_trim_db`), which drives the local player through `tools/loudness_pilot.gd` (walks, spawns props, punts them); a run whose `capture pilot:` line shows no walking or spawning measured an empty room. Stock ids have files, so the stand-in check skips them.
+- **Footsteps and a bed per map are dot-audio's stock** (`PlaygroundPresentation.keep_walkers`; a step's surface is the box's `dot_fps_surface`, the one the movement reads; `bed_for` by map prefix is the fallback). **The quiet mood layer is dot-audio's `DotAmbienceDirector`** (`PlaygroundAmbience`: moods by name prefix, level 0.3, rate 0.5; settings `ambient`, `ambient_volume`; server cvars `pg_ambient*` registered by the module, replicated, followed in `PlaygroundClient`; roof ray once a frame). Levels are measured with `addons/dot_audio/tools/loudness.sh --warmup=6` (−17 LUFS band, `loudness_trim_db`), which drives the local player through `tools/loudness_pilot.gd` (walks, spawns props, punts them); a run whose `capture pilot:` line shows no walking or spawning measured an empty room. Stock ids have files, so the stand-in check skips them.
 
 ## Looking at it
 

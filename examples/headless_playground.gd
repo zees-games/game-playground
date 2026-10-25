@@ -5752,6 +5752,8 @@ func _test_the_client_boots() -> void:
 	_check(sink != null, "the headless client's presentation has a null sink to count on")
 
 	if sink != null:
+		# The null sink never reaps and the ambience layer's beds are loops: room for the cue under test.
+		sink.capacity = 64
 		sink.forget()
 		client.selected_prop = &"crate"
 		client._spawn()

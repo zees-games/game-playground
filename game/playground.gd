@@ -1,5 +1,6 @@
 extends Node3D
 
+const PlaygroundAmbience := preload("playground_ambience.gd")
 const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundZee := preload("playground_zee.gd")
 
@@ -396,6 +397,8 @@ signal toys_built()
 ## dot-player-controller's `mp_forceview` (may a player switch to third person) and
 ## `mp_solidplayers` (do players block each other). Bound by the module (REPLICATED) and
 ## followed by a client through its link.
+## The ambience cvars (`pg_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
+var ambient_rules: DotAmbienceRules = PlaygroundAmbience.make_rules()
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 

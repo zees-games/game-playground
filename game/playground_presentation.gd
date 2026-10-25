@@ -1,5 +1,6 @@
 extends Node
 
+const PlaygroundAmbience := preload("playground_ambience.gd")
 const PlaygroundBindings := preload("playground_bindings.gd")
 const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
@@ -51,6 +52,9 @@ var audio: DotAudioManager = null
 ## meta, which the movement already reads, is what a step on it sounds like.
 var steps: DotAudioFootsteps = null
 var ambience: DotAudioAmbience = null
+
+## Quiet moods under the map (dot-audio's stock set); the old bed plays only when none loaded.
+var ambient: DotAmbienceDirector = null
 var fx: DotFxManager = null
 ## Blood on the surface behind a hit body. Visual only; the player's `gore` setting and `fx_quality` scale it.
 var blood: DotFxBlood = null
@@ -141,6 +145,8 @@ static func schema() -> DotSettingsSchema:
 	s.add(DotSettingsDef.number(&"master_volume", 0.8, 0.0, 1.0, &"audio"))
 	s.add(DotSettingsDef.number(&"sfx_volume", 1.0, 0.0, 1.0, &"audio"))
 	s.add(DotSettingsDef.number(&"voice_volume", 1.0, 0.0, 1.0, &"audio"))
+	s.add(DotSettingsDef.boolean(&"ambient", true, &"audio").with_description("Quiet sounds under the map."))
+	s.add(DotSettingsDef.number(&"ambient_volume", 1.0, 0.0, 1.0, &"audio"))
 
 	s.add(DotSettingsDef.number(&"sensitivity", 2.5, 0.05, 20.0, &"controls").with_scope(
 		DotSettingsDef.Scope.ACCOUNT
@@ -559,7 +565,19 @@ func _build_audio() -> DotResult:
 	# room it happens in, not the thing to listen to.
 	ambience.level = 0.8
 	add_child(ambience)
-	ambience.set_map_bed(bed_for(&""))
+	ambient = DotAmbienceDirector.new()
+	ambient.name = "Ambient"
+	ambient.manager = audio
+	ambient.default_mood = PlaygroundAmbience.DEFAULT_MOOD
+	ambient.prefix_moods = PlaygroundAmbience.PREFIX_MOODS
+	ambient.rules = PlaygroundAmbience.make_rules()
+	add_child(ambient)
+	var _moods := ambient.setup()
+	ambient.follow_settings(settings)
+	if ambient.has_moods():
+		ambient.on_map(&"")
+	else:
+		ambience.set_map_bed(bed_for(&""))
 
 	# Only on a real sink, and only after setup: the manager decides whether there is a
 	# device, and on a headless server there is nothing to bake for. Building the bank
@@ -994,7 +1012,9 @@ func on_wave_incoming() -> void:
 func on_map_changed(map_id: StringName = &"") -> void:
 	fx.clear()
 	blood.clear()
-	if ambience != null:
+	if ambient != null and ambient.has_moods():
+		ambient.on_map(map_id)
+	elif ambience != null:
 		ambience.set_map_bed(bed_for(map_id))
 
 
@@ -1008,6 +1028,12 @@ static func bed_for(map_id: StringName) -> StringName:
 	if id.begins_with("kz_") or id.begins_with("climb_"):
 		return &"amb_cave"
 	return &"amb_outdoor"
+
+
+## The listener's roof, once a frame: under one the ambience crosses to its indoor mood.
+func follow_roof(delta: float, eye: Vector3, space: PhysicsDirectSpaceState3D, world_mask: int) -> void:
+	if ambient != null:
+		ambient.follow_roof(delta, eye, space, world_mask)
 
 
 ## Everybody on the map steps, once a frame: players and bots alike.
@@ -1026,6 +1052,8 @@ func describe_lines() -> PackedStringArray:
 	out.append_array(rng.describe_lines())
 	out.append_array(settings.describe_lines())
 	out.append_array(audio.describe_lines())
+	if ambient != null:
+		out.append("ambience: %s" % str(ambient.describe()))
 	out.append_array(fx.describe_lines())
 
 	if chat_window != null:

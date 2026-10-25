@@ -583,7 +583,11 @@ func _build_netcode() -> DotResult:
 		# predicts its own player.
 		var _view := playground.view_rules.follow_cvars(link)
 		var _solid := playground.body_rules.follow_cvars(link)
+		var _ambient := playground.ambient_rules.follow_cvars(link)
 		_follow_arena(link)
+	# The server's pg_ambient* set (when a link tells it) drives the quiet layer; the player's sliders multiply on top.
+	if presentation != null and presentation.ambient != null:
+		presentation.ambient.follow_settings(presentation.settings, playground.ambient_rules)
 	_build_ragdolls()
 	bridge.body_fell.connect(func(figure: Node3D, death: DotPlayerDeath) -> void:
 		if ragdolls != null and figure.is_inside_tree():
@@ -1356,6 +1360,9 @@ func _process(_delta: float) -> void:
 			if camera != null and camera.is_inside_tree() else Vector3.FORWARD
 		presentation.present(_delta, eye, forward)
 		presentation.keep_walkers(playground.players.values())
+		var stack_now := playground.player_stack
+		if stack_now != null and stack_now.physics != null and stack_now.physics.layout != null and camera != null:
+			presentation.follow_roof(_delta, eye, camera.get_world_3d().direct_space_state, stack_now.physics.layout.mask_of([&"world"]))
 		_present_tool_beam(eye, forward)
 
 	var _bodies := present_frame(net, playground, -1.0, player)

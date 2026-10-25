@@ -351,6 +351,11 @@ func _module_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	var _ambient := game.ambient_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+	)
+
 	_bind_limits()
 	_bind_pickup()
 	_bind_creative()

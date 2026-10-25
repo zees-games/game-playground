@@ -1,5 +1,6 @@
 extends Node
 
+const PlaygroundAmbience := preload("../game/playground_ambience.gd")
 const PlaygroundInventory := preload("../game/playground_inventory.gd")
 const PlaygroundParty := preload("../game/playground_party.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
@@ -26,7 +27,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 135
+const CHECKS := 146
 
 var _passed := 0
 var _failed := 0
@@ -73,6 +74,7 @@ func _run() -> void:
 	await _test_glance_pieces()
 
 	_test_every_sound_has_a_voice()
+	_test_ambience_is_quiet_and_obeys_settings()
 	_test_the_vote_is_heard()
 
 	# A settings manager writes on a debounce, and a freed one writes in `_exit_tree`:
@@ -133,6 +135,45 @@ func _make() -> PlaygroundPresentation:
 	p.settings.load_now()
 	p.apply_all()
 	return p
+
+
+# --- ambience -----------------------------------------------------------------
+func _test_ambience_is_quiet_and_obeys_settings() -> void:
+	_section("The ambience is quiet by default, follows the map and obeys the settings")
+
+	var p := _make()
+	var a := p.ambient
+	_check(a != null and a.has_moods() and a.ambient.mood_names().size() == 8, "dot-audio's stock mood set loaded")
+	if a == null or not a.has_moods():
+		p.queue_free()
+		_done()
+		return
+	a.ambient.set_process(false)
+	_check(a.mood_for_map()["mood"] == &"outdoor_night", "the sandbox's default is a quiet night outdoors")
+	p.on_map_changed(&"surf_ski_2")
+	_check(a.ambient.effective_mood() == &"snow_wind" and a.mood_for_map()["why"] == "name prefix", "a surf map is wind")
+	p.on_map_changed(&"pgc_warehouse")
+	_check(a.ambient.effective_mood() == &"industrial", "the warehouse is machinery")
+	_check(a.ambient.config.enabled and a.ambient.config.volume <= 0.35, "the level is quiet by default (%.2f)" % a.ambient.config.volume)
+	_check(a.ambient.target_level() < 0.5, "and the layer's target level is under half (%.2f)" % a.ambient.target_level())
+
+	var _r1 := p.settings.set_value(&"ambient_volume", 0.5)
+	_check(is_equal_approx(a.ambient.config.volume, PlaygroundAmbience.LEVEL * 0.5), "the player's slider turns it down")
+	var _r2 := p.settings.set_value(&"ambient", false)
+	_check(not a.ambient.config.enabled, "the player's switch turns it off")
+	var _r3 := p.settings.set_value(&"ambient", true)
+	var _r4 := p.settings.set_value(&"master_volume", 0.0)
+	_check(p.audio.mixer.master == 0.0 and a.ambient.bus == &"Ambience", "the master volume reaches it through the Ambience bus")
+
+	var rules := PlaygroundAmbience.make_rules()
+	var names: Array = []
+	for row: Array in DotAmbienceRules.VARS.values():
+		names.append(rules.cvar_of(row))
+	_check(names.has("pg_ambient") and names.has("pg_ambient_volume") and rules.volume == PlaygroundAmbience.LEVEL, "the cvars are pg_ambient* with the quiet defaults")
+	_check(str(p.describe_lines()).contains("ambience"), "describe says what plays")
+
+	p.queue_free()
+	_done()
 
 
 # --- 1 ----------------------------------------------------------------------
@@ -1245,7 +1286,7 @@ func _test_every_sound_has_a_voice() -> void:
 	var uncovered: Array[String] = []
 	for id in cat.ids():
 		# dot-audio's stock footsteps and beds are files the addon ships: no stand-in needed.
-		if not recipes.has(id) and not DotAudioStock.ids().has(id):
+		if not recipes.has(id) and not DotAudioStock.ids().has(id) and not String(id).begins_with(DotAmbience.ID_PREFIX):
 			uncovered.append(String(id))
 	_check(
 		uncovered.is_empty(),
