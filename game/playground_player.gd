@@ -511,7 +511,7 @@ func _tunables() -> DotFpsTunables:
 
 ## A fresh copy of the movement every player here is built with. See [method _tunables].
 static func movement_tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.new()
+	var t := DotFpsTunables.with_profile("legacy")
 
 	t.auto_hop = true
 	t.bhop_speed_cap_scale = 0.0
