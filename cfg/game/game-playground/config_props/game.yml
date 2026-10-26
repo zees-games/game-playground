@@ -1,0 +1,26 @@
+# game-playground: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-playground/config_props/game.yml. Layers: defaults < this < env < argv.
+
+# --- Props
+# Whether props can be spawned at all. Off makes it a pure movement server.
+# allow_props: true
+# Props one player may have at once, counted in COST. 0 = unlimited, and 0 is the default. [0..1000]
+# prop_budget: 0
+# Whether a player may move, freeze or remove somebody else's props.
+# touch_others_props: true
+# Whether a player may switch on creative mode (`!creative`): their props refuse everybody else's tools and h...
+# allow_creative: true
+# Whether standing on a moving prop carries you with it: a crate somebody else swings with the physics gun, a...
+# prop_surfing: true
+# Whether shots and blasts break props that have health (`PlaygroundSpawnables.BREAKABLE`): a crate shot apar...
+# destruction: false
+# Whether a map's breakable boxes (glass) break from shots, blasts and fast impacts. On by default and separa...
+# breakable_glass: true
+# Pieces a broken prop leaves, and how long they lie there. [0..12]
+# debris_pieces: 4
+#  [0.5..60.0]
+# debris_seconds: 6.0
+# Props in the world at once, from everybody. 0 = unlimited. [0..10000]
+# prop_world_budget: 1024
+# Seconds between one player's spawns. [0.0..10.0]
+# prop_spawn_interval: 0.1

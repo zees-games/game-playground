@@ -186,6 +186,22 @@ extends DotConfig
 @export_range(1, 128, 1) var max_players: int = 32
 
 
+## `@export_group` -> the cfg file it lives in: `cfg/game/game-playground/config_<file>/game.yml`.
+const CFG_FILES := {
+	"Content": "server", "Rules": "server", "Records": "server", "Server": "server",
+	"Props": "props",
+	"Arena": "arena", "Economy": "arena",
+}
+
+
+## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
+static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
+	var b := DotGameConfigBinder.create(config, "game-playground", "pg", json_path)
+	b.grouped = true
+	b.group_files = CFG_FILES
+	return b
+
+
 func env_prefix() -> String:
 	return "PLAYGROUND_"
 

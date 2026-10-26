@@ -444,7 +444,7 @@ func _ready() -> void:
 
 	# Layered before anything reads it: a file, cfg/ yml, the environment, then argv. Strict
 	# (a typo or bad value stops the boot) on a dedicated or headless server.
-	config_binder = DotGameConfigBinder.create(config, "game-playground", "pg", config_file)
+	config_binder = PlaygroundConfig.make_binder(config, config_file)
 	var loaded := config_binder.load_layers()
 
 	if not loaded.ok:

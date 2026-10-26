@@ -1,0 +1,35 @@
+# game-playground: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-playground/config_server/game.yml. Layers: defaults < this < env < argv.
+
+# --- Content
+# The map to load on boot.
+# initial_map: "pg_flatgrass"
+# A map catalogue JSON file. Empty uses the maps this build ships.
+# catalogue_path: ""
+# The seed a generated map is built from. Zero picks one and announces it.
+# map_seed: 0
+# A prop catalogue JSON file. Empty uses the fourteen props this build ships.
+# props_path: ""
+# A folder of loose models (.glb or .gltf, each with an optional same-named .json sidecar for name, category,...
+# props_dir: "user://props"
+
+# --- Rules
+# Whether this instance times, ranks and spawns — the authority.
+# authoritative: true
+# Seconds a map runs before the session asks for the next one. 0 disables it. [0.0..86400.0]
+# map_seconds: 2700.0
+# The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the game's own shipped `res://...
+# map_rotation_file: "cfg/maps.yml"
+# Fraction of the players who must rock the vote to end a map early. [0.0..1.0]
+# rtv_fraction: 0.6
+
+# --- Records
+# Where records are kept. Empty keeps them in memory only.
+# records_directory: "user://playground/records"
+# record_replays: true
+# Whether published boards are reported to the TMC backbone.
+# report_to_backbone: false
+
+# --- Server
+# Player slots. Read when the roster is built, so a change takes a restart. [1..128]
+# max_players: 32

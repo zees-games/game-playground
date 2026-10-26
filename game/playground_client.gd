@@ -1241,7 +1241,8 @@ func _add_noblock_and_workbench() -> void:
 	wb.add_set(playground.profiles.npcs, "NPCs")
 	wb.add_set(playground.profiles.weapons, "Weapons")
 	if playground.config_binder != null:
-		wb.add_set(playground.config_binder.profile_set(), "Game settings")
+		for set: DotProfileSet in playground.config_binder.profile_sets():
+			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
 	add_child(wb)
 	var started := wb.start(playground.profiles.runtime)
 	DotLog.result(CHANNEL, "the workbench", started)

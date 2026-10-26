@@ -2,6 +2,9 @@ extends DotModule
 
 const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundMapConfig := preload("playground_map_config.gd")
+const PlaygroundAmbience := preload("playground_ambience.gd")
+## The workbench kind of the ambience cvar set.
+const AMBIENT_KIND := "ambience"
 
 const Playground := preload("playground.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
@@ -1230,13 +1233,19 @@ func _start_workbench(rt: DotProfileRuntime) -> void:
 		return admin_permit.is_valid() and actor is String and bool(admin_permit.call(actor, flag))
 	workbench.add_set(game.profiles.npcs, "NPCs")
 	workbench.add_set(game.profiles.weapons, "Weapons")
-	workbench.add_set(game.config_binder.profile_set(), "Game settings")
+	for set: DotProfileSet in game.config_binder.profile_sets():
+		workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var ambient_set := DotGameWorkbench.cvar_set(console, PlaygroundAmbience.cvar_types(), AMBIENT_KIND)
+	if ambient_set != null:
+		workbench.add_set(ambient_set, "Ambience (pg_ambient*)")
 	add_child(workbench)
 	var started := workbench.start(rt)
 	if not started.ok:
 		DotLog.result(CHANNEL, "the workbench", started)
 		return
 	game.config_binder.attach(rt)
+	if ambient_set != null:
+		var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, rt, console)
 
 
 func _workbench_lines() -> PackedStringArray:

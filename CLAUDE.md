@@ -51,6 +51,8 @@ Short forms; the reasoning is in the linked file.
 
 **Simulation**
 
+- Config is dot-game's `DotGameConfigBinder` over `PlaygroundConfig` (game id `game-playground`, prefix `pg`): every field is a `pg_<field>` cvar, a key in one of three `cfg/game/game-playground/config_<server|props|arena>/game.yml` files (`PlaygroundConfig.CFG_FILES` maps each `@export_group`; `PlaygroundConfig.make_binder` is what the simulation and the suites use; every key is shipped commented out at its default by `tools/cfg_templates.gd`, which `headless_config` holds in step; a key in the wrong file fails a dedicated boot) and a workbench set per file, plus an "ambience" set for the `pg_ambient*` cvars (started once the module has bound them). Noblock is `DotGameNoblock` (`mp_teamblock`, `!block`, `!noblock`). Suite: `headless_config`.
+
 - Per-map cvars: `cfg/game/game-playground/dot_map/map/<map or glob>.yml` through dot-game's `DotGameMapConfig`, keys whitelisted in `game/playground_map_config.gd` (applied in `PlaygroundModule._report_map`, restored on the next map and on unload; server only, the client reads replicated cvars). Operators override under `cfg/server/`.
 
 - Footsteps and per-map beds are dot-audio's stock (a step's surface is the box's `dot_fps_surface`); measure levels with its `loudness.sh`, and check the pilot walked and spawned. [client](docs/client.md#footsteps-and-the-bed)

@@ -1,0 +1,24 @@
+# game-playground: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-playground/config_arena/game.yml. Layers: defaults < this < env < argv.
+
+# --- Arena
+# Seconds one arena round lasts. [10.0..7200.0]
+# arena_round_sec: 240.0
+# Kills that end an arena round. [1..1000]
+# arena_score_limit: 25
+# Health an arena player spawns with, and the ceiling. [1.0..1000.0]
+# arena_health: 100.0
+# Armour ceiling in the arena. [0.0..1000.0]
+# arena_armour: 100.0
+# Seconds a killed arena player waits before respawning. [0.0..60.0]
+# arena_respawn_sec: 3.0
+# Seconds of protection after an arena spawn. [0.0..30.0]
+# arena_spawn_protection_sec: 3.0
+# Whether arena shots hurt everybody (true) or only players on other teams (false, once teams exist).
+# arena_friendly_fire: true
+
+# --- Economy
+# Credits for killing something the wave director sent. [0..10000]
+# wave_kill_reward: 60
+# Credits for an arena kill. [0..10000]
+# arena_kill_reward: 100
