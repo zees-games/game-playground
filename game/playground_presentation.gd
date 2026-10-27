@@ -571,6 +571,7 @@ func _build_audio() -> DotResult:
 	ambient.default_mood = PlaygroundAmbience.DEFAULT_MOOD
 	ambient.prefix_moods = PlaygroundAmbience.PREFIX_MOODS
 	ambient.rules = PlaygroundAmbience.make_rules()
+	ambient.beds = ambience
 	add_child(ambient)
 	var _moods := ambient.setup()
 	ambient.follow_settings(settings)
