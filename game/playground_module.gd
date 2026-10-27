@@ -1179,8 +1179,13 @@ func _build_netcode() -> DotResult:
 	var avatar := DotGameAvatarActionRelay.serve(net, self, server)
 	if not avatar.ok:
 		log_warn("avatar actions not served", {"why": avatar.error.message})
+	# The remote workbench's frame, after the avatar one on both ends.
+	DotLog.result(CHANNEL, "remote workbench message", DotGameWorkbenchRemote.serve(net))
 
 	net.messages.seal()
+	# Off until the owner sets sv_workbench_remote 1; then flagged admins edit from a client.
+	if workbench != null and workbench.api != null:
+		var _served := workbench.serve_remote(net)
 	# [b]A client whose game messages cannot work with this server's is dropped, in words.[/b]
 	# dot-net compares the two schema tables and refuses a pair where either lacks a type
 	# the other REQUIRES, but it owns no socket and can only say so; this is the socket.

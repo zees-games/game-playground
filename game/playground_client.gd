@@ -97,6 +97,8 @@ const FALLBACK_MAP := &"pg_flatgrass"
 @export var link: Node = null
 
 var playground: Playground = null
+## Asks a server whether this player may edit it (sv_workbench_remote); null offline.
+var workbench_remote: DotGameWorkbenchRemoteClient = null
 var net: DotNetManager = null
 var bridge: PlaygroundNetBridge = null
 var player: PlaygroundPlayer = null
@@ -557,6 +559,7 @@ func _build_netcode() -> DotResult:
 
 	# Before the seal and in the server's order (after the bridge), or the actions stay local.
 	DotLog.result("playground.client", "avatar action message", DotGameAvatarActionMessage.register(net))
+	workbench_remote = DotGameWorkbenchRemoteClient.attach(net)
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -634,8 +637,10 @@ func _build_netcode() -> DotResult:
 	# per call, and a client that never joins.
 	if link.has_method("is_playing") and bool(link.call("is_playing")):
 		bridge.ask_ready()
+		workbench_remote.ask()
 	elif link.has_signal("spawned"):
 		link.connect("spawned", bridge.ask_ready, CONNECT_ONE_SHOT)
+		link.connect("spawned", workbench_remote.ask, CONNECT_ONE_SHOT)
 
 	# Nothing in dot-net writes an RTT sample: it never touches a transport. A client
 	# that feeds none has a clock that believes the link is instant, and every command
@@ -1234,6 +1239,7 @@ func _build_pause() -> void:
 func _add_noblock_and_workbench() -> void:
 	if link != null:
 		DotLog.result(CHANNEL, "noblock", platform.add_noblock(playground, Callable(playground, "team_of_side")))
+		_start_remote_workbench()
 		return
 	var wb := DotGameWorkbench.new()
 	wb.name = "Workbench"
@@ -1248,6 +1254,29 @@ func _add_noblock_and_workbench() -> void:
 	DotLog.result(CHANNEL, "the workbench", started)
 	if started.ok and playground.config_binder != null:
 		playground.config_binder.attach(playground.profiles.runtime)
+	platform.add_workbench(wb)
+
+
+## Online: no local trust and no panel until the server names this player an admin (sv_workbench_remote).
+func _start_remote_workbench() -> void:
+	if workbench_remote == null:
+		return
+	var wb := DotGameWorkbench.new()
+	wb.name = "Workbench"
+	wb.remote_client = workbench_remote
+	wb.remote_fn = func() -> bool: return true
+	wb.config = {"enabled": false}
+	wb.add_set(playground.profiles.npcs, "NPCs")
+	wb.add_set(playground.profiles.weapons, "Weapons")
+	if playground.config_binder != null:
+		for set: DotProfileSet in playground.config_binder.profile_sets():
+			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	add_child(wb)
+	var started := wb.start(playground.profiles.runtime)
+	DotLog.result(CHANNEL, "the remote workbench", started)
+	if not started.ok:
+		wb.queue_free()
+		return
 	platform.add_workbench(wb)
 
 
