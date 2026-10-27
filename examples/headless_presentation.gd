@@ -27,7 +27,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 146
+const CHECKS := 147
 
 var _passed := 0
 var _failed := 0
@@ -1054,6 +1054,8 @@ func _test_glance_pieces() -> void:
 			rig = PlaygroundZee.arm(body, def, ZeeWeaponRig.Role.SERVER, true, 64, 0)
 			break
 	_check(rig != null, "a zee weapon is armed for the counter to read")
+	var stock_problems := DotWeaponSound.check_stock()
+	_check(stock_problems.is_empty(), "every weapon class resolves a non-silent, unclipped stock voice (%s)" % ", ".join(stock_problems))
 	if rig == null:
 		hud.queue_free()
 		body.queue_free()
