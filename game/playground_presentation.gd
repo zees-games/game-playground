@@ -563,7 +563,7 @@ func _build_audio() -> DotResult:
 	ambience.manager = audio
 	# Held back under the trim: a sandbox is mostly somebody building, and the bed is the
 	# room it happens in, not the thing to listen to.
-	ambience.level = 0.8
+	ambience.level = 0.3
 	add_child(ambience)
 	ambient = DotAmbienceDirector.new()
 	ambient.name = "Ambient"

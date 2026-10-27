@@ -5,8 +5,8 @@ extends RefCounted
 
 const PREFIX := "pg"
 ## A sandbox is mostly somebody building: the layer is felt, not heard, and the one-shots are rare.
-const LEVEL := 0.3
-const RATE := 0.5
+const LEVEL := 0.15
+const RATE := 0.4
 const DEFAULT_MOOD := &"outdoor_night"
 
 ## By name prefix; imported and custom maps arrive named by their author.
