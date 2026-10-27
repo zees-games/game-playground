@@ -6,6 +6,7 @@ const PlaygroundAddons := preload("../game/playground_addons.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 const PlaygroundWorkshop := preload("../game/playground_workshop.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
+const PlaygroundZee := preload("../game/playground_zee.gd")
 const PlaygroundWeapons := preload("../game/playground_weapons.gd")
 
 ## Renders this game's own screens to `screenshots/` so a person can look at them.
@@ -78,6 +79,7 @@ func _initialize() -> void:
 	menu.name = "SpawnMenu"
 	menu.catalogue = PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), "")
 	menu.weapons = PlaygroundWeapons.built_in()
+	menu.weapons.append_array(PlaygroundZee.defs())
 	_stack.register(menu)
 	_menu = menu
 
@@ -120,6 +122,7 @@ func _initialize() -> void:
 
 	_shots = [
 		{"id": &"spawn_menu", "file": "menu_spawn.png"},
+		{"id": &"spawn_menu", "file": "menu_weapons.png", "tab": PlaygroundSpawnMenu.Tab.WEAPONS},
 		# The model props: a category chip picked, so the thumbnails and their names are on screen.
 		{"id": &"spawn_menu", "file": "menu_props_models.png", "tab": PlaygroundSpawnMenu.Tab.PROPS, "category": &"furniture"},
 		# The tools tab with a tool picked, so its settings panel is drawn: the balloon has

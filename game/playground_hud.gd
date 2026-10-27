@@ -1,6 +1,7 @@
 extends Control
 
 const Playground := preload("playground.gd")
+const PlaygroundWeaponIcons := preload("playground_weapon_icons.gd")
 const PlaygroundGeometry := preload("playground_geometry.gd")
 const PlaygroundPlayer := preload("playground_player.gd")
 
@@ -52,6 +53,8 @@ func set_timer_hud(block: Control) -> void:
 ## What is in hand and how much is in it: a zee weapon's magazine and reserve, bottom right.
 ## Empty with a toy or nothing in hand, which the tool line already names.
 var ammo: DotAmmoCounter = null
+## The held weapon's sprite left of the counter (`cl_weapon_icons`); hidden when it has none.
+var weapon_icon: TextureRect = null
 
 ## Every hit the server confirmed ([method confirm_hit]): a mark round the crosshair, and
 ## the number on the body. Never the local prediction.
@@ -205,6 +208,19 @@ func _ready() -> void:
 	ammo.offset_bottom = -24.0
 	add_child(ammo)
 
+	weapon_icon = TextureRect.new()
+	weapon_icon.name = "WeaponIcon"
+	weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	weapon_icon.offset_left = -580.0
+	weapon_icon.offset_right = -430.0
+	weapon_icon.offset_top = -96.0
+	weapon_icon.offset_bottom = -28.0
+	weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	weapon_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	weapon_icon.visible = false
+	add_child(weapon_icon)
+
 	# Full rect, centred on the crosshair; both draw only what the server confirmed.
 	damage_numbers = DotDamageNumbers.new()
 	damage_numbers.name = "DamageNumbers"
@@ -329,11 +345,16 @@ func show_weapon(rig: ZeeWeaponRig) -> void:
 
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()
+		weapon_icon.visible = false
 		return
 
 	var slot := rig.arsenal.current()
 	var def := slot.def
 	var title := def.display_name if def.display_name != "" else String(def.id).capitalize()
+	var sprite := PlaygroundWeaponIcons.shared.texture(def.id)
+	weapon_icon.texture = sprite
+	weapon_icon.visible = sprite != null
+	PlaygroundWeaponIcons.shared.filter(weapon_icon, true)
 
 	if def.ammo_type == &"":
 		ammo.show_ammo(title, -1, -1)

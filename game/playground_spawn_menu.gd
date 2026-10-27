@@ -2,6 +2,7 @@ extends DotScreen
 
 const PlaygroundBindings := preload("playground_bindings.gd")
 
+const PlaygroundWeaponIcons := preload("playground_weapon_icons.gd")
 const PlaygroundIcons := preload("playground_icons.gd")
 const PlaygroundSpawnables := preload("playground_spawnables.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
@@ -832,8 +833,9 @@ func _prop_card(def: DotPropDef) -> Button:
 
 
 func _weapon_card(def: PlaygroundWeaponDef) -> Button:
+	var sprite := PlaygroundWeaponIcons.shared.menu_texture(PlaygroundZee.zee_id(def)) if PlaygroundZee.is_zee(def) else null
 	var card := _card(
-		PlaygroundIcons.for_weapon(def),
+		sprite if sprite != null else PlaygroundIcons.for_weapon(def),
 		def.name_or_id(),
 		"%s\n%s" % [def.name_or_id(), def.description]
 	)

@@ -1,5 +1,6 @@
 extends Node
 
+const PlaygroundWeaponIcons := preload("playground_weapon_icons.gd")
 const PlaygroundAmbience := preload("playground_ambience.gd")
 const PlaygroundBindings := preload("playground_bindings.gd")
 const PlaygroundPaths := preload("playground_paths.gd")
@@ -787,7 +788,9 @@ func adopt_console(built: DotConsoleController) -> void:
 	var server_sources := console.sources().slice(1)
 	for s in server_sources:
 		console.remove_source(s)
-	console.add_source(_local_commands())
+	var local := _local_commands()
+	var _icons_bound := PlaygroundWeaponIcons.shared.bind_console(local)
+	console.add_source(local)
 	for s in server_sources:
 		console.add_source(s)
 	bind_profile_replies()
