@@ -1368,6 +1368,11 @@ func _process(_delta: float) -> void:
 		var stack_now := playground.player_stack
 		if stack_now != null and stack_now.physics != null and stack_now.physics.layout != null and camera != null:
 			presentation.follow_roof(_delta, eye, camera.get_world_3d().direct_space_state, stack_now.physics.layout.mask_of([&"world"]))
+			var shot_rig: Object = _zee_rig()
+			if shot_rig != null and is_instance_valid(shot_rig) and shot_rig.has_method(&"shot_fx"):
+				var shot_fx: Object = shot_rig.call(&"shot_fx")
+				if shot_fx != null:
+					shot_fx.set(&"roof", presentation.shot_roof)
 		_present_tool_beam(eye, forward)
 
 	var _bodies := present_frame(net, playground, -1.0, player)

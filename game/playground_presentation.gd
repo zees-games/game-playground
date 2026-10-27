@@ -1031,8 +1031,14 @@ static func bed_for(map_id: StringName) -> StringName:
 	return &"amb_outdoor"
 
 
+## The roof probe the weapon's shot sounds read (`ZeeShotFx.roof`): roofed means a room tail follows a shot.
+var shot_roof := DotAmbienceRoof.new()
+
+
 ## The listener's roof, once a frame: under one the ambience crosses to its indoor mood.
 func follow_roof(delta: float, eye: Vector3, space: PhysicsDirectSpaceState3D, world_mask: int) -> void:
+	shot_roof.mask = world_mask
+	var _changed := shot_roof.step(delta, eye, space)
 	if ambient != null:
 		ambient.follow_roof(delta, eye, space, world_mask)
 
