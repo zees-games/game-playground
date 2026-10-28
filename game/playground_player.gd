@@ -554,6 +554,7 @@ func set_style(movement: DotFpsStyle) -> DotResult:
 ## stop reasons (`&"teleport"`, `&"noclip"`, ...), as a StringName.
 func stop_run(reason: StringName) -> void:
 	if timer != null:
+		DotLog.debug(CHANNEL, "the run was stopped", {"player": String(player_id), "reason": String(reason)})
 		timer.call("stop", reason)
 
 

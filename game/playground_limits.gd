@@ -157,6 +157,7 @@ func set_roles_from(text: String) -> DotResult:
 		parsed[StringName(role)] = row
 
 	roles = parsed
+	DotLog.debug(CHANNEL, "role limits parsed", {"roles": parsed.size()})
 	return DotResult.success(parsed)
 
 
