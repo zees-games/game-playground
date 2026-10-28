@@ -62,4 +62,236 @@ func _test_the_wheel_cycles_tools() -> void:
 	_done()
 
 
+func _test_grenades() -> void:
+	_section("grenades and rockets fly")
+	await _sandbox_floor()
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	playground.projectiles.clear()
+
+	_g_bot = playground.players[&"bot"]
+	_g_bot.teleport(Vector3(0, 1.0, 12.0), 0.0)
+	await get_tree().physics_frame
+
+	# A crate and a soldier where it will land, a little apart.
+	var crate := playground.props.spawn(&"crate", &"bot", Vector3(1.5, 0.6, 2.0))
+	var soldier := playground.props.spawn(&"npc_soldier", &"bot", Vector3(-1.5, 1.2, 2.0))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+	var rig := PlaygroundZee.arm(_g_bot, playground.weapon_def(&"zee_frag"), ZeeWeaponRig.Role.SERVER, true,
+		playground.tick_rate, playground.current_tick())
+	_check(rig != null, "a player holds a frag")
+
+	var ctx := DotWeaponContext.new()
+	ctx.origin = _g_bot.eye_position()
+	# Thrown down at the floor ahead, so it lands and rolls between the crate and the
+	# soldier rather than sailing over both.
+	ctx.direction = Vector3(0, -0.6, -1).normalized()
+	ctx.authority = true
+	var thrown := 0
+	for i in 60:
+		ctx.tick = playground.current_tick() + i
+		var command := DotWeaponCommand.new()
+		command.set_button(DotWeaponCommand.BUTTON_ATTACK, i < 6)
+		command.slot = PlaygroundZee.slot_of(rig)
+		var outcome := rig.simulate_tick(command, ctx.tick, ctx)
+		thrown += outcome.spawns.size()
+		playground.player_shots_fired(&"bot", outcome)
+		if thrown > 0:
+			break
+	_check(thrown == 1 and playground.projectiles.live_count() == 1,
+		"releasing it throws one grenade, and the game flies it",
+		"%d thrown, %d live" % [thrown, playground.projectiles.live_count()])
+
+	_g_launched_at = _g_bot.eye_position()
+	_g_danger_heard = false
+	_g_lowest = INF
+	_g_soldier_body = soldier.node if soldier != null else null
+	var soldier_start := _g_soldier_body.global_position if _g_soldier_body != null else Vector3.ZERO
+	_g_soldier_health = float(_g_soldier_body.get("health")) if _g_soldier_body != null else 0.0
+	_g_crate_body = crate.node as RigidBody3D if crate != null else null
+	_g_crate_start = _g_crate_body.global_position if _g_crate_body != null else Vector3.ZERO
+	_g_blasts = []
+	_g_on_blast = func(serial: int, _g_at: Vector3, radius: float) -> void: _g_blasts.append([serial, _g_at, radius])
+	playground.projectiles.detonated.connect(_g_on_blast)
+	_g_ticks = 0
+	_g_bounced = false
+	if not await _test_grenades_2():
+		return
+	await _test_grenades_3()
+	_test_grenades_4()
+	_g_bot = null
+	_g_launched_at = null
+	_g_lowest = null
+	_g_soldier_body = null
+	_g_soldier_health = null
+	_g_crate_body = null
+	_g_crate_start = null
+	_g_blasts = []
+	_g_on_blast = null
+	_g_stood = null
+	_g_rocket_blasts = []
+	_g_on_rocket = null
+
+func _test_grenades_2() -> bool:
+
+	for i in 128 * 5:
+		await get_tree().physics_frame
+		_g_ticks += 1
+		var live := playground.projectiles.flying()
+		if not live.is_empty():
+			_g_lowest = minf(_g_lowest, live[0].position.y)
+			_g_bounced = _g_bounced or live[0].bounces > 0
+			for sound in playground.npc_sounds.audible(live[0].position, playground.npc_world.now(), 1.0):
+				if sound.kind == DotNpcAiSounds.Kind.DANGER:
+					_g_danger_heard = true
+		if not _g_blasts.is_empty():
+			break
+
+	playground.projectiles.detonated.disconnect(_g_on_blast)
+	_check(_g_danger_heard, "while it is live it is a DANGER on the armed NPCs' board")
+	_check(_g_bounced, "it bounces off the floor rather than going off on it")
+	_check(_g_lowest > -0.5, "and never falls through the floor", "lowest %.2f" % _g_lowest)
+	_check(_g_blasts.size() == 1, "it goes off once, on its fuse",
+		"%d blasts in %d ticks" % [_g_blasts.size(), _g_ticks])
+	_check(_g_ticks > 128 * 2, "not before the fuse", "%d ticks" % _g_ticks)
+
+	if _g_blasts.is_empty():
+		PlaygroundZee.disarm(_g_bot)
+		_done()
+		return false
+
+	_g_at = _g_blasts[0][1]
+	print("    frag thrown from %s went off at %s after %d ticks" % [_g_launched_at, _g_at, _g_ticks])
+	_check(_g_at.z < _g_launched_at.z - 3.0, "somewhere in front of the thrower", str(_g_at))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+	if _g_crate_body != null and is_instance_valid(_g_crate_body) and _g_crate_body.global_position.distance_to(_g_at) < 5.2:
+		_check(_g_crate_body.global_position.distance_to(_g_crate_start) > 0.2 or _g_crate_body.linear_velocity.length() > 0.5,
+			"a crate inside the blast is thrown",
+			"moved %.2f m" % _g_crate_body.global_position.distance_to(_g_crate_start))
+	else:
+		_check(false, "a crate inside the blast is thrown", "the crate was not in it")
+
+	var soldier_gap := _g_soldier_body.global_position.distance_to(_g_at) \
+		if _g_soldier_body != null and is_instance_valid(_g_soldier_body) else INF
+	_check(_g_soldier_body == null or not is_instance_valid(_g_soldier_body)
+		or float(_g_soldier_body.get("health")) < _g_soldier_health or soldier_gap > 5.2,
+		"the soldier beside it was hurt or was out of the blast when it went off",
+		"%.1f m from it" % soldier_gap)
+	print("    the soldier was %.1f m from the blast (splash 5.2), at %.0f of %.0f" % [
+		soldier_gap, float(_g_soldier_body.get("health")) if is_instance_valid(_g_soldier_body) else 0.0, _g_soldier_health])
+
+	# A grenade cooked past its fuse goes off where it is, so nobody beside it has time to run.
+	_g_stood = playground.props.spawn(&"npc_soldier", &"bot", Vector3(-8, 1.2, -8))
+	await get_tree().physics_frame
+	return true
+
+func _test_grenades_3() -> void:
+	if _g_stood != null:
+		var stood_health := float(_g_stood.node.get("health"))
+		var cooked := DotWeaponSpawn.new()
+		cooked.id = &"frag"
+		cooked.origin = (_g_stood.node as Node3D).global_position + Vector3(1.0, 0.0, 0.0)
+		cooked.splash_radius = 5.2
+		cooked.splash_damage = 115.0
+		cooked.life_ticks = 4
+		var _c := playground.projectiles.launch(cooked, &"bot")
+		for i in 3:
+			await get_tree().physics_frame
+		_check(not is_instance_valid(_g_stood.node) or float(_g_stood.node.get("health")) < stood_health,
+			"a soldier a metre from a blast is hurt by it",
+			"%.0f of %.0f" % [float(_g_stood.node.get("health")) if is_instance_valid(_g_stood.node) else 0.0, stood_health])
+	else:
+		_check(false, "a soldier a metre from a blast is hurt by it", "no soldier spawned")
+	_check(playground.projectiles.flashes_live() >= 1, "a flash is drawn where it went off")
+	PlaygroundZee.disarm(_g_bot)
+
+	# --- An NPC gets out from under one ----------------------------------------------------------
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	await get_tree().physics_frame
+	var runner := playground.props.spawn(&"npc_soldier", &"bot", Vector3(10, 1.2, -10))
+	await get_tree().physics_frame
+	var runner_body: Node3D = runner.node if runner != null else null
+	var fused := DotWeaponSpawn.new()
+	fused.id = &"frag"
+	fused.origin = runner_body.global_position + Vector3(0.8, -0.4, 0.0) if runner_body != null else Vector3.ZERO
+	fused.gravity_scale = 1.0
+	fused.radius = 0.08
+	fused.splash_radius = 5.2
+	fused.splash_damage = 0.0
+	fused.fuse_ticks = 128 * 2
+	fused.life_ticks = 128 * 3
+	var _f := playground.projectiles.launch(fused, &"bot")
+	var start := runner_body.global_position if runner_body != null else Vector3.ZERO
+	var farthest := 0.0
+	for i in 128 * 2 - 4:
+		await get_tree().physics_frame
+		if runner_body == null or not is_instance_valid(runner_body):
+			break
+		farthest = maxf(farthest, runner_body.global_position.distance_to(fused.origin))
+	_check(farthest > start.distance_to(fused.origin) + 2.0, "a soldier next to a live grenade runs from it",
+		"from %.1f m to at most %.1f m" % [start.distance_to(fused.origin), farthest])
+	for i in 16:
+		await get_tree().physics_frame
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+
+	# --- A rocket goes off on contact -------------------------------------------------------------
+	var rocket := DotWeaponSpawn.new()
+	rocket.id = &"launcher"
+	rocket.origin = Vector3(0, 1.5, 0)
+	rocket.velocity = Vector3(0, -30, 0)
+	rocket.splash_radius = 3.0
+	rocket.splash_damage = 0.0
+	rocket.life_ticks = 128 * 4
+	_g_rocket_blasts = []
+	_g_on_rocket = func(_serial: int, where: Vector3, _radius: float) -> void: _g_rocket_blasts.append(where)
+	playground.projectiles.detonated.connect(_g_on_rocket)
+	var _r := playground.projectiles.launch(rocket, &"bot")
+	for i in 32:
+		await get_tree().physics_frame
+		if not _g_rocket_blasts.is_empty():
+			break
+
+func _test_grenades_4() -> void:
+	playground.projectiles.detonated.disconnect(_g_on_rocket)
+	_check(_g_rocket_blasts.size() == 1 and absf((_g_rocket_blasts[0] as Vector3).y) < 0.3,
+		"a rocket with no fuse goes off where it meets the floor", str(_g_rocket_blasts))
+
+	# --- What a client is told, and its copy decides nothing --------------------------------------
+	var spawn := DotWeaponSpawn.new()
+	spawn.id = &"sticky"
+	spawn.origin = Vector3(1, 2, 3)
+	spawn.velocity = Vector3(4.5, 6.25, -7.0)
+	spawn.gravity_scale = 1.0
+	spawn.radius = 0.08
+	spawn.splash_radius = 4.0
+	spawn.fuse_ticks = 200
+	spawn.life_ticks = 300
+	var wire := PlaygroundEvents.write_launch(9, spawn, &"u3", true)
+	var reader := DotNetReader.new(wire)
+	_check(reader.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS) == PlaygroundEvents.ProjectileTell.LAUNCH,
+		"a launch says it is one")
+	var read := PlaygroundEvents.read_launch(reader)
+	var back: DotWeaponSpawn = read["spawn"]
+	_check(bool(read["ok"]) and int(read["serial"]) == 9 and back.velocity == spawn.velocity
+		and back.fuse_ticks == 200 and bool(back.meta[&"sticks"]) and read["owner_id"] == &"u3"
+		and back.origin.distance_to(spawn.origin) < 0.01,
+		"and carries everything a client flies its copy from", str(read))
+
+	var mirror := PlaygroundProjectiles.new()
+	mirror.authority = false
+	add_child(mirror)
+	var copy := mirror.launch(back, &"u3", RID(), 9)
+	for i in 320:
+		mirror.tick(1.0 / 128.0)
+	_check(mirror.live_count() == 1, "a client's copy does not go off by itself, past its fuse")
+	mirror.detonate_remote(9, Vector3(2, 0, 2), 4.0)
+	_check(mirror.live_count() == 0 and copy.view == null, "and goes when the server says it went off")
+	mirror.queue_free()
+
+	_done()
+
+
 # --- The circuit -----------------------------------------------------------

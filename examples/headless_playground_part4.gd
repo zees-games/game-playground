@@ -10,21 +10,24 @@ extends "res://examples/headless_playground_part3.gd"
 ## Driven by hand rather than by letting the simulation run, because the thing being
 ## tested is the decision and not the walking — and a suite that moved real players
 ## around would be measuring the movement code.
+var _acc_spawned
+var _acc_chaser
+
 func _test_a_chaser_commits(playground: Playground) -> void:
 	var at := Vector3(0.0, 2.0, 0.0)
-	var spawned := playground.props.spawn(&"npc_chaser", &"bot", at)
+	_acc_spawned = playground.props.spawn(&"npc_chaser", &"bot", at)
 
-	if spawned == null:
+	if _acc_spawned == null:
 		_check(false, "a chaser spawns for the commitment check")
 		return
 
-	var chaser := spawned.node as PlaygroundEntity
+	_acc_chaser = _acc_spawned.node as PlaygroundEntity
 
-	_check(chaser.npc != null, "an entity has a dot-npc row")
+	_check(_acc_chaser.npc != null, "an entity has a dot-npc row")
 	_check(
-		chaser.npc.def.sight_range == 40.0,
+		_acc_chaser.npc.def.sight_range == 40.0,
 		"whose perception comes from the catalogue rather than from the script",
-		"%.0f m" % chaser.npc.def.sight_range
+		"%.0f m" % _acc_chaser.npc.def.sight_range
 	)
 
 	# Two candidates a fraction of a metre apart, swapping which is marginally nearer
@@ -35,7 +38,7 @@ func _test_a_chaser_commits(playground: Playground) -> void:
 	playground.npc_candidates = [near, also]
 
 	var first := playground.npc_senses.update_target(
-		chaser.npc, playground.npc_candidates, 0.0, 8
+		_acc_chaser.npc, playground.npc_candidates, 0.0, 8
 	)
 	var switches := 0
 	var last := first
@@ -45,7 +48,7 @@ func _test_a_chaser_commits(playground: Playground) -> void:
 		also.position = Vector3(0, 2, -10.0 - (0.0 if tick % 2 == 0 else 0.5))
 
 		var now := playground.npc_senses.update_target(
-			chaser.npc, playground.npc_candidates, float(tick) * 0.1, 8
+			_acc_chaser.npc, playground.npc_candidates, float(tick) * 0.1, 8
 		)
 
 		if now != last:
@@ -65,12 +68,12 @@ func _test_a_chaser_commits(playground: Playground) -> void:
 	playground.npc_candidates = []
 
 	_check(
-		playground.npc_senses.update_target(chaser.npc, [], 5.0, 8) != &"",
+		playground.npc_senses.update_target(_acc_chaser.npc, [], 5.0, 8) != &"",
 		"and keeps chasing one that stepped out of sight",
 		"a doorway would otherwise be a perfect escape"
 	)
 	_check(
-		playground.npc_senses.update_target(chaser.npc, [], 20.0, 8) == &"",
+		playground.npc_senses.update_target(_acc_chaser.npc, [], 20.0, 8) == &"",
 		"and gives up once the grace has expired"
 	)
 
@@ -79,16 +82,21 @@ func _test_a_chaser_commits(playground: Playground) -> void:
 	playground.npc_candidates = [
 		DotNpcSenses.Candidate.new(&"ghost", Vector3(0, 2, -6), &"player")
 	]
-	playground.npc_senses.update_target(chaser.npc, playground.npc_candidates, 21.0, 8)
+	_test_a_chaser_commits_2(playground)
+	_acc_spawned = null
+	_acc_chaser = null
 
-	_check(chaser.npc.target_id == &"ghost", "a chaser can commit to anybody it sees")
+func _test_a_chaser_commits_2(playground: Playground) -> void:
+	playground.npc_senses.update_target(_acc_chaser.npc, playground.npc_candidates, 21.0, 8)
+
+	_check(_acc_chaser.npc.target_id == &"ghost", "a chaser can commit to anybody it sees")
 	_check(
-		chaser.target() == null and chaser.npc.target_id == &"",
+		_acc_chaser.target() == null and _acc_chaser.npc.target_id == &"",
 		"and drops one that is not a player in this game any more",
 		"or it walks to an empty corner for the whole grace period"
 	)
 
-	playground.props.remove(spawned.instance_id)
+	playground.props.remove(_acc_spawned.instance_id)
 	playground.npc_candidates = []
 
 	_test_a_hunter_decides(playground)
@@ -100,26 +108,30 @@ func _test_a_chaser_commits(playground: Playground) -> void:
 ## [b]`npc_chaser` is still in the catalogue and is still correct.[/b] What this one adds
 ## is a reaction time, a character per NPC, and a machine whose transitions are the design
 ## — and keeping both is the only honest way to say what the addon actually bought.
-func _test_a_hunter_decides(playground: Playground) -> void:
-	var spawned := playground.props.spawn(&"npc_hunter", &"bot", Vector3(0.0, 2.0, 0.0))
+var _ahd_spawned
+var _ahd_hunter
+var _ahd_machine: DotNpcAiMachine
 
-	if spawned == null:
+func _test_a_hunter_decides(playground: Playground) -> void:
+	_ahd_spawned = playground.props.spawn(&"npc_hunter", &"bot", Vector3(0.0, 2.0, 0.0))
+
+	if _ahd_spawned == null:
 		_check(false, "a hunter spawns")
 		return
 
-	var hunter := spawned.node as PlaygroundEntity
+	_ahd_hunter = _ahd_spawned.node as PlaygroundEntity
 
-	_check(hunter.npc != null, "a hunter has a dot-npc row too")
+	_check(_ahd_hunter.npc != null, "a hunter has a dot-npc row too")
 	_check(
-		hunter.get("machine") != null,
+		_ahd_hunter.get("machine") != null,
 		"and a state machine rather than a hand-written if"
 	)
 	_check(
-		hunter.get("character") != null,
+		_ahd_hunter.get("character") != null,
 		"and a character, which is what a difficulty setting is instead of"
 	)
 
-	var character: DotNpcAiCharacter = hunter.get("character")
+	var character: DotNpcAiCharacter = _ahd_hunter.get("character")
 
 	# [b]Seeded from the instance, and this is the check that matters.[/b] A preset is one
 	# resource, and twenty NPCs sharing it share a seed — so every one of them reacts at
@@ -139,10 +151,10 @@ func _test_a_hunter_decides(playground: Playground) -> void:
 
 	# It starts patrolling, not chasing. A machine whose initial state was wrong would be
 	# an NPC that sprinted at somebody it had not seen.
-	var machine: DotNpcAiMachine = hunter.get("machine")
+	_ahd_machine = _ahd_hunter.get("machine")
 	_check(
-		machine.current() == &"patrol",
-		"a hunter starts on patrol (%s)" % String(machine.current())
+		_ahd_machine.current() == &"patrol",
+		"a hunter starts on patrol (%s)" % String(_ahd_machine.current())
 	)
 
 	# Somebody walks into view. [b]It must NOT go straight to chasing[/b] — the reaction
@@ -160,37 +172,43 @@ func _test_a_hunter_decides(playground: Playground) -> void:
 		DotNpcSenses.Candidate.new(&"seen", Vector3(0, 2, -8), &"player")
 	]
 	playground.npc_senses.update_target(
-		hunter.npc, playground.npc_candidates, 0.0, 8
+		_ahd_hunter.npc, playground.npc_candidates, 0.0, 8
 	)
-	hunter.entity_tick(1.0 / 128.0)
+	_ahd_hunter.entity_tick(1.0 / 128.0)
 
 	_check(
-		machine.current() == &"alert",
-		"and turns to look before it commits (%s)" % String(machine.current()),
+		_ahd_machine.current() == &"alert",
+		"and turns to look before it commits (%s)" % String(_ahd_machine.current()),
 		"reaction time is what makes it an opponent rather than a target"
 	)
+	_test_a_hunter_decides_2(playground)
+	_ahd_spawned = null
+	_ahd_hunter = null
+	_ahd_machine = null
+
+func _test_a_hunter_decides_2(playground: Playground) -> void:
 
 	# And then it does commit, once the reaction time has passed.
 	for _step in range(int(128.0 * 1.5)):
-		hunter.entity_tick(1.0 / 128.0)
+		_ahd_hunter.entity_tick(1.0 / 128.0)
 
 	_check(
-		machine.current() == &"chase",
-		"and chases once its reaction time has passed (%s)" % String(machine.current())
+		_ahd_machine.current() == &"chase",
+		"and chases once its reaction time has passed (%s)" % String(_ahd_machine.current())
 	)
 
 	# The target leaves. It searches where they were rather than stopping dead — an NPC
 	# you escape by stepping behind a crate is one nobody has to run from.
 	playground.npc_candidates = []
-	hunter.npc.target_id = &""
+	_ahd_hunter.npc.target_id = &""
 
-	hunter.entity_tick(1.0 / 128.0)
+	_ahd_hunter.entity_tick(1.0 / 128.0)
 	_check(
-		machine.current() == &"lost",
-		"and goes looking when it loses them (%s)" % String(machine.current())
+		_ahd_machine.current() == &"lost",
+		"and goes looking when it loses them (%s)" % String(_ahd_machine.current())
 	)
 
-	playground.props.remove(spawned.instance_id)
+	playground.props.remove(_ahd_spawned.instance_id)
 	playground.npc_candidates = []
 	playground.remove_player(&"seen")
 
@@ -392,148 +410,176 @@ func playground_receive(msg: Dictionary) -> void:
 
 
 ## Spawn providers: a pack's `spawn_provider.gd` fills the Addons tab; server-side gives and spawns.
+var _sp_fixtures: String
+var _sp_pack_script: GDScript
+var _sp_none: PlaygroundAddons
+var _sp_addons: PlaygroundAddons
+var _sp_pmenu: PlaygroundSpawnMenu
+var _sp_pstack: DotScreenStack
+var _sp_ptabs: TabBar
+var _sp_npc_tab
+var _sp_via: PlaygroundAddons
+var _sp_at
+var _sp_prior_addons
+
 func _test_spawn_providers() -> void:
 	_section("spawn providers")
 	await _sandbox_floor()
-	var fixtures := "res://examples/fixtures"
-	var pack_script: GDScript = load(fixtures + "/spawn_pack/spawn_provider.gd")
-	pack_script.set("weapon_id", String(playground.weapons[0].id))
-	pack_script.set("custom_calls", [])
+	_sp_fixtures = "res://examples/fixtures"
+	_sp_pack_script = load(_sp_fixtures + "/spawn_pack/spawn_provider.gd")
+	_sp_pack_script.set("weapon_id", String(playground.weapons[0].id))
+	_sp_pack_script.set("custom_calls", [])
 
 	# No pack installed: nothing found, nothing breaks.
-	var none := PlaygroundAddons.new()
-	_check(none.scan_providers(playground, "res://examples/fixtures/spawn_pack_none") == 0
-		and none.items().is_empty(), "with no provider anywhere the menu is simply empty")
+	_sp_none = PlaygroundAddons.new()
+	_check(_sp_none.scan_providers(playground, "res://examples/fixtures/spawn_pack_none") == 0
+		and _sp_none.items().is_empty(), "with no provider anywhere the menu is simply empty")
 
-	var addons := PlaygroundAddons.new()
-	var found := addons.scan_providers(playground, fixtures)
-	_check(found == 1 and addons.provider_count() == 1,
+	_sp_addons = PlaygroundAddons.new()
+	var found := _sp_addons.scan_providers(playground, _sp_fixtures)
+	_check(found == 1 and _sp_addons.provider_count() == 1,
 		"one valid provider is found, the one without spawn_entries is refused", str(found))
-	_check(addons.items().size() == 7, "bad entries (no id, bad spawn, not a dictionary) are skipped",
-		str(addons.items().size()))
-	var rows := addons.describe_items()
+	_check(_sp_addons.items().size() == 7, "bad entries (no id, bad spawn, not a dictionary) are skipped",
+		str(_sp_addons.items().size()))
+	var rows := _sp_addons.describe_items()
 	var cats := {}
 	for row in rows:
 		cats[row["category"]] = true
 	_check(cats.has("Weapons") and cats.has("NPCs") and cats.has("Bots"),
 		"the menu rows carry the pack's categories", str(cats.keys()))
-	_check(addons.find("spawn_pack/test_guard").kind == "npc", "and the kind")
+	_check(_sp_addons.find("spawn_pack/test_guard").kind == "npc", "and the kind")
 
 	# The menu: own tabs, shown only while a provider has entries of that kind.
-	var pmenu := PlaygroundSpawnMenu.new()
-	pmenu.catalogue = playground.props.catalogue
-	pmenu.weapons = playground.weapons
-	add_child(pmenu)
-	var pstack := DotScreenStack.new()
-	add_child(pstack)
-	pstack.setup()
-	pstack.register(pmenu)
-	pstack.push(pmenu.screen_id())
+	_sp_pmenu = PlaygroundSpawnMenu.new()
+	_sp_pmenu.catalogue = playground.props.catalogue
+	_sp_pmenu.weapons = playground.weapons
+	add_child(_sp_pmenu)
+	_sp_pstack = DotScreenStack.new()
+	add_child(_sp_pstack)
+	_sp_pstack.setup()
+	_sp_pstack.register(_sp_pmenu)
+	_sp_pstack.push(_sp_pmenu.screen_id())
 	await get_tree().process_frame
-	var ptabs: TabBar = pmenu.find_child("Tabs", true, false)
-	var npc_tab := int(PlaygroundSpawnMenu.Tab.NPCS)
+	_sp_ptabs = _sp_pmenu.find_child("Tabs", true, false)
+	_sp_npc_tab = int(PlaygroundSpawnMenu.Tab.NPCS)
 	var gun_tab := int(PlaygroundSpawnMenu.Tab.PACK_WEAPONS)
-	_check(ptabs.is_tab_hidden(npc_tab) and ptabs.is_tab_hidden(gun_tab),
+	_check(_sp_ptabs.is_tab_hidden(_sp_npc_tab) and _sp_ptabs.is_tab_hidden(gun_tab),
 		"with no provider entries the NPCs and Pack Weapons tabs are hidden")
-	pmenu.addon_items = rows
-	_check(not ptabs.is_tab_hidden(npc_tab) and not ptabs.is_tab_hidden(gun_tab),
+	_sp_pmenu.addon_items = rows
+	_check(not _sp_ptabs.is_tab_hidden(_sp_npc_tab) and not _sp_ptabs.is_tab_hidden(gun_tab),
 		"with provider entries both tabs appear")
-	pmenu.show_tab(PlaygroundSpawnMenu.Tab.PACK_WEAPONS)
+	_sp_pmenu.show_tab(PlaygroundSpawnMenu.Tab.PACK_WEAPONS)
 	await get_tree().process_frame
-	_check(pmenu.shown().size() == 2 and pmenu.card_for(&"spawn_pack/test_gun") != null,
-		"Pack Weapons lists the weapon entries only", str(pmenu.shown()))
-	_check(pmenu.card_for(&"spawn_pack/test_gun").icon != null, "an entry without an icon gets a generated tile")
+	_check(_sp_pmenu.shown().size() == 2 and _sp_pmenu.card_for(&"spawn_pack/test_gun") != null,
+		"Pack Weapons lists the weapon entries only", str(_sp_pmenu.shown()))
+	_check(_sp_pmenu.card_for(&"spawn_pack/test_gun").icon != null, "an entry without an icon gets a generated tile")
 	var asked: Array = []
-	pmenu.addon_item_chosen.connect(func(key: String) -> void: asked.append(key))
-	pmenu.card_for(&"spawn_pack/test_gun").pressed.emit()
+	_sp_pmenu.addon_item_chosen.connect(func(key: String) -> void: asked.append(key))
+	_sp_pmenu.card_for(&"spawn_pack/test_gun").pressed.emit()
 	_check(asked == ["spawn_pack/test_gun"], "clicking a card asks for the entry by key (the authority path)")
-	pmenu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
+	_sp_pmenu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
 	await get_tree().process_frame
-	_check(pmenu.shown().size() == 5 and pmenu.card_for(&"spawn_pack/test_bot") != null,
-		"NPCs lists npc and bot entries", str(pmenu.shown()))
-	pmenu._search = "guard"
-	pmenu._rebuild_grid()
+	_check(_sp_pmenu.shown().size() == 5 and _sp_pmenu.card_for(&"spawn_pack/test_bot") != null,
+		"NPCs lists npc and bot entries", str(_sp_pmenu.shown()))
+	_sp_pmenu._search = "guard"
+	_sp_pmenu._rebuild_grid()
 	await get_tree().process_frame
-	_check(pmenu.shown() == [&"spawn_pack/test_guard"], "and the search box filters them", str(pmenu.shown()))
-	pmenu._search = ""
-	pmenu.show_tab(PlaygroundSpawnMenu.Tab.ADDONS)
+	_check(_sp_pmenu.shown() == [&"spawn_pack/test_guard"], "and the search box filters them", str(_sp_pmenu.shown()))
+	_sp_pmenu._search = ""
+	_sp_pmenu.show_tab(PlaygroundSpawnMenu.Tab.ADDONS)
+	await _test_spawn_providers_2()
+	_test_spawn_providers_3()
+	_sp_pack_script = null
+	_sp_none = null
+	_sp_addons = null
+	_sp_pmenu = null
+	_sp_pstack = null
+	_sp_ptabs = null
+	_sp_npc_tab = null
+	_sp_via = null
+	_sp_at = null
+	_sp_prior_addons = null
+
+func _test_spawn_providers_2() -> void:
 	await get_tree().process_frame
-	_check(pmenu.shown().is_empty(), "the Addons tab no longer repeats them")
-	pmenu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
+	_check(_sp_pmenu.shown().is_empty(), "the Addons tab no longer repeats them")
+	_sp_pmenu.show_tab(PlaygroundSpawnMenu.Tab.NPCS)
 	await get_tree().process_frame
-	pmenu.addon_items = []
-	_check(ptabs.is_tab_hidden(npc_tab) and ptabs.current_tab == int(PlaygroundSpawnMenu.Tab.PROPS),
+	_sp_pmenu.addon_items = []
+	_check(_sp_ptabs.is_tab_hidden(_sp_npc_tab) and _sp_ptabs.current_tab == int(PlaygroundSpawnMenu.Tab.PROPS),
 		"losing the entries hides the tab and falls back to Props")
-	pmenu.queue_free()
-	pstack.queue_free()
+	_sp_pmenu.queue_free()
+	_sp_pstack.queue_free()
 
 	# Registry discovery.
-	var reg: Object = pack_script.new()
+	var reg: Object = _sp_pack_script.new()
 	DotRegistry.register(&"playground.spawn_provider.reg_pack", reg)
-	var via := PlaygroundAddons.new()
-	via.scan_providers(playground, fixtures + "/spawn_pack_none")
+	_sp_via = PlaygroundAddons.new()
+	_sp_via.scan_providers(playground, _sp_fixtures + "/spawn_pack_none")
 	DotRegistry.unregister(&"playground.spawn_provider.reg_pack")
-	_check(via.find("reg_pack/test_gun") != null, "a provider registered in DotRegistry is found too")
+	_check(_sp_via.find("reg_pack/test_gun") != null, "a provider registered in DotRegistry is found too")
 
 	# Activation: server-authoritative.
 	var bot: PlaygroundPlayer = playground.players[&"bot"]
-	var at := bot.global_position + Vector3(0, 0, -6)
-	var prior_addons := playground.addons
-	playground.addons = addons
+	_sp_at = bot.global_position + Vector3(0, 0, -6)
+	_sp_prior_addons = playground.addons
+	playground.addons = _sp_addons
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	var picked: Array = []
 	var on_pick := func(who: StringName, w: StringName) -> void: picked.append([who, w])
 	playground.weapon_picked_up.connect(on_pick)
-	var gave := playground.activate_addon_item("spawn_pack/test_gun", 0, at, &"bot")
+	var gave := playground.activate_addon_item("spawn_pack/test_gun", 0, _sp_at, &"bot")
 	_check(gave.ok and picked.size() == 1 and picked[0][1] == playground.weapons[0].id,
 		"a weapon entry goes through the pickup path (the bridge charges and arms it)")
-	_check(not playground.activate_addon_item("spawn_pack/unknown_gun", 0, at, &"bot").ok,
+	_check(not playground.activate_addon_item("spawn_pack/unknown_gun", 0, _sp_at, &"bot").ok,
 		"a weapon the catalogue does not know is refused")
-	_check(not playground.activate_addon_item("spawn_pack/test_gun", 0, at, &"nobody").ok
+	_check(not playground.activate_addon_item("spawn_pack/test_gun", 0, _sp_at, &"nobody").ok
 		and picked.size() == 1, "an unknown player is refused")
 	playground.weapon_picked_up.disconnect(on_pick)
 
-	var guards := playground.activate_addon_item("spawn_pack/test_guard", 0, at, &"bot")
+	var guards := playground.activate_addon_item("spawn_pack/test_guard", 0, _sp_at, &"bot")
 	var soldiers := 0
 	for prop in playground.props.all_props():
 		if prop.def != null and String(prop.def.id) == "npc_soldier":
 			soldiers += 1
 	_check(guards.ok and soldiers == 2, "an npc entry spawns through the prop spawner, count 2", str(soldiers))
 
-	var called := playground.activate_addon_item("spawn_pack/test_bot", 0, at, &"bot")
-	var calls: Array = pack_script.get("custom_calls")
+	var called := playground.activate_addon_item("spawn_pack/test_bot", 0, _sp_at, &"bot")
+	var calls: Array = _sp_pack_script.get("custom_calls")
 	_check(called.ok and calls.size() == 1 and calls[0]["kind"] == "bot" and calls[0]["player_id"] == &"bot",
 		"a Callable entry is called with the context dictionary")
 
 	calls.clear()
-	var viafn := playground.activate_addon_item("spawn_pack/stat_npc", 0, at, &"bot")
+	var viafn := playground.activate_addon_item("spawn_pack/stat_npc", 0, _sp_at, &"bot")
 	_check(viafn.ok and calls.size() == 1 and calls[0]["kind"] == "npc",
 		"spawn_fn is the action when spawn is a stats Dictionary")
-	_check(not playground.activate_addon_item("spawn_pack/stat_only", 0, at, &"bot").ok,
+	_check(not playground.activate_addon_item("spawn_pack/stat_only", 0, _sp_at, &"bot").ok,
 		"a Dictionary spawn with no spawn_fn is listed but refused")
 
 	for i in PlaygroundAddons.MAX_SCENE_SPAWNS + 2:
-		playground.activate_addon_item("spawn_pack/scene_npc", 0, at, &"bot")
+		playground.activate_addon_item("spawn_pack/scene_npc", 0, _sp_at, &"bot")
 	var scene_made := 0
 	for child in playground.world.get_children():
 		if child.has_meta(&"spawn_provider_owner"):
 			scene_made += 1
 	_check(scene_made == PlaygroundAddons.MAX_SCENE_SPAWNS, "scene spawns are capped per player", str(scene_made))
+
+func _test_spawn_providers_3() -> void:
 	for child in playground.world.get_children():
 		if child.has_meta(&"spawn_provider_owner"):
 			child.free()
 
 	var client_side := playground.authoritative
 	playground.authoritative = false
-	_check(not playground.activate_addon_item("spawn_pack/test_guard", 0, at, &"bot").ok,
+	_check(not playground.activate_addon_item("spawn_pack/test_guard", 0, _sp_at, &"bot").ok,
 		"a client never runs an entry")
 	playground.authoritative = client_side
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	# A static on the fixture's script outlives the suite; what it recorded points back into the game.
-	pack_script.set("custom_calls", [])
+	_sp_pack_script.set("custom_calls", [])
 	# Each scan builds lambdas that capture their item and the scanner: release() breaks that cycle.
-	playground.addons = prior_addons
-	for scanner: PlaygroundAddons in [none, addons, via]:
+	playground.addons = _sp_prior_addons
+	for scanner: PlaygroundAddons in [_sp_none, _sp_addons, _sp_via]:
 		scanner.release()
 	_done()
 
@@ -543,210 +589,19 @@ func _test_spawn_providers() -> void:
 ## [b]This game used to drop a weapon outcome's spawns[/b], so a thrown frag cost a grenade
 ## and never existed. Every check here goes through the real path: a rig, its outcome, and
 ## `player_shots_fired`, which is what the server's bridge and the offline client both call.
-func _test_grenades() -> void:
-	_section("grenades and rockets fly")
-	await _sandbox_floor()
-	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
-	playground.projectiles.clear()
-
-	var bot: PlaygroundPlayer = playground.players[&"bot"]
-	bot.teleport(Vector3(0, 1.0, 12.0), 0.0)
-	await get_tree().physics_frame
-
-	# A crate and a soldier where it will land, a little apart.
-	var crate := playground.props.spawn(&"crate", &"bot", Vector3(1.5, 0.6, 2.0))
-	var soldier := playground.props.spawn(&"npc_soldier", &"bot", Vector3(-1.5, 1.2, 2.0))
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-
-	var rig := PlaygroundZee.arm(bot, playground.weapon_def(&"zee_frag"), ZeeWeaponRig.Role.SERVER, true,
-		playground.tick_rate, playground.current_tick())
-	_check(rig != null, "a player holds a frag")
-
-	var ctx := DotWeaponContext.new()
-	ctx.origin = bot.eye_position()
-	# Thrown down at the floor ahead, so it lands and rolls between the crate and the
-	# soldier rather than sailing over both.
-	ctx.direction = Vector3(0, -0.6, -1).normalized()
-	ctx.authority = true
-	var thrown := 0
-	for i in 60:
-		ctx.tick = playground.current_tick() + i
-		var command := DotWeaponCommand.new()
-		command.set_button(DotWeaponCommand.BUTTON_ATTACK, i < 6)
-		command.slot = PlaygroundZee.slot_of(rig)
-		var outcome := rig.simulate_tick(command, ctx.tick, ctx)
-		thrown += outcome.spawns.size()
-		playground.player_shots_fired(&"bot", outcome)
-		if thrown > 0:
-			break
-	_check(thrown == 1 and playground.projectiles.live_count() == 1,
-		"releasing it throws one grenade, and the game flies it",
-		"%d thrown, %d live" % [thrown, playground.projectiles.live_count()])
-
-	var launched_at := bot.eye_position()
-	var danger_heard := false
-	var lowest := INF
-	var soldier_body: Node3D = soldier.node if soldier != null else null
-	var soldier_start := soldier_body.global_position if soldier_body != null else Vector3.ZERO
-	var soldier_health := float(soldier_body.get("health")) if soldier_body != null else 0.0
-	var crate_body: RigidBody3D = crate.node as RigidBody3D if crate != null else null
-	var crate_start := crate_body.global_position if crate_body != null else Vector3.ZERO
-	var blasts: Array = []
-	var on_blast := func(serial: int, at: Vector3, radius: float) -> void: blasts.append([serial, at, radius])
-	playground.projectiles.detonated.connect(on_blast)
-	var ticks := 0
-	var bounced := false
-
-	for i in 128 * 5:
-		await get_tree().physics_frame
-		ticks += 1
-		var live := playground.projectiles.flying()
-		if not live.is_empty():
-			lowest = minf(lowest, live[0].position.y)
-			bounced = bounced or live[0].bounces > 0
-			for sound in playground.npc_sounds.audible(live[0].position, playground.npc_world.now(), 1.0):
-				if sound.kind == DotNpcAiSounds.Kind.DANGER:
-					danger_heard = true
-		if not blasts.is_empty():
-			break
-
-	playground.projectiles.detonated.disconnect(on_blast)
-	_check(danger_heard, "while it is live it is a DANGER on the armed NPCs' board")
-	_check(bounced, "it bounces off the floor rather than going off on it")
-	_check(lowest > -0.5, "and never falls through the floor", "lowest %.2f" % lowest)
-	_check(blasts.size() == 1, "it goes off once, on its fuse",
-		"%d blasts in %d ticks" % [blasts.size(), ticks])
-	_check(ticks > 128 * 2, "not before the fuse", "%d ticks" % ticks)
-
-	if blasts.is_empty():
-		PlaygroundZee.disarm(bot)
-		_done()
-		return
-
-	var at: Vector3 = blasts[0][1]
-	print("    frag thrown from %s went off at %s after %d ticks" % [launched_at, at, ticks])
-	_check(at.z < launched_at.z - 3.0, "somewhere in front of the thrower", str(at))
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-
-	if crate_body != null and is_instance_valid(crate_body) and crate_body.global_position.distance_to(at) < 5.2:
-		_check(crate_body.global_position.distance_to(crate_start) > 0.2 or crate_body.linear_velocity.length() > 0.5,
-			"a crate inside the blast is thrown",
-			"moved %.2f m" % crate_body.global_position.distance_to(crate_start))
-	else:
-		_check(false, "a crate inside the blast is thrown", "the crate was not in it")
-
-	var soldier_gap := soldier_body.global_position.distance_to(at) \
-		if soldier_body != null and is_instance_valid(soldier_body) else INF
-	_check(soldier_body == null or not is_instance_valid(soldier_body)
-		or float(soldier_body.get("health")) < soldier_health or soldier_gap > 5.2,
-		"the soldier beside it was hurt or was out of the blast when it went off",
-		"%.1f m from it" % soldier_gap)
-	print("    the soldier was %.1f m from the blast (splash 5.2), at %.0f of %.0f" % [
-		soldier_gap, float(soldier_body.get("health")) if is_instance_valid(soldier_body) else 0.0, soldier_health])
-
-	# A grenade cooked past its fuse goes off where it is, so nobody beside it has time to run.
-	var stood := playground.props.spawn(&"npc_soldier", &"bot", Vector3(-8, 1.2, -8))
-	await get_tree().physics_frame
-	if stood != null:
-		var stood_health := float(stood.node.get("health"))
-		var cooked := DotWeaponSpawn.new()
-		cooked.id = &"frag"
-		cooked.origin = (stood.node as Node3D).global_position + Vector3(1.0, 0.0, 0.0)
-		cooked.splash_radius = 5.2
-		cooked.splash_damage = 115.0
-		cooked.life_ticks = 4
-		var _c := playground.projectiles.launch(cooked, &"bot")
-		for i in 3:
-			await get_tree().physics_frame
-		_check(not is_instance_valid(stood.node) or float(stood.node.get("health")) < stood_health,
-			"a soldier a metre from a blast is hurt by it",
-			"%.0f of %.0f" % [float(stood.node.get("health")) if is_instance_valid(stood.node) else 0.0, stood_health])
-	else:
-		_check(false, "a soldier a metre from a blast is hurt by it", "no soldier spawned")
-	_check(playground.projectiles.flashes_live() >= 1, "a flash is drawn where it went off")
-	PlaygroundZee.disarm(bot)
-
-	# --- An NPC gets out from under one ----------------------------------------------------------
-	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
-	await get_tree().physics_frame
-	var runner := playground.props.spawn(&"npc_soldier", &"bot", Vector3(10, 1.2, -10))
-	await get_tree().physics_frame
-	var runner_body: Node3D = runner.node if runner != null else null
-	var fused := DotWeaponSpawn.new()
-	fused.id = &"frag"
-	fused.origin = runner_body.global_position + Vector3(0.8, -0.4, 0.0) if runner_body != null else Vector3.ZERO
-	fused.gravity_scale = 1.0
-	fused.radius = 0.08
-	fused.splash_radius = 5.2
-	fused.splash_damage = 0.0
-	fused.fuse_ticks = 128 * 2
-	fused.life_ticks = 128 * 3
-	var _f := playground.projectiles.launch(fused, &"bot")
-	var start := runner_body.global_position if runner_body != null else Vector3.ZERO
-	var farthest := 0.0
-	for i in 128 * 2 - 4:
-		await get_tree().physics_frame
-		if runner_body == null or not is_instance_valid(runner_body):
-			break
-		farthest = maxf(farthest, runner_body.global_position.distance_to(fused.origin))
-	_check(farthest > start.distance_to(fused.origin) + 2.0, "a soldier next to a live grenade runs from it",
-		"from %.1f m to at most %.1f m" % [start.distance_to(fused.origin), farthest])
-	for i in 16:
-		await get_tree().physics_frame
-	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
-
-	# --- A rocket goes off on contact -------------------------------------------------------------
-	var rocket := DotWeaponSpawn.new()
-	rocket.id = &"launcher"
-	rocket.origin = Vector3(0, 1.5, 0)
-	rocket.velocity = Vector3(0, -30, 0)
-	rocket.splash_radius = 3.0
-	rocket.splash_damage = 0.0
-	rocket.life_ticks = 128 * 4
-	var rocket_blasts: Array = []
-	var on_rocket := func(_serial: int, where: Vector3, _radius: float) -> void: rocket_blasts.append(where)
-	playground.projectiles.detonated.connect(on_rocket)
-	var _r := playground.projectiles.launch(rocket, &"bot")
-	for i in 32:
-		await get_tree().physics_frame
-		if not rocket_blasts.is_empty():
-			break
-	playground.projectiles.detonated.disconnect(on_rocket)
-	_check(rocket_blasts.size() == 1 and absf((rocket_blasts[0] as Vector3).y) < 0.3,
-		"a rocket with no fuse goes off where it meets the floor", str(rocket_blasts))
-
-	# --- What a client is told, and its copy decides nothing --------------------------------------
-	var spawn := DotWeaponSpawn.new()
-	spawn.id = &"sticky"
-	spawn.origin = Vector3(1, 2, 3)
-	spawn.velocity = Vector3(4.5, 6.25, -7.0)
-	spawn.gravity_scale = 1.0
-	spawn.radius = 0.08
-	spawn.splash_radius = 4.0
-	spawn.fuse_ticks = 200
-	spawn.life_ticks = 300
-	var wire := PlaygroundEvents.write_launch(9, spawn, &"u3", true)
-	var reader := DotNetReader.new(wire)
-	_check(reader.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS) == PlaygroundEvents.ProjectileTell.LAUNCH,
-		"a launch says it is one")
-	var read := PlaygroundEvents.read_launch(reader)
-	var back: DotWeaponSpawn = read["spawn"]
-	_check(bool(read["ok"]) and int(read["serial"]) == 9 and back.velocity == spawn.velocity
-		and back.fuse_ticks == 200 and bool(back.meta[&"sticks"]) and read["owner_id"] == &"u3"
-		and back.origin.distance_to(spawn.origin) < 0.01,
-		"and carries everything a client flies its copy from", str(read))
-
-	var mirror := PlaygroundProjectiles.new()
-	mirror.authority = false
-	add_child(mirror)
-	var copy := mirror.launch(back, &"u3", RID(), 9)
-	for i in 320:
-		mirror.tick(1.0 / 128.0)
-	_check(mirror.live_count() == 1, "a client's copy does not go off by itself, past its fuse")
-	mirror.detonate_remote(9, Vector3(2, 0, 2), 4.0)
-	_check(mirror.live_count() == 0 and copy.view == null, "and goes when the server says it went off")
-	mirror.queue_free()
-
-	_done()
+var _g_bot: PlaygroundPlayer
+var _g_launched_at
+var _g_danger_heard: bool
+var _g_lowest
+var _g_soldier_body: Node3D
+var _g_soldier_health
+var _g_crate_body: RigidBody3D
+var _g_crate_start
+var _g_blasts: Array
+var _g_on_blast
+var _g_ticks: int
+var _g_bounced: bool
+var _g_at: Vector3
+var _g_stood
+var _g_rocket_blasts: Array
+var _g_on_rocket
