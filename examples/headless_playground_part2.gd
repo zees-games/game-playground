@@ -89,6 +89,17 @@ func _test_buttons_and_doors() -> void:
 
 # --- Saved builds ----------------------------------------------------------
 
+var _sb_at: Vector3
+var _sb_yaw: float
+var _sb_big: DotPropInstance
+var _sb_store: PlaygroundBuilds
+var _sb_doc: DotResult
+var _sb_loaded: DotResult
+var _sb_again: Array[DotPropInstance]
+var _sb_grown: Array
+var _sb_paint: Color
+var _sb_paint_off: float
+
 func _test_saved_builds() -> void:
 	_section("saved builds")
 
@@ -102,43 +113,43 @@ func _test_saved_builds() -> void:
 	playground.props.limits.spawn_interval = 0.0
 	builder.teleport(Vector3(-60.0, 1.0, -30.0), 30.0)
 	await _look(&"builder", 0.0, 90)
-	var at := builder.controller.state.position
-	var yaw := builder.controller.state.yaw
+	_sb_at = builder.controller.state.position
+	_sb_yaw = builder.controller.state.yaw
 
 	# A small build: two planks welded, a painted crate on top, a big one frozen, and a button
 	# wired to a door.
-	var a := playground.props.spawn(&"plank", &"builder", at + Vector3(0.0, 0.2, -3.0))
-	var b := playground.props.spawn(&"plank", &"builder", at + Vector3(1.0, 0.2, -3.0))
-	var crate := playground.props.spawn(&"crate", &"builder", at + Vector3(0.0, 0.8, -3.0))
-	var big := playground.props.spawn(&"crate_large", &"builder", at + Vector3(-3.0, 1.0, -3.0))
-	var button := playground.props.spawn(&"button", &"builder", at + Vector3(2.0, 1.0, -3.0))
-	var door := playground.props.spawn(&"door", &"builder", at + Vector3(4.0, 1.3, -4.0))
+	var a := playground.props.spawn(&"plank", &"builder", _sb_at + Vector3(0.0, 0.2, -3.0))
+	var b := playground.props.spawn(&"plank", &"builder", _sb_at + Vector3(1.0, 0.2, -3.0))
+	var crate := playground.props.spawn(&"crate", &"builder", _sb_at + Vector3(0.0, 0.8, -3.0))
+	_sb_big = playground.props.spawn(&"crate_large", &"builder", _sb_at + Vector3(-3.0, 1.0, -3.0))
+	var button := playground.props.spawn(&"button", &"builder", _sb_at + Vector3(2.0, 1.0, -3.0))
+	var door := playground.props.spawn(&"door", &"builder", _sb_at + Vector3(4.0, 1.3, -4.0))
 	await get_tree().physics_frame
-	for p: DotPropInstance in [a, b, crate, big, button]:
+	for p: DotPropInstance in [a, b, crate, _sb_big, button]:
 		DotPhysGun.set_frozen(p, true)
 	var _w: DotResult = playground.constraints.weld(&"builder", a.node as RigidBody3D, b.node as RigidBody3D, a.position())
 	(crate.node as PlaygroundProp).set_tint(Color(0.2, 0.4, 0.9))
-	var _grown := (big.node as PlaygroundProp).set_size_scale(1.5)
+	var _grown := (_sb_big.node as PlaygroundProp).set_size_scale(1.5)
 	# Physics the edit mode changed: no gravity, twice as heavy, slippery and bouncy.
-	ToolPhysprop._apply(big.node as RigidBody3D, false, 2.0, 0.3, 0.6)
+	ToolPhysprop._apply(_sb_big.node as RigidBody3D, false, 2.0, 0.3, 0.6)
 	var _wire := playground.io.link(button.instance_id, &"pressed", door.instance_id, &"toggle")
 	var before := {}
 	for p in playground.props.props_of(&"builder"):
 		before[p.def.id] = before.get(p.def.id, []) + [(p.node as Node3D).global_transform]
 
-	var store := PlaygroundBuilds.new()
-	store.directory = "user://test_builds"
-	DotPaths.remove_tree(store.directory)
-	var doc := store.capture(playground, &"builder", at, yaw)
-	_check(doc.ok and (doc.value["props"] as Array).size() == 6 and (doc.value["links"] as Array).size() == 1
-		and (doc.value["wires"] as Array).size() == 1, "a build captures its props, its weld and its wire", str(doc.error) if not doc.ok else "")
-	_check(store.save("key:1", "bridge", doc.value).ok and store.names("key:1") == PackedStringArray(["bridge"]), "it is saved under the player's key")
-	_check(not store.save("key:1", "../escape", doc.value).ok, "and a name that is a path is refused")
+	_sb_store = PlaygroundBuilds.new()
+	_sb_store.directory = "user://test_builds"
+	DotPaths.remove_tree(_sb_store.directory)
+	_sb_doc = _sb_store.capture(playground, &"builder", _sb_at, _sb_yaw)
+	_check(_sb_doc.ok and (_sb_doc.value["props"] as Array).size() == 6 and (_sb_doc.value["links"] as Array).size() == 1
+		and (_sb_doc.value["wires"] as Array).size() == 1, "a build captures its props, its weld and its wire", str(_sb_doc.error) if not _sb_doc.ok else "")
+	_check(_sb_store.save("key:1", "bridge", _sb_doc.value).ok and _sb_store.names("key:1") == PackedStringArray(["bridge"]), "it is saved under the player's key")
+	_check(not _sb_store.save("key:1", "../escape", _sb_doc.value).ok, "and a name that is a path is refused")
 
 	playground.props.clear_player(&"builder")
 	await get_tree().physics_frame
-	var loaded := store.load_build("key:1", "bridge")
-	var placed := store.place(playground, &"builder", loaded.value, at, yaw)
+	_sb_loaded = _sb_store.load_build("key:1", "bridge")
+	var placed := _sb_store.place(playground, &"builder", _sb_loaded.value, _sb_at, _sb_yaw)
 	await get_tree().physics_frame
 	_check(placed.ok and int(placed.value) == 6 and playground.props.props_of(&"builder").size() == 6,
 		"loaded back, every prop is there again", str(placed.error) if not placed.ok else "")
@@ -150,40 +161,43 @@ func _test_saved_builds() -> void:
 			nearest = minf(nearest, t.origin.distance_to((p.node as Node3D).global_position))
 		worst = maxf(worst, nearest)
 	_check(worst < 0.01, "where they stood", "%.4f m off" % worst)
-	var again := playground.props.props_of(&"builder")
-	var painted := again.filter(func(p: DotPropInstance) -> bool: return p.def.id == &"crate")
-	var grown := again.filter(func(p: DotPropInstance) -> bool: return p.def.id == &"crate_large")
+	_sb_again = playground.props.props_of(&"builder")
+	var painted := _sb_again.filter(func(p: DotPropInstance) -> bool: return p.def.id == &"crate")
+	_sb_grown = _sb_again.filter(func(p: DotPropInstance) -> bool: return p.def.id == &"crate_large")
 	# Paint is kept as an HTML colour, so to the nearest 1/255.
-	var paint: Color = (painted[0].node as PlaygroundProp).tint if not painted.is_empty() else Color.BLACK
-	var paint_off := absf(paint.r - 0.2) + absf(paint.g - 0.4) + absf(paint.b - 0.9)
-	_check(paint_off < 0.02 and not grown.is_empty() and is_equal_approx((grown[0].node as PlaygroundProp).size_scale, 1.5) and grown[0].frozen,
-		"painted, resized and frozen as they were", "paint %s, scale %s, frozen %s" % [paint,
-			(grown[0].node as PlaygroundProp).size_scale if not grown.is_empty() else -1.0, grown[0].frozen if not grown.is_empty() else false])
-	var big_body: RigidBody3D = grown[0].node as RigidBody3D if not grown.is_empty() else null
+	_sb_paint = (painted[0].node as PlaygroundProp).tint if not painted.is_empty() else Color.BLACK
+	_sb_paint_off = absf(_sb_paint.r - 0.2) + absf(_sb_paint.g - 0.4) + absf(_sb_paint.b - 0.9)
+	_test_saved_builds_2()
+
+func _test_saved_builds_2() -> void:
+	_check(_sb_paint_off < 0.02 and not _sb_grown.is_empty() and is_equal_approx((_sb_grown[0].node as PlaygroundProp).size_scale, 1.5) and _sb_grown[0].frozen,
+		"painted, resized and frozen as they were", "paint %s, scale %s, frozen %s" % [_sb_paint,
+			(_sb_grown[0].node as PlaygroundProp).size_scale if not _sb_grown.is_empty() else -1.0, _sb_grown[0].frozen if not _sb_grown.is_empty() else false])
+	var big_body: RigidBody3D = _sb_grown[0].node as RigidBody3D if not _sb_grown.is_empty() else null
 	_check(big_body != null and big_body.gravity_scale == 0.0
-		and is_equal_approx(big_body.mass, big.def.mass * pow(1.5, 3.0) * 2.0)
+		and is_equal_approx(big_body.mass, _sb_big.def.mass * pow(1.5, 3.0) * 2.0)
 		and big_body.physics_material_override != null
 		and is_equal_approx(big_body.physics_material_override.friction, 0.3)
 		and is_equal_approx(big_body.physics_material_override.bounce, 0.6),
 		"and with the gravity, weight, friction and bounce it was edited to",
 		"gravity %.1f, %.1f kg" % [big_body.gravity_scale, big_body.mass] if big_body != null else "none")
-	_check(not (doc.value["props"] as Array).any(func(e: Dictionary) -> bool: return e.has("physics") and str(e["id"]) == "crate"),
+	_check(not (_sb_doc.value["props"] as Array).any(func(e: Dictionary) -> bool: return e.has("physics") and str(e["id"]) == "crate"),
 		"and a prop nobody edited writes no physics at all")
-	var new_button: DotPropInstance = again.filter(func(p: DotPropInstance) -> bool: return p.def.id == &"button")[0]
+	var new_button: DotPropInstance = _sb_again.filter(func(p: DotPropInstance) -> bool: return p.def.id == &"button")[0]
 	_check(playground.constraints.count_owned(&"builder") >= 1 and playground.io.links_from(new_button.instance_id).size() == 1,
 		"with the weld and the wire made again")
 
 	# Put down somewhere else, turned: it goes in front of whoever loads it.
 	playground.props.clear_player(&"builder")
-	var turned := store.place(playground, &"builder", loaded.value, at + Vector3(0.0, 0.0, 20.0), yaw + 90.0)
+	var turned := _sb_store.place(playground, &"builder", _sb_loaded.value, _sb_at + Vector3(0.0, 0.0, 20.0), _sb_yaw + 90.0)
 	var centre := Vector3.ZERO
 	for p in playground.props.props_of(&"builder"):
 		centre += p.position()
 	centre /= maxf(playground.props.props_of(&"builder").size(), 1)
-	_check(turned.ok and centre.z > at.z + 15.0, "and loaded elsewhere, it is put down there", "centre %s" % centre)
+	_check(turned.ok and centre.z > _sb_at.z + 15.0, "and loaded elsewhere, it is put down there", "centre %s" % centre)
 
 	# A catalogue that has lost a prop refuses the build by name.
-	var broken: Dictionary = (loaded.value as Dictionary).duplicate(true)
+	var broken: Dictionary = (_sb_loaded.value as Dictionary).duplicate(true)
 	broken["props"][0]["id"] = "crate_old"
 	var refused := PlaygroundBuilds.validate(broken, playground.props.catalogue)
 	_check(not refused.ok and refused.error.message.contains("crate_old"), "a build with a prop this server lacks is refused by name",
@@ -193,13 +207,13 @@ func _test_saved_builds() -> void:
 	playground.props.clear_player(&"builder")
 	var old_limits: Dictionary = playground.props.limits.group_limits.duplicate()
 	playground.props.limits.group_limits[DotPropDef.GROUP_PROPS] = 3
-	var too_big := store.place(playground, &"builder", loaded.value, at, yaw)
+	var too_big := _sb_store.place(playground, &"builder", _sb_loaded.value, _sb_at, _sb_yaw)
 	_check(not too_big.ok and playground.props.props_of(&"builder").is_empty(), "a build past the player's limit puts nothing down",
 		too_big.error.message if not too_big.ok else "")
 	playground.props.limits.group_limits = old_limits
 
 	# What the Q menu's Builds tab is sent: a name, a size, and whether it is a custom prop.
-	var listed := store.summaries("key:1")
+	var listed := _sb_store.summaries("key:1")
 	_check(listed.size() == 1 and listed[0]["name"] == "bridge" and int(listed[0]["props"]) == 6
 		and not bool(listed[0]["custom"]), "a player's builds list with their sizes", str(listed))
 	var two_welded := {"props": [{"id": "plank"}, {"id": "plank"}], "links": [{"kind": "weld", "a": 0, "b": 1}]}
@@ -213,7 +227,7 @@ func _test_saved_builds() -> void:
 	_check(bool(back["ok"]) and (back["builds"] as Array).size() == 2 and back["builds"][1]["name"] == "car"
 		and bool(back["builds"][1]["custom"]) and int(back["builds"][0]["props"]) == 6, "and the list crosses the wire whole", str(back))
 
-	DotPaths.remove_tree(store.directory)
+	DotPaths.remove_tree(_sb_store.directory)
 	playground.props.clear_player(&"builder")
 	playground.remove_player(&"builder")
 	_done()
@@ -720,6 +734,9 @@ func _test_map_time_limit() -> void:
 	_check(playground.maps.time_limit.rtv_votes() == 1, "a vote is counted")
 
 	playground.remove_player(&"ghost")
+	_test_map_time_limit_2()
+
+func _test_map_time_limit_2() -> void:
 	_check(
 		playground.maps.time_limit.rtv_votes() == 1,
 		"removing somebody who was not playing changes nothing"

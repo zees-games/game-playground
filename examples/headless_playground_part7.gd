@@ -102,6 +102,11 @@ func _toy_index(id: String) -> int:
 ## from the hit scan sends one off, the use key kicks, a trampoline throws a player, the
 ## roundabout carries one standing on it, a grenade's blast throws a barrel, sv_toys 0 takes
 ## them away and a map change takes them with it.
+var _t_box: DotPropToyBox
+var _t_player: PlaygroundPlayer
+var _t_ball: DotPropToy
+var _t_tramp: DotPropToy
+
 func _test_toys() -> void:
 	_section("the sandbox's toys")
 
@@ -110,32 +115,32 @@ func _test_toys() -> void:
 		_check(false, "the sandbox loads with its toys", on_lobby.error.message if not on_lobby.ok else "no box")
 		_done()
 		return
-	var box := playground.toys
+	_t_box = playground.toys
 	var lobby := playground.current_map_node()
-	_check(box.count() == (lobby.call("map_toys") as Array).size() and box.count() >= 25 and box.missing.is_empty(),
-		"the lobby builds every toy it lists", "%d toys" % box.count())
+	_check(_t_box.count() == (lobby.call("map_toys") as Array).size() and _t_box.count() >= 25 and _t_box.missing.is_empty(),
+		"the lobby builds every toy it lists", "%d toys" % _t_box.count())
 
-	var player := playground.add_player(&"toyer", "Toyer")
+	_t_player = playground.add_player(&"toyer", "Toyer")
 	await get_tree().physics_frame
 
 	# Walked into: the beach ball goes on ahead of the player.
-	var ball := box.toy(_toy_index("beach_ball"))
-	var b0 := ball.body.global_position
-	player.teleport(Vector3(b0.x - 1.2, 0.05, b0.z), -90.0)
+	_t_ball = _t_box.toy(_toy_index("beach_ball"))
+	var b0 := _t_ball.body.global_position
+	_t_player.teleport(Vector3(b0.x - 1.2, 0.05, b0.z), -90.0)
 	await get_tree().physics_frame
 	for _i in range(16):
-		player.controller.state.velocity = Vector3(6.0, 0.0, 0.0)
+		_t_player.controller.state.velocity = Vector3(6.0, 0.0, 0.0)
 		await get_tree().physics_frame
 	for _i in range(30):
 		await get_tree().physics_frame
-	_check(ball.body.global_position.x > b0.x + 0.5, "a player walking into the beach ball sends it on ahead",
-		"moved %.2f m" % (ball.body.global_position.x - b0.x))
+	_check(_t_ball.body.global_position.x > b0.x + 0.5, "a player walking into the beach ball sends it on ahead",
+		"moved %.2f m" % (_t_ball.body.global_position.x - b0.x))
 
 	# Shot through the game's own hit scan (player_shots_fired → PlaygroundZee.trace_outcome):
 	# the second ball flies off, and nobody's prop shove sent it at forty metres a second.
-	var other := box.toy(_toy_index("beach_ball") + 1)
+	var other := _t_box.toy(_toy_index("beach_ball") + 1)
 	var o0 := other.body.global_position
-	player.teleport(o0 + Vector3(0, 0, 5.0), 0.0)
+	_t_player.teleport(o0 + Vector3(0, 0, 5.0), 0.0)
 	await get_tree().physics_frame
 	var outcome := DotWeaponOutcome.new()
 	outcome.used = true
@@ -154,51 +159,54 @@ func _test_toys() -> void:
 		"moved %.2f m, at most %.1f m/s" % [o0.z - other.body.global_position.z, fastest])
 
 	# The use key on the football (the game's F, `use_prop`): kicked along the look.
-	var football := box.toy(_toy_index("football"))
+	var football := _t_box.toy(_toy_index("football"))
 	var f0 := football.body.global_position
-	player.teleport(f0 + Vector3(0, 0.05, 1.3), 0.0)
+	_t_player.teleport(f0 + Vector3(0, 0.05, 1.3), 0.0)
 	# Down at the ball at the feet: the sign of pitch read off the aim, as the lever's is.
 	await _look(&"toyer", 45.0, 4)
-	var at_ball := rad_to_deg(atan2(player.eye_position().y - f0.y, player.eye_position().z - f0.z))
-	await _look(&"toyer", -at_ball if player.aim_direction().y > 0.0 else at_ball, 4)
-	var aimed := playground.toy_aimed(player)
+	var at_ball := rad_to_deg(atan2(_t_player.eye_position().y - f0.y, _t_player.eye_position().z - f0.z))
+	await _look(&"toyer", -at_ball if _t_player.aim_direction().y > 0.0 else at_ball, 4)
+	var aimed := playground.toy_aimed(_t_player)
 	var used := playground.use_prop(&"toyer")
 	for _i in range(20):
 		await get_tree().physics_frame
 	_check(aimed == football.index and used.ok and football.body.global_position.z < f0.z - 1.0,
-		"the use key kicks the football the player looks at", "aimed %d, moved %.2f m; eye %s aim %s ball %s" % [aimed, f0.z - football.body.global_position.z, player.eye_position(), player.aim_direction(), f0])
+		"the use key kicks the football the player looks at", "aimed %d, moved %.2f m; eye %s aim %s ball %s" % [aimed, f0.z - football.body.global_position.z, _t_player.eye_position(), _t_player.aim_direction(), f0])
 
 	# A trampoline under a falling player throws them back up.
-	var tramp := box.toy(_toy_index("trampoline"))
-	player.teleport(tramp.global_position + Vector3(0.2, 1.4, 0.0), 0.0)
+	_t_tramp = _t_box.toy(_toy_index("trampoline"))
+	_t_player.teleport(_t_tramp.global_position + Vector3(0.2, 1.4, 0.0), 0.0)
+	await _test_toys_2()
+
+func _test_toys_2() -> void:
 	var top := 0.0
-	var bounced_before := tramp.count
+	var bounced_before := _t_tramp.count
 	for _i in range(90):
 		await get_tree().physics_frame
-		top = maxf(top, player.controller.state.position.y - tramp.global_position.y)
-	_check(top > 2.0 and tramp.count != bounced_before, "landing on the trampoline throws a player up, and counts the bounce",
-		"%.2f m above it, count %d" % [top, tramp.count])
+		top = maxf(top, _t_player.controller.state.position.y - _t_tramp.global_position.y)
+	_check(top > 2.0 and _t_tramp.count != bounced_before, "landing on the trampoline throws a player up, and counts the bounce",
+		"%.2f m above it, count %d" % [top, _t_tramp.count])
 
 	# Somebody standing on the turning roundabout goes round with it.
-	var spinner := box.toy(_toy_index("merry_go_round"))
+	var spinner := _t_box.toy(_toy_index("merry_go_round"))
 	var hub := spinner.body.global_position
-	var _spun := box.use(spinner.index, hub + Vector3(1.6, 1.0, 0), Vector3(0, 0, 1))
-	player.teleport(hub + Vector3(1.0, 0.1, 0.0), 0.0)
+	var _spun := _t_box.use(spinner.index, hub + Vector3(1.6, 1.0, 0), Vector3(0, 0, 1))
+	_t_player.teleport(hub + Vector3(1.0, 0.1, 0.0), 0.0)
 	for _i in range(6):
 		await get_tree().physics_frame
-	var start := player.controller.state.position - hub
+	var start := _t_player.controller.state.position - hub
 	var start_angle := atan2(start.z, start.x)
 	for _i in range(40):
 		await get_tree().physics_frame
-	var now := player.controller.state.position - hub
+	var now := _t_player.controller.state.position - hub
 	var turned := absf(wrapf(atan2(now.z, now.x) - start_angle, -PI, PI))
 	var out := Vector2(now.x, now.z).length()
-	_check(turned > 0.3 and absf(out - Vector2(start.x, start.z).length()) < 0.3 and player.controller.state.is_grounded(),
+	_check(turned > 0.3 and absf(out - Vector2(start.x, start.z).length()) < 0.3 and _t_player.controller.state.is_grounded(),
 		"a player standing on the turning roundabout is carried round with it, still on the deck",
 		"turned %.2f rad, %.2f m out" % [turned, out])
 
 	# A grenade's blast (through the projectiles' own detonation, which hands toys to the box).
-	var barrel := box.toy(_toy_index("barrel"))
+	var barrel := _t_box.toy(_toy_index("barrel"))
 	var r0 := barrel.body.global_position
 	var thrown := playground.blast_toys(r0 + Vector3(-1.5, 0.2, 0.0), 5.0)
 	for _i in range(20):
@@ -209,16 +217,16 @@ func _test_toys() -> void:
 	# sv_toys 0: nothing to hit, kick or stand on; 1 brings them back.
 	var _off := playground.toy_rules.set_cvar(DotPropToyRules.CVAR_ENABLED, "0")
 	await get_tree().physics_frame
-	var hidden := not ball.visible and playground.toy_aimed(player) == -1
+	var hidden := not _t_ball.visible and playground.toy_aimed(_t_player) == -1
 	var _on := playground.toy_rules.set_cvar(DotPropToyRules.CVAR_ENABLED, "1")
-	_check(hidden and ball.visible, "sv_toys 0 takes the toys away and 1 puts them back")
+	_check(hidden and _t_ball.visible, "sv_toys 0 takes the toys away and 1 puts them back")
 
 	playground.remove_player(&"toyer")
 	var away: DotResult = await playground.change_map(&"pg_generated")
 	await get_tree().process_frame
-	_check(away.ok and playground.toys != null and playground.toys.count() == 0 and not is_instance_valid(ball),
+	_check(away.ok and playground.toys != null and playground.toys.count() == 0 and not is_instance_valid(_t_ball),
 		"a map with no toys has none, and the lobby's went with it",
-		"%s, %s, ball %s" % [str(away.ok), str(playground.toys.describe()) if playground.toys != null else "no box", str(is_instance_valid(ball))])
+		"%s, %s, ball %s" % [str(away.ok), str(playground.toys.describe()) if playground.toys != null else "no box", str(is_instance_valid(_t_ball))])
 	var _back: DotResult = await playground.change_map(&"pg_flatgrass")
 	_done()
 
@@ -435,6 +443,11 @@ func _jump_height(player: PlaygroundPlayer, at: Vector3) -> float:
 ## handling, a blast, a crate thrown into it; not a crate nudged into it, not a player running
 ## alongside it, and nothing at all with `pg_breakable_glass` off. Shards fly and the
 ## signal every client's sound hangs off fires.
+var _g_west: int
+var _g_east: int
+var _g_north: int
+var _g_on_broken
+
 func _test_glass() -> void:
 	_section("glass breaks")
 
@@ -455,13 +468,13 @@ func _test_glass() -> void:
 		return -1
 	var glass_panes := playground.panes.values().filter(func(p: Dictionary) -> bool: return p["material"] == &"glass")
 	_check(glass_panes.size() == 6, "the greenhouse's six glass boxes are breakable", str(glass_panes.size()))
-	var west: int = pane_at.call(Vector3(-7.95, 1.75, 50.0))
-	var east: int = pane_at.call(Vector3(7.95, 1.75, 50.0))
-	var north: int = pane_at.call(Vector3(0.0, 1.75, 45.05))
+	_g_west = pane_at.call(Vector3(-7.95, 1.75, 50.0))
+	_g_east = pane_at.call(Vector3(7.95, 1.75, 50.0))
+	_g_north = pane_at.call(Vector3(0.0, 1.75, 45.05))
 
 	var heard: Array = []
-	var on_broken := func(index: int, _at: Vector3, material: StringName) -> void: heard.append([index, material])
-	playground.pane_broken.connect(on_broken)
+	_g_on_broken = func(index: int, _at: Vector3, material: StringName) -> void: heard.append([index, material])
+	playground.pane_broken.connect(_g_on_broken)
 
 	# --- Running alongside a pane at full speed is not running into it ---------------------
 	# Starting past the north wall's end: the first version started south of it, ran into
@@ -474,7 +487,7 @@ func _test_glass() -> void:
 	run.move = Vector2(0.0, 1.0)
 	run.yaw = 180.0
 	await _drive(&"bot", run, 100)
-	_check(playground.panes.has(east) and heard.is_empty(), "a player running alongside a pane does not break it",
+	_check(playground.panes.has(_g_east) and heard.is_empty(), "a player running alongside a pane does not break it",
 		"%.2f m/s, at %s" % [player.controller.state.velocity.length(), str(player.controller.state.position)])
 
 	# --- Off, nothing breaks it -----------------------------------------------------------------
@@ -488,7 +501,7 @@ func _test_glass() -> void:
 		playground.tick_rate, playground.current_tick())
 	playground.panes_break = false
 	var _off := _fire_at_crates(rig, player, 160)
-	_check(playground.panes.has(west), "with pg_breakable_glass off, shots break no glass")
+	_check(playground.panes.has(_g_west), "with pg_breakable_glass off, shots break no glass")
 	playground.panes_break = true
 
 	# --- A pistol breaks it ------------------------------------------------------------------------
@@ -499,33 +512,36 @@ func _test_glass() -> void:
 	PlaygroundZee.disarm(player)
 	await get_tree().physics_frame
 	var shards := playground.props.all_props().filter(func(p: DotPropInstance) -> bool: return p.def.id == &"debris")
-	_check(not playground.panes.has(west) and playground.broken_panes.has(west), "a pistol shoots a pane out")
+	_check(not playground.panes.has(_g_west) and playground.broken_panes.has(_g_west), "a pistol shoots a pane out")
 	_check(shards.size() >= 3 and playground.props.all_props().size() > before, "and it leaves shards", "%d shards" % shards.size())
-	_check(heard.size() == 1 and heard[0][0] == west and heard[0][1] == &"glass", "and says so, once, for the sound", str(heard))
+	_check(heard.size() == 1 and heard[0][0] == _g_west and heard[0][1] == &"glass", "and says so, once, for the sound", str(heard))
 	await get_tree().physics_frame
+	await _test_glass_2()
+
+func _test_glass_2() -> void:
 	var through := playground.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(
 		Vector3(-14.0, 1.7, 50.0), Vector3(-2.0, 1.7, 50.0)))
-	_check(through.is_empty() or not ((through["collider"] as Node).get_meta(&"pg_box", -1) == west),
+	_check(through.is_empty() or not ((through["collider"] as Node).get_meta(&"pg_box", -1) == _g_west),
 		"and nothing is left where it stood")
 
 	# --- A blast ---------------------------------------------------------------------------------
-	var standing := playground.panes.has(north)
+	var standing := playground.panes.has(_g_north)
 	playground.hurt_panes_in(Vector3(0.0, 1.75, 43.0), 4.0, 100.0, &"bot")
-	_check(standing and not playground.panes.has(north), "a blast beside a pane breaks it")
+	_check(standing and not playground.panes.has(_g_north), "a blast beside a pane breaks it")
 
 	# --- A crate thrown into it, and one nudged into it -----------------------------------------------
 	var nudged := playground.props.spawn(&"crate", &"bot", Vector3(10.5, 0.6, 52.0))
 	await get_tree().physics_frame
 	(nudged.node as RigidBody3D).linear_velocity = Vector3(-2.0, 0.0, 0.0)
 	await _drive(&"bot", DotFpsCommand.new(), 128)
-	_check(playground.panes.has(east), "a crate nudged into a pane leaves it standing")
+	_check(playground.panes.has(_g_east), "a crate nudged into a pane leaves it standing")
 	var thrown := playground.props.spawn(&"crate", &"bot", Vector3(11.0, 1.2, 48.0))
 	await get_tree().physics_frame
 	(thrown.node as RigidBody3D).linear_velocity = Vector3(-12.0, 0.0, 0.0)
 	await _drive(&"bot", DotFpsCommand.new(), 64)
-	_check(not playground.panes.has(east), "and one thrown into it breaks it")
+	_check(not playground.panes.has(_g_east), "and one thrown into it breaks it")
 
-	playground.pane_broken.disconnect(on_broken)
+	playground.pane_broken.disconnect(_g_on_broken)
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	var back: DotResult = await playground.change_map(&"pgc_nature")
 	_check(back.ok and playground.panes.size() == 7 and playground.broken_panes.is_empty(), "a map change puts every pane back (the glass and the lake's ice)")
