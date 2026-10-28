@@ -1,0 +1,8 @@
+Rigged first-person arm (arms-rigged.glb), built from a CC0 base. Rebuild: blender -b "FPS ARMS RIG 1.blend" --python art-src/arms/build_arms.py -- assets/arms/arms-rigged.glb
+
+para, "fps arms (rigged only)" (2015-03-18)
+  https://opengameart.org/content/fps-arms-rigged-only
+  Licence: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/ (stated on the page, checked 2026-10-19; the download, "fps arms.7z", carries no licence file)
+  The author built the mesh and texture with the MakeHuman tool and credits its team.
+
+What was changed (art-src/arms/build_arms.py): only the right arm is kept (the left hand is its mirror, drawn in code); the author's IK and copy-rotation control bones and constraints are dropped, clavicle and deltoid weights are merged into the upper arm and the bones are renamed, leaving 22 deform bones that ZeeRiggedArm poses; the skin texture is dropped and the mesh is split into a Glove and a Sleeve surface that the game paints in its own colours; the forearm is thickened slightly and given a flared cuff; the whole arm is scaled to a 0.52 m reach with the shoulder at the origin.
