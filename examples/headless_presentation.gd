@@ -1026,7 +1026,6 @@ func _test_chat_drawn_once(p: PlaygroundPresentation) -> void:
 ## handed this game's numbers, out of the chat box's way and under a ballot's.
 func _test_glance_pieces() -> void:
 	_section("What is in hand, and what a shot did")
-
 	var p := _make()
 	var hud := PlaygroundHud.new()
 	hud.name = "GlanceHud"
@@ -1072,8 +1071,7 @@ func _test_glance_pieces() -> void:
 		"%s %s" % [str(hud.hit_marker.describe()), str(hud.damage_numbers.texts())]
 	)
 
-	# Out of the chat box's way: both are bottom-anchored, the box from the left and the
-	# counter from the right, so the test is the narrowest frame a client shell draws.
+	# Out of the chat box's way: the narrowest frame a client shell draws.
 	await get_tree().process_frame
 	var window := p.chat_window
 	var plate := hud.ammo.get_global_transform() * hud.ammo.footprint()

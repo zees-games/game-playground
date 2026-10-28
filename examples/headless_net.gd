@@ -35,13 +35,9 @@ func _run() -> void:
 		await _test_vehicle_over_the_wire()
 		await _test_timer()
 		await _test_lossy()
-		# Last of the tests that need a connected player, and that placement is the
-		# point. Both halves of this suite are nodes in ONE scene tree and therefore
-		# one physics space, so every test that advances the world moves the reading
-		# every test after it takes — the vehicle drive and the lossy-link distance
-		# are both velocities over a fixed number of steps. Measured: this test run
-		# before the vehicle one took its 1-in-5 flake to 3 failures out of 3, at the
-		# same -0.16 m/s. Nothing here spawns a body, so run last it moves nothing.
+		# Last of the tests that need a connected player: both halves share one physics space, so
+		# a test that advances the world moves every later reading. This one spawns no body.
+		# Run before the vehicle test it made that test flake.
 		await _test_weapon_request()
 		# After the weapon request for the same reason it is after everything else: this
 		# adds a second body to the shared physics space. It takes the body back out again.
