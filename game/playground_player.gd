@@ -624,30 +624,14 @@ func eye_position() -> Vector3:
 	return controller.motor.eye_position(controller.state)
 
 
-## Where the eye is DRAWN this frame, which is not where it is: the last two ticks blended by
-## how far this frame sits between them ([method DotFpsController.render_state]). Aim, reach
-## and every trace still use [method eye_position]; this is the camera's and nothing else's.
+## Where the eye is DRAWN this frame: the last two ticks blended by how far this frame sits
+## between them ([method DotFpsController.render_state]). Aim, reach and every trace still use
+## [method eye_position]; this is the camera's alone.
 ##
-## [b]Why the camera needs it now and did not before 2026-09-25.[/b] Until then a connected
-## client predicted nobody, its own player was interpolated like everybody else's, and the
-## eye rode that interpolation — smooth, and a round trip plus the interpolation delay behind
-## the keys. Predicted, the eye is the simulation's and moves once a tick, so on a screen
-## faster than the tick some frames advance it and some do not: measured with
-## `tools/screenshot_net.sh --walk`, 62 of 593 frames standing still at full speed.
-##
-## Not while riding: the controller is not simulated in a vehicle, so its previous tick is
-## wherever the player got in, and a blend toward it drags the view backwards every frame —
-## the lurch mg-buses-from-hell measured at 137.9 m/s when its blend read a tick nothing had
-## simulated. A teleport resets the blend itself (`DotFpsController.teleport`).
-## The camera motion this game picks for a bunny-hop and surf sandbox (scale 1 of each
-## setting). Its numbers are about [method movement_tunables]:
-##
-## - A hop lands at about 6.8 m/s (1.15 m at 20 m/s²), under [code]landing_min_speed[/code], so
-##   a chain of hops never bobs the view; a drop off a ledge does, fully from 16 m/s (6.4 m).
-## - The widening starts past the 7 m/s run and is all there at 25 m/s, where a good bhop or
-##   any surf ramp is; a player walking about building never sees the lens move.
-## - The lean is a degree at a sideways run, bounded, because a surfer looks across the ramp
-##   for whole seconds at a time.
+## A predicted eye moves once a tick, so on a screen faster than the tick some frames stand still
+## (62 of 593 in `tools/screenshot_net.sh --walk`). Not while riding: the controller is not
+## simulated in a vehicle, so a blend toward its stale previous tick drags the view backwards.
+## A teleport resets the blend itself (`DotFpsController.teleport`).
 static func camera_motion_picks() -> DotFpsViewMotion:
 	var m := DotFpsViewMotion.new()
 	m.landing_dip = 0.06

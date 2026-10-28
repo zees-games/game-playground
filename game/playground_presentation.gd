@@ -11,16 +11,10 @@ const PlaygroundVote := preload("playground_vote.gd")
 
 ## Settings, randomness, audio, effects and a console.
 ##
-## [b]This is the only game in the family that holds dot-randomness as well[/b], and the
-## reason is the generated map: a sandbox whose layout, whose scattered props and whose
-## wave composition all come out of **one** seed is a sandbox two people can compare notes
-## about. Three separate generators would be three numbers, and "what seed are you on"
-## would stop meaning anything.
-##
-## The manager is here rather than in `Playground` because it is the thing that owns the
-## session's seed, and because `Playground` should be able to run without it — a server
-## with no randomness manager falls back to a fixed seed and says so, which is better than
-## a sandbox that is a different shape on every boot and cannot say why.
+## This is the only game that holds dot-randomness as well: the generated map, the scattered
+## props and the wave composition all come from one seed, so two people can compare notes.
+## The manager is here rather than in `Playground` because it owns the session's seed, and
+## `Playground` must run without it (a fixed seed, said so).
 
 const CHANNEL := "playground.presentation"
 

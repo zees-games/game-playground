@@ -25,27 +25,18 @@ const PlaygroundSpectate := preload("playground_spectate.gd")
 const PlaygroundVote := preload("playground_vote.gd")
 const PlaygroundWaves := preload("playground_waves.gd")
 
-## Binds a [Playground] to a [DotServer]: the console commands an operator and an
-## admin actually type.
+## Binds a [Playground] to a [DotServer]: the console commands an operator and an admin type.
 ##
-## [b]This is the only file in the project that names dot-server[/b], which is where
-## the family's own documentation says such a bridge belongs — dot-timer does not
-## import dot-server, dot-map does not, and dot-props does not, so a game that wants
-## a dedicated server writes one file and it is this one.
+## This is the only file in the project that names dot-server, where the family says such a
+## bridge belongs: a game that wants a dedicated server writes this one file.
 ##
 ## [codeblock]
 ## server.modules.load_module("res://game/playground_module.gd")
 ## [/codeblock]
 ##
-## [b]The commands are the point of the module, not a garnish.[/b] A surf or bhop
-## server is administered from a console: maps are changed, zones are drawn on maps
-## whose authors never used this engine, styles are switched, and props are cleared
-## when somebody has built a wall across the start. Without a console, every one of
-## those needs a code change — which is exactly the position community servers were
-## in before their admin plugins, and the reason console zone tools exist.
-##
-## The zone commands reproduce that workflow deliberately: stand on one corner, run
-## the command, stand on the other, run it again.
+## The commands are the point: maps are changed, zones drawn, styles switched and props cleared
+## from a console, and without one each needs a code change. The zone commands reproduce the
+## usual workflow: stand on one corner, run the command, stand on the other, run it again.
 
 const CHANNEL := "playground.module"
 
