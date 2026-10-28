@@ -1,7 +1,6 @@
 extends "res://examples/headless_playground_part4.gd"
 
 const WorkshopScript := preload("res://game/playground_workshop.gd")
-const WeaponScript := preload("res://game/weapons/playground_weapon.gd")
 
 ## An entity is a prop with a script, and the script is loaded by path.
 ##

@@ -589,19 +589,3 @@ func _test_spawn_providers_3() -> void:
 ## [b]This game used to drop a weapon outcome's spawns[/b], so a thrown frag cost a grenade
 ## and never existed. Every check here goes through the real path: a rig, its outcome, and
 ## `player_shots_fired`, which is what the server's bridge and the offline client both call.
-var _g_bot: PlaygroundPlayer
-var _g_launched_at
-var _g_danger_heard: bool
-var _g_lowest
-var _g_soldier_body: Node3D
-var _g_soldier_health
-var _g_crate_body: RigidBody3D
-var _g_crate_start
-var _g_blasts: Array
-var _g_on_blast
-var _g_ticks: int
-var _g_bounced: bool
-var _g_at: Vector3
-var _g_stood
-var _g_rocket_blasts: Array
-var _g_on_rocket

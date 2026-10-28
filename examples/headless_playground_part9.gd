@@ -62,6 +62,23 @@ func _test_the_wheel_cycles_tools() -> void:
 	_done()
 
 
+var _g_bot: PlaygroundPlayer
+var _g_launched_at
+var _g_danger_heard: bool
+var _g_lowest
+var _g_soldier_body: Node3D
+var _g_soldier_health
+var _g_crate_body: RigidBody3D
+var _g_crate_start
+var _g_blasts: Array
+var _g_on_blast
+var _g_ticks: int
+var _g_bounced: bool
+var _g_at: Vector3
+var _g_stood
+var _g_rocket_blasts: Array
+var _g_on_rocket
+
 func _test_grenades() -> void:
 	_section("grenades and rockets fly")
 	await _sandbox_floor()
@@ -294,4 +311,145 @@ func _test_grenades_4() -> void:
 	_done()
 
 
-# --- The circuit -----------------------------------------------------------
+var _an_body: Node
+var _an_bot: PlaygroundPlayer
+var _an_before: float
+var _an_rebel: DotPropInstance
+
+func _test_armed_npcs() -> void:
+	_section("NPCs with weapons")
+	await _sandbox_floor()
+
+	var soldier := playground.props.spawn(&"npc_soldier", &"bot", Vector3(0, 1.2, 0))
+	await get_tree().physics_frame
+	_check(soldier != null, "a soldier spawns")
+
+	if soldier == null:
+		_done()
+		return
+
+	_an_body = soldier.node
+	_check(String(_an_body.get("weapon_id")) == "zee_smg" and _an_body.call("is_armed"),
+		"carrying the weapon its catalogue entry names")
+	_check(playground.armed_npcs.has(_an_body), "and the world knows it is armed")
+	_check(_an_body.get("brain") != null and _an_body.get("brain").get("squad") != null,
+		"with a tactical brain, in its owner's squad")
+
+	_check(playground.set_npc_weapon_choice(&"bot", &"zee_shotgun").ok, "a player picks what their NPCs carry")
+	_check(not playground.set_npc_weapon_choice(&"bot", &"zee_frag").ok,
+		"and cannot pick a grenade, which an NPC has no arc to throw")
+	var shotgunner := playground.props.spawn(&"npc_soldier", &"bot", Vector3(-6, 1.2, 0))
+	await get_tree().physics_frame
+	_check(shotgunner != null and String(shotgunner.node.get("weapon_id")) == "zee_shotgun",
+		"and the next one carries it")
+	playground.npc_weapon_choice.erase(&"bot")
+	if shotgunner != null:
+		playground.props.remove(shotgunner.instance_id)
+
+	# --- A player's shot hurts it -------------------------------------------------------------
+	_an_bot = playground.players[&"bot"]
+	_an_bot.teleport(Vector3(0, 1.0, 12.0), 0.0)
+	await get_tree().physics_frame
+	var rig := PlaygroundZee.arm(_an_bot, playground.weapon_def(&"zee_rifle"), ZeeWeaponRig.Role.SERVER, true,
+		playground.tick_rate, playground.current_tick())
+	var target: Node3D = _an_body
+	_an_before = float(_an_body.get("health"))
+	var ctx := DotWeaponContext.new()
+	ctx.origin = _an_bot.eye_position()
+	ctx.direction = (target.global_position + Vector3.UP * 0.3 - ctx.origin).normalized()
+	ctx.authority = true
+	for i in 40:
+		ctx.tick = playground.current_tick() + i
+		var command := DotWeaponCommand.new()
+		command.set_button(DotWeaponCommand.BUTTON_ATTACK, i % 2 == 0)
+		command.slot = PlaygroundZee.slot_of(rig)
+		var outcome := rig.simulate_tick(command, ctx.tick, ctx)
+		playground.player_shots_fired(&"bot", outcome)
+		if float(_an_body.get("health")) < _an_before:
+			break
+	_check(float(_an_body.get("health")) < _an_before, "a player's shot hurts an NPC",
+		"%.0f of %.0f" % [float(_an_body.get("health")), _an_before])
+	PlaygroundZee.disarm(_an_bot)
+
+	# --- Replicated --------------------------------------------------------------------------
+	var net := PlaygroundNpcNet.new()
+	net.prop = _an_body
+	net.pull()
+	_check(net.net_weapon == "zee_smg", "a client is told which weapon it holds")
+	net.free()
+
+	# --- Soldiers and rebels fight each other -------------------------------------------------
+	_an_bot.teleport(Vector3(-60.0, 1.0, -60.0), 0.0)
+	# Healed first: the player's shots above already hurt it, and a fight measured against
+	# that would end before it began.
+	_an_body.set("health", float(_an_body.get("max_health")))
+	_an_before = float(_an_body.get("max_health"))
+	_an_rebel = playground.props.spawn(&"npc_rebel", &"bot", Vector3(0, 1.2, -14))
+	await _test_armed_npcs_2()
+
+func _test_armed_npcs_2() -> void:
+	await get_tree().physics_frame
+	var rebel_body: Node = _an_rebel.node if _an_rebel != null else null
+	var fired_before := int((_an_body.get("zee_rig") as ZeeWeaponRig).fire_seq)
+	var hurt := false
+	for i in 128 * 8:
+		await get_tree().physics_frame
+		if not is_instance_valid(_an_body) or not is_instance_valid(rebel_body):
+			hurt = true
+			break
+		if float(_an_body.get("health")) < _an_before - 0.1 or float(rebel_body.get("health")) < float(rebel_body.get("max_health")):
+			hurt = true
+			break
+	_check(hurt, "a soldier and a rebel find each other and fight",
+		"soldier targets '%s', rebel targets '%s'" % [
+			String(_an_body.get("npc").target_id) if is_instance_valid(_an_body) else "(gone)",
+			String(rebel_body.get("npc").target_id) if is_instance_valid(rebel_body) else "(gone)",
+		])
+	_check(not is_instance_valid(_an_body) or int((_an_body.get("zee_rig") as ZeeWeaponRig).fire_seq) > fired_before
+		or (rebel_body != null and is_instance_valid(rebel_body) and int((rebel_body.get("zee_rig") as ZeeWeaponRig).fire_seq) > 0),
+		"with their own weapons")
+
+	# --- Death drops the weapon, and walking over it picks it up ---------------------------------
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	await get_tree().physics_frame
+	var doomed := playground.props.spawn(&"npc_soldier", &"bot", Vector3(0, 1.2, 0))
+	await get_tree().physics_frame
+	var at: Vector3 = (doomed.node as Node3D).global_position
+	var had := float(doomed.node.get("health"))
+	var landed: Array = []
+	var on_hit := func(by: StringName, victim: int, amount: float, _at: Vector3, killed: bool, _head: bool) -> void:
+		landed.append([by, victim, amount, killed])
+	playground.hit_landed.connect(on_hit)
+	doomed.node.call("take_damage", 9999.0, &"bot")
+	playground.hit_landed.disconnect(on_hit)
+	_check(landed.size() == 1 and landed[0][0] == &"bot" and DotEntity.kind_of(int(landed[0][1])) == DotEntity.KIND_NPC
+		and absf(float(landed[0][2]) - had) < 0.01 and bool(landed[0][3]),
+		"the player who killed it is told so, for the health it had rather than the 9999 thrown",
+		"%s, had %.0f" % [str(landed), had])
+	await get_tree().physics_frame
+	var dropped: DotPropInstance = null
+	for prop in playground.props.all_props():
+		if prop.def != null and String(prop.def.id) == "pickup_zee_smg":
+			dropped = prop
+	_check(dropped != null, "a soldier that dies drops its weapon")
+	_check(playground.armed_npcs.is_empty(), "and is no longer an armed NPC")
+
+	var picked: Array = []
+	var on_pick := func(who: StringName, weapon: StringName) -> void: picked.append([who, weapon])
+	playground.weapon_picked_up.connect(on_pick)
+	_an_bot.teleport(at, 0.0)
+	for i in 160:
+		await get_tree().physics_frame
+		if not picked.is_empty():
+			break
+	_check(not picked.is_empty() and picked[0][0] == &"bot" and picked[0][1] == &"zee_smg",
+		"and the player who walks over it picks it up", str(picked))
+	playground.weapon_picked_up.disconnect(on_pick)
+
+	# --- A weapon spawned from the menu counts against `weapons` ----------------------------------
+	var placed := playground.props.spawn(Playground.pickup_id_of(&"zee_pistol"), &"bot", Vector3(8, 1, 8))
+	_check(placed != null and playground.props.group_count(&"bot", &"weapons") == 1,
+		"a weapon put on the ground counts against the weapons limit")
+
+	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
+	_done()
