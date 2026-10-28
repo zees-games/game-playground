@@ -64,28 +64,21 @@ static func is_known(id: String) -> bool:
 
 
 static func surface(id: String) -> DotPhysicsSurface:
-	return physics().get_surface(StringName(id)) if is_known(id) else null
+	return physics().find(StringName(id))
 
 
 static func is_liquid(id: String) -> bool:
-	var s := surface(id)
-	return s != null and s.liquid
+	return physics().is_liquid(StringName(id))
 
 
 ## Built with no collider at all: a liquid, or something not solid (foliage).
 static func is_volume(id: String) -> bool:
-	var s := surface(id)
-	return s != null and (s.liquid or not s.solid)
+	return physics().is_volume(StringName(id))
 
 
-## A liquid a person swims in rather than sinks to the bottom of or burns in: water, slime.
-## By density, because that is what decides it (dot-physics' lava is three times water's).
-const SWIM_DENSITY := 1200.0
-
-
+## A liquid a person swims in rather than burns in: water, slime.
 static func is_swimmable(id: String) -> bool:
-	var s := surface(id)
-	return s != null and s.liquid and s.density <= SWIM_DENSITY
+	return physics().is_swimmable(StringName(id))
 
 
 ## The colour a box of this material is drawn in, or [param fallback] for none.
@@ -96,12 +89,8 @@ static func look(id: String, fallback: Color) -> Color:
 ## Marks a built solid box as made of [param id]: the player's surface, the solver's
 ## friction and bounce, and the name everything else reads (glass breaking, footsteps).
 static func apply(body: StaticBody3D, id: String) -> void:
-	var s := surface(id)
-	if s == null or body == null:
-		return
-	body.set_meta(META_SURFACE, StringName(id))
-	body.set_meta(META_MATERIAL, StringName(id))
-	body.physics_material_override = s.to_physics_material()
+	var keys: Array[StringName] = [META_SURFACE, META_MATERIAL]
+	physics().apply(body, StringName(id), keys)
 
 
 static func material_of(node: Object) -> StringName:
