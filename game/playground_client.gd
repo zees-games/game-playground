@@ -19,18 +19,12 @@ const PlaygroundWeapons := preload("playground_weapons.gd")
 const PlaygroundZee := preload("playground_zee.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
 
-## Boots a playable playground: one local player, a camera, a HUD, a spawn menu and
-## the keys.
+## Boots a playable playground: one local player, a camera, a HUD, a spawn menu and the keys.
 ##
-## [b]Separate from [Playground] on purpose.[/b] The playground is the simulation and
-## runs headless — that is what `examples/headless_playground.tscn` drives, and it has
-## no camera, no HUD and no input. This is everything a person needs on top of it, and
-## a dedicated server simply never loads it.
+## Separate from [Playground] on purpose: the playground is the simulation and runs headless;
+## this is everything a person needs on top of it, and a dedicated server never loads it.
 ##
-## [b]The bindings are the sandbox ones[/b], because that is the game this one is asking
-## to be compared with and a sandbox with its own scheme is a sandbox nobody can pick
-## up. Two mouse buttons that mean different things depending on what is in your
-## hands, a menu you hold open, and a spawn that happens the moment you click a prop:
+## The bindings are the sandbox ones, so the game can be picked up without a manual:
 ##
 ## [codeblock]
 ## Q (hold)     the spawn menu. Release to close; tap to pin it open
@@ -568,10 +562,8 @@ func _build_netcode() -> DotResult:
 	bridge.hello_received.connect(_on_hello)
 	bridge.roster_changed.connect(_on_roster_changed)
 	bridge.weapon_changed.connect(_on_weapon_changed)
-	# [b]dot-server's own `chat_received` is deliberately NOT connected.[/b] The server
-	# cancels that path and routes every line through [DotChatRouter] onto this game's own
-	# wire instead; connecting both would draw a line twice on a server running the old
-	# path and once on one running the new.
+	# dot-server's own `chat_received` is deliberately NOT connected: every line is routed
+	# through [DotChatRouter] onto this game's wire, and both would draw a line twice.
 	bridge.chat_received.connect(_on_chat_wire)
 	bridge.builds_received.connect(func(list: Array) -> void:
 		if menu != null:
@@ -634,10 +626,8 @@ func _build_netcode() -> DotResult:
 	_sampler = DotFpsSampler.new(DotFpsTunables.new())
 	DotFpsSampler.register_default_actions(_sampler)
 
-	# [b]Nothing may be sent to a peer before it says it can receive.[/b] dot-server's
-	# signon finishes and THEN the client builds its scene, so everything sent in
-	# between lands on a node that does not exist and is lost — one "Node not found"
-	# per call, and a client that never joins.
+	# Nothing may be sent before the peer says it can receive: dot-server's signon ends before
+	# this scene exists, so earlier sends hit a missing node and the client never joins.
 	if link.has_method("is_playing") and bool(link.call("is_playing")):
 		bridge.ask_ready()
 		workbench_remote.ask()
@@ -1389,10 +1379,8 @@ func _process(_delta: float) -> void:
 			hud.notice("Click to play. Escape again for the menu.")
 	_was_driving = driving
 	if presentation != null:
-		# Once a frame, with where the camera is. dot-audio culls by distance from the
-		# listener and dot-fx ages what it spawned, and neither ticks itself -- for the
-		# reason everything tickable in this family is explicit: `_process` does not run
-		# while a tree is paused, and a pause menu is exactly when nothing finishes.
+	# Once a frame, with the camera position: dot-audio and dot-fx do not tick themselves,
+	# and `_process` does not run while paused.
 		var eye := camera.global_position if camera != null and camera.is_inside_tree() \
 			else Vector3.ZERO
 		var forward := -camera.global_transform.basis.z \
@@ -1417,10 +1405,8 @@ func _process(_delta: float) -> void:
 	# draws them rather than where the last frame did.
 	_present_beacons(_delta)
 
-	# `is_inside_tree`, not just null. A camera whose parent was freed — a player who
-	# left, a map change — is a live object that is not in the scene, and writing a
-	# global transform to one is an engine error every frame rather than a crash that
-	# points anywhere.
+	# `is_inside_tree`, not just null: a camera whose parent was freed is live but out of the
+	# scene, and writing its transform errors every frame.
 	if player == null or camera == null or not camera.is_inside_tree():
 		return
 
@@ -1429,14 +1415,8 @@ func _process(_delta: float) -> void:
 
 	var punch := _present_zee()
 
-	# The camera follows the SIMULATED eye position rather than being parented to
-	# something the movement drives. Parenting works and hides a real difference: the
-	# simulation runs at a fixed tick and the camera is drawn every frame, so a
-	# parented camera steps once per tick and judders between them.
-	#
-	# The shake is added here, on the drawn camera and never to the eye the simulation
-	# aims from: a punt that moved the aim would move where the next shot goes, and a
-	# player who turned `shake_scale` to zero gets an offset of exactly zero.
+	# The camera follows the SIMULATED eye, not a parented node: the sim steps per tick and a
+	# parented camera would judder. Shake is added on the drawn camera, never to the aim.
 	var shake := presentation.camera_shake() \
 		if presentation != null and presentation.fx != null else Vector3.ZERO
 	# `render_eye_position` inside, not `eye_position`: the blend of the last two ticks,
@@ -1453,24 +1433,14 @@ func _process(_delta: float) -> void:
 		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
 
 
-## What a frame draws that a tick does not: the netcode's interpolation, then every
-## player's body turned the way they are looking. Returns how many bodies are shown. Static
-## so the net suite drives exactly this rather than a copy of it.
+## What a frame draws that a tick does not: the netcode's interpolation, then every player's
+## body turned the way they are looking. Returns how many bodies are shown. Static so the net
+## suite drives exactly this.
 ##
-## [b]Once a frame, not once a tick.[/b] The interpolator blends two snapshots perfectly and
-## is then useless if it is only ever asked at a tick boundary: remote players and every
-## replicated prop would step at the snapshot rate however smoothly they were interpolated.
-## dot-net shipped exactly that.
-##
-## [b]And the bodies after it[/b], because a remote player's node is moved by that call and
-## the body hangs off the node. Until 2026-09-24 there was no body to move — it was hidden
-## as if it were the local player's own and parked at the world origin (see
-## `PlaygroundPlayer.body_shown`, and dot-player-char's visual seating), so on a networked
-## client every other person in the sandbox was a beacon with nobody under it.
-##
-## [param alpha] is how far through the current tick the frame is; -1 asks the engine,
-## which is what a real frame wants and what a suite's frames cannot. [param own] is this
-## client's own player, drawn at the netcode clock's render alpha.
+## Once a frame, not once a tick: asked only at a tick boundary the interpolator is useless and
+## remote players step at the snapshot rate. The bodies come after it because it moves the nodes
+## they hang off. [param alpha] is how far through the tick the frame is (-1 asks the engine);
+## [param own] is this client's own player.
 static func present_frame(
 	p_net: DotNetManager, p_game: Playground, alpha: float = -1.0, own: PlaygroundPlayer = null
 ) -> int:
@@ -1550,20 +1520,10 @@ func _menu_is_open() -> bool:
 
 ## The sampler the next simulated tick will actually read.
 ##
-## [b]There are two of them and which one drives is a property of the deployment.[/b] A
-## networked client builds its command from `_sampler` in [method _net_physics], because
-## a command has to be stamped for a tick and kept for reconciliation. A local player
-## samples through its own `player.sampler` in `PlaygroundPlayer.simulate`, because there
-## is no tick to stamp it for.
-##
-## [b]This exists so the mouse and the tick cannot disagree about which one that is.[/b]
-## They did: `_on_mouse_motion` fed `player.sampler` unconditionally, and a networked
-## player is not built with a sampler of its own, so every mouse event was dropped by a
-## null guard while `_sampler` — the one being sampled — never saw one. Nothing errored
-## and nothing else broke, because `DotFpsSampler.sample` polls the `InputMap` rather
-## than reading events: the player walked, shot and spawned props with a dead mouse.
-## `game-g2gfast` had the right form already; this file was the outlier.
-## Set by a headless suite to answer [method mouse_drives_view] without a display
+## A networked client builds its command from `_sampler` in [method _net_physics] (the command
+## is stamped for a tick); a local player samples through `player.sampler`. Mouse events must
+## feed this one: a networked player has no sampler of its own, so feeding `player.sampler`
+## dropped every event and left the mouse dead.
 ## server. Left null in play, where the real mouse mode is the only honest answer.
 var mouse_capture_override: Variant = null
 
