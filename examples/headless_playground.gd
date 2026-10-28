@@ -58,7 +58,7 @@ const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
 const TICK := 1.0 / 128.0
 
-const CHECKS := 776 + 21
+const CHECKS := 776 + 22
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -5557,6 +5557,11 @@ func _test_the_client_boots() -> void:
 	pg_hud.call("set_aim", 0.0, false)
 	_check(scoped_ok and (pg_hud.get("_crosshair") as Control).visible and float((pg_hud.get("scope") as Control).get("fraction")) == 0.0,
 		"through a scope the HUD shows zee's scope instead of the crosshair, and puts it back at the hip")
+	var pg_xh := pg_hud.get("_crosshair") as DotCrosshair
+	pg_hud.call("set_alive", false)
+	var dead_hidden: bool = DotAddonApi.build_level("dot_ui") < 14 or not pg_xh.is_shown()
+	pg_hud.call("set_alive", true)
+	_check(dead_hidden and pg_xh.is_shown(), "the HUD hides the crosshair while the viewer is dead and shows it again alive")
 	# Closed right before the key: an offline client with no captured pointer (headless) may
 	# have put its menu back up, and while anything is open every key is the menu's.
 	menu.close_all()

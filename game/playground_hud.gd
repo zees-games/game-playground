@@ -438,6 +438,12 @@ static func time_left_text(view: DotVoteClockView, local: String, now: float) ->
 	return local
 
 
+## Whether the viewer is alive, pushed from the replicated COMBAT health (dot-ui API 14).
+func set_alive(alive: bool) -> void:
+	if _crosshair != null and DotAddonApi.build_level("dot_ui") >= 14:
+		_crosshair.call(&"set_alive", alive)
+
+
 ## A zee gun's aim this frame, from the client: dot-ui's DotCrosshair fades as the gun comes up
 ## (`set_aim`, API 5, as game-arena's), and a scope replaces it for its own reticle.
 func set_aim(fraction: float, scoped: bool) -> void:

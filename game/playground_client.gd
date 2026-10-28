@@ -972,6 +972,8 @@ func _on_combat(state: Dictionary) -> void:
 
 	health = int(state["health"])
 	armour = int(state["armour"])
+	if hud != null:
+		hud.set_alive(health > 0)
 
 	if bool(state["died"]) and hud != null:
 		hud.notice("You were killed.")
