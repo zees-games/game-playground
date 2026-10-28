@@ -129,10 +129,8 @@ const BLIND_COLOUR := Color(0.01, 0.01, 0.015)
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	# Offsets as well as the preset. `set_anchors_preset` does NOT set them, so a
-	# Control built in code keeps the zero size it was created with — the whole
-	# interface then lays out inside nothing and is invisible while being, by every
-	# property, correctly configured. This cost the family a day in dot-ui.
+	# Offsets as well: `set_anchors_preset` does not set them, and a code-built Control would
+	# stay zero-sized and invisible.
 	offset_left = 0.0
 	offset_top = 0.0
 	offset_right = 0.0
@@ -144,39 +142,22 @@ func _ready() -> void:
 	blind_overlay = ColorRect.new()
 	blind_overlay.name = "Blind"
 	blind_overlay.color = BLIND_COLOUR
-	# Not anchored to this HUD's rect, although this HUD is the full rect today: the
-	# reference game's blind was HUD-sized and its first rendered frame showed a sixteen-
-	# pixel frame of the world round the edge, because its HUD insets itself by the safe
-	# area. Sized to the whole viewport in `present_blind` instead, so a HUD that one day
-	# does the same cannot reopen it.
+	# Sized to the whole viewport in `present_blind`, not this rect: a HUD that insets itself by
+	# the safe area would leave a frame of world round the edge.
 	blind_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	blind_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	blind_overlay.modulate.a = 0.0
 	blind_overlay.visible = false
 	add_child(blind_overlay)
 
-	_notice = Label.new()
-	_notice.name = "Notice"
-	_notice.position = Vector2(24.0, 240.0)
-	_notice.size = Vector2(700.0, 32.0)
-	add_child(_notice)
+	_notice = _add_line("Notice", 240.0)
 
-	_status = Label.new()
-	_status.name = "Status"
-	_status.position = Vector2(24.0, 276.0)
-	_status.size = Vector2(700.0, 32.0)
-	add_child(_status)
+	_status = _add_line("Status", 276.0)
 
-	_tools = Label.new()
-	_tools.name = "Tools"
-	_tools.position = Vector2(24.0, 312.0)
-	_tools.size = Vector2(700.0, 32.0)
-	add_child(_tools)
+	_tools = _add_line("Tools", 312.0)
 
-	# A crosshair, because every tool here is aimed. A physics gun with nothing to
-	# aim by is one that picks up whatever happens to be near the middle of the
-	# screen, and "why did it grab that one" is the commonest complaint in a sandbox.
-	# Under the crosshair and the pieces: the scope is the view, the HUD reads over it.
+	# A crosshair, because every tool here is aimed. Under it and the pieces: the scope is the
+	# view, the HUD reads over it.
 	scope = ZeeScopeOverlay.new()
 	scope.name = "Scope"
 	add_child(scope)
@@ -186,8 +167,7 @@ func _ready() -> void:
 	_crosshair = DotCrosshair.new()
 	_crosshair.name = "Crosshair"
 	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
-	# Offsets as well as the preset. See the note in the block above: without them
-	# the crosshair draws inside a zero-sized rect in the top-left corner.
+	# Offsets too (see above), or the crosshair draws in a zero-sized rect.
 	_crosshair.offset_left = 0.0
 	_crosshair.offset_top = 0.0
 	_crosshair.offset_right = 0.0
@@ -233,6 +213,15 @@ func _ready() -> void:
 	add_child(hit_marker)
 
 	set_process(true)
+
+
+func _add_line(p_name: String, y: float) -> Label:
+	var label := Label.new()
+	label.name = p_name
+	label.position = Vector2(24.0, y)
+	label.size = Vector2(700.0, 32.0)
+	add_child(label)
+	return label
 
 
 ## Wires the HUD to a playground and a player.

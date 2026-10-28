@@ -12,31 +12,18 @@ const SwepToolgun := preload("weapons/swep_toolgun.gd")
 
 ## The spawn menu: hold Q, pick something, click it.
 ##
-## [b]The sandbox Q menu, and the behaviour is the part that matters.[/b] Holding the
-## key opens it and releasing closes it; a quick tap pins it open so both hands are
-## free. Clicking a prop [i]spawns[/i] it rather than arming a separate spawn key,
-## because a menu that only selects means every prop costs two actions and building
-## anything is twice the clicks. The menu stays open afterwards, so a wall is nine
-## clicks rather than nine open-and-closes.
+## Holding the key opens it, releasing closes it, a quick tap pins it open. Clicking a prop
+## spawns it directly, so building is one click per prop and the menu stays open.
 ##
-## [b]Three tabs, two systems.[/b] Props and entities are one [DotPropCatalogue] split
-## by [method PlaygroundSpawnables.kind_of]; weapons are their own registry, because a
-## weapon is never spawned and dot-props' catalogue requires a scene path. The player
-## sees three kinds of thing; underneath, one of them is a different system, and it is
-## different for a reason rather than by accident.
+## Three tabs, two systems: props and entities are one [DotPropCatalogue] split by
+## [method PlaygroundSpawnables.kind_of]; weapons are their own registry, because a weapon is
+## never spawned and the catalogue requires a scene path.
 ##
-## [b]dot-props deliberately ships no menu[/b] — "a menu of four hundred props with
-## icons and a search box is a game's own design", which is right, and this is that
-## design for this game. What the addon provides is everything the menu needs
-## **without loading a single scene**: `categories()`, `in_category()` and `search()`
-## all read fields of a [DotPropDef], so a four-hundred-prop catalogue costs four
-## hundred dictionary lookups rather than four hundred `load()` calls. The icons are
-## drawn from the same fields — see [PlaygroundIcons] — so opening the menu still
-## loads nothing.
+## dot-props ships no menu on purpose; this is this game's own. Its `categories()`,
+## `in_category()` and `search()` read [DotPropDef] fields without loading a scene, and the
+## icons are drawn from the same fields (see [PlaygroundIcons]), so opening loads nothing.
 ##
-## The menu never spawns anything itself. It emits, and [PlaygroundClient] asks the
-## server — the same division the tools make, and the reason this file works unchanged
-## when a dot-net bridge arrives and a spawn becomes a message.
+## The menu never spawns anything itself: it emits, and [PlaygroundClient] asks the server.
 
 # No CHANNEL: a screen, and nothing it draws is an operator's to act on. What a player picks is
 # logged where it is acted on — by the spawner, or by the server the bridge asks.
