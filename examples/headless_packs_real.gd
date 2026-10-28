@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
@@ -26,8 +26,6 @@ const MONSTERS: Array[String] = ["trex", "allosaurus", "raptor", "tiger", "thyla
 const CHECKS := 49
 const SECTIONS := 7
 
-var _passed := 0
-var _failed := 0
 var _entered := 0
 var _completed := 0
 var _skipped := 0
@@ -75,13 +73,7 @@ func _run() -> void:
 	await _test_workbench()
 	await _test_workbench_identity()
 
-	print("")
-	print("%d sections, %d passed, %d failed" % [_completed, _passed, _failed])
-	if _completed != SECTIONS or _passed + _failed != CHECKS - _skipped:
-		print("ERROR: %d of %d sections, %d of %d checks ran." % [_completed, SECTIONS, _passed + _failed, CHECKS - _skipped])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report_sections(_completed, _completed, SECTIONS, CHECKS - _skipped)
 
 
 func _test_menu() -> void:
@@ -480,11 +472,3 @@ func _section(title: String) -> void:
 func _done() -> void:
 	_completed += 1
 
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		print("  FAIL  %s" % (what if detail == "" else "%s (%s)" % [what, detail]))

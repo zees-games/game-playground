@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const PlaygroundBindings := preload("../game/playground_bindings.gd")
 const Playground := preload("../game/playground.gd")
@@ -70,9 +70,6 @@ const SECTIONS := 40
 const TIMER_SECTIONS := 2
 const TIMER_CHECKS := 14
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
 
@@ -172,33 +169,9 @@ func _run() -> void:
 	await _test_the_client_boots()
 	await _test_the_wheel_cycles_tools()
 
-	print("")
-	print("%d passed, %d failed, %d of %d sections ran to their last line" % [
-		_passed, _failed, _completed, _entered
-	])
-
-	for line in _failures:
-		print("  FAIL  %s" % line)
-
 	var sections := SECTIONS + (TIMER_SECTIONS if _timer_linked() else 0)
 	var checks := CHECKS + (TIMER_CHECKS if _timer_linked() else 0)
-	if _entered != sections or _completed != _entered:
-		print("ERROR: %d sections entered and %d completed, %d expected. One aborted or was skipped." % [
-			_entered, _completed, sections
-		])
-		get_tree().quit(1)
-		return
-
-	# The total the section counter cannot be. A runtime error inside a section aborts
-	# that function, and the counter is satisfied because the section had already
-	# announced itself. See docs/testing.md.
-	if _passed + _failed != checks:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [
-			_passed + _failed, checks
-		])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report_sections(_entered, _completed, sections, checks)
 
 
 ## The Q menu's NPCs and pack weapons come from profiles, a game profile overrides an entry, and an
@@ -521,16 +494,6 @@ func _section(title: String) -> void:
 func _done() -> void:
 	_completed += 1
 
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		var line := what if detail == "" else "%s (%s)" % [what, detail]
-		_failures.append(line)
-		print("  FAIL  %s" % line)
 
 
 func _check_near(

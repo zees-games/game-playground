@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
@@ -25,8 +25,6 @@ const PlaygroundPlayerStack := preload("../game/playground_player_stack.gd")
 
 const CHECKS := 40
 
-var _passed := 0
-var _failed := 0
 var _section_count := 0
 
 const SECTIONS := 5
@@ -53,22 +51,7 @@ func _run() -> void:
 	await _test_view_switch()
 	_test_character()
 
-	print("")
-	print("%d sections, %d passed, %d failed" % [_section_count, _passed, _failed])
-
-	if _section_count != SECTIONS:
-		print("ERROR: %d of %d sections ran." % [_section_count, SECTIONS])
-		get_tree().quit(1)
-		return
-
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [
-			_passed + _failed, CHECKS
-		])
-		get_tree().quit(1)
-		return
-
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report_sections(_section_count, _section_count, SECTIONS, CHECKS)
 
 
 func _build() -> bool:
@@ -340,11 +323,3 @@ func _section(title: String) -> void:
 	print("")
 	print("-- %s" % title)
 
-
-func _check(condition: bool, what: String) -> void:
-	if condition:
-		_passed += 1
-		print("   ok   %s" % what)
-	else:
-		_failed += 1
-		print("  FAIL  %s" % what)

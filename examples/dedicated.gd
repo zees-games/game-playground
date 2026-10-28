@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const Playground := preload("../game/playground.gd")
 const PlaygroundArena := preload("../game/playground_arena.gd")
@@ -64,9 +64,6 @@ const TIMER_CHECKS := 24
 ## time. The achievements half of this already failed once on an unchanged tree.
 const SERVER_DIR := "user://pg_dedicated"
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 var _sections_done := 0
 
 var server: DotServer = null
@@ -162,27 +159,7 @@ func _run() -> void:
 
 	_forget_learned_heat()
 
-	print("")
-	print("%d passed, %d failed, %d of %d sections ran to their last line" % [
-		_passed, _failed, _sections_done, sections
-	])
-
-	for line in _failures:
-		print("  FAIL  %s" % line)
-
-	if _sections_done != sections:
-		print("ERROR: %d of %d sections ran to their last line." % [_sections_done, sections])
-		get_tree().quit(1)
-		return
-
-	if _passed + _failed != checks:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [
-			_passed + _failed, checks
-		])
-		get_tree().quit(1)
-		return
-
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report_sections(_sections_done, _sections_done, sections, checks)
 
 
 ## Takes the server down before quitting, so nothing is left for the engine to tear out
@@ -278,16 +255,6 @@ func _test_query() -> void:
 	)
 	_section_done()
 
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		var line := what if detail == "" else "%s (%s)" % [what, detail]
-		_failures.append(line)
-		print("  FAIL  %s" % line)
 
 
 ## Runs a console command as the local console and returns what it replied.

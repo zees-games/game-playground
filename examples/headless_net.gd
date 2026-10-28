@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
@@ -65,9 +65,6 @@ const CHECKS := 395
 ## total above is the other half — see docs/testing.md.
 const SECTIONS := 46
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
 
@@ -193,7 +190,7 @@ func _run() -> void:
 	_check(seen.is_empty(), "the engine reported no error over the whole run",
 		"%d: %s" % [seen.size(), ", ".join(seen.slice(0, 3))])
 
-	_report()
+	_finish()
 
 
 ## sv_workbench_remote over the real frames, in the order PlaygroundModule and PlaygroundClient register them: an admin gets a
@@ -315,39 +312,9 @@ func _test_the_remote_workbench() -> void:
 	_done()
 
 
-func _report() -> void:
-	print("")
-	print("%d passed, %d failed, %d of %d sections ran to their last line" % [
-		_passed, _failed, _completed, _entered
-	])
-	for line in _failures:
-		print("  " + line)
-	if _entered != SECTIONS or _completed != _entered:
-		print("ERROR: %d sections entered and %d completed, %d expected. One aborted or was skipped." % [
-			_entered, _completed, SECTIONS
-		])
-		get_tree().quit(1)
-		return
-	# The total the section counter cannot be. A runtime error inside a section aborts
-	# that function, and the counter is satisfied because the section had already
-	# announced itself. See docs/testing.md.
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [
-			_passed + _failed, CHECKS
-		])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+func _finish() -> void:
+	_report_sections(_entered, _completed, SECTIONS, CHECKS)
 
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    " + what)
-	else:
-		_failed += 1
-		_failures.append(what + ("  (%s)" % detail if detail != "" else ""))
-		print("  FAIL  " + what + ("  (%s)" % detail if detail != "" else ""))
 
 
 func _section(name: String) -> void:

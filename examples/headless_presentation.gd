@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const PlaygroundAmbience := preload("../game/playground_ambience.gd")
 const PlaygroundInventory := preload("../game/playground_inventory.gd")
@@ -29,9 +29,6 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 
 const CHECKS := 147
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
 
@@ -94,20 +91,7 @@ func _run() -> void:
 		"every section ran to its last line (%d of %d)" % [_completed, _entered],
 		"a section that aborted stops adding checks and the total cannot show it"
 	)
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for f in _failures:
-		print("  %s" % f)
-	# The total the section counter cannot be. A runtime error inside a section aborts
-	# that function, and the counter is satisfied because the section had already
-	# announced itself. See docs/testing.md.
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [
-			_passed + _failed, CHECKS
-		])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report(CHECKS)
 
 
 ## Every file in the player's own settings directory, as name, modification time and MD5,
@@ -1342,13 +1326,3 @@ func _section(title: String) -> void:
 func _done() -> void:
 	_completed += 1
 
-
-func _check(condition: bool, what: String, detail: String = "") -> bool:
-	if condition:
-		_passed += 1
-		print("   ok   %s" % what)
-	else:
-		_failed += 1
-		print("  FAIL  %s" % what)
-		_failures.append(what if detail == "" else "%s — %s" % [what, detail])
-	return condition
