@@ -1,5 +1,8 @@
 extends "res://examples/headless_playground_part4.gd"
 
+const WorkshopScript := preload("res://game/playground_workshop.gd")
+const WeaponScript := preload("res://game/weapons/playground_weapon.gd")
+
 ## An entity is a prop with a script, and the script is loaded by path.
 ##
 ## [b]This is the whole "spawning things that carry code" mechanism.[/b] The scene is a
@@ -7,6 +10,13 @@ extends "res://examples/headless_playground_part4.gd"
 ## class, and is attached by `Playground._configure_entity`. The path matters: a
 ## mounted dot-cloud pack's `class_name` globals are not registered in the host, so an
 ## entity named by class could only ever ship inside the build.
+var _erts_at: Vector3
+var _erts_npc: DotPropInstance
+var _erts_body: PlaygroundEntity
+var _erts_mirrored_ent: bool
+var _erts_before_count: int
+var _erts_refused: DotPropInstance
+
 func _test_entities_run_their_scripts() -> void:
 	_section("entities that run their own scripts")
 
@@ -32,67 +42,71 @@ func _test_entities_run_their_scripts() -> void:
 	playground.props.limits.spawn_interval = 0.0
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 
-	var at := Vector3(0.0, 1.2, 0.0)
-	var npc := playground.props.spawn(&"npc_wanderer", &"bot", at)
+	_erts_at = Vector3(0.0, 1.2, 0.0)
+	_erts_npc = playground.props.spawn(&"npc_wanderer", &"bot", _erts_at)
 
-	_check(npc != null, "an entity spawns")
+	_check(_erts_npc != null, "an entity spawns")
 
-	if npc == null:
+	if _erts_npc == null:
 		return
 
-	var body := npc.node as PlaygroundEntity
+	_erts_body = _erts_npc.node as PlaygroundEntity
 
-	_check(body != null, "and its body is a PlaygroundEntity, not a plain prop")
+	_check(_erts_body != null, "and its body is a PlaygroundEntity, not a plain prop")
 	_check(
-		body != null and body.get_script() != null
-		and body.get_script().resource_path
-			== PlaygroundSpawnables.script_of(npc.def),
+		_erts_body != null and _erts_body.get_script() != null
+		and _erts_body.get_script().resource_path
+			== PlaygroundSpawnables.script_of(_erts_npc.def),
 		"running exactly the script its definition names",
-		body.get_script().resource_path if body != null else "none"
+		_erts_body.get_script().resource_path if _erts_body != null else "none"
 	)
 	_check(
-		playground.entities.has(body),
+		playground.entities.has(_erts_body),
 		"and it is on the list the simulation ticks"
 	)
 
 	# `_ready` has already run by the time the script is attached — the spawner adds
 	# the body to the world before it emits — so `bind` is what an entity gets
 	# instead, and an entity whose world never arrived would sit there being a crate.
-	_check(body != null and body.game == playground, "it knows its world")
-	_check(body != null and body.instance == npc, "and its own row in the spawner")
+	_check(_erts_body != null and _erts_body.game == playground, "it knows its world")
+	_check(_erts_body != null and _erts_body.instance == _erts_npc, "and its own row in the spawner")
 
 	# It moves. Everything above is satisfied by an entity that does nothing at all.
-	var before := body.global_position
+	var before := _erts_body.global_position
 	var ticks := 0
 	var moved := 0.0
 
 	while ticks < 240:
 		await get_tree().physics_frame
 		ticks += 1
-		moved = maxf(moved, before.distance_to(body.global_position))
+		moved = maxf(moved, before.distance_to(_erts_body.global_position))
 
 	_check(moved > 1.0, "and it walks about", "%.2f m" % moved)
-	_check(body.age > 0.0, "counting simulated time, not wall time",
-		"%.2f s" % body.age)
+	_check(_erts_body.age > 0.0, "counting simulated time, not wall time",
+		"%.2f s" % _erts_body.age)
+	await _test_entities_run_their_scripts_2()
+	await _test_entities_run_their_scripts_3()
+
+func _test_entities_run_their_scripts_2() -> void:
 
 	# A held entity is furniture. Without that, the NPC fights the physics gun's
 	# spring — the gun writes a velocity toward the goal and the NPC writes one
 	# toward wherever it was walking — and the prop shudders between them.
-	npc.held_by = &"bot"
+	_erts_npc.held_by = &"bot"
 
-	var held_at := body.global_position
-	body.linear_velocity = Vector3.ZERO
+	var held_at := _erts_body.global_position
+	_erts_body.linear_velocity = Vector3.ZERO
 
 	for _i in range(30):
 		await get_tree().physics_frame
 
 	_check(
-		held_at.distance_to(body.global_position) < 0.6,
+		held_at.distance_to(_erts_body.global_position) < 0.6,
 		"a held entity stops driving itself",
-		"%.2f m" % held_at.distance_to(body.global_position)
+		"%.2f m" % held_at.distance_to(_erts_body.global_position)
 	)
 
-	npc.held_by = &""
+	_erts_npc.held_by = &""
 
 	# A chaser goes toward somebody. The bot is at the origin-ish; put the chaser
 	# out and check the distance closes, which is the one thing that distinguishes
@@ -133,20 +147,22 @@ func _test_entities_run_their_scripts() -> void:
 	playground.props.catalogue.add(broken)
 
 	# Both refusals below log at ERROR on purpose.
-	var mirrored_ent := DotLog.mirror_to_engine
+	_erts_mirrored_ent = DotLog.mirror_to_engine
 	DotLog.mirror_to_engine = false
-	var before_count := playground.props.world_count()
-	var refused := playground.props.spawn(&"npc_broken", &"bot", at)
+	_erts_before_count = playground.props.world_count()
+	_erts_refused = playground.props.spawn(&"npc_broken", &"bot", _erts_at)
 
 	await get_tree().process_frame
 
+func _test_entities_run_their_scripts_3() -> void:
+
 	_check(
-		playground.props.world_count() == before_count,
+		playground.props.world_count() == _erts_before_count,
 		"an entity whose script is missing leaves nothing in the world",
-		"%d -> %d" % [before_count, playground.props.world_count()]
+		"%d -> %d" % [_erts_before_count, playground.props.world_count()]
 	)
 	_check(
-		refused == null or not refused.is_alive(),
+		_erts_refused == null or not _erts_refused.is_alive(),
 		"and its row is dead rather than counted against a budget"
 	)
 
@@ -156,16 +172,16 @@ func _test_entities_run_their_scripts() -> void:
 	wrong.meta = {"kind": "entity", "script": "res://game/playground_config.gd"}
 	playground.props.catalogue.add(wrong)
 
-	before_count = playground.props.world_count()
-	playground.props.spawn(&"npc_wrong", &"bot", at)
+	_erts_before_count = playground.props.world_count()
+	playground.props.spawn(&"npc_wrong", &"bot", _erts_at)
 
 	await get_tree().process_frame
 
 	_check(
-		playground.props.world_count() == before_count,
+		playground.props.world_count() == _erts_before_count,
 		"and so does one whose script is not an entity"
 	)
-	DotLog.mirror_to_engine = mirrored_ent
+	DotLog.mirror_to_engine = _erts_mirrored_ent
 
 	playground.props.catalogue.remove(&"npc_broken")
 	playground.props.catalogue.remove(&"npc_wrong")
@@ -184,6 +200,14 @@ func _test_entities_run_their_scripts() -> void:
 ## dot-weapon's bridge takes a shot from the body's transform, whose basis is identity here
 ## — so every shot leaves northwards from the feet, fires, costs ammunition and hits
 ## nothing, and every other number about it is right.
+var _zw_player: PlaygroundPlayer
+var _zw_eye: Vector3
+var _zw_aim: Vector3
+var _zw_crate: DotPropInstance
+var _zw_shots: Array[DotShot]
+var _zw_moved: int
+var _zw_state
+
 func _test_zee_weapons() -> void:
 	_section("zee-dot-weapons")
 
@@ -216,66 +240,69 @@ func _test_zee_weapons() -> void:
 		"the menu's categories come from the pack's slots"
 	)
 
-	var player: PlaygroundPlayer = playground.players[&"bot"]
+	_zw_player = playground.players[&"bot"]
 	playground.props.limits.spawn_interval = 0.0
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
-	player.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
+	_zw_player.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
 	await get_tree().physics_frame
 
 	var rig := PlaygroundZee.arm(
-		player, playground.weapon_def(&"zee_pistol"), ZeeWeaponRig.Role.SERVER, true,
+		_zw_player, playground.weapon_def(&"zee_pistol"), ZeeWeaponRig.Role.SERVER, true,
 		playground.tick_rate, playground.current_tick()
 	)
-	_check(rig != null and player.zee_rig == rig, "a server's rig goes on the player")
-	_check(player.component(&"DotFpsController") == player.controller,
+	_check(rig != null and _zw_player.zee_rig == rig, "a server's rig goes on the player")
+	_check(_zw_player.component(&"DotFpsController") == _zw_player.controller,
 		"and the player answers dot-weapon's controller lookup")
 
 	# A crate four metres along the way the player faces.
-	var eye := player.eye_position()
-	var aim := player.aim_direction()
-	var crate := playground.props.spawn(&"crate", &"bot", eye + aim * 4.0)
+	_zw_eye = _zw_player.eye_position()
+	_zw_aim = _zw_player.aim_direction()
+	_zw_crate = playground.props.spawn(&"crate", &"bot", _zw_eye + _zw_aim * 4.0)
 	await get_tree().physics_frame
 
-	var shots: Array[DotShot] = []
-	var moved := 0
-	var state := player.controller.state
+	_zw_shots = []
+	_zw_moved = 0
+	_zw_state = _zw_player.controller.state
 
 	for i in range(200):
 		var held := DotFpsCommand.BUTTON_USER_0 if (i / 20) % 2 == 0 else 0
 		var outcome := rig.simulate_tick(
-			PlaygroundZee.command_for(held, state.yaw, state.pitch, PlaygroundZee.slot_of(rig)),
+			PlaygroundZee.command_for(held, _zw_state.yaw, _zw_state.pitch, PlaygroundZee.slot_of(rig)),
 			playground.current_tick() + i
 		) if rig != null else null
 		if outcome != null:
-			shots.append_array(outcome.shots)
-			moved += PlaygroundZee.shove_props(player, outcome, true)
-		if moved > 0:
+			_zw_shots.append_array(outcome.shots)
+			_zw_moved += PlaygroundZee.shove_props(_zw_player, outcome, true)
+		if _zw_moved > 0:
 			break
 
-	_check(not shots.is_empty(), "it fires", "%d shots" % shots.size())
+	_check(not _zw_shots.is_empty(), "it fires", "%d shots" % _zw_shots.size())
+	await _test_zee_weapons_2()
 
-	if not shots.is_empty():
-		var first := shots[0]
-		_check(first.origin.distance_to(eye) < 0.5, "from the eye, not the feet",
-			"%.2f m off" % first.origin.distance_to(eye))
-		_check(first.direction.normalized().dot(aim) > 0.98, "the way the player is facing",
-			"dot %.3f" % first.direction.normalized().dot(aim))
+func _test_zee_weapons_2() -> void:
+
+	if not _zw_shots.is_empty():
+		var first := _zw_shots[0]
+		_check(first.origin.distance_to(_zw_eye) < 0.5, "from the eye, not the feet",
+			"%.2f m off" % first.origin.distance_to(_zw_eye))
+		_check(first.direction.normalized().dot(_zw_aim) > 0.98, "the way the player is facing",
+			"dot %.3f" % first.direction.normalized().dot(_zw_aim))
 
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	_check(moved > 0 and crate != null and crate.body().linear_velocity.dot(aim) > 0.5,
+	_check(_zw_moved > 0 and _zw_crate != null and _zw_crate.body().linear_velocity.dot(_zw_aim) > 0.5,
 		"and with the arena off it shoves the crate it hits, away from the shooter",
-		"%.2f m/s along the aim" % (crate.body().linear_velocity.dot(aim) if crate != null else 0.0))
+		"%.2f m/s along the aim" % (_zw_crate.body().linear_velocity.dot(_zw_aim) if _zw_crate != null else 0.0))
 
-	PlaygroundZee.disarm(player)
-	_check(player.zee_rig == null, "disarmed, the rig is gone")
+	PlaygroundZee.disarm(_zw_player)
+	_check(_zw_player.zee_rig == null, "disarmed, the rig is gone")
 
 	# [b]The pack is written at 64 Hz and this server runs 128[/b]; until dot-weapon scaled
 	# a row by its authored_tick_rate every zee weapon here fired, reloaded and deployed
 	# twice as fast. A second on an SMG's trigger is as many shots as at 64 Hz.
 	var smg := PlaygroundZee.arm(
-		player, playground.weapon_def(&"zee_smg"), ZeeWeaponRig.Role.SERVER, true,
+		_zw_player, playground.weapon_def(&"zee_smg"), ZeeWeaponRig.Role.SERVER, true,
 		playground.tick_rate, playground.current_tick()
 	)
 	var rate := playground.tick_rate
@@ -288,7 +315,7 @@ func _test_zee_weapons() -> void:
 		for i in range(rate * 3):
 			var held := DotFpsCommand.BUTTON_USER_0 if i >= rate * 2 else 0
 			var out := smg.simulate_tick(
-				PlaygroundZee.command_for(held, state.yaw, state.pitch, PlaygroundZee.slot_of(smg)),
+				PlaygroundZee.command_for(held, _zw_state.yaw, _zw_state.pitch, PlaygroundZee.slot_of(smg)),
 				base + i
 			)
 			if out != null and out.used and i >= rate * 2:
@@ -305,13 +332,24 @@ func _test_zee_weapons() -> void:
 			"and its reload and deploy take the same seconds",
 			"reload %.3f s, deploy %.3f s" % [reload_here, deploy_here]
 		)
-	PlaygroundZee.disarm(player)
+	PlaygroundZee.disarm(_zw_player)
 
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	_done()
 
 
 ## The Workshop in solo play: packs a player subscribed to land on the Q menu, only in solo.
+var _wx_index: DotContentIndex
+var _wx_own_weapons: int
+var _wx_own_props: int
+var _wx_changes: Array
+var _wx_shop: WorkshopScript
+var _wx_sidearm_def: PlaygroundWeaponDef
+var _wx_menu: PlaygroundSpawnMenu
+var _wx_stack: DotScreenStack
+var _wx_player: PlaygroundPlayer
+var _wx_before: int
+
 func _test_workshop() -> void:
 	_section("the workshop")
 
@@ -337,87 +375,92 @@ func _test_workshop() -> void:
 			{"kind": "npc", "id": "fixture_guard", "name": "Fixture Guard", "def": "defs/guard.tres", "category": "stuff"},
 		],
 	}
-	var index := DotContentIndex.new()
-	index.set_session(DotContentIndex.SESSION_SOLO)
-	var added := index.add_pack({
+	_wx_index = DotContentIndex.new()
+	_wx_index.set_session(DotContentIndex.SESSION_SOLO)
+	var added := _wx_index.add_pack({
 		"content_id": "tmc/fixture-pack", "version": "1.0.0", "prefix": root,
 		"session": "solo", "source": "subscription", "provides": provides,
 	})
 	_check(added.ok, "the pack is in the index", "" if added.ok else added.error.message)
 
-	var own_weapons := playground.weapons.size()
-	var own_props := playground.props.catalogue.size()
-	var changes := [0]
-	playground.workshop_changed.connect(func() -> void: changes[0] += 1)
-	var shop := playground.follow_workshop(index)
-	_check(changes[0] == 1, "following announces what is already mounted", str(changes[0]))
+	_wx_own_weapons = playground.weapons.size()
+	_wx_own_props = playground.props.catalogue.size()
+	_wx_changes = [0]
+	playground.workshop_changed.connect(func() -> void: _wx_changes[0] += 1)
+	_wx_shop = playground.follow_workshop(_wx_index)
+	_check(_wx_changes[0] == 1, "following announces what is already mounted", str(_wx_changes[0]))
 
-	var sidearm_def := playground.weapon_def(&"ws_fixture_sidearm")
-	_check(sidearm_def != null and sidearm_def.meta.get("pack_title") == "Fixture Pack",
+	_wx_sidearm_def = playground.weapon_def(&"ws_fixture_sidearm")
+	_check(_wx_sidearm_def != null and _wx_sidearm_def.meta.get("pack_title") == "Fixture Pack",
 		"solo: the pack weapon is one of the game's weapons, labelled with its pack")
-	_check(playground.weapons.size() == own_weapons + 1, "and the game's own are untouched",
-		"%d -> %d" % [own_weapons, playground.weapons.size()])
+	_check(playground.weapons.size() == _wx_own_weapons + 1, "and the game's own are untouched",
+		"%d -> %d" % [_wx_own_weapons, playground.weapons.size()])
 	_check(playground.props.catalogue.has(&"ws_fixture_crate"), "solo: the pack prop is in the prop catalogue")
 	var guard := playground.props.catalogue.get_prop(&"ws_fixture_guard")
 	_check(guard != null and PlaygroundSpawnables.kind_of(guard) == PlaygroundSpawnables.Kind.ENTITY
 		and guard.limit_group == &"npcs", "solo: the pack npc is an entity counted as an NPC")
-	_check(playground.props.catalogue.size() == own_props + 2, "and the game's own props are untouched")
-	_check(shop.rows().size() == 3, "three rows for the menu", str(shop.rows().size()))
+	_check(playground.props.catalogue.size() == _wx_own_props + 2, "and the game's own props are untouched")
+	_check(_wx_shop.rows().size() == 3, "three rows for the menu", str(_wx_shop.rows().size()))
 
 	# The menu: a tab per pack, the pack's items grouped by its categories, none on the built-in tabs.
-	var menu := PlaygroundSpawnMenu.new()
-	menu.catalogue = playground.props.catalogue
-	menu.weapons = playground.weapons
-	menu.set_pack_rows(shop.rows())
-	add_child(menu)
-	var stack := DotScreenStack.new()
-	add_child(stack)
-	var _ready_result := stack.setup()
-	var _registered := stack.register(menu)
-	var _pushed := stack.push(menu.screen_id())
+	_wx_menu = PlaygroundSpawnMenu.new()
+	_wx_menu.catalogue = playground.props.catalogue
+	_wx_menu.weapons = playground.weapons
+	_wx_menu.set_pack_rows(_wx_shop.rows())
+	add_child(_wx_menu)
+	_wx_stack = DotScreenStack.new()
+	add_child(_wx_stack)
+	var _ready_result := _wx_stack.setup()
+	var _registered := _wx_stack.register(_wx_menu)
+	var _pushed := _wx_stack.push(_wx_menu.screen_id())
 	await get_tree().process_frame
 
 	var pack_tab := PlaygroundSpawnMenu.Tab.size() as PlaygroundSpawnMenu.Tab
-	menu.show_tab(pack_tab)
+	_wx_menu.show_tab(pack_tab)
 	await get_tree().process_frame
-	_check(menu.describe()["pack_tabs"] == ["Fixture Pack"] and menu.describe()["tab"] == "Fixture Pack",
-		"the menu has a tab for the pack", str(menu.describe()["pack_tabs"]))
-	_check(menu.shown().size() == 3 and menu.shown().has(&"ws_fixture_sidearm")
-		and menu.shown().has(&"ws_fixture_crate") and menu.shown().has(&"ws_fixture_guard"),
-		"holding its weapon, prop and npc", str(menu.shown()))
-	_check(menu.card_for(&"ws_fixture_sidearm") != null and menu.card_for(&"ws_fixture_sidearm").tooltip_text.contains("Fixture Pack"),
+	await _test_workshop_2()
+	await _test_workshop_3()
+	_wx_changes = []
+
+func _test_workshop_2() -> void:
+	_check(_wx_menu.describe()["pack_tabs"] == ["Fixture Pack"] and _wx_menu.describe()["tab"] == "Fixture Pack",
+		"the menu has a tab for the pack", str(_wx_menu.describe()["pack_tabs"]))
+	_check(_wx_menu.shown().size() == 3 and _wx_menu.shown().has(&"ws_fixture_sidearm")
+		and _wx_menu.shown().has(&"ws_fixture_crate") and _wx_menu.shown().has(&"ws_fixture_guard"),
+		"holding its weapon, prop and npc", str(_wx_menu.shown()))
+	_check(_wx_menu.card_for(&"ws_fixture_sidearm") != null and _wx_menu.card_for(&"ws_fixture_sidearm").tooltip_text.contains("Fixture Pack"),
 		"each card says which pack it is from")
-	menu.show_tab(PlaygroundSpawnMenu.Tab.WEAPONS)
+	_wx_menu.show_tab(PlaygroundSpawnMenu.Tab.WEAPONS)
 	await get_tree().process_frame
-	_check(not menu.shown().has(&"ws_fixture_sidearm") and menu.shown().has(&"launcher"),
+	_check(not _wx_menu.shown().has(&"ws_fixture_sidearm") and _wx_menu.shown().has(&"launcher"),
 		"the Weapons tab keeps only the game's own")
-	menu.show_tab(PlaygroundSpawnMenu.Tab.PROPS)
+	_wx_menu.show_tab(PlaygroundSpawnMenu.Tab.PROPS)
 	await get_tree().process_frame
-	_check(not menu.shown().has(&"ws_fixture_crate"), "and so does the Props tab")
-	menu.show_tab(PlaygroundSpawnMenu.Tab.ENTITIES)
+	_check(not _wx_menu.shown().has(&"ws_fixture_crate"), "and so does the Props tab")
+	_wx_menu.show_tab(PlaygroundSpawnMenu.Tab.ENTITIES)
 	await get_tree().process_frame
-	_check(not menu.shown().has(&"ws_fixture_guard"), "and the Entities tab")
+	_check(not _wx_menu.shown().has(&"ws_fixture_guard"), "and the Entities tab")
 
 	# Spawning: the prop and the npc through the spawner, the weapon through a rig that fires.
-	var player: PlaygroundPlayer = playground.players[&"bot"]
+	_wx_player = playground.players[&"bot"]
 	playground.props.limits.spawn_interval = 0.0
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
-	player.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
+	_wx_player.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
 	await get_tree().physics_frame
-	var spawned_crate := playground.props.spawn(&"ws_fixture_crate", &"bot", player.eye_position() + player.aim_direction() * 3.0)
-	var spawned_guard := playground.props.spawn(&"ws_fixture_guard", &"bot", player.eye_position() + player.aim_direction() * 6.0)
+	var spawned_crate := playground.props.spawn(&"ws_fixture_crate", &"bot", _wx_player.eye_position() + _wx_player.aim_direction() * 3.0)
+	var spawned_guard := playground.props.spawn(&"ws_fixture_guard", &"bot", _wx_player.eye_position() + _wx_player.aim_direction() * 6.0)
 	await get_tree().physics_frame
 	_check(spawned_crate != null and spawned_crate.node != null, "the pack prop spawns")
 	_check(spawned_guard != null and spawned_guard.node != null
 		and str(spawned_guard.node.get_script().resource_path).ends_with("npc_wanderer.gd"),
 		"and the pack npc spawns running a script")
 
-	var rig := PlaygroundZee.arm(player, sidearm_def, ZeeWeaponRig.Role.SERVER, true,
+	var rig := PlaygroundZee.arm(_wx_player, _wx_sidearm_def, ZeeWeaponRig.Role.SERVER, true,
 		playground.tick_rate, playground.current_tick())
 	_check(rig != null and rig.arsenal.catalogue.has(&"fixture_sidearm"),
 		"the pack weapon arms: the rig holds an id the built-in pack does not have")
 	var shots := 0
-	var state := player.controller.state
+	var state := _wx_player.controller.state
 	for i in range(120):
 		var held := DotFpsCommand.BUTTON_USER_0 if (i / 10) % 2 == 0 else 0
 		var outcome := rig.simulate_tick(
@@ -429,12 +472,12 @@ func _test_workshop() -> void:
 	_check(shots > 0, "and it fires", str(shots))
 	_check(PlaygroundZee.catalogue().has(&"fixture_sidearm") == false,
 		"without leaking into the table a server reads")
-	PlaygroundZee.disarm(player)
+	PlaygroundZee.disarm(_wx_player)
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 
 	# A pack mounted later arrives; a map pack lists on the map menu.
-	var before: int = changes[0]
-	var _late := index.add_pack({
+	_wx_before = _wx_changes[0]
+	var _late := _wx_index.add_pack({
 		"content_id": "tmc/fixture-maps", "version": "1.0.0", "prefix": "res://",
 		"session": "solo", "source": "subscription",
 		"provides": {"schema": 1, "title": "Fixture Maps", "kinds": ["map"], "entries": [
@@ -446,25 +489,27 @@ func _test_workshop() -> void:
 		"solo: a sandbox map pack is on the map list")
 	_check(playground.maps.catalogue.available().filter(func(m: DotMapDef) -> bool: return m.id == &"ws_arena").is_empty(),
 		"and a map of a kind the game does not accept is not")
-	_check(changes[0] == before, "a pack with nothing for the menu does not redraw it")
+	_check(_wx_changes[0] == _wx_before, "a pack with nothing for the menu does not redraw it")
+
+func _test_workshop_3() -> void:
 
 	# Online: all of it is gone, from every list, and comes back with solo. The pack's tab is
 	# the open one, so the fall back to Props is what is being checked.
-	menu.show_tab(PlaygroundSpawnMenu.Tab.size() as PlaygroundSpawnMenu.Tab)
-	index.set_session(DotContentIndex.SESSION_ONLINE)
-	_check(playground.weapon_def(&"ws_fixture_sidearm") == null and playground.weapons.size() == own_weapons,
+	_wx_menu.show_tab(PlaygroundSpawnMenu.Tab.size() as PlaygroundSpawnMenu.Tab)
+	_wx_index.set_session(DotContentIndex.SESSION_ONLINE)
+	_check(playground.weapon_def(&"ws_fixture_sidearm") == null and playground.weapons.size() == _wx_own_weapons,
 		"online: the pack weapon is not on the menu")
 	_check(not playground.props.catalogue.has(&"ws_fixture_crate") and not playground.props.catalogue.has(&"ws_fixture_guard")
-		and playground.props.catalogue.size() == own_props, "online: the pack props and npcs are gone")
-	_check(shop.rows().is_empty(), "online: no rows")
+		and playground.props.catalogue.size() == _wx_own_props, "online: the pack props and npcs are gone")
+	_check(_wx_shop.rows().is_empty(), "online: no rows")
 	_check(playground.maps.catalogue.available().filter(func(m: DotMapDef) -> bool: return m.id == &"ws_lobby").is_empty(),
 		"online: the pack map is gone")
-	menu.set_pack_rows(shop.rows())
+	_wx_menu.set_pack_rows(_wx_shop.rows())
 	await get_tree().process_frame
-	_check(menu.describe()["pack_tabs"] == [] and menu.describe()["tab"] == "PROPS",
+	_check(_wx_menu.describe()["pack_tabs"] == [] and _wx_menu.describe()["tab"] == "PROPS",
 		"online: the menu has no pack tab, and the one that was open fell back")
-	_check(changes[0] > before, "and the session change was announced")
-	index.set_session(DotContentIndex.SESSION_SOLO)
+	_check(_wx_changes[0] > _wx_before, "and the session change was announced")
+	_wx_index.set_session(DotContentIndex.SESSION_SOLO)
 	_check(playground.weapon_def(&"ws_fixture_sidearm") != null and playground.props.catalogue.has(&"ws_fixture_crate"),
 		"back in solo they return")
 
@@ -481,56 +526,61 @@ func _test_workshop() -> void:
 		zee_dir = target.simplify_path().get_base_dir().get_base_dir()
 	if FileAccess.file_exists(zee_dir.path_join("provides.json")):
 		var zee_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string(zee_dir.path_join("provides.json")))
-		var _zee := index.add_pack({
+		var _zee := _wx_index.add_pack({
 			"content_id": "gamemann/zee-dot-weapons", "version": "1.0.0", "prefix": zee_dir,
 			"session": "solo", "source": "subscription", "provides": zee_provides,
 		})
-		var zee_rows := shop.rows().filter(func(r: Dictionary) -> bool: return r["pack_title"] == "Zee Weapons")
+		var zee_rows := _wx_shop.rows().filter(func(r: Dictionary) -> bool: return r["pack_title"] == "Zee Weapons")
 		_check(zee_rows.size() == 27, "zee-dot-weapons' own provides.json lists 27 weapons", str(zee_rows.size()))
 		_check(zee_rows.all(func(r: Dictionary) -> bool: return playground.weapon_def(r["id"]) != null),
 			"each a weapon the game can arm")
 		var smg := playground.weapon_def(&"ws_smg")
-		var smg_rig := PlaygroundZee.arm(player, smg, ZeeWeaponRig.Role.SERVER, true,
+		var smg_rig := PlaygroundZee.arm(_wx_player, smg, ZeeWeaponRig.Role.SERVER, true,
 			playground.tick_rate, playground.current_tick())
 		_check(smg_rig != null and smg_rig.arsenal.catalogue.has(&"smg"), "and a pack weapon that shares a built-in id arms with the built-in's art and rules")
-		PlaygroundZee.disarm(player)
+		PlaygroundZee.disarm(_wx_player)
 	else:
 		_check(false, "zee-dot-weapons is next to this game", zee_dir)
 
-	menu.queue_free()
-	stack.queue_free()
+	_wx_menu.queue_free()
+	_wx_stack.queue_free()
 	playground.unfollow_workshop()
 	_check(playground.weapon_def(&"ws_fixture_sidearm") == null and not playground.props.catalogue.has(&"ws_fixture_crate")
-		and playground.weapons.size() == own_weapons and playground.props.catalogue.size() == own_props,
+		and playground.weapons.size() == _wx_own_weapons and playground.props.catalogue.size() == _wx_own_props,
 		"unfollowing leaves the game's lists as they were")
 	_done()
 
 
 ## Weapons: a script loaded by path, held rather than spawned.
+var _w_defs: Array[PlaygroundWeaponDef]
+var _w_launcher: WeaponScript
+var _w_fired: DotResult
+var _w_stuck: DotPropInstance
+
 func _test_weapons() -> void:
 	_section("weapons")
 
-	var defs := PlaygroundWeapons.built_in()
+	_w_defs = PlaygroundWeapons.built_in()
 
-	_check(defs.size() >= 3, "the build ships an arsenal", "%d" % defs.size())
+	_check(_w_defs.size() >= 3, "the build ships an arsenal", "%d" % _w_defs.size())
 	_check(
 		# Not the weapons a linked spawn provider taught the game (`meta.provider`).
 		playground.weapons.filter(func(d: Variant) -> bool: return not d.meta.has("provider")).size()
-			== defs.size() + PlaygroundZee.defs().size(),
+			== _w_defs.size() + PlaygroundZee.defs().size(),
 		"and the game offers it, with zee-dot-weapons after it"
 	)
 
-	for def in defs:
+	for def in _w_defs:
 		_check(def.validate().ok, "'%s' is a usable definition" % def.id)
 
-	var launcher := PlaygroundWeapons.make(
-		PlaygroundWeapons.find(defs, &"launcher")
+	_w_launcher = PlaygroundWeapons.make(
+		PlaygroundWeapons.find(_w_defs, &"launcher")
 	)
 
-	_check(launcher != null, "a weapon is built from its definition")
+	_check(_w_launcher != null, "a weapon is built from its definition")
 	_check(
-		launcher != null and launcher.get_script().resource_path
-			== PlaygroundWeapons.find(defs, &"launcher").script_path,
+		_w_launcher != null and _w_launcher.get_script().resource_path
+			== PlaygroundWeapons.find(_w_defs, &"launcher").script_path,
 		"running exactly the script it names"
 	)
 
@@ -559,16 +609,20 @@ func _test_weapons() -> void:
 	playground.props.limits.spawn_interval = 0.0
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 
-	launcher.equip(playground, PlaygroundWeapons.find(defs, &"launcher"))
-	launcher.wielder = &"bot"
-	launcher.armed = &"beach_ball"
+	_w_launcher.equip(playground, PlaygroundWeapons.find(_w_defs, &"launcher"))
+	_w_launcher.wielder = &"bot"
+	_w_launcher.armed = &"beach_ball"
 
-	var fired := launcher.primary(null, Vector3(0.0, 6.0, 0.0), Vector3.FORWARD)
+	_w_fired = _w_launcher.primary(null, Vector3(0.0, 6.0, 0.0), Vector3.FORWARD)
 
-	_check(fired.ok, "the launcher fires")
+	_check(_w_fired.ok, "the launcher fires")
+	await _test_weapons_2()
+	_test_weapons_3()
 
-	if fired.ok:
-		var shot := fired.value as DotPropInstance
+func _test_weapons_2() -> void:
+
+	if _w_fired.ok:
+		var shot := _w_fired.value as DotPropInstance
 
 		_check(shot.def.id == &"beach_ball", "the prop the menu armed")
 		_check(
@@ -580,9 +634,9 @@ func _test_weapons() -> void:
 		# A muzzle velocity, not an impulse. An impulse is divided by the mass, which
 		# is right for a punt and exactly wrong here: a launcher whose boulder leaves
 		# at a fortieth of the speed of its ball is one nobody can aim.
-		launcher.armed = &"boulder"
+		_w_launcher.armed = &"boulder"
 
-		var heavy := launcher.primary(null, Vector3(0.0, 6.0, 0.0), Vector3.FORWARD)
+		var heavy := _w_launcher.primary(null, Vector3(0.0, 6.0, 0.0), Vector3.FORWARD)
 
 		_check(
 			heavy.ok and is_equal_approx(
@@ -595,9 +649,9 @@ func _test_weapons() -> void:
 	# Armed with something the catalogue no longer has — a map change can do that —
 	# it falls back rather than being refused with "no such prop", which reads as the
 	# weapon being broken rather than as the ammunition being gone.
-	launcher.armed = &"nothing_like_this"
+	_w_launcher.armed = &"nothing_like_this"
 
-	var fallback := launcher.primary(null, Vector3(0.0, 6.0, 0.0), Vector3.FORWARD)
+	var fallback := _w_launcher.primary(null, Vector3(0.0, 6.0, 0.0), Vector3.FORWARD)
 
 	_check(fallback.ok, "an armed prop that no longer exists falls back")
 
@@ -607,12 +661,12 @@ func _test_weapons() -> void:
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 
 	var loose := playground.props.spawn(&"crate", &"bot", Vector3(2.0, 1.0, 0.0))
-	var stuck := playground.props.spawn(&"crate", &"bot", Vector3(-2.0, 1.0, 0.0))
+	_w_stuck = playground.props.spawn(&"crate", &"bot", Vector3(-2.0, 1.0, 0.0))
 
-	DotPhysGun.set_frozen(stuck, true)
+	DotPhysGun.set_frozen(_w_stuck, true)
 
-	var impulse := PlaygroundWeapons.make(PlaygroundWeapons.find(defs, &"impulse"))
-	impulse.equip(playground, PlaygroundWeapons.find(defs, &"impulse"))
+	var impulse := PlaygroundWeapons.make(PlaygroundWeapons.find(_w_defs, &"impulse"))
+	impulse.equip(playground, PlaygroundWeapons.find(_w_defs, &"impulse"))
 	impulse.wielder = &"bot"
 
 	loose.body().linear_velocity = Vector3.ZERO
@@ -632,16 +686,18 @@ func _test_weapons() -> void:
 		"a loose prop is shoved",
 		"%.1f m/s" % loose.body().linear_velocity.length()
 	)
+
+func _test_weapons_3() -> void:
 	_check(
-		stuck.body().linear_velocity.length() < 0.5,
+		_w_stuck.body().linear_velocity.length() < 0.5,
 		"and a frozen one is left alone",
-		"%.1f m/s" % stuck.body().linear_velocity.length()
+		"%.1f m/s" % _w_stuck.body().linear_velocity.length()
 	)
 
 	# The remover's right click clears what you own, and goes through the spawner so
 	# the budget it frees is real.
-	var remover := PlaygroundWeapons.make(PlaygroundWeapons.find(defs, &"remover"))
-	remover.equip(playground, PlaygroundWeapons.find(defs, &"remover"))
+	var remover := PlaygroundWeapons.make(PlaygroundWeapons.find(_w_defs, &"remover"))
+	remover.equip(playground, PlaygroundWeapons.find(_w_defs, &"remover"))
 	remover.wielder = &"bot"
 
 	var cleared := remover.secondary(null, Vector3.ZERO, Vector3.FORWARD)
