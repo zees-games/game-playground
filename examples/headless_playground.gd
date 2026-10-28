@@ -1,4 +1,4 @@
-extends "res://examples/headless_playground_part8.gd"
+extends "res://examples/headless_playground_part9.gd"
 
 const CHECKS := 776 + 22
 
