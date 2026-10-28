@@ -32,42 +32,49 @@ func _test_prop_removal() -> void:
 ## that arrives as a body rotation, a seat mask nobody reads, a driver whose input is
 ## applied on the client and never sent, and a rider drawn on the other machine at the
 ## spot where they got in.
+var _votw_driver: PlaygroundPlayer
+var _votw_spawned: DotPropInstance
+var _votw_vehicle: DotVehicleInstance
+var _votw_mirror: PlaygroundVehicle
+var _votw_rider_body: PlaygroundCharacter
+var _votw_head: Node3D
+
 func _test_vehicle_over_the_wire() -> void:
 	_section("a vehicle, over the socket")
 
 	var id := &"u%d" % SESSION
-	var driver := _server_player()
+	_votw_driver = _server_player()
 
-	if driver == null:
+	if _votw_driver == null:
 		return
 
 	var at := Vector3(-60.0, 1.2, -60.0)
-	driver.teleport(at + Vector3(2.5, 0.0, 0.0), 0.0)
+	_votw_driver.teleport(at + Vector3(2.5, 0.0, 0.0), 0.0)
 
 	_server_game.props.limits.spawn_interval = 0.0
-	var spawned := _server_game.props.spawn(&"buggy", id, at)
-	_check(spawned != null, "the server spawns a buggy")
+	_votw_spawned = _server_game.props.spawn(&"buggy", id, at)
+	_check(_votw_spawned != null, "the server spawns a buggy")
 
-	if spawned == null:
+	if _votw_spawned == null:
 		return
 
-	var vehicle := _server_game.vehicles.vehicle_for_node(spawned.node)
-	_check(vehicle != null, "and adopts it as a vehicle")
+	_votw_vehicle = _server_game.vehicles.vehicle_for_node(_votw_spawned.node)
+	_check(_votw_vehicle != null, "and adopts it as a vehicle")
 
-	if vehicle == null:
+	if _votw_vehicle == null:
 		return
 
 	_exchange()
 	await _steps(8)
 
-	var mirror := _find_vehicle_node(_client_game)
-	_check(mirror != null, "the client builds its own copy of it")
+	_votw_mirror = _find_vehicle_node(_client_game)
+	_check(_votw_mirror != null, "the client builds its own copy of it")
 	_check(
-		mirror != null and mirror.get_node_or_null("Net") is PlaygroundVehicleNet,
+		_votw_mirror != null and _votw_mirror.get_node_or_null("Net") is PlaygroundVehicleNet,
 		"replicating through DotVehicleNetSync rather than as a plain prop"
 	)
 	_check(
-		mirror != null and (mirror as PlaygroundVehicle).wheel_count() == 4,
+		_votw_mirror != null and (_votw_mirror as PlaygroundVehicle).wheel_count() == 4,
 		"with its wheels built on the client too"
 	)
 
@@ -78,9 +85,9 @@ func _test_vehicle_over_the_wire() -> void:
 	# The first version of this test measured 1.24 m and a car reversing at half a metre
 	# a second, which was the server's buggy wedged against its own reflection. On two
 	# machines there is no such body.
-	if mirror != null:
-		mirror.collision_layer = 0
-		mirror.collision_mask = 0
+	if _votw_mirror != null:
+		_votw_mirror.collision_layer = 0
+		_votw_mirror.collision_mask = 0
 
 	# Let it settle onto its suspension. A raycast vehicle spawned in the air is falling,
 	# and "did it drive" measured through the drop measures the drop.
@@ -92,13 +99,18 @@ func _test_vehicle_over_the_wire() -> void:
 	_exchange()
 	await _steps(6)
 
-	_check(vehicle.driver() == id, "the client's use key puts it in the driving seat")
-	_check(driver.riding, "the server stops walking them")
+	_check(_votw_vehicle.driver() == id, "the client's use key puts it in the driving seat")
+	_check(_votw_driver.riding, "the server stops walking them")
 	_check(
 		_client_player() != null and _client_player().riding,
 		"and the SEAT event stops the client predicting them",
 		"a predicted controller under a rider fights every snapshot"
 	)
+	await _test_vehicle_over_the_wire_2()
+	await _test_vehicle_over_the_wire_3()
+	await _test_vehicle_over_the_wire_4()
+
+func _test_vehicle_over_the_wire_2() -> void:
 
 	# Sat down, not standing. A rider's node is carried to the seat, and the body hanging off
 	# it was a standing 1.8 m figure — legs through the floor of the car, head two metres over
@@ -108,23 +120,23 @@ func _test_vehicle_over_the_wire() -> void:
 	# Looking out of the side, a quarter turn off the car's heading: otherwise the rider's
 	# look and the car's heading agree, and "faces the car" cannot be told from "faces where
 	# they look" — which is how this check first passed with the vehicle never sent.
-	if rider != null and mirror != null:
-		rider.controller.state.yaw = rad_to_deg(mirror.global_rotation.y) + 90.0
+	if rider != null and _votw_mirror != null:
+		rider.controller.state.yaw = rad_to_deg(_votw_mirror.global_rotation.y) + 90.0
 	var _drawn := PlaygroundClient.present_frame(_client_net, _client_game, 0.0)
-	var rider_body: PlaygroundCharacter = rider.character if rider != null else null
-	var head := (
-		rider_body.rig.get_node_or_null("Body/Head") as Node3D
-		if rider_body != null and rider_body.rig != null else null
+	_votw_rider_body = rider.character if rider != null else null
+	_votw_head = (
+		_votw_rider_body.rig.get_node_or_null("Body/Head") as Node3D
+		if _votw_rider_body != null and _votw_rider_body.rig != null else null
 	)
 	_check(
-		rider_body != null and rider_body.is_seated_pose() and head != null
-			and head.position.y < 1.2,
+		_votw_rider_body != null and _votw_rider_body.is_seated_pose() and _votw_head != null
+			and _votw_head.position.y < 1.2,
 		"and the client sits their body down in the seat",
-		"head %.2f m above the seat" % (head.position.y if head != null else -1.0)
+		"head %.2f m above the seat" % (_votw_head.position.y if _votw_head != null else -1.0)
 	)
 	var facing_dot := (
-		rider_body.rig.global_basis.z.normalized().dot(mirror.global_basis.z.normalized())
-		if rider_body != null and mirror != null else -2.0
+		_votw_rider_body.rig.global_basis.z.normalized().dot(_votw_mirror.global_basis.z.normalized())
+		if _votw_rider_body != null and _votw_mirror != null else -2.0
 	)
 	_check(
 		facing_dot > 0.99,
@@ -132,8 +144,8 @@ func _test_vehicle_over_the_wire() -> void:
 		"dot %.3f" % facing_dot
 	)
 
-	var before := vehicle.position()
-	var mirror_before := mirror.global_position if mirror != null else Vector3.ZERO
+	var before := _votw_vehicle.position()
+	var mirror_before := _votw_mirror.global_position if _votw_mirror != null else Vector3.ZERO
 
 	# The driver's own input goes round trip. That is dot-vehicle's decision rather than
 	# a gap here: a rigid body is not reproducible across machines, so a predicted
@@ -149,12 +161,12 @@ func _test_vehicle_over_the_wire() -> void:
 
 	for _leg in range(16):
 		await _steps(20, _forward())
-		fastest = maxf(fastest, vehicle.forward_speed())
+		fastest = maxf(fastest, _votw_vehicle.forward_speed())
 
 	_exchange()
 	await _steps(6)
 
-	var travelled := vehicle.position().distance_to(before)
+	var travelled := _votw_vehicle.position().distance_to(before)
 	# Deliberately well under what the car can do in 320 ticks. The client is on a
 	# different tick rate from the server here on purpose, so how many of its inputs land
 	# in a given wall-clock stretch is not a constant — and a threshold set at the
@@ -162,19 +174,21 @@ func _test_vehicle_over_the_wire() -> void:
 	_check(travelled > 3.0, "keys sent over the wire drive it", "%.2f m" % travelled)
 	_check(fastest > 0.5, "forwards", "%.2f m/s at its fastest" % fastest)
 	_check(
-		mirror != null and mirror.global_position.distance_to(mirror_before) > 2.0,
+		_votw_mirror != null and _votw_mirror.global_position.distance_to(mirror_before) > 2.0,
 		"and the client's copy went with it",
-		"%.2f m" % (mirror.global_position.distance_to(mirror_before) if mirror != null else -1.0)
+		"%.2f m" % (_votw_mirror.global_position.distance_to(mirror_before) if _votw_mirror != null else -1.0)
 	)
+
+func _test_vehicle_over_the_wire_3() -> void:
 	_check(
-		mirror != null and mirror.global_position.distance_to(vehicle.position()) < 6.0,
+		_votw_mirror != null and _votw_mirror.global_position.distance_to(_votw_vehicle.position()) < 6.0,
 		"to roughly where the server has it",
 		"%.2f m apart" % (
-			mirror.global_position.distance_to(vehicle.position()) if mirror != null else -1.0
+			_votw_mirror.global_position.distance_to(_votw_vehicle.position()) if _votw_mirror != null else -1.0
 		)
 	)
 
-	var net_behaviour := mirror.get_node_or_null("Net") as PlaygroundVehicleNet
+	var net_behaviour := _votw_mirror.get_node_or_null("Net") as PlaygroundVehicleNet
 	_check(
 		net_behaviour != null and net_behaviour.seat_occupied(0),
 		"the seat mask says the driving seat is full"
@@ -186,9 +200,9 @@ func _test_vehicle_over_the_wire() -> void:
 
 	# The rider's own position, which is the half that is invisible in one process.
 	_check(
-		driver.controller.state.position.distance_to(vehicle.position()) < 4.0,
+		_votw_driver.controller.state.position.distance_to(_votw_vehicle.position()) < 4.0,
 		"the rider's replicated position is on the vehicle, not where they got in",
-		"%.2f m" % driver.controller.state.position.distance_to(vehicle.position())
+		"%.2f m" % _votw_driver.controller.state.position.distance_to(_votw_vehicle.position())
 	)
 
 	# Turning the wheels. A client cannot derive this from anything else it is sent.
@@ -209,32 +223,34 @@ func _test_vehicle_over_the_wire() -> void:
 	brake.set_button(DotFpsCommand.BUTTON_CROUCH, true)
 	await _steps(200, brake)
 
-	if mirror != null:
-		await _measure_round_trip(vehicle, mirror, brake)
+	if _votw_mirror != null:
+		await _measure_round_trip(_votw_vehicle, _votw_mirror, brake)
 
 	_client_bridge.ask_use_vehicle()
 	_exchange()
 	await _steps(6)
 
-	_check(not driver.riding, "the same key takes them back out")
-	_check(vehicle.is_empty(), "leaving the car empty")
+	_check(not _votw_driver.riding, "the same key takes them back out")
+	_check(_votw_vehicle.is_empty(), "leaving the car empty")
 	_check(
 		_client_player() != null and not _client_player().riding,
 		"and the client is predicting them again"
 	)
 	_check(
-		rider_body != null and not rider_body.is_seated_pose() and head != null
-			and head.position.y > 1.4,
+		_votw_rider_body != null and not _votw_rider_body.is_seated_pose() and _votw_head != null
+			and _votw_head.position.y > 1.4,
 		"and standing up again",
-		"head %.2f m" % (head.position.y if head != null else -1.0)
+		"head %.2f m" % (_votw_head.position.y if _votw_head != null else -1.0)
 	)
 	_check(
-		driver.global_position.distance_to(vehicle.position()) > 0.9,
+		_votw_driver.global_position.distance_to(_votw_vehicle.position()) > 0.9,
 		"put down beside the car rather than inside it",
-		"%.2f m" % driver.global_position.distance_to(vehicle.position())
+		"%.2f m" % _votw_driver.global_position.distance_to(_votw_vehicle.position())
 	)
 
-	_server_game.props.remove(spawned.instance_id, DotPropSpawner.REASON_ADMIN)
+func _test_vehicle_over_the_wire_4() -> void:
+
+	_server_game.props.remove(_votw_spawned.instance_id, DotPropSpawner.REASON_ADMIN)
 	_exchange()
 	await _steps(6)
 
@@ -492,30 +508,37 @@ func _find_vehicle_node(game: Playground) -> PlaygroundVehicle:
 ## Then a gag, through the moderation the base built first, keyed the way the subclass keys
 ## a peer with no session. Armed: without the subclass's `_subject_for_peer` the gagged line
 ## is delivered; without its `_send_chat` the line arrives with nobody's id on it.
+var _cete_store: String
+var _cete_services: PlaygroundServices
+var _cete_heard: Array[Dictionary]
+var _cete_refused: Array[DotResult]
+var _cete_on_chat
+var _cete_on_say
+
 func _test_chat_end_to_end() -> void:
 	_section("a chat line, end to end through the services")
 
-	var store := ProjectSettings.globalize_path(NET_PUNISHMENTS)
-	DirAccess.remove_absolute(store)
+	_cete_store = ProjectSettings.globalize_path(NET_PUNISHMENTS)
+	DirAccess.remove_absolute(_cete_store)
 
-	var services := PlaygroundServices.new()
-	services.name = "Services"
-	services.service_scope = &"server"
-	services.bridge = _server_bridge
-	services.punishments_path = NET_PUNISHMENTS
-	_server_bridge.get_parent().add_child(services)
+	_cete_services = PlaygroundServices.new()
+	_cete_services.name = "Services"
+	_cete_services.service_scope = &"server"
+	_cete_services.bridge = _server_bridge
+	_cete_services.punishments_path = NET_PUNISHMENTS
+	_server_bridge.get_parent().add_child(_cete_services)
 
-	var ready: DotResult = services.setup(null, _server_game, _server_bridge)
+	var ready: DotResult = _cete_services.setup(null, _server_game, _server_bridge)
 	_check(
 		ready.ok, "the services come up on DotGameServices with no DotServer",
 		str(ready.error) if not ready.ok else ""
 	)
 	_check(
-		services.chat != null and services.moderation != null and services.voice != null,
+		_cete_services.chat != null and _cete_services.moderation != null and _cete_services.voice != null,
 		"with chat, moderation and voice"
 	)
 	_check(
-		services.mod_tools == null,
+		_cete_services.mod_tools == null,
 		"and no second set of live tools, which are the module's"
 	)
 	_check(
@@ -523,22 +546,22 @@ func _test_chat_end_to_end() -> void:
 		"the client is a peer the bridge will send a line to"
 	)
 
-	var heard: Array[Dictionary] = []
-	var refused: Array[DotResult] = []
-	var on_chat := func(wire: Dictionary) -> void:
-		heard.append(wire)
-	var on_say := func(peer_id: int, channel_id: StringName, text: String) -> void:
-		var said: DotResult = services.say(peer_id, channel_id, text)
+	_cete_heard = []
+	_cete_refused = []
+	_cete_on_chat = func(wire: Dictionary) -> void:
+		_cete_heard.append(wire)
+	_cete_on_say = func(peer_id: int, channel_id: StringName, text: String) -> void:
+		var said: DotResult = _cete_services.say(peer_id, channel_id, text)
 		if not said.ok:
-			refused.append(said)
-	_client_bridge.chat_received.connect(on_chat)
-	_server_bridge.say_requested.connect(on_say)
+			_cete_refused.append(said)
+	_client_bridge.chat_received.connect(_cete_on_chat)
+	_server_bridge.say_requested.connect(_cete_on_say)
 
 	_client_bridge.say(PlaygroundServices.CHANNEL_ALL, "hello from the client")
 	_exchange()
 
-	_check(heard.size() == 1, "the line comes back to the client, once", "%d" % heard.size())
-	var got: Dictionary = heard[0] if heard.size() > 0 else {}
+	_check(_cete_heard.size() == 1, "the line comes back to the client, once", "%d" % _cete_heard.size())
+	var got: Dictionary = _cete_heard[0] if _cete_heard.size() > 0 else {}
 	_check(String(got.get("m", "")) == "hello from the client", "with the text")
 	_check(
 		String(got.get("c", "")) == String(PlaygroundServices.CHANNEL_ALL),
@@ -554,40 +577,43 @@ func _test_chat_end_to_end() -> void:
 	# [b]The backlog is the module's[/b], sent from `_welcome` once the bridge says the peer
 	# is ready. The base sends one from `add_peer` unless told not to, and both at once is
 	# every line of the backlog twice for everybody who joins.
-	heard.clear()
-	services.add_peer(CLIENT_PEER)
+	_cete_heard.clear()
+	_cete_services.add_peer(CLIENT_PEER)
 	_exchange()
+	await _test_chat_end_to_end_2()
+
+func _test_chat_end_to_end_2() -> void:
 	_check(
-		heard.is_empty(),
+		_cete_heard.is_empty(),
 		"seating a peer sends no backlog of its own, because the module sends it",
-		"%d lines" % heard.size()
+		"%d lines" % _cete_heard.size()
 	)
 
 	var subject := DotPunishmentSubject.for_uid("local:%d" % SESSION)
-	var gagged: DotResult = await services.moderation.issue(
+	var gagged: DotResult = await _cete_services.moderation.issue(
 		DotPunishment.Kind.GAG, subject, "testing", "console", 60
 	)
 	_check(gagged.ok, "a gag is issued", str(gagged.error) if not gagged.ok else "")
 
-	heard.clear()
+	_cete_heard.clear()
 	_client_bridge.say(PlaygroundServices.CHANNEL_ALL, "and now I am gagged")
 	_exchange()
 
 	var leaked := 0
-	for wire in heard:
+	for wire in _cete_heard:
 		if String(wire.get("m", "")) == "and now I am gagged":
 			leaked += 1
 	_check(
-		leaked == 0 and refused.size() == 1,
+		leaked == 0 and _cete_refused.size() == 1,
 		"and the gagged player's next line reaches nobody",
-		"%d delivered, %d refused" % [leaked, refused.size()]
+		"%d delivered, %d refused" % [leaked, _cete_refused.size()]
 	)
 
-	_server_bridge.say_requested.disconnect(on_say)
-	_client_bridge.chat_received.disconnect(on_chat)
-	services.get_parent().remove_child(services)
-	services.free()
-	DirAccess.remove_absolute(store)
+	_server_bridge.say_requested.disconnect(_cete_on_say)
+	_client_bridge.chat_received.disconnect(_cete_on_chat)
+	_cete_services.get_parent().remove_child(_cete_services)
+	_cete_services.free()
+	DirAccess.remove_absolute(_cete_store)
 
 	_check(
 		not DotRegistry.has(DotModerationManager.MUTE_SERVICE),
@@ -646,6 +672,8 @@ func _test_lossy() -> void:
 ## is 8's screen and nobody else's, so this client must never be told; a blind on 7 is
 ## this client's own screen, so it must be; a beacon is for everybody. Asserted on the
 ## client's own copy of each player, which is what its HUD and its renderer read.
+var _bab_theirs: PlaygroundPlayer
+
 func _test_blind_and_beacon() -> void:
 	_section("an admin's blind and beacon: who is told")
 
@@ -654,8 +682,8 @@ func _test_blind_and_beacon() -> void:
 	_check(added.ok, "a second player joins on a peer of their own")
 	await _steps(4)
 
-	var theirs: PlaygroundPlayer = _client_game.players.get(&"u%d" % (SESSION + 1))
-	_check(theirs != null, "and this client draws them")
+	_bab_theirs = _client_game.players.get(&"u%d" % (SESSION + 1))
+	_check(_bab_theirs != null, "and this client draws them")
 
 	var server_net := _server_player().get_node_or_null("Net") as PlaygroundPlayerNet
 	_check(
@@ -678,16 +706,16 @@ func _test_blind_and_beacon() -> void:
 	# Several snapshots' worth, so an absence below is not a snapshot that had not come.
 	await _steps(12)
 
-	var their_net := theirs.get_node_or_null("Net") as PlaygroundPlayerNet \
-		if theirs != null else null
+	var their_net := _bab_theirs.get_node_or_null("Net") as PlaygroundPlayerNet \
+		if _bab_theirs != null else null
 	_check(
-		theirs != null and not theirs.blinded
+		_bab_theirs != null and not _bab_theirs.blinded
 		and their_net != null and not their_net.net_blind,
 		"this client is never told somebody else is blind",
 		"received net_blind = %s" % (str(their_net.net_blind) if their_net != null else "-")
 	)
 	_check(
-		theirs != null and theirs.beacon,
+		_bab_theirs != null and _bab_theirs.beacon,
 		"but draws the beacon on them, because a beacon is for everybody"
 	)
 	_check(
@@ -696,7 +724,7 @@ func _test_blind_and_beacon() -> void:
 	)
 	_check(
 		_server_player().get_node("Identity").always_relevant
-		and theirs != null and theirs.is_inside_tree(),
+		and _bab_theirs != null and _bab_theirs.is_inside_tree(),
 		"a beaconed player is relevant to every peer, as every player here already is"
 	)
 
@@ -712,18 +740,21 @@ func _test_blind_and_beacon() -> void:
 	var _unlit: DotResult = beacon.call(them, {"on": false, "actor": "1"})
 	await _steps(12)
 	_check(
-		not _client_player().blinded and theirs != null and not theirs.beacon,
+		not _client_player().blinded and _bab_theirs != null and not _bab_theirs.beacon,
 		"and turning both off reaches the client"
 	)
+	await _test_blind_and_beacon_2()
+
+func _test_blind_and_beacon_2() -> void:
 
 	# Creative mode is everybody's too: a watcher sees who is building, and this client's
 	# own tools ask before the server has to refuse.
 	var _creative := _server_game.set_creative(&"u%d" % (SESSION + 1), true)
 	await _steps(12)
-	_check(theirs != null and theirs.creative, "creative mode on somebody else reaches this client")
+	_check(_bab_theirs != null and _bab_theirs.creative, "creative mode on somebody else reaches this client")
 	var _plain := _server_game.set_creative(&"u%d" % (SESSION + 1), false)
 	await _steps(12)
-	_check(theirs != null and not theirs.creative, "and so does turning it off")
+	_check(_bab_theirs != null and not _bab_theirs.creative, "and so does turning it off")
 
 	_server_bridge.remove_player(SESSION + 1)
 	await _steps(4)

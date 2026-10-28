@@ -1,26 +1,30 @@
 extends "res://examples/headless_net_part2.gd"
 
+var _lip_mine: PlaygroundPlayer
+var _lip_identity
+var _lip_server_from: Vector3
+
 func _test_local_is_predicted() -> void:
 	_section("this client predicts its own player, and nobody else")
 
-	var mine := _client_player()
-	var mine_net := mine.get_node_or_null("Net") as PlaygroundPlayerNet if mine != null else null
+	_lip_mine = _client_player()
+	var mine_net := _lip_mine.get_node_or_null("Net") as PlaygroundPlayerNet if _lip_mine != null else null
 
 	if mine_net == null or mine_net.identity == null:
 		_check(false, "the client has its own player, replicated")
 		return
 
-	var identity := mine_net.identity
+	_lip_identity = mine_net.identity
 	_check(
-		identity.owner_peer_id == _client_net.local_peer_id and identity.is_owner,
+		_lip_identity.owner_peer_id == _client_net.local_peer_id and _lip_identity.is_owner,
 		"the client's mirror of its own player is owned by this client (peer %d)"
 			% _client_net.local_peer_id,
-		"owner %d, is_owner %s" % [identity.owner_peer_id, str(identity.is_owner)]
+		"owner %d, is_owner %s" % [_lip_identity.owner_peer_id, str(_lip_identity.is_owner)]
 	)
 
 	var predicted := _client_net.registry.predicted()
 	_check(
-		predicted.size() == 1 and predicted[0] == identity,
+		predicted.size() == 1 and predicted[0] == _lip_identity,
 		"so it is the one entity the client predicts",
 		"predicted %d" % predicted.size()
 	)
@@ -49,36 +53,40 @@ func _test_local_is_predicted() -> void:
 	# A key, and nothing from the server: one client tick, no server tick, no flush. Standing
 	# still first, so the press is the only reason to move.
 	await _steps(24)
-	var client_from := mine.controller.state.position
-	var node_from := mine.global_position
-	var server_from := _server_player().controller.state.position
+	var client_from := _lip_mine.controller.state.position
+	var node_from := _lip_mine.global_position
+	_lip_server_from = _server_player().controller.state.position
 	_tick += 1
 	_client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
 	_client_bridge.client_tick(_tick + INPUT_LEAD, _forward())
-	var moved := mine.controller.state.position.distance_to(client_from)
+	var moved := _lip_mine.controller.state.position.distance_to(client_from)
 	_check(
 		_to_client.is_empty() and moved > 0.0005,
 		"a key moves the player on the client in the tick it is pressed, before any snapshot",
 		"%.4f m (a client that waits for the server moves 0)" % moved
 	)
 	_check(
-		mine.global_position.distance_to(node_from) > 0.0005,
+		_lip_mine.global_position.distance_to(node_from) > 0.0005,
 		"and the node the camera and the body follow moved with it",
-		"%.4f m" % mine.global_position.distance_to(node_from)
+		"%.4f m" % _lip_mine.global_position.distance_to(node_from)
 	)
+	await _test_local_is_predicted_2()
+	await _test_local_is_predicted_3()
+
+func _test_local_is_predicted_2() -> void:
 	_check(
-		_server_player().controller.state.position.distance_to(server_from) < 0.0001,
+		_server_player().controller.state.position.distance_to(_lip_server_from) < 0.0001,
 		"while the server has not moved them yet: this is prediction, not a snapshot"
 	)
 
 	# Key to motion, counted: ticks from the press to the client's player moving, over a whole
 	# exchange with the server. Zero is the tick it was pressed in.
 	await _steps(24)
-	var still_from := mine.controller.state.position
+	var still_from := _lip_mine.controller.state.position
 	var latency := -1
 	for i in range(16):
 		await _step(_forward())
-		if latency < 0 and mine.controller.state.position.distance_to(still_from) > 0.0005:
+		if latency < 0 and _lip_mine.controller.state.position.distance_to(still_from) > 0.0005:
 			latency = i
 	_check(latency == 0, "key to motion over the link is zero ticks", "%d ticks" % latency)
 	await _steps(24)
@@ -88,10 +96,10 @@ func _test_local_is_predicted() -> void:
 	var server_mine := _server_player()
 	var target := server_mine.controller.state.position + Vector3(3.0, 0.0, 0.0)
 	server_mine.teleport(target, server_mine.controller.state.yaw)
-	var before_gap := mine.controller.state.position.distance_to(target)
+	var before_gap := _lip_mine.controller.state.position.distance_to(target)
 	await _steps(32)
 	var server_at := server_mine.controller.state.position
-	var gap := mine.controller.state.position.distance_to(server_at)
+	var gap := _lip_mine.controller.state.position.distance_to(server_at)
 	var corrections := _corrections_and_snaps() - corrections_before
 	_check(
 		before_gap > 2.0 and gap < 0.05,
@@ -99,16 +107,16 @@ func _test_local_is_predicted() -> void:
 		"%.2f m away when it happened, %.4f m after" % [before_gap, gap]
 	)
 	_check(
-		mine.global_position.distance_to(server_at) < 0.05,
+		_lip_mine.global_position.distance_to(server_at) < 0.05,
 		"on the node as well as in the state",
-		"%.4f m" % mine.global_position.distance_to(server_at)
+		"%.4f m" % _lip_mine.global_position.distance_to(server_at)
 	)
 	_check(
 		corrections > 0, "by the predictor, as a correction or a snap",
 		"%d corrections and snaps" % corrections
 	)
 	_check(
-		_client_net.registry.predicted().size() == 1 and identity.is_predicted(),
+		_client_net.registry.predicted().size() == 1 and _lip_identity.is_predicted(),
 		"and the player is still predicted afterwards"
 	)
 
@@ -120,16 +128,18 @@ func _test_local_is_predicted() -> void:
 	# sends HELLO first and JOIN after it, and the mirror has to be built owned. Each is
 	# forced here, and each was armed on its own: without the claim, the first nine checks
 	# above fail and so does the claim below; without the owned mirror, only the rebuild does.
-	var _given := _client_net.registry.change_owner(identity.net_id, 0)
-	_check(not identity.is_predicted(), "a mirror handed back to the server stops being predicted")
+	var _given := _client_net.registry.change_owner(_lip_identity.net_id, 0)
+	_check(not _lip_identity.is_predicted(), "a mirror handed back to the server stops being predicted")
 	_client_bridge.ask_ready()
 	_exchange()
 	await _steps(4)
 	_check(
-		identity.owner_peer_id == _client_net.local_peer_id and identity.is_predicted(),
+		_lip_identity.owner_peer_id == _client_net.local_peer_id and _lip_identity.is_predicted(),
 		"and HELLO claims it again for this client (JOIN first)",
-		"owner %d" % identity.owner_peer_id
+		"owner %d" % _lip_identity.owner_peer_id
 	)
+
+func _test_local_is_predicted_3() -> void:
 
 	# HELLO first: the client forgets its mirror, as a LEAVE would, and is admitted again.
 	_client_bridge._on_event(PlaygroundEvent.new(
@@ -155,6 +165,12 @@ func _test_local_is_predicted() -> void:
 
 
 # --- Props, which is what makes this a sandbox -----------------------------
+
+var _pr_client_node: Node3D
+var _pr_server_node: Node3D
+var _pr_at_first: Vector3
+var _pr_server_first: Vector3
+var _pr_waited: int
 
 func _test_prop_replication() -> void:
 	_section("a prop the server spawns reaches the client")
@@ -198,10 +214,10 @@ func _test_prop_replication() -> void:
 	# And it MOVES. A prop that replicated its spawn and then sat still is the family's
 	# "produced correctly and consumed by nothing" — the position looks right because it
 	# was right once.
-	var client_node := _client_prop_node()
-	_check(client_node != null, "the client built a body for it")
+	_pr_client_node = _client_prop_node()
+	_check(_pr_client_node != null, "the client built a body for it")
 
-	if client_node == null:
+	if _pr_client_node == null:
 		return
 
 	# [b]Measured against the server's drop, not a fixed number of exchanges.[/b] This
@@ -215,37 +231,40 @@ func _test_prop_replication() -> void:
 	# pushed UP is the server's, or the interpolation's, and the print and the separate
 	# server check below say which the next time it happens. 12 of 12 old-form runs
 	# passed on 2026-09-24, so the 25.02 was not reproduced.
-	var server_node := _server_prop_node()
-	_check(server_node != null, "the server has a body for it")
+	_pr_server_node = _server_prop_node()
+	_check(_pr_server_node != null, "the server has a body for it")
 
-	if server_node == null:
+	if _pr_server_node == null:
 		return
 
-	var at_first := client_node.global_position
-	var server_first := server_node.global_position
-	var waited := 0
+	_pr_at_first = _pr_client_node.global_position
+	_pr_server_first = _pr_server_node.global_position
+	_pr_waited = 0
+	await _test_prop_replication_2()
 
-	while server_node.global_position.y > server_first.y - 1.0 and waited < 512:
+func _test_prop_replication_2() -> void:
+
+	while _pr_server_node.global_position.y > _pr_server_first.y - 1.0 and _pr_waited < 512:
 		await _steps(1)
-		waited += 1
+		_pr_waited += 1
 
 	# A few more exchanges, so the client's interpolation has the last snapshots.
 	await _steps(8)
 
-	var server_last := server_node.global_position
-	var at_last := client_node.global_position
+	var server_last := _pr_server_node.global_position
+	var at_last := _pr_client_node.global_position
 
 	print("    the crate: server %.2f -> %.2f in %d steps, client %.2f -> %.2f" % [
-		server_first.y, server_last.y, waited, at_first.y, at_last.y,
+		_pr_server_first.y, server_last.y, _pr_waited, _pr_at_first.y, at_last.y,
 	])
 
-	_check(server_last.y < server_first.y - 1.0,
+	_check(server_last.y < _pr_server_first.y - 1.0,
 		"the server's physics drops it a metre",
-		"%.2f -> %.2f in %d steps" % [server_first.y, server_last.y, waited])
-	_check(at_last.y < at_first.y - 0.5,
+		"%.2f -> %.2f in %d steps" % [_pr_server_first.y, server_last.y, _pr_waited])
+	_check(at_last.y < _pr_at_first.y - 0.5,
 		"and it falls on the client because the server's physics moved it",
-		"%.2f -> %.2f" % [at_first.y, at_last.y])
-	_check(at_last.distance_to(at_first) > 0.5,
+		"%.2f -> %.2f" % [_pr_at_first.y, at_last.y])
+	_check(at_last.distance_to(_pr_at_first) > 0.5,
 		"which is movement the client did not simulate for itself")
 	# Within 0.5 m: the client draws an interpolated past, some ticks behind the server,
 	# and a crate falling at ~5 m/s covers 0.5 m in about thirteen of the server's ticks.
@@ -257,14 +276,14 @@ func _test_prop_replication() -> void:
 
 	# A mirrored rigid body must not simulate locally as well: an unfrozen one fights
 	# every position written into it and jitters against gravity.
-	var body := client_node as RigidBody3D
+	var body := _pr_client_node as RigidBody3D
 	_check(body == null or body.freeze, "the mirrored body does not simulate itself too")
 
 	# `[prop-mirror-layer-1]`: the mirror is on the layout's props layer with its mask,
 	# as the server's body is — not the scene's 1/1, which made a crate scenery to a
 	# client that predicts its own player against its own copy of the world.
-	var client_body := client_node as CollisionObject3D
-	var server_body := server_node as CollisionObject3D
+	var client_body := _pr_client_node as CollisionObject3D
+	var server_body := _pr_server_node as CollisionObject3D
 	_check(
 		client_body != null and server_body != null
 			and server_body.collision_layer != 1
@@ -289,15 +308,19 @@ func _test_prop_replication() -> void:
 ## every third snapshot — so steps added anywhere before it move its phase. Put inside the
 ## prop section first, these checks took that check from passing to "held still on 7 of 33"
 ## every run, with the new prop fields themselves ruled out by turning them off.
+var _tlaan_crate: DotPropInstance
+var _tlaan_soldier: DotPropInstance
+var _tlaan_armed_mirror: PlaygroundNpcNet
+
 func _test_tool_look_and_armed_npcs() -> void:
 	_section("a resized, painted prop and an armed NPC reach the client")
 
 	# Its own crate: the replication section's is long gone by now.
-	var crate := _server_game.props.spawn(&"crate", &"u%d" % SESSION, Vector3(14.0, 3.0, -14.0))
+	_tlaan_crate = _server_game.props.spawn(&"crate", &"u%d" % SESSION, Vector3(14.0, 3.0, -14.0))
 	_exchange()
 	await _steps(8)
-	var server_net: PlaygroundPropNet = _server_bridge.get("_prop_nets").get(crate.instance_id) if crate != null else null
-	var server_node: Node3D = crate.node if crate != null else null
+	var server_net: PlaygroundPropNet = _server_bridge.get("_prop_nets").get(_tlaan_crate.instance_id) if _tlaan_crate != null else null
+	var server_node: Node3D = _tlaan_crate.node if _tlaan_crate != null else null
 	var client_node: Node3D = _client_bridge.call("_mirror_node", server_net.identity.net_id) if server_net != null else null
 
 	if server_node == null or client_node == null:
@@ -353,25 +376,28 @@ func _test_tool_look_and_armed_npcs() -> void:
 	_server_game.constraints.remove(second.value)
 
 	# An armed NPC's mirror holds its weapon: the client is told which, and draws it.
-	var soldier := _server_game.props.spawn(&"npc_soldier", &"u%d" % SESSION, Vector3(-18.0, 2.0, -18.0))
-	_check(soldier != null, "the server spawns an armed NPC")
+	_tlaan_soldier = _server_game.props.spawn(&"npc_soldier", &"u%d" % SESSION, Vector3(-18.0, 2.0, -18.0))
+	_check(_tlaan_soldier != null, "the server spawns an armed NPC")
 	_exchange()
-	var armed_mirror: PlaygroundNpcNet = null
+	_tlaan_armed_mirror = null
+	await _test_tool_look_and_armed_npcs_2()
+
+func _test_tool_look_and_armed_npcs_2() -> void:
 	for i in 128:
 		await _steps(1)
 		for net in _client_bridge.get("_prop_nets").values():
 			if net is PlaygroundNpcNet:
-				armed_mirror = net
-		if armed_mirror != null and armed_mirror.net_weapon != "":
+				_tlaan_armed_mirror = net
+		if _tlaan_armed_mirror != null and _tlaan_armed_mirror.net_weapon != "":
 			break
 	var server_side := ""
 	for net in _server_bridge.get("_prop_nets").values():
 		if net is PlaygroundNpcNet:
 			server_side = (net as PlaygroundNpcNet).net_weapon
-	_check(armed_mirror != null and armed_mirror.net_weapon == "zee_smg",
+	_check(_tlaan_armed_mirror != null and _tlaan_armed_mirror.net_weapon == "zee_smg",
 		"the client is told which weapon the NPC holds",
-		"client '%s', server '%s'" % [armed_mirror.net_weapon if armed_mirror != null else "(no mirror)", server_side])
-	_check(armed_mirror != null and armed_mirror.prop.get_node_or_null("Hands") != null,
+		"client '%s', server '%s'" % [_tlaan_armed_mirror.net_weapon if _tlaan_armed_mirror != null else "(no mirror)", server_side])
+	_check(_tlaan_armed_mirror != null and _tlaan_armed_mirror.prop.get_node_or_null("Hands") != null,
 		"and puts one in its hands")
 	# A wave NPC reaches the client too, through the same path: it was never replicated,
 	# so a connected player was hunted by a wave they could not see.
@@ -418,9 +444,9 @@ func _test_tool_look_and_armed_npcs() -> void:
 
 	waves.queue_free()
 
-	if soldier != null:
-		_server_game.props.remove(soldier.instance_id)
-	_server_game.props.remove(crate.instance_id)
+	if _tlaan_soldier != null:
+		_server_game.props.remove(_tlaan_soldier.instance_id)
+	_server_game.props.remove(_tlaan_crate.instance_id)
 	_exchange()
 	await _steps(4)
 	_done()
