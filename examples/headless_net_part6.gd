@@ -9,15 +9,17 @@ extends "res://examples/headless_net_part5.gd"
 ## join the new one logged "Failed to get path from RPC: Server/Playground". The loopback
 ## hands a broadcast over as peer 0, so "nothing to peer 0" is what that looks like here.
 ## `pg-rpc-before-scene`.
+var _nbr_late: int
+
 func _test_nothing_before_ready() -> void:
 	_section("a spawned peer that has not said READY is sent nothing on the link")
 
 	var late_peer := CLIENT_PEER + 5
-	var late := SESSION + 5
+	_nbr_late = SESSION + 5
 
 	_server_events.clear()
 	_recording = true
-	var added := _server_bridge.add_player(late_peer, late, "Di")
+	var added := _server_bridge.add_player(late_peer, _nbr_late, "Di")
 	await _steps(2)
 
 	_check(
@@ -77,9 +79,12 @@ func _test_nothing_before_ready() -> void:
 		not DotRegistry.has(DotModerationManager.MUTE_SERVICE),
 		"and the voice section's services leave no mute source behind"
 	)
+	await _test_nothing_before_ready_2()
+
+func _test_nothing_before_ready_2() -> void:
 
 	_server_events.clear()
-	_server_bridge.remove_player(late)
+	_server_bridge.remove_player(_nbr_late)
 	await _steps(2)
 	_check(
 		_event_kinds(0).is_empty() and _event_kinds(CLIENT_PEER).has(PlaygroundEvents.Kind.LEAVE),
@@ -251,17 +256,23 @@ func _test_toys_over_the_wire() -> void:
 ## client deciding what it hit, so `_give_weapon` puts a deciding rig on the server's copy of
 ## the player and `_drive_tools` ticks it. Armed by skipping that branch: the two firing
 ## checks fail (0 uses in 256 ticks).
+var _zotw_theirs: PlaygroundPlayer
+var _zotw_uses: Array[int]
+var _zotw_resolved: Array[int]
+var _zotw_mirror: PlaygroundPlayer
+var _zotw_mirror_net: PlaygroundPlayerNet
+
 func _test_zee_over_the_wire() -> void:
 	_section("a zee weapon is run by the server")
 
-	var theirs := _server_player()
+	_zotw_theirs = _server_player()
 	_client_bridge.ask_weapon(&"zee_smg")
 	_exchange()
 	await _steps(4)
 	_exchange()
 	await _steps(4)
 
-	var rig: Variant = theirs.zee_rig if theirs != null else null
+	var rig: Variant = _zotw_theirs.zee_rig if _zotw_theirs != null else null
 	_check(
 		rig is ZeeWeaponRig and (rig as ZeeWeaponRig).authority
 			and (rig as ZeeWeaponRig).role == ZeeWeaponRig.Role.SERVER,
@@ -269,19 +280,19 @@ func _test_zee_over_the_wire() -> void:
 	)
 
 	# Arrays, because a lambda captures a scalar by value.
-	var uses: Array[int] = []
-	var resolved: Array[int] = []
-	_server_bridge.shot_fn = func(_id: StringName, _shot: DotShot) -> void: resolved.append(1)
+	_zotw_uses = []
+	_zotw_resolved = []
+	_server_bridge.shot_fn = func(_id: StringName, _shot: DotShot) -> void: _zotw_resolved.append(1)
 	if rig is ZeeWeaponRig:
 		(rig as ZeeWeaponRig).used.connect(
-			func(o: DotWeaponOutcome) -> void: uses.append(o.shots.size())
+			func(o: DotWeaponOutcome) -> void: _zotw_uses.append(o.shots.size())
 		)
 
 	# What a client draws of it: the server's WEAPON event puts the SMG on the body, and the
 	# fire counter crosses in the snapshot. Armed: without the bridge's `show_held` the first
 	# fails; without the specs in `PlaygroundPlayerNet` the counter check does.
-	var mirror := _client_player()
-	var drawn: Variant = mirror.zee_world if mirror != null else null
+	_zotw_mirror = _client_player()
+	var drawn: Variant = _zotw_mirror.zee_world if _zotw_mirror != null else null
 	_check(
 		drawn is ZeeWorldModel and (drawn as ZeeWorldModel).equipped() == &"smg",
 		"a client draws the SMG in that player's hands",
@@ -291,21 +302,21 @@ func _test_zee_over_the_wire() -> void:
 	# Outside the body, not inside it. The mount named the torso until 2026-10-03, which hung
 	# every gun at the capsule's centre with two pixels of barrel showing (rendered with
 	# `tools/screenshot_net.sh --zee=rifle`). Armed: mounted on "Torso" this is 0.00 m.
-	var torso: Variant = mirror.character.rig.find_child("Torso", true, false) if mirror != null and mirror.character != null else null
+	var torso: Variant = _zotw_mirror.character.rig.find_child("Torso", true, false) if _zotw_mirror != null and _zotw_mirror.character != null else null
 	var torso_radius := ((torso as MeshInstance3D).mesh as CapsuleMesh).radius if torso is MeshInstance3D and (torso as MeshInstance3D).mesh is CapsuleMesh else 0.0
 	# A body drawn as the character kit's figure has no capsule: its torso is the kit's own
 	# `torso` mesh, and "outside the body" is past half its widest horizontal extent.
-	var kit_torso: Variant = mirror.character.rig.find_child("torso", true, false) if mirror != null and mirror.character != null else null
+	var kit_torso: Variant = _zotw_mirror.character.rig.find_child("torso", true, false) if _zotw_mirror != null and _zotw_mirror.character != null else null
 	# One of the family's people: half its chest, measured off the people at 1.8 m.
-	if torso_radius <= 0.0 and mirror != null and mirror.character != null \
-			and mirror.character.rig.find_child("Figure", true, false) is DotHumanoidFigure:
+	if torso_radius <= 0.0 and _zotw_mirror != null and _zotw_mirror.character != null \
+			and _zotw_mirror.character.rig.find_child("Figure", true, false) is DotHumanoidFigure:
 		torso_radius = 0.2
 	if torso_radius <= 0.0 and kit_torso is MeshInstance3D:
 		var box := (kit_torso as MeshInstance3D).global_transform * (kit_torso as MeshInstance3D).get_aabb()
 		torso_radius = maxf(box.size.x, box.size.z) * 0.5
 	var off_axis := -1.0
 	if drawn is ZeeWorldModel:
-		var at := (drawn as ZeeWorldModel).global_position - mirror.global_position
+		var at := (drawn as ZeeWorldModel).global_position - _zotw_mirror.global_position
 		off_axis = Vector2(at.x, at.z).length()
 	_check(
 		torso_radius > 0.0 and off_axis > torso_radius,
@@ -318,28 +329,31 @@ func _test_zee_over_the_wire() -> void:
 	await _steps(256, fire)
 	await _steps(8)
 
-	var mirror_net: PlaygroundPlayerNet = _client_bridge._behaviours.get(SESSION)
+	_zotw_mirror_net = _client_bridge._behaviours.get(SESSION)
+	await _test_zee_over_the_wire_2()
+
+func _test_zee_over_the_wire_2() -> void:
 	_check(
-		mirror_net != null and mirror_net.net_fire_seq != 0 and mirror_net._seen_fire_seq == mirror_net.net_fire_seq,
+		_zotw_mirror_net != null and _zotw_mirror_net.net_fire_seq != 0 and _zotw_mirror_net._seen_fire_seq == _zotw_mirror_net.net_fire_seq,
 		"the client sees the fire counter move, and has acted on it",
-		"seq %d" % (mirror_net.net_fire_seq if mirror_net != null else -1)
+		"seq %d" % (_zotw_mirror_net.net_fire_seq if _zotw_mirror_net != null else -1)
 	)
 
-	_check(uses.size() > 1, "the server fires it from the buttons the client holds",
-		"%d uses in 256 ticks" % uses.size())
-	_check(resolved.size() >= uses.size() and resolved.size() > 0,
-		"and hands every shot to whatever resolves it", "%d shots" % resolved.size())
+	_check(_zotw_uses.size() > 1, "the server fires it from the buttons the client holds",
+		"%d uses in 256 ticks" % _zotw_uses.size())
+	_check(_zotw_resolved.size() >= _zotw_uses.size() and _zotw_resolved.size() > 0,
+		"and hands every shot to whatever resolves it", "%d shots" % _zotw_resolved.size())
 
 	# Somebody arriving now was never sent the WEAPON event: READY replays what everybody
 	# holds. Armed: without the `_tool_of` loop in `_admit` this fails.
-	PlaygroundZee.show_held(mirror, null)
+	PlaygroundZee.show_held(_zotw_mirror, null)
 	await get_tree().process_frame
 	_client_bridge.ask_ready()
 	_exchange()
 	await _steps(4)
 	_exchange()
 	await _steps(4)
-	var replayed: Variant = mirror.zee_world if mirror != null else null
+	var replayed: Variant = _zotw_mirror.zee_world if _zotw_mirror != null else null
 	_check(
 		replayed is ZeeWorldModel and (replayed as ZeeWorldModel).equipped() == &"smg",
 		"a client that says READY again is told what everybody is holding"
@@ -350,9 +364,9 @@ func _test_zee_over_the_wire() -> void:
 	await _steps(4)
 	_exchange()
 	await _steps(4)
-	_check(theirs != null and theirs.zee_rig == null,
+	_check(_zotw_theirs != null and _zotw_theirs.zee_rig == null,
 		"the physics gun takes it back out of their hands on the server")
-	_check(mirror != null and mirror.zee_world == null,
+	_check(_zotw_mirror != null and _zotw_mirror.zee_world == null,
 		"and off the body the client draws")
 
 	_server_bridge.shot_fn = Callable()
@@ -414,18 +428,23 @@ func _test_inventory_flood() -> void:
 
 
 ## A person who reconnects is a new userid to dot-server, and the same person to their bag.
+var _irx_rejoin: int
+var _irx_person: StringName
+var _irx_inv: PlaygroundInventory
+var _irx_held: String
+
 func _test_inventory_rejoin() -> void:
 	_section("a player who reconnects is sent their whole bag, under a new userid")
 
-	var rejoin := SESSION + 20
-	var person := &"bag:ada"
-	var inv := _server_game.inventory
+	_irx_rejoin = SESSION + 20
+	_irx_person = &"bag:ada"
+	_irx_inv = _server_game.inventory
 	var net_half: PlaygroundInventoryNet = _server_bridge.inventory_net
 	var old_key := net_half.bag_key(SESSION)
 
 	# What the module sets: who a session IS, for a bag that should outlast it.
 	_server_bridge.inventory_key_fn = func(session_id: int) -> String:
-		return String(person) if session_id == SESSION or session_id == rejoin else ""
+		return String(_irx_person) if session_id == SESSION or session_id == _irx_rejoin else ""
 
 	# An op still in flight when the connection drops, whose request never arrives.
 	var mine_then := _client_bag()
@@ -437,60 +456,63 @@ func _test_inventory_rejoin() -> void:
 
 	await _disconnect()
 	_check(
-		not inv.has_bag(old_key),
+		not _irx_inv.has_bag(old_key),
 		"the bag the first connection had was the session's, and went with it"
 	)
 	await _reconnect(SESSION)
 	_check(
 		stranded.ok and _client_bridge.inventory_net.in_flight_count() == 0
-			and _bag_summary(_client_bag()) == _bag_summary(inv.for_player(person)),
+			and _bag_summary(_client_bag()) == _bag_summary(_irx_inv.for_player(_irx_person)),
 		"nothing from the old connection is replayed onto the new bag, though dot-server gave the same userid",
 		"%d in flight, %s vs %s" % [
 			_client_bridge.inventory_net.in_flight_count(), _bag_summary(_client_bag()),
-			_bag_summary(inv.for_player(person))
+			_bag_summary(_irx_inv.for_player(_irx_person))
 		]
 	)
 	_check(
-		net_half.bag_key(SESSION) == person and _client_bag() != null,
+		net_half.bag_key(SESSION) == _irx_person and _client_bag() != null,
 		"reconnected, this player's bag is now kept under who they are"
 	)
 
-	var gave := inv.give(person, &"crate").ok and inv.give(person, &"barrel").ok \
-		and inv.give(person, &"beach_ball").ok
+	var gave := _irx_inv.give(_irx_person, &"crate").ok and _irx_inv.give(_irx_person, &"barrel").ok \
+		and _irx_inv.give(_irx_person, &"beach_ball").ok
 	await _steps(2)
 	var mine := _client_bag()
 	var ball := _uid_at(mine, _cell_of(mine, &"beach_ball"))
 	var moved := mine != null and mine.apply(DotInvOp.move(BACKPACK, ball, BACKPACK, Vector2i(7, 4))).ok
 	_exchange()
 	_check(
-		gave and moved and _bag_summary(_client_bag()) == _bag_summary(inv.for_player(person)),
+		gave and moved and _bag_summary(_client_bag()) == _bag_summary(_irx_inv.for_player(_irx_person)),
 		"they fill it — three things from the server and a move of their own",
-		"%s vs %s" % [_bag_summary(_client_bag()), _bag_summary(inv.for_player(person))]
+		"%s vs %s" % [_bag_summary(_client_bag()), _bag_summary(_irx_inv.for_player(_irx_person))]
 	)
 
 	_recording = true
 	_server_events.clear()
 	await _disconnect()
-	_check(inv.has_bag(person), "they leave, and the bag stays: it belongs to somebody the server will know again")
-	var away := inv.give(person, &"die")
+	_check(_irx_inv.has_bag(_irx_person), "they leave, and the bag stays: it belongs to somebody the server will know again")
+	var away := _irx_inv.give(_irx_person, &"die")
 	await _steps(2)
 	_check(
 		away.ok and _inventory_events(CLIENT_PEER).is_empty() and _inventory_peers().is_empty(),
 		"an admin gives them a die while they are away, and nobody is sent anything"
 	)
 	_recording = false
-	var held := _bag_summary(inv.for_player(person))
+	_irx_held = _bag_summary(_irx_inv.for_player(_irx_person))
 
-	await _reconnect(rejoin)
+	await _reconnect(_irx_rejoin)
+	await _test_inventory_rejoin_2()
+
+func _test_inventory_rejoin_2() -> void:
 	_check(
-		_client_bridge.local_player_id == rejoin,
+		_client_bridge.local_player_id == _irx_rejoin,
 		"they come back, and dot-server gives them a new userid"
 	)
 	_check(
-		_bag_summary(_client_bag()) == held and _client_bag().doc.count_of(&"die") == 1
+		_bag_summary(_client_bag()) == _irx_held and _client_bag().doc.count_of(&"die") == 1
 			and _client_bag().doc.count_of(&"crate") == 1 and _client_bag().doc.count_of(&"barrel") == 1,
 		"and the whole bag, uids and all, including what arrived while they were away",
-		"%s vs %s" % [_bag_summary(_client_bag()), held]
+		"%s vs %s" % [_bag_summary(_client_bag()), _irx_held]
 	)
 	_check(
 		_client_game.inventory.keys().size() == 1,
@@ -503,7 +525,7 @@ func _test_inventory_rejoin() -> void:
 	var again := mine_again.apply(DotInvOp.move(BACKPACK, back_ball, BACKPACK, Vector2i(8, 4)))
 	_exchange()
 	_check(
-		again.ok and _cell_of(inv.for_player(person), &"beach_ball") == Vector2i(8, 4)
+		again.ok and _cell_of(_irx_inv.for_player(_irx_person), &"beach_ball") == Vector2i(8, 4)
 			and _client_bridge.inventory_net.in_flight_count() == 0,
 		"and an op on it after the rejoin is confirmed against the same bag on the server"
 	)
@@ -635,86 +657,98 @@ func _test_downed_over_the_wire() -> void:
 	_done()
 
 
+var _dac_theirs: PlaygroundPlayer
+var _dac_mirror: PlaygroundPlayer
+var _dac_server_rig: ZeeWeaponRig
+var _dac_drawn: ZeeWeaponRig
+var _dac_settle: int
+var _dac_drive
+var _dac_spent: int
+var _dac_def: DotWeaponDef
+
 func _test_drawn_ammo_corrected() -> void:
 	_section("the drawn gun takes the server's ammunition count")
 
-	var theirs := _server_player()
-	var mirror := _client_player()
+	_dac_theirs = _server_player()
+	_dac_mirror = _client_player()
 	_client_bridge.ask_weapon(&"zee_smg")
 	_exchange()
 	await _steps(4)
 	_exchange()
 	await _steps(4)
 
-	var server_rig: ZeeWeaponRig = theirs.zee_rig as ZeeWeaponRig if theirs != null else null
+	_dac_server_rig = _dac_theirs.zee_rig as ZeeWeaponRig if _dac_theirs != null else null
 	# The client's drawn gun, as PlaygroundClient._arm_zee builds it: LOCAL, no authority.
-	var drawn: ZeeWeaponRig = PlaygroundZee.arm(mirror, _client_game.weapon_def(&"zee_smg"),
-		ZeeWeaponRig.Role.LOCAL, false, _client_game.tick_rate, _tick) if mirror != null else null
-	_check(server_rig != null and drawn != null, "a gun on the server and one drawn on the client")
-	if server_rig == null or drawn == null:
+	_dac_drawn = PlaygroundZee.arm(_dac_mirror, _client_game.weapon_def(&"zee_smg"),
+		ZeeWeaponRig.Role.LOCAL, false, _client_game.tick_rate, _tick) if _dac_mirror != null else null
+	_check(_dac_server_rig != null and _dac_drawn != null, "a gun on the server and one drawn on the client")
+	if _dac_server_rig == null or _dac_drawn == null:
 		_done()
 		return
 
-	var full := drawn.arsenal.current().magazine
+	var full := _dac_drawn.arsenal.current().magazine
 	var tick_sec := 1.0 / float(maxi(_client_game.tick_rate, 1))
-	var settle := int(ceil(PlaygroundZee.SETTLE_SEC / tick_sec)) + 24
+	_dac_settle = int(ceil(PlaygroundZee.SETTLE_SEC / tick_sec)) + 24
 
 	# One tick on both ends, the drawn gun driven the way PlaygroundClient._net_physics does.
-	var drive := func(drawn_fire: bool) -> void:
+	_dac_drive = func(drawn_fire: bool) -> void:
 		var buttons := DotFpsCommand.BUTTON_USER_0 if drawn_fire else 0
-		var command := PlaygroundZee.command_for(buttons, 0.0, 0.0, PlaygroundZee.slot_of(drawn))
-		var _outcome := drawn.simulate_tick(command, _tick)
-		PlaygroundZee.note_drawn(mirror, drawn, command, tick_sec)
+		var command := PlaygroundZee.command_for(buttons, 0.0, 0.0, PlaygroundZee.slot_of(_dac_drawn))
+		var _outcome := _dac_drawn.simulate_tick(command, _tick)
+		PlaygroundZee.note_drawn(_dac_mirror, _dac_drawn, command, tick_sec)
 
 	# Shots the server never hears.
 	for _i in range(40):
-		drive.call(true)
+		_dac_drive.call(true)
 		await _step()
-	var refused := drawn.arsenal.current().magazine
+	var refused := _dac_drawn.arsenal.current().magazine
 	_check(refused < full, "the drawn gun fired shots the server did not", "%d of %d" % [refused, full])
 
 	for _i in range(8):
-		drive.call(false)
+		_dac_drive.call(false)
 		await _step()
-	_check(drawn.arsenal.current().magazine == refused,
+	_check(_dac_drawn.arsenal.current().magazine == refused,
 		"and is not corrected while the shots could still be in flight")
 
-	for _i in range(settle):
-		drive.call(false)
+	for _i in range(_dac_settle):
+		_dac_drive.call(false)
 		await _step()
-	_check(drawn.arsenal.current().magazine == server_rig.arsenal.current().magazine,
+	_check(_dac_drawn.arsenal.current().magazine == _dac_server_rig.arsenal.current().magazine,
 		"once quiet, it takes the server's count",
-		"drawn %d, server %d" % [drawn.arsenal.current().magazine, server_rig.arsenal.current().magazine])
+		"drawn %d, server %d" % [_dac_drawn.arsenal.current().magazine, _dac_server_rig.arsenal.current().magazine])
 
 	# Both fire, then the gun in hand is asked for again: the server refills its own rig, and
 	# says nothing to the drawn one but the snapshot.
 	var fire := DotFpsCommand.new()
 	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
 	for _i in range(30):
-		drive.call(true)
+		_dac_drive.call(true)
 		await _step(fire)
 	for _i in range(8):
-		drive.call(false)
+		_dac_drive.call(false)
 		await _step()
-	var spent := server_rig.arsenal.current().magazine
+	_dac_spent = _dac_server_rig.arsenal.current().magazine
 	_client_bridge.ask_weapon(&"zee_smg")
 	_exchange()
 	await _steps(4)
-	var def := server_rig.current_def()
-	_check(theirs.zee_rig == server_rig and spent < def.magazine
-		and server_rig.arsenal.current().magazine == def.magazine
-		and server_rig.arsenal.ammo().count(def.ammo_type) >= def.reserve,
-		"asking for the gun in hand refills it on the server, without a fresh rig",
-		"spent to %d, now %d" % [spent, server_rig.arsenal.current().magazine])
-	for _i in range(settle):
-		drive.call(false)
-		await _step()
-	_check(drawn.arsenal.current().magazine == def.magazine
-		and drawn.arsenal.ammo().count(def.ammo_type) == server_rig.arsenal.ammo().count(def.ammo_type),
-		"and the refill reaches the drawn gun",
-		"drawn %d / %d" % [drawn.arsenal.current().magazine, drawn.arsenal.ammo().count(def.ammo_type)])
+	_dac_def = _dac_server_rig.current_def()
+	await _test_drawn_ammo_corrected_2()
 
-	PlaygroundZee.disarm(mirror)
+func _test_drawn_ammo_corrected_2() -> void:
+	_check(_dac_theirs.zee_rig == _dac_server_rig and _dac_spent < _dac_def.magazine
+		and _dac_server_rig.arsenal.current().magazine == _dac_def.magazine
+		and _dac_server_rig.arsenal.ammo().count(_dac_def.ammo_type) >= _dac_def.reserve,
+		"asking for the gun in hand refills it on the server, without a fresh rig",
+		"spent to %d, now %d" % [_dac_spent, _dac_server_rig.arsenal.current().magazine])
+	for _i in range(_dac_settle):
+		_dac_drive.call(false)
+		await _step()
+	_check(_dac_drawn.arsenal.current().magazine == _dac_def.magazine
+		and _dac_drawn.arsenal.ammo().count(_dac_def.ammo_type) == _dac_server_rig.arsenal.ammo().count(_dac_def.ammo_type),
+		"and the refill reaches the drawn gun",
+		"drawn %d / %d" % [_dac_drawn.arsenal.current().magazine, _dac_drawn.arsenal.ammo().count(_dac_def.ammo_type)])
+
+	PlaygroundZee.disarm(_dac_mirror)
 	_client_bridge.ask_tool(&"phys")
 	_exchange()
 	await _steps(4)
@@ -732,3 +766,12 @@ func _test_leave() -> void:
 	_check(int(_server_bridge.describe()["players"]) == 0, "and their entity")
 	_check(_client_player() == null, "and the client is told")
 	_done()
+
+
+## One well-formed frame of this server's voice format, on the everybody channel.
+func _voice_frame() -> PackedByteArray:
+	var packet := DotVoicePacket.new()
+	packet.channel = DotVoiceRouter.Channel.ALL
+	packet.sample_count = PlaygroundServices.voice_config().frame_samples()
+	packet.payload.resize(packet.sample_count / 2)
+	return packet.to_bytes()

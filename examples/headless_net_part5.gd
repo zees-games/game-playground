@@ -14,19 +14,26 @@ extends "res://examples/headless_net_part4.gd"
 ## Driven through `PlaygroundClient.present_frame`, the function the real client's
 ## `_process` calls, so a client that stops interpolating or stops placing bodies fails
 ## here rather than in a screenshot.
+var _seid_session: int
+var _seid_server_bea: PlaygroundPlayer
+var _seid_theirs: PlaygroundPlayer
+var _seid_bea_net: PlaygroundPlayerNet
+var _seid_server_track: Array[Vector3]
+var _seid_drawn: Array[Vector3]
+
 func _test_somebody_else_is_drawn() -> void:
 	_section("somebody else has a body, where the server has them, moving every frame")
 
-	var session := SESSION + 2
-	var added := _server_bridge.add_player(CLIENT_PEER + 2, session, "Bea")
+	_seid_session = SESSION + 2
+	var added := _server_bridge.add_player(CLIENT_PEER + 2, _seid_session, "Bea")
 	_check(added.ok, "a second player joins on a peer of their own")
 	await _steps(6)
 
-	var server_bea: PlaygroundPlayer = _server_game.players.get(&"u%d" % session)
-	var theirs: PlaygroundPlayer = _client_game.players.get(&"u%d" % session)
+	_seid_server_bea = _server_game.players.get(&"u%d" % _seid_session)
+	_seid_theirs = _client_game.players.get(&"u%d" % _seid_session)
 	var mine := _client_player()
 
-	if server_bea == null or theirs == null or mine == null:
+	if _seid_server_bea == null or _seid_theirs == null or mine == null:
 		_check(false, "both ends have them, and this client has its own player")
 		return
 
@@ -49,12 +56,12 @@ func _test_somebody_else_is_drawn() -> void:
 	)
 
 	_check(
-		theirs.character != null and theirs.character.is_body_visible()
-		and theirs.character.rig.is_visible_in_tree(),
+		_seid_theirs.character != null and _seid_theirs.character.is_body_visible()
+		and _seid_theirs.character.rig.is_visible_in_tree(),
 		"the client draws a body for them",
 		"character %s, shown %s" % [
-			str(theirs.character != null),
-			str(theirs.character.is_body_visible()) if theirs.character != null else "-",
+			str(_seid_theirs.character != null),
+			str(_seid_theirs.character.is_body_visible()) if _seid_theirs.character != null else "-",
 		]
 	)
 	_check(
@@ -63,36 +70,40 @@ func _test_somebody_else_is_drawn() -> void:
 	)
 	_check(shown == 1, "so exactly one body is drawn on this client", "%d" % shown)
 	_check(
-		theirs.character != null and theirs.character.is_on_body(),
+		_seid_theirs.character != null and _seid_theirs.character.is_on_body(),
 		"the body hangs off the player's own node, which is what places it"
 	)
 
 	# Running, with the client drawing FRAMES_PER_TICK frames between ticks. Driven the way a
 	# peer drives them: the command their input would have carried, applied by the server.
-	var bea_net := server_bea.get_node("Net") as PlaygroundPlayerNet
+	_seid_bea_net = _seid_server_bea.get_node("Net") as PlaygroundPlayerNet
 	var run := DotFpsCommand.new()
 	run.move = Vector2(0.0, 1.0)
 	run.yaw = 90.0
-	bea_net.last_move = run
+	_seid_bea_net.last_move = run
 
-	var server_track: Array[Vector3] = []
-	var drawn: Array[Vector3] = []
+	_seid_server_track = []
+	_seid_drawn = []
+	await _test_somebody_else_is_drawn_2()
+	await _test_somebody_else_is_drawn_3()
+
+func _test_somebody_else_is_drawn_2() -> void:
 
 	for i in range(160):
 		await _step()
-		server_track.append(server_bea.controller.state.position)
+		_seid_server_track.append(_seid_server_bea.controller.state.position)
 
 		for f in range(FRAMES_PER_TICK):
 			var _n := PlaygroundClient.present_frame(
 				_client_net, _client_game, float(f) / float(FRAMES_PER_TICK)
 			)
-			if theirs.character != null and i >= 60:
-				drawn.append(theirs.character.rig.global_position)
+			if _seid_theirs.character != null and i >= 60:
+				_seid_drawn.append(_seid_theirs.character.rig.global_position)
 
-	bea_net.last_move = DotFpsCommand.new()
+	_seid_bea_net.last_move = DotFpsCommand.new()
 
-	var from := server_track[0]
-	var to := server_track[server_track.size() - 1]
+	var from := _seid_server_track[0]
+	var to := _seid_server_track[_seid_server_track.size() - 1]
 	_check(
 		Vector2(to.x, to.z).distance_to(Vector2(from.x, from.z)) > 3.0,
 		"the server runs them off the spawn pad",
@@ -103,19 +114,19 @@ func _test_somebody_else_is_drawn() -> void:
 	# them at. Not the latest one, because a remote player is drawn an interpolation delay in
 	# the past on purpose; the nearest point on the server's own track is the fair test.
 	var worst := 0.0
-	for at in drawn:
+	for at in _seid_drawn:
 		var nearest := INF
-		for p in server_track:
+		for p in _seid_server_track:
 			nearest = minf(nearest, at.distance_to(p))
 		worst = maxf(worst, nearest)
 
 	_check(
-		not drawn.is_empty() and worst < 0.25,
+		not _seid_drawn.is_empty() and worst < 0.25,
 		"and every frame draws the body on the path the server ran them along",
-		"worst %.3f m off it, over %d frames" % [worst, drawn.size()]
+		"worst %.3f m off it, over %d frames" % [worst, _seid_drawn.size()]
 	)
 
-	var last: Vector3 = drawn[drawn.size() - 1] if not drawn.is_empty() else Vector3.ZERO
+	var last: Vector3 = _seid_drawn[_seid_drawn.size() - 1] if not _seid_drawn.is_empty() else Vector3.ZERO
 	_check(
 		Vector2(last.x, last.z).length() > 3.0,
 		"so the body followed them away from the world origin, where it used to stay",
@@ -129,29 +140,31 @@ func _test_somebody_else_is_drawn() -> void:
 	var mean := 0.0
 	var largest := 0.0
 	var smallest := INF
-	for j in range(1, drawn.size()):
-		var d := drawn[j].distance_to(drawn[j - 1])
+	for j in range(1, _seid_drawn.size()):
+		var d := _seid_drawn[j].distance_to(_seid_drawn[j - 1])
 		mean += d
 		largest = maxf(largest, d)
 		smallest = minf(smallest, d)
-	mean /= float(maxi(drawn.size() - 1, 1))
+	mean /= float(maxi(_seid_drawn.size() - 1, 1))
 
 	_check(
 		mean > 0.001 and largest < mean * 1.5 and smallest > mean * 0.5,
 		"and it moves by an even step on every frame, not in snapshot-sized jumps",
 		"per frame %.4f m mean, %.4f..%.4f" % [mean, smallest, largest]
 	)
+
+func _test_somebody_else_is_drawn_3() -> void:
 	_check(
-		theirs.character != null
-		and absf(wrapf(theirs.character.rig.rotation.y - deg_to_rad(90.0), -PI, PI)) < 0.05,
+		_seid_theirs.character != null
+		and absf(wrapf(_seid_theirs.character.rig.rotation.y - deg_to_rad(90.0), -PI, PI)) < 0.05,
 		"and it faces the way the server says they are looking",
-		"%.1f deg" % (rad_to_deg(theirs.character.rig.rotation.y) if theirs.character != null else 0.0)
+		"%.1f deg" % (rad_to_deg(_seid_theirs.character.rig.rotation.y) if _seid_theirs.character != null else 0.0)
 	)
 
-	_server_bridge.remove_player(session)
+	_server_bridge.remove_player(_seid_session)
 	await _steps(4)
 	_check(
-		not _client_game.players.has(&"u%d" % session),
+		not _client_game.players.has(&"u%d" % _seid_session),
 		"and they leave again, so the sections after this one see one player"
 	)
 	_done()
@@ -431,29 +444,33 @@ func _test_inventory_predicted() -> void:
 
 ## Two refusals: one the client could have known about, sent with a good op behind it, and
 ## one it could not — the server had changed the bag and not yet said so.
+var _ir_mine: DotInvManager
+var _ir_server: DotInvManager
+var _ir_on_refused
+
 func _test_inventory_refused() -> void:
 	_section("an op the server refuses is rolled back, and a good op sent behind it survives")
 
-	var mine := _client_bag()
-	var server := _server_bag()
+	_ir_mine = _client_bag()
+	_ir_server = _server_bag()
 	var net_half: PlaygroundInventoryNet = _client_bridge.inventory_net
 	var reasons: Array[String] = []
-	var on_refused := func(reason: String) -> void: reasons.append(reason)
-	_client_bridge.inventory_refused.connect(on_refused)
+	_ir_on_refused = func(reason: String) -> void: reasons.append(reason)
+	_client_bridge.inventory_refused.connect(_ir_on_refused)
 
-	var crates := mine.doc.count_of(&"crate")
-	var server_crates := server.doc.count_of(&"crate")
+	var crates := _ir_mine.doc.count_of(&"crate")
+	var server_crates := _ir_server.doc.count_of(&"crate")
 	var docs := _server_bridge.inventory_net.docs_sent
 
 	# A client giving itself something. Predicted like any other op, because a client
 	# cannot know what it may do — and a predicting manager applies it before asking.
-	var gift := mine.apply(DotInvOp.add(&"crate", 1, BACKPACK))
+	var gift := _ir_mine.apply(DotInvOp.add(&"crate", 1, BACKPACK))
 	_check(
-		gift.ok and mine.doc.count_of(&"crate") == crates + 1,
+		gift.ok and _ir_mine.doc.count_of(&"crate") == crates + 1,
 		"a client that gives itself a crate sees it, locally"
 	)
-	var crate := _uid_at(mine, _cell_of(mine, &"crate"))
-	var behind := mine.apply(DotInvOp.move(BACKPACK, crate, BACKPACK, Vector2i(9, 5)))
+	var crate := _uid_at(_ir_mine, _cell_of(_ir_mine, &"crate"))
+	var behind := _ir_mine.apply(DotInvOp.move(BACKPACK, crate, BACKPACK, Vector2i(9, 5)))
 	_check(
 		behind.ok and net_half.in_flight_count() == 2,
 		"and moves its real crate right behind it, both in flight before either is answered"
@@ -462,52 +479,55 @@ func _test_inventory_refused() -> void:
 	var rolled := net_half.rolled_back_count
 	_exchange()
 	_check(
-		server.doc.count_of(&"crate") == server_crates,
+		_ir_server.doc.count_of(&"crate") == server_crates,
 		"the server never gave it: an ADD from a client is the server's to do"
 	)
 	_check(reasons.size() == 1, "the client is told why", str(reasons))
 	_check(
-		mine.doc.count_of(&"crate") == crates and net_half.rolled_back_count == rolled + 1,
+		_ir_mine.doc.count_of(&"crate") == crates and net_half.rolled_back_count == rolled + 1,
 		"and the crate it gave itself is gone again"
 	)
 	_check(
-		_uid_at(mine, Vector2i(9, 5)) != 0 and _uid_at(server, Vector2i(9, 5)) != 0,
+		_uid_at(_ir_mine, Vector2i(9, 5)) != 0 and _uid_at(_ir_server, Vector2i(9, 5)) != 0,
 		"while the move sent behind it survives the rollback — DotInvManager.rollback alone restores the snapshot from before the refused op, which undoes this one too"
 	)
 	_check(
-		mine.pending_count() == 0 and net_half.in_flight_count() == 0,
+		_ir_mine.pending_count() == 0 and net_half.in_flight_count() == 0,
 		"and nothing is left waiting"
 	)
 	await _steps(4)
 	_check(
-		_bag_summary(mine) == _bag_summary(server) and _server_bridge.inventory_net.docs_sent == docs,
+		_bag_summary(_ir_mine) == _bag_summary(_ir_server) and _server_bridge.inventory_net.docs_sent == docs,
 		"the two bags agree, uids and all, with no document sent to put it right",
-		"%s vs %s, %d documents" % [_bag_summary(mine), _bag_summary(server), _server_bridge.inventory_net.docs_sent - docs]
+		"%s vs %s, %d documents" % [_bag_summary(_ir_mine), _bag_summary(_ir_server), _server_bridge.inventory_net.docs_sent - docs]
 	)
 
 	# The race: the server has put something where the client is about to, and has not
 	# said so yet — it says so once a tick, and this is inside one.
-	var where := _first_free(server)
+	var where := _first_free(_ir_server)
 	var gave := _server_game.inventory.give(_server_bridge.inventory_net.bag_key(SESSION), &"barrel")
-	_check(gave.ok and _cell_of(server, &"barrel") == where, "the server puts a barrel in the first free cell")
-	var ball_was := _cell_of(mine, &"beach_ball")
-	var into := mine.apply(DotInvOp.move(BACKPACK, _uid_at(mine, ball_was), BACKPACK, where))
+	_check(gave.ok and _cell_of(_ir_server, &"barrel") == where, "the server puts a barrel in the first free cell")
+	var ball_was := _cell_of(_ir_mine, &"beach_ball")
+	var into := _ir_mine.apply(DotInvOp.move(BACKPACK, _uid_at(_ir_mine, ball_was), BACKPACK, where))
 	_check(into.ok, "and the client, not yet told, moves its ball into that same cell")
 	_flush()
 	_flush()
 	_check(
-		reasons.size() == 2 and _cell_of(mine, &"beach_ball") == ball_was,
+		reasons.size() == 2 and _cell_of(_ir_mine, &"beach_ball") == ball_was,
 		"the server refuses, and the ball springs back to where it was",
-		"%s, ball at %s" % [str(reasons), str(_cell_of(mine, &"beach_ball"))]
+		"%s, ball at %s" % [str(reasons), str(_cell_of(_ir_mine, &"beach_ball"))]
 	)
+	await _test_inventory_refused_2()
+
+func _test_inventory_refused_2() -> void:
 	await _steps(2)
 	_check(
-		mine.doc.count_of(&"barrel") == 1 and _bag_summary(mine) == _bag_summary(server),
+		_ir_mine.doc.count_of(&"barrel") == 1 and _bag_summary(_ir_mine) == _bag_summary(_ir_server),
 		"then the barrel arrives, and the two bags agree",
-		"%s vs %s" % [_bag_summary(mine), _bag_summary(server)]
+		"%s vs %s" % [_bag_summary(_ir_mine), _bag_summary(_ir_server)]
 	)
 
-	_client_bridge.inventory_refused.disconnect(on_refused)
+	_client_bridge.inventory_refused.disconnect(_ir_on_refused)
 	_done()
 
 
@@ -572,23 +592,28 @@ func _test_inventory_lost() -> void:
 
 ## A purchase, a spawn from the bag and an admin's give all change a bag on the server. Each
 ## reaches its owner as the whole bag.
+var _ifts_charged: Array[StringName]
+var _ifts_bag: StringName
+var _ifts_inv: PlaygroundInventory
+var _ifts_balls: int
+
 func _test_inventory_from_the_server() -> void:
 	_section("what the server changes reaches the owner: a purchase, a spawn from the bag")
 
-	var charged: Array[StringName] = []
+	_ifts_charged = []
 	_server_bridge.charge_fn = func(_id: StringName, thing: StringName) -> DotResult:
-		charged.append(thing)
+		_ifts_charged.append(thing)
 		return DotResult.success(null)
 
-	var bag := _server_bridge.inventory_net.bag_key(SESSION)
-	var barrels := _server_game.inventory.carries(bag, &"barrel")
+	_ifts_bag = _server_bridge.inventory_net.bag_key(SESSION)
+	var barrels := _server_game.inventory.carries(_ifts_bag, &"barrel")
 
 	_client_bridge.ask_buy(&"barrel")
 	_exchange()
 	await _steps(2)
-	_check(charged.size() == 1 and charged[0] == &"barrel", "a barrel bought into the bag is charged for", str(charged))
+	_check(_ifts_charged.size() == 1 and _ifts_charged[0] == &"barrel", "a barrel bought into the bag is charged for", str(_ifts_charged))
 	_check(
-		_server_game.inventory.carries(bag, &"barrel") == barrels + 1
+		_server_game.inventory.carries(_ifts_bag, &"barrel") == barrels + 1
 			and _client_bag().doc.count_of(&"barrel") == barrels + 1,
 		"and lands in the bag on both ends"
 	)
@@ -605,9 +630,9 @@ func _test_inventory_from_the_server() -> void:
 	_exchange()
 	await _steps(2)
 	_check(
-		charged.size() == 1 and _client_bag().doc.count_of(&"boulder") == 0,
+		_ifts_charged.size() == 1 and _client_bag().doc.count_of(&"boulder") == 0,
 		"a 900 kg boulder in a 400 kg bag is refused before anybody is charged",
-		str(charged)
+		str(_ifts_charged)
 	)
 	_check(notices.size() == 1, "and the player is told why", str(notices))
 	_client_bridge.notice_received.disconnect(on_notice)
@@ -617,49 +642,52 @@ func _test_inventory_from_the_server() -> void:
 	_exchange()
 	await _steps(4)
 	_check(_server_game.props.world_count() == props + 1, "a barrel spawned from the bag appears")
-	_check(charged.size() == 1, "and is not charged for again: it was paid for when it went in", str(charged))
+	_check(_ifts_charged.size() == 1, "and is not charged for again: it was paid for when it went in", str(_ifts_charged))
 	_check(
-		_server_game.inventory.carries(bag, &"barrel") == barrels
+		_server_game.inventory.carries(_ifts_bag, &"barrel") == barrels
 			and _client_bag().doc.count_of(&"barrel") == barrels,
 		"and the bag has one fewer, on both ends"
 	)
 
 	# The server's own changes spend nobody's budget. They spent the PLAYER'S: thirty
 	# a second, so the thirty-first thing given in a second was refused.
-	var inv := _server_game.inventory
-	var balls := inv.carries(bag, &"beach_ball")
+	_ifts_inv = _server_game.inventory
+	_ifts_balls = _ifts_inv.carries(_ifts_bag, &"beach_ball")
 	var burst := 0
 	for i in range(35):
-		if inv.give(bag, &"beach_ball").ok:
+		if _ifts_inv.give(_ifts_bag, &"beach_ball").ok:
 			burst += 1
 	await _steps(2)
 	_check(
-		burst == 35 and _client_bag().doc.count_of(&"beach_ball") == balls + 35,
+		burst == 35 and _client_bag().doc.count_of(&"beach_ball") == _ifts_balls + 35,
 		"thirty-five things given by the server in one tick all land, on both ends (%d)" % burst
 	)
+	await _test_inventory_from_the_server_2()
+
+func _test_inventory_from_the_server_2() -> void:
 
 	# A purchase into a bag with no ROOM. dot-inventory validated an ADD for the item, the
 	# container and the weight and not for room, so asking only it charged first; it asks
 	# room now, and this is the check that says so from here.
-	var filled := inv.give(bag, &"beach_ball", _free_cells(_server_bag()))
+	var filled := _ifts_inv.give(_ifts_bag, &"beach_ball", _free_cells(_server_bag()))
 	_check(filled.ok and _free_cells(_server_bag()) == 0, "the server fills the bag to the last cell")
 	var validated := _server_bag().validate(DotInvOp.add(&"crate", 1, BACKPACK))
 	_check(
 		not validated.ok and validated.code() == DotError.CODE_QUOTA,
 		"and dot-inventory's own validate says there is no room for a crate"
 	)
-	var paid := charged.size()
+	var paid := _ifts_charged.size()
 	_client_bridge.ask_buy(&"crate")
 	_exchange()
 	await _steps(2)
 	_check(
-		charged.size() == paid and _client_bag().doc.count_of(&"crate") == _server_bag().doc.count_of(&"crate"),
+		_ifts_charged.size() == paid and _client_bag().doc.count_of(&"crate") == _server_bag().doc.count_of(&"crate"),
 		"so a crate bought into it is refused before anybody is charged",
-		str(charged)
+		str(_ifts_charged)
 	)
 
-	while inv.carries(bag, &"beach_ball") > balls:
-		if not inv.take(bag, &"beach_ball").ok:
+	while _ifts_inv.carries(_ifts_bag, &"beach_ball") > _ifts_balls:
+		if not _ifts_inv.take(_ifts_bag, &"beach_ball").ok:
 			break
 	await _steps(2)
 	_check(
@@ -762,12 +790,3 @@ func _event_kinds(peer_id: int) -> Array[int]:
 		if decoded.ok and decoded.value is PlaygroundEvent:
 			out.append((decoded.value as PlaygroundEvent).kind)
 	return out
-
-
-## One well-formed frame of this server's voice format, on the everybody channel.
-func _voice_frame() -> PackedByteArray:
-	var packet := DotVoicePacket.new()
-	packet.channel = DotVoiceRouter.Channel.ALL
-	packet.sample_count = PlaygroundServices.voice_config().frame_samples()
-	packet.payload.resize(packet.sample_count / 2)
-	return packet.to_bytes()
