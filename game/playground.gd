@@ -27,47 +27,20 @@ const PlaygroundMaterials := preload("playground_materials.gd")
 const PlaygroundAddons := preload("playground_addons.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
 
-## The playground: a sandbox on a flat grass plate, with props you can spawn and a
-## physics gun to move them with. Any map a server adds plays here too, surf and bunny-hop
-## courses among them; a run timer is not shipped, and a server that adds dot-timer gets
-## one through `addons/pg_timer` (see [member run_timer]).
-##
-## [b]This is the only place every addon in the movement half of the family runs
-## together[/b] — dot-player-controller, dot-map, dot-props and dot-leaderboard, over
-## dot-core — and, by the family's own repeated lesson, the
-## seams between them are where the bugs are. Each addon's own suite runs it with the
-## others absent; `examples/headless_playground.tscn` is the only thing that runs the
-## joins.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_playground.tscn
-## [/codeblock]
-##
-## [b]It is a server and a client in one process.[/b] Nothing here is networked yet —
-## dot-net's bridge is the next piece, and the shape is deliberately ready for it:
-## the prop spawner is authoritative in one place, and the player's own copy of it
-## would be non-authoritative.
+## The playground: a sandbox on a flat grass plate with spawnable props and a physics gun. Any map a server adds plays here too;
+## a run timer comes only from `addons/pg_timer` (see [member run_timer]). Nothing is networked here: the bridge is dot-net's.
+## The one place every movement-half addon runs together, and the seams between them are where the bugs are: `examples/headless_playground.tscn` runs the joins.
 
 const CHANNEL := "playground"
 
-## The name this registers itself under, so a dot-server module can find it.
-##
-## A registry name rather than being handed in, because a module is loaded by PATH —
-## [code]server.modules.load_module("res://game/playground_module.gd")[/code] — and a
-## path cannot carry an instance.
+## The registry name a dot-server module finds this under: a module is loaded by path, and a path cannot carry an instance.
 const SERVICE := &"playground"
 
 ## The map changed and everything has been rebuilt against it.
 signal map_ready(map: DotMapDef)
 
-## The playground has finished booting: the first map, if any, is up.
-##
-## [b]Paired with [member booted], and a caller must check that first.[/b]
-## [method change_map] may complete without ever suspending — a built-in map is a
-## scene already in the build — in which case this has been emitted before the caller
-## reaches its `await` and the `await` never returns. That is the family's own
-## fan-out trap in its smallest form: a signal is not a state, and code that waits on
-## one has to be able to see that it has already happened.
+## The first map, if any, is up. Check [member booted] first: [method change_map] may finish without suspending, so this has
+## already fired before a caller reaches its `await` and the `await` never returns. A signal is not a state.
 signal ready_for_players()
 
 ## A player now exists in [member players]. The net bridge answers this by building the
@@ -90,32 +63,24 @@ signal held_changed(id: StringName, prop: DotPropInstance, held: bool)
 ## what it was made of. Emitted on every end that removes it, so a client plays the sound.
 signal pane_broken(index: int, at: Vector3, material: StringName)
 
-## A player's shot, blast or blow took something off a body, a breakable prop or a pane: the
-## confirmation the shooter's hit marker and damage numbers are drawn from. The authority's
-## decision, never a client's prediction; the bridge sends it to the shooter alone. Fed from
-## the four places damage is applied ([method confirm_hit]). [param victim] only groups hits
-## on one thing ([method hit_victim_id]); [param point] is where the number goes up.
+## A shot, blast or blow took health off a body, a breakable prop or a pane: the authority's confirmation (never a prediction)
+## the shooter's hit marker is drawn from, sent to the shooter alone. [param victim] only groups hits on one thing
+## ([method hit_victim_id]); [param point] is where the number goes up. Fed from the four damage sites ([method confirm_hit]).
 signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
 
 ## Somebody walked over a weapon lying in the world. The bridge gives it to them on a
 ## server; the client equips it offline.
 signal weapon_picked_up(player_id: StringName, weapon_id: StringName)
 
-## Somebody finished a timed run, [param time] seconds long. [param rank] is 0 when it was
-## not filed, and [param reason] then says why. Emitted only by a run timer (see
-## [member run_timer]); a game without one never emits it.
-##
-## A time rather than dot-timer's run object, because this file must compile with the
-## timer absent, and a signal naming its class would not.
+## Somebody finished a timed run of [param time] seconds; [param rank] is 0 when not filed and [param reason] says why. Emitted
+## only by a run timer (see [member run_timer]). A time rather than dot-timer's run object, because this file must compile
+## with the timer absent.
 signal run_filed(player_id: StringName, time: float, rank: int, reason: String)
 
 @export_group("Content")
 
-## Layered configuration. One is created with the defaults if this is left empty.
-##
-## [b]A config rather than a wall of exports on this node[/b], because a dedicated
-## server is configured by somebody who is not opening the editor. See
-## [PlaygroundConfig].
+## Layered configuration, created with the defaults if left empty. A config rather than exports on this node, because a
+## dedicated server is configured by somebody not opening the editor. See [PlaygroundConfig].
 @export var config: PlaygroundConfig = null
 
 ## A JSON file to layer over [member config]'s defaults, or empty for none.
@@ -123,31 +88,17 @@ signal run_filed(player_id: StringName, time: float, rank: int, reason: String)
 
 @export_group("Role")
 
-## Simulation ticks per second.
-##
-## [b]Read from the engine, not from here, whenever the engine has been told.[/b]
-## dot-server writes [member Engine.physics_ticks_per_second] from its own
-## [code]sv_tickrate[/code] cvar, so on a real server this ends up being whatever the
-## operator put in [code]server.cfg[/code] — see [method _resolve_tick_rate]. The
-## export is the fallback for a client or a test with no server to ask.
-##
-## It is also what every record a run timer files is stamped with, which is what lets a
-## disputed time be checked afterwards.
+## Simulation ticks per second. The engine's rate wins whenever dot-server has set it from `sv_tickrate` (see
+## [method _resolve_tick_rate]); the export is the fallback for a client or test with no server to ask.
+## It stamps every record a run timer files, which is what lets a disputed time be checked.
 @export_range(1, 240, 1) var tick_rate: int = 128
 
-## Registry scope, so a server game and a client game can share one process — the shape
-## every headless netcode test in this family takes.
-##
-## Without it both halves register under the same name and the second one wins, so a
-## component resolving `playground` reaches whichever game happened to boot last. There
-## is no error: the lookup succeeds, at the wrong game.
+## Registry scope, so a server game and a client game can share one process (every headless netcode test does). Without it
+## both register under one name and a lookup of `playground` silently reaches whichever booted last.
 @export var service_scope: StringName = &""
 
-## Whether this instance is the authority: it times, it ranks, it spawns props.
-##
-## Derived from [member PlaygroundConfig.authoritative] on ready rather than exported
-## beside it, so there is one place to set it and no way for the two to disagree. A
-## client leaves it false, runs its own copy of everything for its HUD, and files nothing.
+## Whether this instance is the authority: it times, it ranks, it spawns props. Derived from [member PlaygroundConfig.authoritative]
+## on ready rather than exported beside it, so the two cannot disagree. A client leaves it false and runs its own copy for its HUD.
 var authoritative: bool = true
 
 ## What the hooks of the addons folder registered: the Q menu's Addons tab, and where a
@@ -168,34 +119,18 @@ var booted: bool = false
 
 var maps: DotMapSession = null
 
-## Whether the map session's own clock running out changes to the rotation's next map.
-##
-## On for a sandbox with no vote, where that clock is the only thing that ever ends a map.
-## Off once [code]PlaygroundModule[/code] has a ballot: the vote's clock ends a map then,
-## and both acting was a map the players voted to extend being ended on the old clock, by
-## a rotation nobody asked.
+## Whether the map session's own clock running out changes to the rotation's next map. On for a sandbox with no vote; off once
+## [code]PlaygroundModule[/code] has a ballot, because both acting ended a map the players had voted to extend on the old clock.
 var rotation_ends_maps: bool = true
 
-## The clock that ends a map, as [method DotVoteClockView.state_of] describes it. Set by
-## [code]PlaygroundModule[/code] to its vote's [code]clock_state[/code]; unset on a sandbox
-## with no vote, where the map session's own clock is the one that ends a map.
-##
-## [b]A Callable rather than the vote, because the game does not know the vote exists[/b]
-## — the module builds it, over this game. It is read by [method time_left_text], which is
-## what `pg_status` and [method describe] say: both read the map session's clock after the
-## vote had taken the map's end over, so an operator was shown a limit an extend had
-## already moved, and under the deployed `trigger: rtv_only` with no duration, thirty
-## minutes the server did not have.
+## The clock that ends a map, as [method DotVoteClockView.state_of] describes it; set by [code]PlaygroundModule[/code], unset on a sandbox with no vote.
+## A Callable rather than the vote, because the game does not know the vote exists. [method time_left_text] (so `pg_status` and
+## [method describe]) reads it: reading the session's clock instead showed a limit an extend had already moved.
 var clock_fn: Callable = Callable()
 
-## The run timer, or null: the game ships none.
-##
-## [b]Attached by `addons/pg_timer`'s hook, and only when `addons/dot_timer` is present.[/b]
-## A server that wants timed runs adds the dot_timer addon (or a player subscribes to it);
-## the hook then builds a `DotTimerManager` and calls [method attach_run_timer]. Untyped and
-## called by name, because nothing in the game may name a dot-timer class: every script must
-## compile in a checkout without it. What it is called with is the whole interface, and
-## every call below is guarded on null.
+## The run timer, or null: the game ships none. `addons/pg_timer`'s hook attaches a `DotTimerManager` through [method attach_run_timer]
+## only when `addons/dot_timer` is present. Untyped and called by name, because every script must compile without dot-timer;
+## every call is guarded on null.
 var run_timer: Object = null
 var props: DotPropSpawner = null
 
@@ -210,34 +145,17 @@ var boards_config: DotBoardsConfig = null
 const BOARDS_CONFIG_PATH := "user://playground_boards.json"
 
 
-## The scripted spawnables in the world, ticked every simulated tick.
-##
-## A list beside the spawner's rather than a walk over it every tick: a sandbox with a
-## thousand crates and four NPCs would otherwise ask a thousand props whether they are
-## an NPC, a hundred and twenty-eight times a second.
+## The scripted spawnables in the world, ticked every simulated tick. A list beside the spawner's rather than a walk over it,
+## which would ask a thousand props a hundred and twenty-eight times a second whether they are an NPC.
 var entities: Array[PlaygroundEntity] = []
 
-## What the entities can perceive, shared by all of them.
-##
-## [b]dot-npc's, rather than "the nearest player" recomputed every tick.[/b] The chaser
-## used to ask [method PlaygroundEntity.nearest_player] on every one of the hundred and
-## twenty-eight ticks a second this game runs at, which is the classic broken NPC: two
-## players standing a metre apart make it turn back and forth for ever, and one who steps
-## behind a pillar makes it forget instantly and walk away mid-swing.
-## [DotNpcSenses] acquires at one threshold and drops at a weaker one, with a grace
-## measured from the last sighting.
-##
-## One object for the whole world, because its tuning is the world's rather than an
-## NPC's: how far a particular thing can see belongs on its catalogue entry, and that is
-## where it is.
+## What the entities can perceive, shared by all of them: dot-npc's [DotNpcSenses], which acquires at one threshold and drops at a weaker one.
+## "Nearest player" recomputed per tick made a chaser turn back and forth between two players and forget one behind a pillar.
+## One object for the world because its tuning is the world's; how far a thing can see belongs on its catalogue entry.
 var npc_senses: DotNpcSenses = null
 
-## How good every NPC is, server-wide: `npc_skill`, `npc_reaction_scale`,
-## `npc_reaction_min`, bound by the module.
-##
-## On the world, because both kinds of NPC here need it and neither owns the other: the
-## waves' spawner has it attached, and a sandbox hunter — built by the spawn menu rather
-## than by a spawner — asks for it here.
+## How good every NPC is, server-wide: `npc_skill`, `npc_reaction_scale`, `npc_reaction_min`, bound by the module. On the world because
+## both the waves' spawner and a sandbox hunter built by the spawn menu need it, and neither owns the other.
 var npc_skill: DotNpcAiSkill = DotNpcAiSkill.new()
 
 ## How many props, NPCs, entities, vehicles, balloons, weapons and constraints one player may
@@ -314,55 +232,28 @@ const GUNFIRE_RADIUS := 30.0
 ## Push on a prop per point of a shot's damage. The same feel as `PlaygroundZee.shove_props`.
 const SHOT_IMPULSE := 0.6
 
-## The players as [DotNpcSenses.Candidate]s, rebuilt once per simulated tick.
-##
-## Once per tick and not once per entity: twenty NPCs each building their own list of
-## eight players is a hundred and sixty allocations a tick for one list that does not
-## differ between them.
+## The players as [DotNpcSenses.Candidate]s, rebuilt once per simulated tick and not once per entity: twenty NPCs would each build
+## their own identical list.
 var npc_candidates: Array = []
 
 ## What a player may hold. See [PlaygroundWeapons].
 var weapons: Array[PlaygroundWeaponDef] = []
 
-## What every player is carrying — prepaid props, a grid and a weight. See
-## [PlaygroundInventory], and [PlaygroundInventoryNet] for how it crosses a wire.
-##
-## [b]The game's, on both ends, and authoritative exactly when the game is.[/b] A server
-## holds one bag per person and decides; a client holds its OWN bag and nobody else's, and
-## predicts. It was built by nothing until 2026-09-25 — the class existed, its suite
-## passed, and no running game had an inventory at all.
+## What every player is carrying: prepaid props, a grid and a weight (see [PlaygroundInventory], [PlaygroundInventoryNet]).
+## The game's on both ends: a server holds one bag per person and decides, a client holds its OWN bag and predicts.
 var inventory: PlaygroundInventory = null
 
 ## The node loaded maps and spawned props are put under.
 var world: Node3D = null
 
-## Who is in the session, which side, what class, where they start, and the physics.
-##
-## [b]Built last and binds to everything else.[/b] It adds no authority: the props are
-## still the spawner's and the course is still dot-timer's. What it does is keep one set
-## of records in step, so a scoreboard, a spectator seat and a start selector read the
-## same thing. See [PlaygroundPlayerStack].
+## Who is in the session, which side, what class, where they start, and the physics. See [PlaygroundPlayerStack]. Built last and
+## binds to everything else; it adds no authority, it keeps one set of records in step so a scoreboard, a spectator seat and a
+## start selector read the same thing.
 var player_stack: PlaygroundPlayerStack = null
 
-## The players in this instance, by id.
-## Every world object this game has an id for. See [DotEntityTable].
-##
-## [b]Owned by the game and opened on join, NOT by the layer that happens to need an
-## id first.[/b] That distinction is the bug this replaced. `PlaygroundArena` kept a
-## counter and two dictionaries and only ran when the waves mode was on, so
-## `PlaygroundDowns` — which is a separate switch — fell back to
-## `abs(String(player_id).hash())` when the arena was off. A player therefore had TWO
-## entity ids depending on which layers an operator had enabled, and the file said so
-## in a comment: "answering differently in the two is how a player who is down in one
-## system is up in the other." A handle whose existence depends on a mode is not a
-## handle.
-##
-## [b]Named `entity_table` and not `entities` because this project got there first[/b]:
-## [member Playground.entities] is the sandbox's own list of spawned
-## `PlaygroundEntity`s and has been since before dot-entity existed. The other three
-## games call theirs `entities`. Renaming the sandbox's list is a much larger change
-## than living with two names, and the day those two concepts merge -- a sandbox entity
-## IS a world object with an id -- is the day this one takes the name.
+## Every world object this game has an id for ([DotEntityTable]), opened on join by the game and not by whichever layer needs an id
+## first: otherwise a player had two entity ids depending on which layers were enabled. Named `entity_table` because
+## [member Playground.entities] is the sandbox's own list of spawned `PlaygroundEntity`s; the day the two concepts merge this takes the name.
 var entity_table := DotEntityTable.new()
 
 ## What a dead body does, and which death reactions the server allows: dot-player-char's
@@ -370,11 +261,9 @@ var entity_table := DotEntityTable.new()
 ## link, because the client draws the bodies. Decided with by [method PlaygroundArena.decide_death].
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
-## The current map's toys (dot-props' [DotPropToyBox]): balls, barrels, swings, see-saws, a
-## roundabout, trampolines, switches. Built from the map's `map_toys()` on both ends in the same
-## order, simulated here where [member authoritative] and posed from snapshots on a client
-## (PlaygroundToyNet). A child of this node, not of the map: the map's tree is classified onto
-## the `world` layer when it is ready, which would take every toy with it. Null before a map.
+## The current map's toys (dot-props' [DotPropToyBox]): built from `map_toys()` on both ends, simulated where [member authoritative] and
+## posed from snapshots on a client. A child of this node, not of the map, whose tree is classified onto `world` and would take every
+## toy with it. Null before a map.
 var toys: DotPropToyBox = null
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
@@ -394,10 +283,8 @@ var workshop: PlaygroundWorkshop = null
 ## The map's toys are built, on both ends. What a client's bridge pairs them on.
 signal toys_built()
 
-## dot-player-controller's `mp_forceview` (may a player switch to third person) and
-## `mp_solidplayers` (do players block each other). Bound by the module (REPLICATED) and
-## followed by a client through its link.
-## The ambience cvars (`pg_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
+## dot-player-controller's `mp_forceview` and `mp_solidplayers`, and the ambience cvars (`pg_ambient*`): bound by the module
+## (REPLICATED) and followed by a client through its link.
 var ambient_rules: DotAmbienceRules = PlaygroundAmbience.make_rules()
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
@@ -549,10 +436,8 @@ func activate_addon_item(
 	return addons.activate(key, ctx)
 
 
-## Stands up the player-facing addons and binds them to this game.
-##
-## After the maps, because it reads the start points the map session loads — and a
-## stack built before them binds to nothing and reports success.
+## Stands up the player-facing addons and binds them to this game, after the maps: it reads the start points the map session
+## loads, and a stack built before them binds to nothing and reports success.
 func _build_player_stack() -> void:
 	player_stack = PlaygroundPlayerStack.new()
 	player_stack.name = "PlayerStack"
@@ -571,18 +456,9 @@ func _build_player_stack() -> void:
 		player_stack = null
 
 
-## The rate everything counts in.
-##
-## [b]The engine's, when a server has set it.[/b] The chain is: an operator writes
-## `sv_tickrate 128` in `server.cfg`; dot-server's `_apply_tickrate` writes
-## `Engine.physics_ticks_per_second`; this reads it; a run timer adopts it; and it lands
-## on every record filed. Without that, the rate would be an export
-## on a node nobody would think to change, and a server retuned from 64 to 128 would
-## go on producing times computed against 64 — twice their real length, on a
-## leaderboard shared with servers that got it right, with no error anywhere.
-##
-## The exported value is the fallback for a client or a test, where the engine's rate
-## is a rendering default rather than a decision anybody made.
+## The rate everything counts in: the engine's when a server has set it (`sv_tickrate` into `Engine.physics_ticks_per_second`), else the
+## export, a rendering default on a client or test. Every record is stamped with it, so a server retuned from 64 to 128 would
+## otherwise file times against 64 with no error anywhere.
 func _resolve_tick_rate() -> int:
 	var engine_rate := Engine.physics_ticks_per_second
 
@@ -592,14 +468,8 @@ func _resolve_tick_rate() -> int:
 	return tick_rate
 
 
-## The simulation loop.
-##
-## [b]A fixed step accumulated from the frame time, not the frame's own delta.[/b]
-## Delta is an input to the movement, so a variable one makes the same play produce
-## different results on different machines — and it makes a run's time depend on the
-## frame rate, which on a leaderboard is disqualifying. The bound on the budget is
-## there so a frame spike does not spend the next frame simulating a hundred ticks and
-## make the stall worse.
+## The simulation loop: a fixed step accumulated from the frame time, not the frame's own delta, which would make the same play move
+## differently per machine and a run's time depend on frame rate. The budget bound stops a spike spending the next frame on a hundred ticks.
 func _physics_process(delta: float) -> void:
 	if external_tick:
 		return
@@ -623,13 +493,8 @@ func _physics_process(delta: float) -> void:
 		_accumulator = 0.0
 
 
-## One simulated tick for everything.
-##
-## The order is the point, and it is the same order a dedicated server uses:
-## move every player, then time the tick with the position the move produced. Timing
-## first shifts every run by exactly one tick — and by a DIFFERENT amount at each
-## tickrate, which is the tickrate dependence a run timer's sub-tick fractions exist to
-## remove.
+## One simulated tick for everything, in the order a dedicated server uses: move every player, then time the tick with the
+## position the move produced. Timing first shifts every run by one tick, a different amount at each tickrate.
 func _simulate_tick(step: float) -> void:
 	props.advance(step)
 	maps.advance(step)
@@ -640,23 +505,15 @@ func _simulate_tick(step: float) -> void:
 	_drive_vehicles()
 	vehicles.tick(step)
 
-	# What the entities can see, rebuilt before any of them thinks about it.
-	#
-	# Before, not after: a candidate list built at the end of a tick is a list of where
-	# everybody was, and a chaser steering at last tick's position lags its target by
-	# exactly one tick — which is the thing the ordering below already exists to avoid.
+	# What the entities can see, rebuilt before any of them thinks: a list built at the end of a tick is last tick's positions,
+	# and a chaser steering at them lags its target by one tick.
 	_rebuild_npc_candidates()
 
 	if npc_world != null:
 		npc_world.advance(step)
 
-	# Entities before players, for the same reason the timer runs after them: an NPC
-	# that moved after the player was moved would be a tick behind everything that
-	# collided with it, and a chaser would visibly lag its target at exactly the rate
-	# the server ticks.
-	#
-	# Iterated over a copy because an entity may remove itself — walking into a pit,
-	# or being cleaned up by a script — and `_on_prop_removed` erases from this list.
+	# Entities before players, as the timer runs after them: an NPC moved after the player lags what collided with it by a tick.
+	# Iterated over a copy because an entity may remove itself (a pit, a script) and `_on_prop_removed` erases from this list.
 	for entity in entities.duplicate():
 		if is_instance_valid(entity):
 			entity.entity_tick(step)
@@ -701,12 +558,9 @@ func _simulate_tick(step: float) -> void:
 		run_timer.call("tick", _tick)
 
 
-## One authoritative tick driven from outside, at a tick number the driver chose.
-##
-## The net bridge calls this instead of letting [method _physics_process] run, because
-## the game's tick has to happen between dot-net applying the inputs that arrived and
-## building the snapshot that goes back out. A game still running its own loop would
-## simulate somewhere between those two and send state from the wrong instant.
+## One authoritative tick driven from outside, at a tick number the driver chose. The net bridge calls this instead of
+## [method _physics_process] because the tick has to happen between dot-net applying inputs and building the snapshot; a game
+## running its own loop would send state from the wrong instant.
 func tick_once(tick: int) -> void:
 	_tick = tick
 	_simulate_tick(1.0 / float(maxi(tick_rate, 1)))
@@ -715,15 +569,9 @@ func tick_once(tick: int) -> void:
 		player_stack.tick(tick)
 
 
-## The client's half of a tick: what it was told is in the air, and the run timer.
-##
-## What a CLIENT runs. A client may not simulate props — rigid bodies are not
-## reproducible across machines, which is the whole reason this sandbox is
-## server-authoritative — and it may not simulate remote players, which are
-## interpolated from snapshots. Its own player is simulated by the predictor through
-## [PlaygroundPlayerNet]. What is left is the projectiles it was told about, and feeding a
-## run timer the position it can see, so a local run reads a tick earlier than any packet
-## could deliver it.
+## The client's half of a tick: what it was told is in the air, and the run timer. A client may not simulate props (rigid bodies are not
+## reproducible across machines) or remote players (interpolated); its own player is predicted through [PlaygroundPlayerNet].
+## It feeds a run timer the position it can see, so a local run reads a tick earlier than any packet could deliver it.
 func tick_timers_only(tick: int) -> void:
 	_tick = tick
 
@@ -735,19 +583,9 @@ func tick_timers_only(tick: int) -> void:
 		run_timer.call("tick", _tick)
 
 
-## Puts the whole game on a tick rate decided elsewhere — a server's `sv_tickrate`,
-## reaching a client through HELLO.
-##
-## [b]Every player's controller moves with it, not just the loop.[/b] A controller
-## keeps its own rate to size a step, so changing the game's and leaving theirs runs
-## the simulation at one rate and the movement at another — and the symptom is a
-## player who is correct on their own screen and wrong everywhere else.
-## The tick this game is on.
-##
-## The same accessor `ArenaGame` and `G2GGame` both have, and this project did without
-## because every layer it had was handed the tick as an argument. A layer that is ticked
-## from the module rather than from `_simulate_tick` has no such argument, and reaching
-## for `_tick` from outside would be reaching past the underscore.
+## Puts the whole game on a tick rate decided elsewhere (a server's `sv_tickrate`, reaching a client through HELLO). Every player's
+## controller moves with it, not just the loop: a controller keeps its own rate, and a mismatch is correct on one's own screen and wrong everywhere else.
+## The tick accessor `ArenaGame` and `G2GGame` also have, so a layer ticked from the module need not reach past the underscore of `_tick`.
 func current_tick() -> int:
 	return _tick
 
@@ -769,8 +607,6 @@ func set_tick_rate(rate: int) -> bool:
 	DotLog.info(CHANNEL, "tick rate adopted", {"tick_rate": tick_rate})
 	return true
 
-
-# --- Building --------------------------------------------------------------
 
 func _build_styles() -> void:
 	for style in DotFpsStyle.defaults():
@@ -818,10 +654,8 @@ func _build_props() -> void:
 
 	props.world_ref = DotNodeRef.of_path(^"../World")
 
-	# Every prop this build ships is the same scene, and what makes a plank a plank
-	# rather than a crate is three fields of its definition. dot-props deliberately
-	# does not know that: it instantiates a scene and places it, because a server
-	# with real content has a scene per prop and nothing to configure.
+		# Every prop this build ships is the same scene; what makes a plank a plank is three fields of its definition. dot-props does
+		# not know that: it instantiates a scene and places it, because a server with real content has a scene per prop.
 	props.spawned.connect(_on_prop_spawned)
 	props.removed.connect(_on_prop_removed)
 
@@ -862,11 +696,8 @@ func _build_inventory() -> void:
 		inventory = null
 
 
-## Builds a spawned prop's body from the definition it came from.
-##
-## Connected rather than done inside a subclass of [DotPropSpawner], because what a
-## prop's scene needs is the game's business and overriding the spawner would mean
-## re-implementing the budget, the cooldown and the undo stack to get at one line.
+## Builds a spawned prop's body from the definition it came from. Connected rather than done in a subclass of [DotPropSpawner],
+## because overriding the spawner would mean re-implementing the budget, the cooldown and the undo stack to reach one line.
 func _on_prop_spawned(prop: DotPropInstance) -> void:
 	_classify_spawned(prop)
 
@@ -946,10 +777,8 @@ func _liquid_tick(step: float) -> void:
 		if _melting.has(prop.instance_id):
 			still[prop.instance_id] = float(_melting[prop.instance_id]) + step
 			continue
-		# Its underside in the lava, not its centre: a crate floats on lava (it is denser than
-		# wood), and a centre test let a floating crate ride a lava lake for ever.
-		# A light one floats in it by millimetres, so the bottom is asked of the lava grown a
-		# little: resting on the surface is touching it.
+				# Its underside in the lava, not its centre: a crate floats on lava (it is denser than wood) and a centre test let one
+				# ride a lava lake for ever. A light one floats by millimetres, so the bottom is asked of the lava grown a little.
 		var underside := node.global_position - Vector3.UP * _half_height_of(prop)
 		for each: Array in burning:
 			if (each[0] as AABB).grow(0.1).has_point(underside):
@@ -961,8 +790,6 @@ func _liquid_tick(step: float) -> void:
 			_melting.erase(instance_id)
 			var _gone := props.remove(instance_id, DotPropSpawner.REASON_CLEANUP)
 
-
-# --- Breakable map boxes: glass ----------------------------------------------------
 
 ## Map box index -> `{node: StaticBody3D, health: float, material: StringName}` for every box
 ## whose material breaks (dot-physics' `break_health`: glass). Rebuilt per map.
@@ -1095,10 +922,8 @@ func _throw_shards(bounds: AABB, material: StringName) -> void:
 		props.limits.spawn_interval = interval
 
 
-## Fast things breaking panes: a prop thrown into one, a player running into one. Read off the
-## velocity each had at the end of the LAST tick, because the contact has already stopped
-## them, and only its part along the pane's normal: running ALONG a greenhouse wall at full
-## speed is not running into it.
+## Fast things breaking panes: a prop thrown into one, a player running into one. Read off the velocity at the end of the LAST
+## tick, because the contact has already stopped them, and only its part along the pane's normal: running ALONG a wall is not into it.
 func _pane_impacts() -> void:
 	if not authoritative or not panes_break or panes.is_empty():
 		_last_speed.clear()
@@ -1159,12 +984,9 @@ static func _reach_of(body: Node3D) -> float:
 const RISE_SPEED := 2.0
 
 
-## Buoyancy and drag on every loose prop in a liquid, on the authority (props are not
-## predicted). A body lighter than the liquid for its volume floats, sitting as deep as its
-## density says; a heavier one sinks, slowed. Its density is the catalogue's `density` when
-## the definition gives one (rock, concrete: the catalogue's masses are tuned for a physics
-## gun, and a 900 kg, 3 m boulder works out lighter than water) and its mass over its volume
-## otherwise.
+## Buoyancy and drag on every loose prop in a liquid, on the authority (props are not predicted). Lighter than the liquid for its
+## volume floats, heavier sinks, slowed. Density is the catalogue's `density` when given (rock, concrete: the catalogue's masses
+## are tuned for a physics gun and a 900 kg boulder works out lighter than water), else mass over volume.
 func _float_props(step: float) -> void:
 	var gravity := float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 	for prop: DotPropInstance in props.all_props():
@@ -1192,22 +1014,17 @@ func _float_props(step: float) -> void:
 			var extra := maxf(density * volume - body.mass, 0.0) * gravity * submerged
 			# Drag, never more than the velocity it is taking off.
 			var drag := clampf(s.dampening * submerged * step, 0.0, 1.0)
-			# And the bob damped critically. Buoyancy is a spring whose stiffness is the
-			# liquid's density over the body's: a crate the catalogue makes fifty times lighter
-			# than water is a very stiff one, and the first version shot crates a metre out of
-			# the pond and let them bounce for ever. Damping at 2 sqrt(k) settles it in a bob.
+						# And the bob damped critically. Buoyancy is a spring whose stiffness is the liquid's density over the body's: a crate fifty
+						# times lighter than water is a very stiff one and shot out of the pond and bounced for ever. Damping at 2 sqrt(k) settles it.
 			var ratio := clampf(s.density / maxf(density, 1.0), 0.0, 60.0)
 			var critical := 2.0 * sqrt(gravity * ratio / maxf(half * 2.0, 0.1))
 			# Whenever it touches, not scaled by how deep: a body that floats rides almost
 			# entirely out of the liquid, and damping scaled by that depth let a crate bounce on
 			# lava half a metre high indefinitely.
 			var settle := clampf(critical * step, 0.0, 1.0)
-			# The vertical velocity is worked out once, here, and set with one impulse. Applied
-			# as separate impulses the damping read the velocity BEFORE the lift landed, so a
-			# beach ball held at the bottom of a pool gained the whole of a sixty-g lift every
-			# tick, kept it, and left the surface at tens of metres a second (the harbour's
-			# balls reached y 2081). Under water a body rises at most at [constant RISE_SPEED]:
-			# drag sets a terminal speed in a real liquid, and this is that.
+						# Vertical velocity is worked out once and set with one impulse: as separate impulses the damping read the velocity BEFORE
+						# the lift landed, so a held beach ball gained a sixty-g lift every tick and left the surface at tens of metres a second.
+						# Under water a body rises at most at [constant RISE_SPEED]: drag sets a terminal speed in a real liquid, and this is that.
 			var vy := body.linear_velocity.y
 			var rise := (lift - extra) * step / maxf(body.mass, 0.001)
 			var vy_after := minf(vy * (1.0 - drag) * (1.0 - settle) + rise, maxf(vy, RISE_SPEED))
@@ -1310,22 +1127,9 @@ func spawn_map_props(entries: Array, wires: Array) -> int:
 	return placed.filter(func(p: Variant) -> bool: return p != null).size()
 
 
-## Puts a spawned body on the layer that matches what it is.
-##
-## [b]`sandbox_3d` is the one preset with `held_prop` and `frozen_prop` in it, and this is
-## why they exist.[/b] A prop being carried by the physics gun must not collide with the
-## player carrying it — otherwise it shoves them backwards down a corridor — and a frozen
-## prop is scenery that everything should be solid against. They are different rows in the
-## layout rather than different code, which is the whole argument for having one.
-##
-## Everything arrived on Godot's default layer 1 masking layer 1 before this, so two
-## crates dropped in the same place fell through one another and an NPC was indis-
-## tinguishable from the floor as far as collision was concerned.
-##
-## [b]Spawn time only, and that is a real limitation.[/b] dot-props emits `spawned`,
-## `removed` and `refused` and has no signal for freezing or grabbing, so a prop frozen
-## later keeps the layer it spawned with. `PlaygroundProp` calls `reclassify` when it
-## changes state, which is the half this can reach.
+## Puts a spawned body on the layer that matches what it is. `sandbox_3d` is the one preset with `held_prop` and `frozen_prop`: a
+## carried prop must not collide with its carrier (it shoves them down a corridor) and a frozen one is scenery everything is solid against.
+## Spawn time only: dot-props has no signal for freezing or grabbing, so `PlaygroundProp` calls `reclassify` when it changes state.
 func _classify_spawned(prop: DotPropInstance) -> void:
 	if player_stack == null or prop.node == null:
 		return
@@ -1333,12 +1137,8 @@ func _classify_spawned(prop: DotPropInstance) -> void:
 	var _put := player_stack.classify(prop.node, layer_for(prop.def, prop.frozen))
 
 
-## The collision layer a spawned body of [param def] belongs on.
-##
-## One answer for both ends: the server's spawn and a client's mirror of it
-## (`PlaygroundNetBridge._apply_prop`) read this, because a mirror on a different layer
-## is a client whose own predicted player collides with a different world from the one
-## the server moves it through.
+## The collision layer a spawned body of [param def] belongs on. One answer for both ends: the server's spawn and a client's mirror
+## (`PlaygroundNetBridge._apply_prop`) read it, because a mirror on a different layer collides with a different world from the server's.
 static func layer_for(def: DotPropDef, frozen: bool) -> StringName:
 	match PlaygroundSpawnables.kind_of(def):
 		PlaygroundSpawnables.Kind.ENTITY:
@@ -1349,10 +1149,8 @@ static func layer_for(def: DotPropDef, frozen: bool) -> StringName:
 			return &"frozen_prop" if frozen else &"prop"
 
 
-## Re-reads a prop's layer after it was frozen, unfrozen, grabbed or dropped.
-##
-## Public because the states change long after the spawn and dot-props has no signal for
-## any of them — so the code that changes the state is the code that has to say so.
+## Re-reads a prop's layer after it was frozen, unfrozen, grabbed or dropped. Public because dot-props has no signal for those
+## states, so the code that changes the state is the code that has to say so.
 func reclassify_prop(node: Node, frozen: bool, held: bool) -> void:
 	if player_stack == null or node == null:
 		return
@@ -1367,19 +1165,9 @@ func reclassify_prop(node: Node, frozen: bool, held: bool) -> void:
 	var _put := player_stack.classify(node, layer)
 
 
-## Turns a spawned body into a scripted entity, by attaching the script its definition
-## names.
-##
-## [b]This is the whole "an entity has a script" mechanism, and it is four lines.[/b]
-## The scene is a bare [RigidBody3D]; the script comes from `meta`, is loaded by PATH
-## because a mounted dot-cloud pack's `class_name` globals are not registered in the
-## host, and is attached here. [method Node._ready] has already run by this point —
-## the spawner adds the body to the world before it emits — so nothing in an entity
-## may rely on `_ready`, which is why the base has `_entity_ready` instead.
-##
-## A failure removes the prop rather than leaving it. A body with no script sits there
-## being a crate, which is indistinguishable from an NPC with nothing to do — and "the
-## NPC does not move" sends the next person to the movement code.
+## Turns a spawned body into a scripted entity by attaching the script its definition names: the whole "an entity has a script" mechanism.
+## The script comes from `meta`, loaded by PATH because a mounted dot-cloud pack's `class_name` globals are not registered in the host.
+## [method Node._ready] has already run by now, hence `_entity_ready`. A failure removes the prop: a script-less body is a crate, which looks like an NPC with nothing to do.
 func _configure_entity(prop: DotPropInstance) -> void:
 	var script := PlaygroundSpawnables.load_script(prop.def)
 
@@ -1408,10 +1196,8 @@ func _configure_entity(prop: DotPropInstance) -> void:
 
 	body.set_script(script)
 
-	# Checked after attaching rather than assumed. A script that is valid GDScript but
-	# extends the wrong thing attaches perfectly and then has none of the methods the
-	# tick calls — and the first symptom is a crash inside the simulation loop, a long
-	# way from the catalogue entry that caused it.
+		# Checked after attaching rather than assumed: a script that is valid GDScript but extends the wrong thing attaches and then lacks
+		# the methods the tick calls, and the crash lands in the simulation loop, far from the catalogue entry that caused it.
 	var entity := body as PlaygroundEntity
 
 	if entity == null:
@@ -1429,14 +1215,9 @@ func _configure_entity(prop: DotPropInstance) -> void:
 	entities.append(entity)
 
 
-## The vehicle spawner, and the handover it drives.
-##
-## [b]It spawns nothing.[/b] Every vehicle in this game arrives through
-## [DotPropSpawner] and is handed over with [method DotVehicleSpawner.adopt], because a
-## vehicle here is a prop first — budgeted, undoable, and punt-able by a gravity gun. Its
-## own budget is left generous for that reason: the number that actually limits vehicles
-## is the prop budget, and a second limit that bites first would be a refusal an operator
-## editing `pg_prop_budget` could not explain.
+## The vehicle spawner, and the handover it drives. It spawns nothing: every vehicle arrives through [DotPropSpawner] and is handed over with
+## [method DotVehicleSpawner.adopt], because a vehicle is a prop first (budgeted, undoable). Its own budget is left generous so the prop
+## budget is what limits vehicles; a second limit biting first is a refusal `pg_prop_budget` could not explain.
 func _build_vehicles() -> void:
 	vehicles = DotVehicleSpawner.new()
 	vehicles.name = "Vehicles"
@@ -1447,16 +1228,12 @@ func _build_vehicles() -> void:
 	vehicles.per_player_budget = 0
 	vehicles.spawn_interval = 0.0
 
-	# The rider node IS carried: a PlaygroundPlayer is a Node3D with the camera under it
-	# on a client, so parenting it into the seat is what puts a rider's view on the
-	# vehicle without a single line about cameras in this file. The controller state is
-	# pulled back off the node each tick — see [method _carry_riders].
+		# The rider node IS carried: a PlaygroundPlayer is a Node3D with the camera under it on a client, so parenting it into the seat puts a
+		# rider's view on the vehicle with no camera code here. The controller state is pulled back each tick, see [method _carry_riders].
 	vehicles.ride.carry_rider_nodes = true
 
-	# Layer 1 is the world's, which is what a playground map builds its geometry on and
-	# what the movement collides against. Checked rather than left at the addon's default
-	# of 1 by luck: an exit sweep against the wrong mask finds nothing, always succeeds,
-	# and puts players through walls — the one failure this whole sweep exists to stop.
+		# Layer 1 is the world's, checked rather than left at the addon's default by luck: an exit sweep against the wrong mask
+		# finds nothing, always succeeds and puts players through walls.
 	vehicles.ride.exit_mask = 1
 
 	vehicles.ride.on_seated = _on_seated
@@ -1465,12 +1242,9 @@ func _build_vehicles() -> void:
 	add_child(vehicles)
 
 
-## Makes a spawned prop a vehicle as well.
-##
-## [b]Configured before adopted, and the order is load-bearing.[/b] [DotVehicleWheeled]
-## walks the body's direct children for wheels once, when the chassis binds, and caches
-## what it finds — so a car whose wheels are built after the adoption has four wheels
-## that nothing drives, steers or brakes, with every number in its tunables correct.
+## Makes a spawned prop a vehicle as well. Configured before adopted, and the order is load-bearing: [DotVehicleWheeled] walks the
+## body's direct children for wheels once, when the chassis binds, so wheels built after adoption are four that nothing drives,
+## steers or brakes.
 func _configure_vehicle(prop: DotPropInstance) -> void:
 	var body := prop.node as PlaygroundVehicle
 
@@ -1505,14 +1279,9 @@ func _configure_vehicle(prop: DotPropInstance) -> void:
 		body.vehicle_def = vehicle.def
 
 
-## Whoever is in a vehicle stops being a player who walks.
-##
-## [b]The controller is turned OFF, not ignored.[/b] A controller still simulating a
-## player parented into a moving vehicle writes its own answer into the state every tick
-## and the two fight: the movement pushes the body one way, the vehicle carries the node
-## the other, and the result reads as the vehicle shaking itself apart. [method
-## PlaygroundPlayer.set_riding] is the switch; [method _carry_riders] is what keeps the
-## replicated state honest while it is off.
+## Whoever is in a vehicle stops being a player who walks. The controller is turned OFF, not ignored: one still simulating a player
+## parented into a moving vehicle writes its own answer each tick and the two fight, reading as the vehicle shaking itself apart.
+## [method PlaygroundPlayer.set_riding] is the switch; [method _carry_riders] keeps the replicated state honest meanwhile.
 func _on_seated(
 	rider_id: StringName, vehicle: DotVehicleInstance, seat: DotVehicleSeat
 ) -> void:
@@ -1568,18 +1337,9 @@ func _on_unseated(
 	player.teleport(at)
 
 
-## Keeps a riding player's movement state on the seat they are sitting in.
-##
-## [b]The half that is invisible until somebody watches from another machine.[/b] The
-## rider's NODE is carried by the vehicle, because dot-vehicle reparents it — but
-## everything that reads a player reads [code]controller.state.position[/code]: the
-## timer, the NPC candidate list, the HUD, and above all [PlaygroundPlayerNet], which
-## replicates the movement state and nothing else. Without this a passenger is drawn on
-## everybody else's screen at the spot where they got in, for the whole journey, while
-## being perfectly correct on their own.
-##
-## Run AFTER the vehicles have ticked and before the timers are fed, which is the same
-## "time the tick with the position the move produced" rule the players already follow.
+## Keeps a riding player's movement state on the seat they are in. The rider's NODE is carried by dot-vehicle, but everything
+## reads [code]controller.state.position[/code] (timer, NPC list, HUD, [PlaygroundPlayerNet]): without this a passenger is drawn
+## elsewhere at the spot they got in. Run AFTER the vehicles tick and before the timers are fed, as the players' own rule.
 func _carry_riders() -> void:
 	if vehicles == null or vehicles.ride.rider_count() == 0:
 		return
@@ -1654,10 +1414,8 @@ func _rebuild_npc_candidates() -> void:
 			DotNpcSenses.Candidate.new(id, player.global_position, &"player", loudness)
 		)
 
-	# The armed NPCs see the players and each other: a soldier on `hostile` and a rebel on
-	# `player` are candidates for one another, and the senses skip a candidate on the
-	# perceiver's own faction — so a rebel never picks a player, which is what makes it
-	# friendly. The older entities keep [member npc_candidates], players only.
+		# The armed NPCs see the players and each other: a soldier on `hostile` and a rebel on `player` are candidates for one
+		# another and the senses skip the perceiver's own faction, so a rebel never picks a player. Older entities keep [member npc_candidates].
 	npc_candidates_all = npc_candidates.duplicate()
 
 	for entity in armed_npcs:
@@ -1670,11 +1428,8 @@ func _rebuild_npc_candidates() -> void:
 		))
 
 
-## Drops an entity from the tick list when its prop goes.
-##
-## Connected to the spawner's own signal rather than checked per tick. `removed` is
-## emitted BEFORE the node is freed, which is exactly so a listener holding a
-## reference can let go while it still exists.
+## Drops an entity from the tick list when its prop goes. Connected to the spawner's own signal rather than checked per tick;
+## `removed` is emitted BEFORE the node is freed so a listener can let go while the reference still exists.
 func _on_prop_removed(prop: DotPropInstance, _reason: StringName) -> void:
 	# Not while a blast is still walking the props: the barrel it started from must stay
 	# skipped until the outermost blast is done (see [member _breaking]).
@@ -1688,7 +1443,7 @@ func _on_prop_removed(prop: DotPropInstance, _reason: StringName) -> void:
 	# forcing the exit, because a car being deleted is exactly the case where there may
 	# be nowhere to stand — and leaves the node alone, since dot-props owns it.
 	if PlaygroundSpawnables.kind_of(prop.def) == PlaygroundSpawnables.Kind.VEHICLE:
-		# Found by NODE, not by the prop's instance id. dot-props and dot-vehicle both
+		# Looked up by NODE, not by the prop's instance id. dot-props and dot-vehicle both
 		# key their tables on "an instance id" and there is nothing making the two the
 		# same number; the node is what both of them actually agree about.
 		var riding_vehicle := vehicles.vehicle_for_node(prop.node) if vehicles != null else null
@@ -1709,8 +1464,6 @@ func _on_prop_removed(prop: DotPropInstance, _reason: StringName) -> void:
 	unregister_armed_npc(entity)
 	waypoints.erase(entity)
 
-
-# --- Armed NPCs -----------------------------------------------------------------
 
 ## Every waypoint placed, in the order placed. See [method nearest_waypoint].
 var waypoints: Array = []
@@ -1780,10 +1533,9 @@ func candidate_position(id: StringName, fallback: Vector3 = Vector3.ZERO) -> Vec
 	return npc.global_position + Vector3.UP * 0.4 if npc != null else fallback
 
 
-## How a dead NPC's body falls (a sandbox soldier, a wave): the reaction rule over the
-## server's `sv_ragdoll_reactions`, pushed away from [param by] when that is a player, from
-## [method next_seed]. Kept on the node as `pg_death` for the bridge, which sends it with the
-## PROP_GONE that takes the body away; every client copies a ragdoll from the figure it drew.
+## How a dead NPC's body falls (a sandbox soldier, a wave): the reaction rule over the server's `sv_ragdoll_reactions`, pushed away
+## from [param by] when that is a player, from [method next_seed]. Kept as `pg_death` for the bridge, which sends it with the PROP_GONE;
+## every client copies a ragdoll from the figure it drew.
 func decide_npc_death(body: Node3D, by: StringName, damage: float = 0.0) -> DotPlayerDeath:
 	if body == null:
 		return null
@@ -1835,13 +1587,8 @@ func constraint_count(player_id: StringName) -> int:
 	return constraints.count_owned(player_id) if constraints != null else 0
 
 
-# --- Shots ----------------------------------------------------------------------
-
-## A player's zee weapon fired: NPCs in earshot hear it, and NPCs it hits are hurt.
-##
-## Players hurting players is the arena's, and props being shoved is
-## `PlaygroundZee.shove_props`; this is the third thing a shot does, which only exists
-## because NPCs can now be killed.
+## A player's zee weapon fired: NPCs in earshot hear it, and NPCs it hits are hurt. The third thing a shot does, beside players
+## hurting players (the arena's) and `PlaygroundZee.shove_props`.
 func player_shots_fired(player_id: StringName, outcome: DotWeaponOutcome) -> void:
 	if outcome == null:
 		return
@@ -1855,7 +1602,7 @@ func player_shots_fired(player_id: StringName, outcome: DotWeaponOutcome) -> voi
 
 	# Before the `used` test: what a grenade's release produces is a spawn, and whether a
 	# weapon calls that a use is the weapon's business. A spawn left in an outcome is a
-	# grenade that cost one and never existed, which is what this game used to do.
+	# grenade that cost one and never existed.
 	if projectiles != null:
 		var _thrown := projectiles.accept(outcome, player_id, shooter)
 
@@ -1928,10 +1675,8 @@ func npc_shots_fired(entity: Node3D, outcome: DotWeaponOutcome) -> void:
 				)
 
 
-## `func(victim: StringName, amount: float) -> bool`: hurts a player standing in a hazard
-## (lava) and says whether it did. The module sets it to the arena's `hurt` while the arena
-## is on; unset, or answering false, a hazard sends the player back to the spawn instead,
-## because a sandbox where nobody can be hurt still has to say "not in there".
+## `func(victim: StringName, amount: float) -> bool`: hurts a player standing in a hazard (lava) and says whether it did. The module sets it to
+## the arena's `hurt` while the arena is on; unset or false, a hazard sends the player back to the spawn, so a sandbox where nobody can be hurt still says "not in there".
 var hazard_hurt: Callable = Callable()
 
 ## The current map's liquid volumes, `[{box: AABB, material, index}]`, from a document map.
@@ -1948,8 +1693,6 @@ const MELT_SECONDS := 1.0
 ## on; unset, NPCs cannot hurt players — the sandbox's own rule.
 var arena_hurt: Callable = Callable()
 
-
-# --- Weapons in the world -------------------------------------------------------
 
 ## The catalogue id a weapon lies in the world as.
 static func pickup_id_of(weapon_id: StringName) -> StringName:
@@ -2002,12 +1745,9 @@ func _build_maps() -> void:
 var rotation_file: DotMapRotationFile = null
 
 
-## Reads maps.yml (the game's shipped `res://maps.yml` under the server's
-## [member PlaygroundConfig.map_rotation_file], looked for in the `--config` directory too) and
-## applies it. The server module calls it at boot and `sv_map_rotation_file` calls it again.
-## The merge, wildcards and rules are dot-map's [DotMapRotationFile]; this game supplies the
-## paths. A file that is present and unreadable is an ERROR and changes nothing: rotating every
-## map is a better failure than rotating none.
+## Reads maps.yml (the game's `res://maps.yml` under [member PlaygroundConfig.map_rotation_file], also looked for in the `--config`
+## directory) and applies it; the server module calls it at boot and `sv_map_rotation_file` again. The merge and rules are dot-map's
+## [DotMapRotationFile]. A present but unreadable file is an ERROR and changes nothing: rotating every map beats rotating none.
 func load_rotation() -> DotResult:
 	var stem := config.map_rotation_file if config != null else ""
 	var dir := DotMapRotationFile.config_dir_arg()
@@ -2088,13 +1828,8 @@ func command_names(role: String) -> PackedStringArray:
 	return DotCommandNames.all_of("", names, {}, role)
 
 
-## The maps this build ships. A server with delivered maps loads a JSON catalogue.
-##
-## An instance method that forwards, so a caller with a [Playground] keeps working — and
-## [b]a static one beside it, because the server browser needs the list without a game.[/b]
-## A browser is a menu: there is no world, no server and no [Playground] to ask, and a
-## second copy of the list written into the menu is the thing this tree has now gone stale
-## four times over.
+## The maps this build ships; a server with delivered maps loads a JSON catalogue. An instance method that forwards, and a static
+## one beside it because the server browser needs the list without a game: a copy written into the menu went stale four times.
 func _map_catalogue() -> DotMapCatalogue:
 	return map_catalogue()
 
@@ -2136,10 +1871,9 @@ const CUSTOM_MAPS_DIR := "res://maps/custom"
 const DATA_MAP_SCENE := "res://maps/pg_data.tscn"
 
 
-## Adds every map document (`*.json`) in [param dir] to [param catalogue], each built by
-## [constant DATA_MAP_SCENE] with its path in `meta.doc`. A document that does not read is
-## left out with a WARN; an id already in the catalogue is left as it was, so a delivered map
-## can never replace a built-in one under the same name. Returns how many were added.
+## Adds every map document (`*.json`) in [param dir] to [param catalogue], each built by [constant DATA_MAP_SCENE] with its path in
+## `meta.doc`. An unreadable document is left out with a WARN; an existing id is kept, so a delivered map never replaces a
+## built-in one. Returns how many were added.
 static func add_map_docs(catalogue: DotMapCatalogue, dir: String) -> int:
 	if not DirAccess.dir_exists_absolute(dir):
 		return 0
@@ -2195,11 +1929,8 @@ func add_map_directory(dir: String) -> int:
 
 func _prop_catalogue() -> DotPropCatalogue:
 	if config.props_path != "":
-		# An operator's own catalogue, which is the seam between "a game with a
-		# handful of props" and "a server with a content pack". Loaded here rather
-		# than layered over the built-in list: a catalogue that merged with the
-		# defaults would give every server these fourteen whether it wanted them or
-		# not, and there would be no way to remove one.
+				# An operator's own catalogue, the seam between a game with a handful of props and a server with a content pack. Loaded here
+				# rather than layered over the built-in list: a merged catalogue would give every server these fourteen with no way to remove one.
 		var loaded := DotPropCatalogue.load_json(config.props_path)
 
 		if loaded.ok:
@@ -2237,23 +1968,15 @@ func rescan_props() -> PackedStringArray:
 	)
 
 
-# --- Players ---------------------------------------------------------------
-
 ## match id -> record key, for the players who have one. See [method record_key].
 var _record_keys: Dictionary = {}
 ## record key -> match id, the other way, for what a run timer reports back.
 var _match_ids: Dictionary = {}
 
 
-## The key a run timer, its records and the boards know a player by.
-##
-## [b]Not the match id.[/b] The match id (`u<userid>`) is dot-server's sequential,
-## server-local counter: it names a seat for the length of one connection, and the same
-## account reconnecting is a new number (and a restarted server hands the old numbers to
-## strangers). A record keyed by it was a different runner at every connection and could
-## be inherited. The key is the account's `session.uid()` (a guest's is per device), given
-## to [method add_player]. A player added without one (a solo game, a client's copy, a
-## test) is known by the match id, which is then also the key. A display name is never a key.
+## The key a run timer, its records and the boards know a player by: the account's `session.uid()` (a guest's is per device),
+## given to [method add_player]. Not the match id, which is server-local, names a seat for one connection and is handed to strangers
+## after a restart. A player added without one (solo, a client's copy, a test) is known by the match id. A display name is never a key.
 func record_key(id: StringName) -> StringName:
 	return _record_keys.get(id, id)
 
@@ -2322,11 +2045,8 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 	player.phys_gun.spawner = props
 	player.phys_gun.wielder = id
 
-	# [b]A held prop, a frozen prop and a loose one are three rows in the layout.[/b]
-	# `sandbox_3d` carries `held_prop` and `frozen_prop` for exactly this, and until
-	# dot-props grew these three signals a game could only set a layer at spawn and then
-	# be wrong for the rest of the prop's life — a carried crate colliding with the
-	# player carrying it, which shoves them backwards down a corridor.
+		# A held prop, a frozen prop and a loose one are three rows in the layout: `sandbox_3d` carries `held_prop` and `frozen_prop`
+		# for this. Without dot-props' three signals a layer could only be set at spawn, and a carried crate collided with its carrier.
 	player.phys_gun.grabbed.connect(
 		func(prop: DotPropInstance, who: StringName) -> void:
 			reclassify_prop(prop.node, false, true)
@@ -2371,7 +2091,7 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 
 	# Their entity id, before anything that might want one. Opened here rather than in
 	# a layer so every layer sees the same id whether or not the others are switched
-	# on; `PlaygroundDowns` and `PlaygroundArena` both used to mint their own.
+	# on; `PlaygroundDowns` and `PlaygroundArena` would otherwise each mint their own.
 	var opened := entity_table.open(
 		DotEntity.KIND_PLAYER,
 		player,
@@ -2417,21 +2137,16 @@ func remove_player(id: StringName) -> void:
 	# map ends on the votes of people who are no longer there.
 	maps.time_limit.unrock(id)
 
-	# Out of the car before anything else, and forced. A player who disconnects while
-	# riding leaves a node stowed inside a vehicle and a rider id the ride will never
-	# clear — so the seat stays occupied for the rest of the round and the id can never
-	# enter anything again. Forced because there may be nowhere legal to stand, and the
-	# alternative to putting them somewhere is not putting them anywhere.
+		# Out of the car before anything else, and forced: a player who disconnects while riding leaves a node stowed in a vehicle and
+		# a rider id that never clears, so the seat stays occupied for the round. Forced because there may be nowhere legal to stand.
 	if vehicles != null and vehicles.ride.is_riding(id):
 		var riding := vehicles.vehicle_of_rider(id)
 
 		if riding != null:
 			vehicles.ride.exit(riding, id, true)
 
-	# Their vehicles are DISOWNED rather than removed, which is dot-vehicle's rule and
-	# the opposite of dot-props'. A prop is a thing somebody built; a vehicle is a thing
-	# somebody parked, usually with other people in it, and deleting it deletes the car
-	# three passengers are riding in.
+		# Their vehicles are DISOWNED rather than removed (dot-vehicle's rule, the opposite of dot-props'): a prop is something somebody
+		# built, a vehicle something somebody parked, and deleting it deletes the car three passengers are riding in.
 	if vehicles != null:
 		vehicles.owner_left(id)
 
@@ -2453,13 +2168,9 @@ func remove_player(id: StringName) -> void:
 
 ## Puts a player at the current map's spawn for their track.
 
-## A stable colour for a player, derived from their id.
-##
-## [b]Derived rather than assigned, so two machines agree without sending anything.[/b]
-## A colour handed out by the server is one more field on the wire and one more thing to
-## be out of step during a reconnect; a hash of the id is the same colour everywhere, for
-## ever, for free. Full saturation and a fixed value, because two players told apart by
-## brightness alone are not told apart at a distance.
+## A stable colour for a player, derived from their id. Derived rather than assigned, so two machines agree with no field on the
+## wire and nothing to be out of step in a reconnect. Full saturation and a fixed value, because brightness alone does not
+## tell two players apart at a distance.
 func _colour_for(id: StringName) -> Color:
 	var hue := float(hash(String(id)) % 360) / 360.0
 	return Color.from_hsv(hue, 0.62, 0.92)
@@ -2478,11 +2189,9 @@ func spawn_player(id: StringName) -> void:
 	var track := track_of(id)
 	var map := current_map_node()
 
-	# [b]The director chooses among the map's own starts; the map is the fallback.[/b]
-	# `PlaygroundPlayerStack.refresh_spawns` copies every track's start into it, so this
-	# is a better choice among one set rather than a second set — the per-site cooldown,
-	# the occupancy check, and with the arena layer on the protection window that is
-	# granted inside `choose` and nowhere else.
+		# The director chooses among the map's own starts; the map is the fallback. `PlaygroundPlayerStack.refresh_spawns` copies every
+		# track's start into it, so this is a better choice among one set: the per-site cooldown, occupancy check, and the arena's protection
+		# window granted inside `choose` and nowhere else.
 	if player_stack != null:
 		var chosen := player_stack.choose_start(id, track)
 
@@ -2510,16 +2219,9 @@ func spawn_player(id: StringName) -> void:
 const SPAWN_SPACING := 1.5
 const SPAWN_RINGS := 2
 
-## [param at], or the nearest point on a ring round it that nobody else is standing on.
-##
-## [b]Every start here is a single point, and every player was put on it.[/b] Two people
-## joining the sandbox stood inside each other at (0, 1, 0), facing the same way, so each
-## one's first-person camera was inside the other's head: a connected client that drew
-## the other player perfectly showed a wall of their colour, and stepping off the spot was
-## the only way either found out anybody else was there. dot-spawn's occupancy does not
-## help with one site — it can only choose between sites. Two rings of eight at 1.5 m
-## stay on the smallest start pad (6 m), and a crowd past seventeen shares the centre
-## rather than being thrown off a course.
+## [param at], or the nearest point on a ring round it that nobody else is standing on. Every start is a single point and every
+## player was put on it: two joiners stood inside each other and each first-person camera was inside the other's head. dot-spawn's
+## occupancy cannot help with one site. Two rings of eight at 1.5 m fit the smallest pad (6 m); a crowd past seventeen shares the centre.
 func _clear_of_players(at: Vector3, id: StringName) -> Vector3:
 	for ring in range(SPAWN_RINGS + 1):
 		var steps := 1 if ring == 0 else 8
@@ -2563,13 +2265,9 @@ func set_player_style(id: StringName, style_id: StringName) -> bool:
 	return player.set_style(movement_styles[style_id]).ok
 
 
-## Starts offering what the player subscribed to (the Workshop) on the spawn menu and the map
-## list: pack weapons, props, NPCs and entities, and maps of the kinds `provides.json` accepts.
-##
-## [b]Solo only, and it is the caller that decides.[/b] The offline client calls this; a dedicated
-## server and a connected client never do, so an online game has none of it, and the index's own
-## session tag hides it again for a solo game that goes online. [param index] defaults to the
-## shared one.
+## Starts offering what the player subscribed to (the Workshop) on the spawn menu and the map list: pack weapons, props, NPCs,
+## entities and maps of the kinds `provides.json` accepts. Solo only, and the caller decides: the offline client calls it and a
+## dedicated server or connected client never does. [param index] defaults to the shared one.
 func follow_workshop(index: DotContentIndex = null) -> PlaygroundWorkshop:
 	var shared := index if index != null else DotContentIndex.shared()
 	if workshop == null:
@@ -2594,15 +2292,9 @@ func weapon_def(id: StringName) -> PlaygroundWeaponDef:
 	return PlaygroundWeapons.find(weapons, id)
 
 
-## Whether a player may act on somebody else's props, from the configuration.
-##
-## [b]Asked of the game, not decided in a tool.[/b] dot-props passes
-## `can_touch_others` to every tool call precisely so this is one answer in one place;
-## a physics gun and a remover that disagreed would be a server where you cannot move
-## somebody's crate but can delete it.
-## The physics gun's primary press: a player in the beam first, then a prop. A player
-## refused (immune, already held) is an answer, not a miss, so the prop behind them is not
-## grabbed instead; a beam that meets nobody falls through to the gun.
+## Whether a player may act on somebody else's props, from the configuration: asked of the game, not decided in a tool, so a gun and
+## a remover cannot disagree. The physics gun's primary press: a player in the beam first, then a prop. A player refused (immune,
+## already held) is an answer, not a miss, so the prop behind is not grabbed; a beam that meets nobody falls through to the gun.
 func phys_gun_grab(
 	player: PlaygroundPlayer, space: Variant, origin: Vector3, aim: Vector3, view: Basis, may_touch: bool
 ) -> DotResult:
@@ -2619,12 +2311,8 @@ func phys_gun_release(player: PlaygroundPlayer) -> void:
 	player.phys_gun.release()
 
 
-## Turns creative mode on or off for [param id]: their props protected in dot-props (every
-## tool and every source of harm asks the spawner), out of anybody's beam, and the arena's
-## damage refused both ways. Refused when the server does not allow it.
-##
-## [b]Both ways[/b]: a player nobody can hurt who could still hurt everybody would be the
-## best way to win the arena, not a way to build.
+## Turns creative mode on or off for [param id]: their props protected in dot-props, out of anybody's beam, and the arena's damage
+## refused both ways (a player nobody can hurt who could hurt everybody would win the arena). Refused when the server does not allow it.
 func set_creative(id: StringName, on: bool) -> DotResult:
 	var player: PlaygroundPlayer = players.get(id)
 
@@ -2692,12 +2380,9 @@ func hurt_prop(node: Node, amount: float, by: StringName) -> bool:
 	return taken.ok
 
 
-## Tells the shooter their hit landed ([signal hit_landed]): from the arena's damage to a
-## player, an NPC's [code]take_damage[/code], [method hurt_prop] and [method hurt_pane].
-##
-## [b]Only for a player, only on the authority, and only for something taken.[/b] An NPC's
-## shot, a barrel nobody lit and the world's own damage confirm nothing to anybody; a hit
-## that took nothing (a dead body, a protected prop) did not land.
+## Tells the shooter their hit landed ([signal hit_landed]): from the arena's damage to a player, an NPC's [code]take_damage[/code],
+## [method hurt_prop] and [method hurt_pane]. Only for a player, only on the authority, only for something taken: a hit that took
+## nothing (a dead body, a protected prop) did not land.
 func confirm_hit(by: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool = false) -> void:
 	if not authoritative or amount <= 0.0 or by == &"" or not players.has(by):
 		return
@@ -2774,8 +2459,6 @@ func _on_prop_exploded(at: Vector3, radius: float, damage: float, _force: float,
 	if _blast_depth == 0:
 		_breaking.clear()
 
-
-# --- Toys ----------------------------------------------------------------------
 
 ## What a person weighs on a see-saw, kg.
 const PERSON_MASS := 70.0
@@ -2920,10 +2603,8 @@ func current_map_node() -> PlaygroundMap:
 	return maps.world as PlaygroundMap if maps != null else null
 
 
-## Which tracks this map has something on, main track (0) first.
-##
-## The run timer's answer, from its zones, when there is one. [code][0][/code] otherwise,
-## because a sandbox is a legitimate track and every map has it.
+## Which tracks this map has something on, main track (0) first: the run timer's answer from its zones when there is one,
+## else [code][0][/code], because a sandbox is a legitimate track and every map has it.
 func tracks_on_this_map() -> Array[int]:
 	var out: Array[int] = [0]
 
@@ -2941,11 +2622,8 @@ func track_of(id: StringName) -> int:
 	return 0
 
 
-## Where a player on [param track] starts, as `{at: Vector3, yaw: float}` (degrees), or an
-## empty dictionary when there is no map or the track has no start.
-##
-## The run timer's SPAWN zone first, when it has one for the track: a course's start is
-## the timer's to say, and a sandbox with no timer starts every track at the map's spawn.
+## Where a player on [param track] starts, as `{at: Vector3, yaw: float}` (degrees), or an empty dictionary with no map or no start.
+## The run timer's SPAWN zone first when it has one for the track; a sandbox with no timer starts every track at the map's spawn.
 func start_for(track: int) -> Dictionary:
 	if run_timer != null:
 		var zoned: Dictionary = run_timer.call("start_for", track)
@@ -2979,8 +2657,6 @@ static func format_time(seconds: float) -> String:
 	return ("-" if seconds < 0.0 else "") + text
 
 
-# --- Maps ------------------------------------------------------------------
-
 func change_map(id: StringName) -> DotResult:
 	return await maps.change_to(id)
 
@@ -2990,15 +2666,9 @@ func change_map(id: StringName) -> DotResult:
 var _seed_serial: int = 0
 
 
-## The seed a generated map is built from.
-##
-## [b]Zero means "pick one and announce it", which is the only honest default.[/b] A
-## generated world nobody can name the seed of is a world nobody can share, and "play the
-## map I played" is the single most-requested feature every one of them gets. `pg_seed`
-## is the cvar, and the seed that was actually used is logged whichever way it came.
-##
-## Taken from dot-randomness when a game has one, so a generated map and every other
-## random thing in the session come out of one seed rather than two.
+## The seed a generated map is built from. Zero means "pick one and announce it": a world nobody can name the seed of cannot be
+## shared. `pg_seed` is the cvar and the seed used is logged either way. Taken from dot-randomness when a game has one, so a
+## generated map and every other random thing in the session come from one seed.
 func map_seed() -> int:
 	if config != null and config.map_seed != 0:
 		return config.map_seed
@@ -3013,14 +2683,9 @@ func map_seed() -> int:
 	return 1
 
 
-## A stable seed for the next thing that wants its own randomness: a scripted entity's
-## [member DotNpcInstance.seed], or a broken prop's debris. The session's [method map_seed]
-## and a count of what has asked, on a stream per kind.
-##
-## [b]Never an object id.[/b] Entities and debris were seeded from `instance_id`, the Godot
-## object id, which moves whenever anything earlier in the process allocates one more object:
-## the same session then walked its NPCs and scattered its debris differently from build to
-## build. Always above 1, because dot-npc-ai reads a character seed of 0 or 1 as the preset's.
+## A stable seed for the next thing wanting its own randomness (a scripted entity's [member DotNpcInstance.seed], a broken prop's
+## debris): the session's [method map_seed] and a count of what has asked, a stream per kind. Never an object id, which moves
+## whenever anything earlier allocates and made NPCs and debris move differently build to build. Always above 1: dot-npc-ai reads 0 or 1 as the preset's.
 func next_seed(kind: StringName) -> int:
 	_seed_serial += 1
 	return DotRandomStream.new(map_seed()).stream_for(kind, _seed_serial).range_i_at(0, 2, 0x7FFFFFFF)
@@ -3053,14 +2718,9 @@ func _on_map_changing(_from: DotMapDef, _to: DotMapDef) -> void:
 
 
 func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
-	# A map that has to be told something before it can build itself. Duck-typed rather
-	# than type-checked, so a delivered map with the same shape works and this file names
-	# nothing from `maps/`.
-	#
-	# [b]Before the spawns below, and that ordering is the whole reason it is here.[/b]
-	# A generated map's spawn point comes out of the generator, so spawning a player
-	# before it has run puts them at the fallback -- which on a generated map is a guess,
-	# and a guess inside a wall is a player who cannot move.
+		# A map that has to be told something before it can build itself, duck-typed so a delivered map of the same shape works and this
+		# file names nothing from `maps/`. Before the spawns below: a generated map's spawn comes out of the generator, and spawning
+		# before it ran puts a player at the fallback, a guess that may be inside a wall.
 	if loaded != null and loaded.has_method("configure"):
 		loaded.call("configure", map_seed(), DotRegistry.get_service(&"dot_random_source"))
 
@@ -3097,16 +2757,9 @@ func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
 	map_ready.emit(map)
 
 
-## The map ran out of time, or enough players rocked the vote.
-##
-## [b]The session says the map is over; deciding what happens next is here.[/b] A
-## game might run a vote, show a scoreboard, finish the round first, or go straight
-## to the rotation — and a session that changed the map itself would have to be
-## fought by every game that wanted any of those.
-##
-## A run in progress is not protected: a map ending under somebody mid-run costs them
-## that attempt, which is what a time limit means. Waiting for the last runner would
-## mean a map that never ends while one person keeps restarting.
+## The map ran out of time, or enough players rocked the vote. The session says the map is over; what happens next is here, since
+## a session that changed the map itself would be fought by every game that wanted a vote, a scoreboard or a finished round first.
+## A run in progress is not protected: waiting for the last runner would never end a map while one person keeps restarting.
 func _on_map_over(_map: DotMapDef, reason: StringName) -> void:
 	if not rotation_ends_maps:
 		DotLog.debug(CHANNEL, "the map clock ran out; the vote decides", {"reason": String(reason)})
@@ -3134,17 +2787,10 @@ func _on_map_over(_map: DotMapDef, reason: StringName) -> void:
 
 
 ## Registers a rock-the-vote from a player.
-# --- Vehicles ---------------------------------------------------------------
 
-## Turns each driver's movement keys into what their vehicle is being asked for.
-##
-## [b]The mapping is here and not in dot-vehicle, and that is where it belongs.[/b] A
-## [DotVehicleCommand] is built by the game from a keyboard, a gamepad, a touch layout or
-## a bot; the addon deliberately has no input at all. Reusing [DotFpsCommand] rather than
-## adding a second wire format is the other half of the same decision — a client already
-## sends one of those every tick, it is already sanitised, already replayed by the
-## predictor and already quantised, and a driver's throttle is exactly as much a per-tick
-## intent as a walk is.
+## Turns each driver's movement keys into what their vehicle is being asked for. The mapping is here, not in dot-vehicle, which has no
+## input at all: a [DotVehicleCommand] is built from a keyboard, pad, touch layout or bot. Reuses [DotFpsCommand] rather than a second
+## wire format: a client already sends one per tick, sanitised, replayed by the predictor and quantised.
 func _drive_vehicles() -> void:
 	if vehicles == null or vehicles.ride.rider_count() == 0:
 		return
@@ -3158,24 +2804,18 @@ func _drive_vehicles() -> void:
 		var vehicle := vehicles.vehicle_of_rider(id)
 
 		if vehicle == null or vehicle.driver() != id:
-			# A passenger's keys do nothing, and the refusal is dot-vehicle's anyway:
-			# `set_command` checks the driver on the server on every command, because a
-			# client is a program the player can edit and driving from the back seat is
-			# what that hole would give them.
+						# A passenger's keys do nothing, and the refusal is dot-vehicle's anyway: `set_command` checks the driver on the server
+						# every command, because a client can be edited and driving from the back seat is the hole that would give.
 			continue
 
-		# S brakes while the car still rolls forward and reverses once it has stopped
-		# (dot-vehicle's `brake_then_reverse`), the convention every driving game here
-		# keeps; on reverse thrust alone it took about three times the brake's distance.
-		# Here and not in `drive_command`, which has no vehicle to read a speed from.
+				# S brakes while the car still rolls forward and reverses once stopped (dot-vehicle's `brake_then_reverse`); reverse thrust alone
+				# took about three times the brake's distance. Here and not in `drive_command`, which has no vehicle to read a speed from.
 		var cmd := drive_command(player.pending_command())
 		vehicles.set_command(vehicle.instance_id, id, cmd.brake_then_reverse(vehicle.forward_speed()))
 
 
-## One tick of driving, from one tick of movement input.
-##
-## Static and public because it is the whole mapping, and a suite that had to build a
-## player to test it would be testing something else.
+## One tick of driving, from one tick of movement input. Static and public because it is the whole mapping, and a suite that had
+## to build a player to test it would be testing something else.
 static func drive_command(move: DotFpsCommand) -> DotVehicleCommand:
 	var cmd := DotVehicleCommand.new()
 
@@ -3199,11 +2839,8 @@ static func drive_command(move: DotFpsCommand) -> DotVehicleCommand:
 	return cmd.sanitise()
 
 
-## The nearest vehicle a player could get into, or null.
-##
-## [b]Measured from the eye and not from the feet.[/b] A player standing beside a car is
-## about 1.7 m above the point their body reports, and a reach measured from there is a
-## reach that fails while they are looking straight at the door.
+## The nearest vehicle a player could get into, or null. Measured from the eye, not the feet: a player beside a car is about 1.7 m
+## above the point their body reports, and a reach from there fails while they look straight at the door.
 func vehicle_near(player_id: StringName, reach: float = 3.5) -> DotVehicleInstance:
 	var player: PlaygroundPlayer = players.get(player_id)
 
@@ -3213,14 +2850,9 @@ func vehicle_near(player_id: StringName, reach: float = 3.5) -> DotVehicleInstan
 	return vehicles.nearest_free(player.eye_position(), reach)
 
 
-## Gets a player into whatever they are standing next to, or out of what they are in.
-##
-## [b]One entry point for both, because the player pressed one key.[/b] A game with
-## separate "enter" and "exit" calls has a client deciding which one to send, and a
-## client that guesses wrong asks to get into the car it is already in.
-## What F does: presses the button, throws the lever or swings the door in front of the
-## player, and otherwise gets in or out of a vehicle. One key, because both are "use" and the
-## bridge already carries it (`ask_use_vehicle`), so pressing a button needs no new message.
+## What F does: presses the button, throws the lever or swings the door in front of the player, otherwise gets in or out of a
+## vehicle. One entry point for both, because the player pressed one key and a client guessing enter versus exit asks to enter the car
+## it is already in; the bridge already carries it (`ask_use_vehicle`), so a button needs no new message.
 func use_vehicle(player_id: StringName) -> DotResult:
 	var player: PlaygroundPlayer = players.get(player_id)
 
@@ -3366,8 +2998,6 @@ func rock_the_vote(player_id: StringName) -> bool:
 	return maps.rock_the_vote(player_id, players.size())
 
 
-# --- Diagnostics -----------------------------------------------------------
-
 func describe() -> Dictionary:
 	return {
 		"map": String(maps.current.id) if maps != null and maps.current != null else "-",
@@ -3400,12 +3030,9 @@ func describe_lines() -> PackedStringArray:
 	return out
 
 
-## The map's time left as an operator should read it: the vote's clock when there is a
-## vote — "no limit" when that vote has none, "stopped" while a ballot holds it or it has
-## run out — and the map session's otherwise.
-##
-## "no limit" here where the HUD shows nothing: a status line is read when somebody asks,
-## and an absent row reads as a diagnostic that forgot to say, not as a clock that is off.
+## The map's time left as an operator should read it: the vote's clock when there is a vote ("no limit" when it has none, "stopped"
+## while a ballot holds it or it ran out), else the map session's. "no limit" here where the HUD shows nothing: an absent row reads
+## as a diagnostic that forgot to say.
 func time_left_text() -> String:
 	if clock_fn.is_valid():
 		var state: Dictionary = clock_fn.call()
@@ -3429,11 +3056,9 @@ func _exit_tree() -> void:
 		profiles.release()
 
 
-## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at
-## (a player's body has no shape of its own): with the rule on, somebody walking into you
-## stops at your shoulder instead of filling your screen. Through `apply_to`, which goes
-## through `set_collision_mask` (a style does not undo it) and makes the players' layer one a
-## player may walk out of.
+## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at (a player's body has no shape of its
+## own): with the rule on, somebody walking into you stops at your shoulder. Through `apply_to`, which goes through `set_collision_mask`
+## (a style does not undo it) and makes the players' layer one a player may walk out of.
 func _apply_body_mask(player: PlaygroundPlayer) -> void:
 	if player_stack == null or player == null or player.controller == null:
 		return
