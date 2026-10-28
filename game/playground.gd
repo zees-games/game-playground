@@ -1396,6 +1396,16 @@ func _configure_entity(prop: DotPropInstance) -> void:
 		props.remove(prop.instance_id, DotPropSpawner.REASON_CLEANUP)
 		return
 
+	# set_script itself errors on a script whose native base is not this body's.
+	if not ClassDB.is_parent_class(body.get_class(), String(script.get_instance_base_type())):
+		DotLog.error(CHANNEL, "an entity's script is not an entity", {
+			"entity": String(prop.def.id),
+			"script": PlaygroundSpawnables.script_of(prop.def),
+			"hint": "extend res://game/entities/playground_entity.gd",
+		})
+		props.remove(prop.instance_id, DotPropSpawner.REASON_CLEANUP)
+		return
+
 	body.set_script(script)
 
 	# Checked after attaching rather than assumed. A script that is valid GDScript but

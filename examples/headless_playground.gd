@@ -2692,7 +2692,10 @@ func playground_receive(msg: Dictionary) -> void:
 	var addons := PlaygroundAddons.new()
 	var host := Node3D.new()
 	add_child(host)
+	var mirrored_add := DotLog.mirror_to_engine
+	DotLog.mirror_to_engine = false
 	var count := addons.scan(host, true, root)
+	DotLog.mirror_to_engine = mirrored_add
 	_check(count == 1 and addons.hook_count() == 1, "one folder with a hook is loaded", str(count))
 	_check(addons.skipped().has("fake_plain") and not addons.skipped().has("fake_with_hook"),
 		"a folder without one is passed over, and its scripts never run")
@@ -3339,6 +3342,9 @@ func _test_entities_run_their_scripts() -> void:
 	broken.meta = {"kind": "entity", "script": "res://game/entities/nope.gd"}
 	playground.props.catalogue.add(broken)
 
+	# Both refusals below log at ERROR on purpose.
+	var mirrored_ent := DotLog.mirror_to_engine
+	DotLog.mirror_to_engine = false
 	var before_count := playground.props.world_count()
 	var refused := playground.props.spawn(&"npc_broken", &"bot", at)
 
@@ -3369,6 +3375,7 @@ func _test_entities_run_their_scripts() -> void:
 		playground.props.world_count() == before_count,
 		"and so does one whose script is not an entity"
 	)
+	DotLog.mirror_to_engine = mirrored_ent
 
 	playground.props.catalogue.remove(&"npc_broken")
 	playground.props.catalogue.remove(&"npc_wrong")
@@ -3740,6 +3747,8 @@ func _test_weapons() -> void:
 	# The two ways a catalogue entry is wrong, and neither may hand back a working-
 	# looking weapon: a base `PlaygroundWeapon` whose buttons do nothing is
 	# indistinguishable from a weapon that is fine and pointed at nothing.
+	var mirrored_wpn := DotLog.mirror_to_engine
+	DotLog.mirror_to_engine = false
 	var missing := PlaygroundWeaponDef.make(&"x", "X", "res://game/weapons/nope.gd")
 	_check(
 		PlaygroundWeapons.make(missing) == null,
@@ -3753,6 +3762,7 @@ func _test_weapons() -> void:
 		PlaygroundWeapons.make(not_a_weapon) == null,
 		"and so is one whose script is not a weapon"
 	)
+	DotLog.mirror_to_engine = mirrored_wpn
 
 	# The launcher fires whatever the menu armed, which is what saves it having a
 	# second list of ammunition and a second way to choose from it.
@@ -5691,9 +5701,13 @@ func _test_the_client_boots() -> void:
 	var connected := PlaygroundClient.new()
 	connected.name = "ConnectedClient"
 	connected.link = Node.new()
+	# The bare link cannot replicate cvars, so noblock logs its refusal; that is the stub, not the client.
+	var mirrored_link := DotLog.mirror_to_engine
+	DotLog.mirror_to_engine = false
 	add_child(connected)
 	for _i in range(4):
 		await get_tree().process_frame
+	DotLog.mirror_to_engine = mirrored_link
 	_check(
 		connected.hud != null and connected.bridge != null
 			and connected.hud.clock_view == connected.bridge.clock_view,
