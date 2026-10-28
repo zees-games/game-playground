@@ -6,6 +6,15 @@ extends "res://examples/headless_net_part1.gd"
 ## and hears nothing the server decides — so an extend changed the server's clock and
 ## not one pixel on a client, and the deployed `trigger: rtv_only` with no limit showed
 ## thirty minutes counting down to nothing. This is the check that both reach the screen.
+var _cw_vote: PlaygroundVote
+var _cw_arrived: Array[Dictionary]
+var _cw_on_clock
+var _cw_dt
+var _cw_now
+var _cw_before
+var _cw_extend_by
+var _cw_after
+
 func _test_clock_wire() -> void:
 	_section("the vote's clock over the link")
 
@@ -20,91 +29,94 @@ func _test_clock_wire() -> void:
 
 	# A real vote on the server's game, on this game's own rules. `setup` does not apply
 	# or register anything; the module is what would.
-	var vote := PlaygroundVote.new()
-	vote.name = "ClockVote"
-	vote.config_path = ""
-	add_child(vote)
-	var built := vote.setup(_server_game)
+	_cw_vote = PlaygroundVote.new()
+	_cw_vote.name = "ClockVote"
+	_cw_vote.config_path = ""
+	add_child(_cw_vote)
+	var built := _cw_vote.setup(_server_game)
 	_check(built.ok, "a vote is built on the server's game", str(built.error) if not built.ok else "")
 	if not built.ok:
-		remove_child(vote)
-		vote.free()
+		remove_child(_cw_vote)
+		_cw_vote.free()
 		return
-	vote.note_playing(_server_game.maps.current.id)
+	_cw_vote.note_playing(_server_game.maps.current.id)
 
-	var arrived: Array[Dictionary] = []
-	var on_clock := func(state: Dictionary) -> void: arrived.append(state)
-	_client_bridge.clock_received.connect(on_clock)
-	vote.clock_due.connect(_server_bridge.broadcast_clock)
-	var dt := 1.0 / float(_server_game.tick_rate)
+	_cw_arrived = []
+	_cw_on_clock = func(state: Dictionary) -> void: _cw_arrived.append(state)
+	_client_bridge.clock_received.connect(_cw_on_clock)
+	_cw_vote.clock_due.connect(_server_bridge.broadcast_clock)
+	_cw_dt = 1.0 / float(_server_game.tick_rate)
 
-	vote.advance(dt)
+	_cw_vote.advance(_cw_dt)
 	_flush()
-	var now := Time.get_ticks_msec() / 1000.0
-	var before := _client_bridge.clock_view.remaining_at(now)
+	_cw_now = Time.get_ticks_msec() / 1000.0
+	_cw_before = _client_bridge.clock_view.remaining_at(_cw_now)
 	_check(
-		arrived.size() == 1 and _client_bridge.clock_view.has_clock
-			and absf(before - vote.director.clock.remaining) <= 1.0,
+		_cw_arrived.size() == 1 and _client_bridge.clock_view.has_clock
+			and absf(_cw_before - _cw_vote.director.clock.remaining) <= 1.0,
 		"the client is told the vote's time left (%.0f s, the server's is %.0f s)" % [
-			before, vote.director.clock.remaining
+			_cw_before, _cw_vote.director.clock.remaining
 		]
 	)
 	_check(
-		PlaygroundHud.time_left_text(_client_bridge.clock_view, "9:59", now)
-			== _client_bridge.clock_view.formatted_at(now),
+		PlaygroundHud.time_left_text(_client_bridge.clock_view, "9:59", _cw_now)
+			== _client_bridge.clock_view.formatted_at(_cw_now),
 		"and the HUD draws that rather than the client's own map clock (%s)" % (
-			PlaygroundHud.time_left_text(_client_bridge.clock_view, "9:59", now)
+			PlaygroundHud.time_left_text(_client_bridge.clock_view, "9:59", _cw_now)
 		)
 	)
 
 	for i in range(_server_game.tick_rate * 3):
-		vote.advance(dt)
+		_cw_vote.advance(_cw_dt)
 	_flush()
 	_check(
-		arrived.size() == 1,
+		_cw_arrived.size() == 1,
 		"three quiet seconds send nothing: the client counts them itself (%d sent)" % (
-			arrived.size() - 1
+			_cw_arrived.size() - 1
 		)
 	)
 
-	var extend_by := vote.director.rules.extend_seconds
-	_check(vote.director.clock.extend(), "the server extends the map")
-	vote.advance(dt)
+	_cw_extend_by = _cw_vote.director.rules.extend_seconds
+	_check(_cw_vote.director.clock.extend(), "the server extends the map")
+	_cw_vote.advance(_cw_dt)
 	_flush()
-	now = Time.get_ticks_msec() / 1000.0
-	var after := _client_bridge.clock_view.remaining_at(now)
+	_cw_now = Time.get_ticks_msec() / 1000.0
+	_cw_after = _client_bridge.clock_view.remaining_at(_cw_now)
+	_test_clock_wire_2()
+
+func _test_clock_wire_2() -> void:
 	_check(
-		arrived.size() == 2 and absf((after - before) - (extend_by - 3.0)) <= 2.0,
+		_cw_arrived.size() == 2 and absf((_cw_after - _cw_before) - (_cw_extend_by - 3.0)) <= 2.0,
 		"and what the client sees moves by the extension (%.0f s -> %.0f s, extended by %.0f)" % [
-			before, after, extend_by
+			_cw_before, _cw_after, _cw_extend_by
 		],
 		"the HUD would go on counting down the old limit"
 	)
 
 	# The deployed shape: `metadata: map_vote: {trigger: rtv_only, duration_sec: 0}`.
-	vote.director.rules.duration_sec = 0.0
-	vote.director.rules.trigger = DotVoteRules.Trigger.RTV_ONLY
-	vote.note_playing(_server_game.maps.current.id)
-	vote.advance(dt)
+	_cw_vote.director.rules.duration_sec = 0.0
+	_cw_vote.director.rules.trigger = DotVoteRules.Trigger.RTV_ONLY
+	_cw_vote.note_playing(_server_game.maps.current.id)
+	_cw_vote.advance(_cw_dt)
 	_flush()
-	now = Time.get_ticks_msec() / 1000.0
+	_cw_now = Time.get_ticks_msec() / 1000.0
 	_check(
-		arrived.size() == 3 and not _client_bridge.clock_view.has_clock,
+		_cw_arrived.size() == 3 and not _client_bridge.clock_view.has_clock,
 		"an rtv-only vote with no limit tells the client there is no clock"
 	)
 	_check(
-		PlaygroundHud.time_left_text(_client_bridge.clock_view, "29:59", now) == "",
+		PlaygroundHud.time_left_text(_client_bridge.clock_view, "29:59", _cw_now) == "",
 		"and the HUD shows none, rather than the local session's thirty minutes"
 	)
 	_check(
-		PlaygroundHud.time_left_text(null, "29:59", now) == "29:59",
+		PlaygroundHud.time_left_text(null, "29:59", _cw_now) == "29:59",
 		"while a HUD nothing has told (offline) keeps the local session's, which is the real one there"
 	)
 
-	_client_bridge.clock_received.disconnect(on_clock)
+	_client_bridge.clock_received.disconnect(_cw_on_clock)
 	_client_bridge.clock_view = DotVoteClockView.new()
-	remove_child(vote)
-	vote.free()
+	remove_child(_cw_vote)
+	_cw_vote.free()
 	_done()
 
 
@@ -461,6 +473,9 @@ func _test_map_toys_over_the_wire() -> void:
 	_check(plots > 0 and _client_bridge.toy_count() == plots and _client_game.toys.count() == plots,
 		"a map change replaces them on both ends", "%d on the server, %d paired on the client" % [plots, _client_bridge.toy_count()])
 	var _back: DotResult = await _server_game.change_map(&"pg_flatgrass")
+	await _test_map_toys_over_the_wire_2()
+
+func _test_map_toys_over_the_wire_2() -> void:
 	for i in 240:
 		_exchange()
 		await _steps(1)

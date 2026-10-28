@@ -138,6 +138,23 @@ class EngineErrors extends Logger:
 		return out
 ## sv_workbench_remote over the real frames, in the order PlaygroundModule and PlaygroundClient register them: an admin gets a
 ## panel and an edit that applies and replicates; a guest, a non-admin, a revoked admin and the cvar off are refused.
+var _trw_flags: Dictionary
+var _trw_state: Dictionary
+var _trw_snet: DotNetManager
+var _trw_cnet: DotNetManager
+var _trw_sconfig: PlaygroundConfig
+var _trw_sbinder: DotGameConfigBinder
+var _trw_swb: DotGameWorkbench
+var _trw_slink: DotNetProfileLink
+var _trw_cremote: DotGameWorkbenchRemoteClient
+var _trw_crt: DotProfileRuntime
+var _trw_clink: DotNetProfileLink
+var _trw_remote: DotGameWorkbenchRemote
+var _trw_cwb: DotGameWorkbench
+var _trw_kind: String
+var _trw_edit: Dictionary
+var _trw_srt: DotProfileRuntime
+
 func _test_the_remote_workbench() -> void:
 	_section("[a flagged admin edits the server's profiles, and nobody else can]")
 	if not DotGameWorkbench.available():
@@ -145,113 +162,116 @@ func _test_the_remote_workbench() -> void:
 		_passed += 16
 		_done()
 		return
-	var flags := {"boss": ["cvar", "root"], "plain": []}
-	var state := {"on": false, "uid": "", "now": 100000}
-	var snet := _make_manager(true, &"wbserver", 1, self, 60)
-	var cnet := _make_manager(false, &"wbclient", 5, self, 60)
-	var sconfig := PlaygroundConfig.new()
+	_trw_flags = {"boss": ["cvar", "root"], "plain": []}
+	_trw_state = {"on": false, "uid": "", "now": 100000}
+	_trw_snet = _make_manager(true, &"wbserver", 1, self, 60)
+	_trw_cnet = _make_manager(false, &"wbclient", 5, self, 60)
+	_trw_sconfig = PlaygroundConfig.new()
 	var cconfig := PlaygroundConfig.new()
-	var sbinder := PlaygroundConfig.make_binder(sconfig)
+	_trw_sbinder = PlaygroundConfig.make_binder(_trw_sconfig)
 	var cbinder := PlaygroundConfig.make_binder(cconfig)
-	var _l1 := sbinder.load_layers()
+	var _l1 := _trw_sbinder.load_layers()
 	var _l2 := cbinder.load_layers()
 	var set: DotProfileSet = null
-	for candidate: DotProfileSet in sbinder.profile_sets():
+	for candidate: DotProfileSet in _trw_sbinder.profile_sets():
 		if candidate.rel_path.ends_with("props"):
 			set = candidate
 	var cset: DotProfileSet = null
 	for candidate: DotProfileSet in cbinder.profile_sets():
 		if candidate.rel_path.ends_with("props"):
 			cset = candidate
-	var swb := DotGameWorkbench.new()
-	swb.dedicated = true
-	swb.config = {"enabled": false}
-	swb.add_set(set, "Game settings")
-	add_child(swb)
-	var started := swb.start()
-	sbinder.attach(swb.api.runtime)
-	var made := DotGameWorkbenchRemote.serve(snet)
-	var slink := DotNetProfileLink.attach(snet, swb.api.runtime as DotProfileRuntime)
-	var cremote := DotGameWorkbenchRemoteClient.attach(cnet)
-	var crt := DotProfileRuntime.new()
-	var clink := DotNetProfileLink.attach(cnet, crt)
-	snet.messages.seal()
-	cnet.messages.seal()
-	var remote := swb.serve_remote(snet)
-	_check(started.ok and made.ok and remote != null and slink != null and clink != null, "the server's workbench serves the remote frame and the profile link")
-	snet.send_fn = func(_p: int, b: PackedByteArray, _d: int) -> void: var _r := cnet.receive(b, 1)
-	cnet.send_fn = func(_p: int, b: PackedByteArray, _d: int) -> void: var _r := snet.receive(b, 5)
-	var _s := snet.start()
-	var _c := cnet.start()
-	snet.add_peer(5)
-	slink.peer_joined(5)
-	remote.enabled_fn = func() -> bool: return state["on"]
-	remote.uid_fn = func(_p: int) -> String: return state["uid"]
-	remote.connected_fn = func(_p: int) -> bool: return true
-	remote.permit_uid_fn = func(uid: String, flag: String) -> bool: return (flags.get(uid, []) as Array).has(flag)
-	remote.now_fn = func() -> int: return state["now"]
-	remote.limiter = DotRateLimiter.new(1000.0, 1000.0)
-	var cwb := DotGameWorkbench.new()
-	cwb.panel_mode = 2
-	cwb.config = {"enabled": false}
-	cwb.remote_client = cremote
-	cwb.remote_fn = func() -> bool: return true
-	cwb.add_set(cset, "Game settings")
-	add_child(cwb)
-	var cstarted := cwb.start(crt)
-	_check(cstarted.ok and cwb.overlay == null, "the client's workbench starts with no panel")
-	var kind: String = set.rel_path
-	var edit := {"op": "set", "kind": kind, "id": sbinder.profile_id, "key": "allow_props", "value": false}
-	var srt := swb.api.runtime as DotProfileRuntime
+	_trw_swb = DotGameWorkbench.new()
+	_trw_swb.dedicated = true
+	_trw_swb.config = {"enabled": false}
+	_trw_swb.add_set(set, "Game settings")
+	add_child(_trw_swb)
+	var started := _trw_swb.start()
+	_trw_sbinder.attach(_trw_swb.api.runtime)
+	var made := DotGameWorkbenchRemote.serve(_trw_snet)
+	_trw_slink = DotNetProfileLink.attach(_trw_snet, _trw_swb.api.runtime as DotProfileRuntime)
+	_trw_cremote = DotGameWorkbenchRemoteClient.attach(_trw_cnet)
+	_trw_crt = DotProfileRuntime.new()
+	_trw_clink = DotNetProfileLink.attach(_trw_cnet, _trw_crt)
+	_trw_snet.messages.seal()
+	_trw_cnet.messages.seal()
+	_trw_remote = _trw_swb.serve_remote(_trw_snet)
+	_check(started.ok and made.ok and _trw_remote != null and _trw_slink != null and _trw_clink != null, "the server's workbench serves the remote frame and the profile link")
+	_trw_snet.send_fn = func(_p: int, b: PackedByteArray, _d: int) -> void: var _r := _trw_cnet.receive(b, 1)
+	_trw_cnet.send_fn = func(_p: int, b: PackedByteArray, _d: int) -> void: var _r := _trw_snet.receive(b, 5)
+	var _s := _trw_snet.start()
+	var _c := _trw_cnet.start()
+	_trw_snet.add_peer(5)
+	_trw_slink.peer_joined(5)
+	_trw_remote.enabled_fn = func() -> bool: return _trw_state["on"]
+	_trw_remote.uid_fn = func(_p: int) -> String: return _trw_state["uid"]
+	_trw_remote.connected_fn = func(_p: int) -> bool: return true
+	_trw_remote.permit_uid_fn = func(uid: String, flag: String) -> bool: return (_trw_flags.get(uid, []) as Array).has(flag)
+	_trw_remote.now_fn = func() -> int: return _trw_state["now"]
+	_trw_remote.limiter = DotRateLimiter.new(1000.0, 1000.0)
+	_trw_cwb = DotGameWorkbench.new()
+	_trw_cwb.panel_mode = 2
+	_trw_cwb.config = {"enabled": false}
+	_trw_cwb.remote_client = _trw_cremote
+	_trw_cwb.remote_fn = func() -> bool: return true
+	_trw_cwb.add_set(cset, "Game settings")
+	add_child(_trw_cwb)
+	var cstarted := _trw_cwb.start(_trw_crt)
+	_check(cstarted.ok and _trw_cwb.overlay == null, "the client's workbench starts with no panel")
+	_trw_kind = set.rel_path
+	_trw_edit = {"op": "set", "kind": _trw_kind, "id": _trw_sbinder.profile_id, "key": "allow_props", "value": false}
+	_trw_srt = _trw_swb.api.runtime as DotProfileRuntime
 
-	state["uid"] = "boss"
-	cremote.ask()
-	_check(not cremote.allowed and cwb.overlay == null, "with the cvar off even an admin is told no and gets no panel")
-	var _q1 := cremote.request(edit)
-	_check(sconfig.allow_props, "and a request it forges anyway changes nothing on the server")
+	_trw_state["uid"] = "boss"
+	_trw_cremote.ask()
+	_check(not _trw_cremote.allowed and _trw_cwb.overlay == null, "with the cvar off even an admin is told no and gets no panel")
+	_test_the_remote_workbench_2()
 
-	state["on"] = true
-	cremote.ask()
-	_check(cremote.allowed and cremote.flags.has("cvar"), "with the cvar on an admin is told the flags it holds")
-	_check(cwb.overlay != null, "and gets the panel")
-	var applied: DotResult = cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, edit)
-	_check(applied.ok and not sconfig.allow_props, "an edit from the panel reaches the server's live config", "" if applied.ok else applied.error.message)
-	_check(crt.revision(kind, sbinder.profile_id) > 0 and crt.revision(kind, sbinder.profile_id) == srt.revision(kind, sbinder.profile_id), "and its row replicated to the client")
+func _test_the_remote_workbench_2() -> void:
+	var _q1 := _trw_cremote.request(_trw_edit)
+	_check(_trw_sconfig.allow_props, "and a request it forges anyway changes nothing on the server")
 
-	var back := edit.merged({"value": true})
-	state["uid"] = ""
-	var _q2 := cremote.request(back)
-	_check(not sconfig.allow_props, "a guest's forged edit is refused")
-	state["now"] += 2000
-	remote.poll()
-	_check(not cremote.allowed and cwb.overlay == null, "and the panel is taken away from it")
+	_trw_state["on"] = true
+	_trw_cremote.ask()
+	_check(_trw_cremote.allowed and _trw_cremote.flags.has("cvar"), "with the cvar on an admin is told the flags it holds")
+	_check(_trw_cwb.overlay != null, "and gets the panel")
+	var applied: DotResult = _trw_cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, _trw_edit)
+	_check(applied.ok and not _trw_sconfig.allow_props, "an edit from the panel reaches the server's live config", "" if applied.ok else applied.error.message)
+	_check(_trw_crt.revision(_trw_kind, _trw_sbinder.profile_id) > 0 and _trw_crt.revision(_trw_kind, _trw_sbinder.profile_id) == _trw_srt.revision(_trw_kind, _trw_sbinder.profile_id), "and its row replicated to the client")
 
-	state["uid"] = "plain"
-	cremote.ask()
-	var _q3 := cremote.request(back)
-	_check(not cremote.allowed and not sconfig.allow_props, "a player holding no flag is told no and refused")
+	var back := _trw_edit.merged({"value": true})
+	_trw_state["uid"] = ""
+	var _q2 := _trw_cremote.request(back)
+	_check(not _trw_sconfig.allow_props, "a guest's forged edit is refused")
+	_trw_state["now"] += 2000
+	_trw_remote.poll()
+	_check(not _trw_cremote.allowed and _trw_cwb.overlay == null, "and the panel is taken away from it")
 
-	state["uid"] = "boss"
-	cremote.ask()
-	_check(cremote.allowed and cwb.overlay != null, "an admin is let back in")
-	flags["boss"] = []
-	var _q4 := cremote.request(back)
-	_check(not sconfig.allow_props, "the revoked admin's next edit is refused at once")
-	state["now"] += 2000
-	remote.poll()
-	_check(not cremote.allowed and cwb.overlay == null, "and the panel closes")
+	_trw_state["uid"] = "plain"
+	_trw_cremote.ask()
+	var _q3 := _trw_cremote.request(back)
+	_check(not _trw_cremote.allowed and not _trw_sconfig.allow_props, "a player holding no flag is told no and refused")
 
-	flags["boss"] = ["cvar", "root"]
-	state["on"] = false
-	var _q5 := cremote.request(back)
-	_check(not sconfig.allow_props, "switching the cvar off refuses a restored admin too")
-	_check(not remote.permit_actor("remote:boss", "cvar"), "and revokes the server-made actors")
-	slink.release()
-	clink.release()
-	swb.queue_free()
-	cwb.queue_free()
-	snet.queue_free()
-	cnet.queue_free()
+	_trw_state["uid"] = "boss"
+	_trw_cremote.ask()
+	_check(_trw_cremote.allowed and _trw_cwb.overlay != null, "an admin is let back in")
+	_trw_flags["boss"] = []
+	var _q4 := _trw_cremote.request(back)
+	_check(not _trw_sconfig.allow_props, "the revoked admin's next edit is refused at once")
+	_trw_state["now"] += 2000
+	_trw_remote.poll()
+	_check(not _trw_cremote.allowed and _trw_cwb.overlay == null, "and the panel closes")
+
+	_trw_flags["boss"] = ["cvar", "root"]
+	_trw_state["on"] = false
+	var _q5 := _trw_cremote.request(back)
+	_check(not _trw_sconfig.allow_props, "switching the cvar off refuses a restored admin too")
+	_check(not _trw_remote.permit_actor("remote:boss", "cvar"), "and revokes the server-made actors")
+	_trw_slink.release()
+	_trw_clink.release()
+	_trw_swb.queue_free()
+	_trw_cwb.queue_free()
+	_trw_snet.queue_free()
+	_trw_cnet.queue_free()
 	_done()
 
 
@@ -298,6 +318,8 @@ func _test_command_wire() -> void:
 ## ends of a wire.[/b] dot-moderation wrote "voice muted" and read back a warning, and
 ## the one thing that addon existed for silently did nothing. These are cheap and they
 ## are the only thing that checks the pairs.
+var _ew_wire: Dictionary
+
 func _test_event_wire() -> void:
 	_section("every event round-trips")
 
@@ -364,11 +386,16 @@ func _test_event_wire() -> void:
 	line.seq = 5
 	line.sent_at = 1700000000
 
-	var wire := line.to_dictionary()
-	wire["x"] = {"p": 7}
+	_ew_wire = line.to_dictionary()
+	_ew_wire["x"] = {"p": 7}
+	_test_event_wire_2()
+	_test_event_wire_3()
+	_test_event_wire_4()
+
+func _test_event_wire_2() -> void:
 
 	var chat := PlaygroundEvents.read_chat(
-		DotNetReader.new(PlaygroundEvents.write_chat(wire))
+		DotNetReader.new(PlaygroundEvents.write_chat(_ew_wire))
 	)
 	_check(bool(chat["ok"]), "chat: the reader was not exhausted")
 	_check(String(chat["m"]) == "over here", "chat: the text")
@@ -433,6 +460,8 @@ func _test_event_wire() -> void:
 			and carried.direction.distance_to(Vector3(0.0, 0.0, 1.0)) < 0.05,
 		"combat: a death carries the server's fall", str(died)
 	)
+
+func _test_event_wire_3() -> void:
 
 	var clock := PlaygroundEvents.read_match(
 		DotNetReader.new(PlaygroundEvents.write_match(2, 96.0, 3, "Live"))
@@ -499,11 +528,13 @@ func _test_event_wire() -> void:
 	var short := PlaygroundEvents.read_join(DotNetReader.new(truncated.slice(0, 2)))
 	_check(not bool(short["ok"]), "a truncated join is reported as exhausted, not as zeros")
 
+func _test_event_wire_4() -> void:
+
 	# And a truncated chat line. [b]dot-timer found the general shape[/b]: a
 	# `StreamPeerBuffer` reads past its end by returning zeros rather than failing, so a
 	# replay truncated inside its header parsed as a valid replay of nothing.
 	var short_chat := PlaygroundEvents.read_chat(
-		DotNetReader.new(PlaygroundEvents.write_chat(wire).slice(0, 3))
+		DotNetReader.new(PlaygroundEvents.write_chat(_ew_wire).slice(0, 3))
 	)
 	_check(
 		not bool(short_chat["ok"]),
@@ -579,12 +610,15 @@ func _make_manager(
 	return manager
 
 
+var _b_server_side: Node
+var _b_client_side: Node
+
 func _build() -> bool:
 	_section("bringing both halves up")
 
-	var server_side := Node.new()
-	server_side.name = "ServerSide"
-	add_child(server_side)
+	_b_server_side = Node.new()
+	_b_server_side.name = "ServerSide"
+	add_child(_b_server_side)
 
 	# [b]The client gets its own physics space, and a prop is what proves it must.[/b]
 	# One process is one World3D unless somebody asks for a second, so without this the
@@ -610,12 +644,12 @@ func _build() -> bool:
 	client_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(client_view)
 
-	var client_side := Node.new()
-	client_side.name = "ClientSide"
-	client_view.add_child(client_side)
+	_b_client_side = Node.new()
+	_b_client_side.name = "ClientSide"
+	client_view.add_child(_b_client_side)
 
-	_server_game = _make_game(true, &"server", server_side)
-	_client_game = _make_game(false, &"client", client_side)
+	_server_game = _make_game(true, &"server", _b_server_side)
+	_client_game = _make_game(false, &"client", _b_client_side)
 
 	_check(
 		_server_game.get_world_3d() != _client_game.get_world_3d(),
@@ -647,6 +681,9 @@ func _build() -> bool:
 		"so the two now disagree",
 		"%d vs %d" % [_client_game.tick_rate, _server_game.tick_rate]
 	)
+	return _build_2()
+
+func _build_2() -> bool:
 
 	Engine.physics_ticks_per_second = CLIENT_ENGINE_TICK_RATE
 	_check(
@@ -656,9 +693,9 @@ func _build() -> bool:
 			% [Engine.physics_ticks_per_second, _server_game.tick_rate]
 	)
 
-	_server_net = _make_manager(true, &"server", 1, server_side, _server_game.tick_rate)
+	_server_net = _make_manager(true, &"server", 1, _b_server_side, _server_game.tick_rate)
 	_client_net = _make_manager(
-		false, &"client", CLIENT_PEER, client_side, _client_game.tick_rate
+		false, &"client", CLIENT_PEER, _b_client_side, _client_game.tick_rate
 	)
 	# This suite stamps every command itself (`_tick + INPUT_LEAD`), not from the client's
 	# clock, so the client must not ask for dot-net's input-lead report: steered by reports
@@ -670,10 +707,10 @@ func _build() -> bool:
 
 	_server_bridge = PlaygroundNetBridge.new()
 	_server_bridge.name = "Bridge"
-	server_side.add_child(_server_bridge)
+	_b_server_side.add_child(_server_bridge)
 	_client_bridge = PlaygroundNetBridge.new()
 	_client_bridge.name = "Bridge"
-	client_side.add_child(_client_bridge)
+	_b_client_side.add_child(_client_bridge)
 
 	var attached := _server_bridge.attach(_server_game, _server_net, _server_net)
 	_check(attached.ok, "the server bridge attaches", str(attached.error) if not attached.ok else "")
