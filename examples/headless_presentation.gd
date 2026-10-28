@@ -27,7 +27,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 147
+const CHECKS := 149
 
 var _entered := 0
 var _completed := 0
@@ -138,6 +138,11 @@ func _test_ambience_is_quiet_and_obeys_settings() -> void:
 	_check(a.ambient.effective_mood() == &"snow_wind" and a.mood_for_map()["why"] == "name prefix", "a surf map is wind")
 	p.on_map_changed(&"pgc_warehouse")
 	_check(a.ambient.effective_mood() == &"industrial", "the warehouse is machinery")
+	a.map_lookup = func(id: StringName) -> Variant: return {"meta": {"ambient": {"level": 1.6, "lively": true}}} if id == &"zz_doc" else null
+	p.on_map_changed(&"zz_doc")
+	_check(p.ambience != null and is_equal_approx(p.ambience._gain(), p.ambience.level * 1.6), "on_map_changed(id) alone reaches the bed with the map definition's ambient.level through the lookup")
+	p.on_map_changed(&"zz_plain")
+	_check(p.ambience != null and is_equal_approx(p.ambience._gain(), p.ambience.level), "and the next map without one is back at the quiet default")
 	_check(a.ambient.config.enabled and a.ambient.config.volume <= 0.35, "the level is quiet by default (%.2f)" % a.ambient.config.volume)
 	_check(a.ambient.target_level() < 0.5, "and the layer's target level is under half (%.2f)" % a.ambient.target_level())
 

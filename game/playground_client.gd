@@ -474,6 +474,9 @@ func _wire_presentation() -> void:
 			or presentation.audio == null or presentation.fx == null:
 		return
 
+	if presentation.ambient != null:
+		presentation.ambient.map_lookup = func(id: StringName) -> Variant: return playground.maps.catalogue.get_map(id)
+
 	# Both ends: a map change frees the world the live effects are parented into.
 	playground.maps.changed.connect(
 		func(map: DotMapDef, _loaded: Node) -> void: presentation.on_map_changed(map.id if map != null else &"")
