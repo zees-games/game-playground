@@ -294,8 +294,16 @@ signal toys_built()
 ## dot-player-controller's `mp_forceview` and `mp_solidplayers`, and the ambience cvars (`pg_ambient*`): bound by the module
 ## (REPLICATED) and followed by a client through its link.
 var ambient_rules: DotAmbienceRules = PlaygroundAmbience.make_rules()
-var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
+var view_rules: DotPlayerViewRules = make_view_rules()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+
+## The view rules with this game's extra `selfie` view, cycled last (`mp_viewcycle` reorders or drops it).
+static func make_view_rules() -> DotPlayerViewRules:
+	var rules := DotPlayerViewRules.new()
+	rules.register_mode(&"selfie")
+	rules.view_cycle = PackedStringArray(["fp", "tp", "selfie"])
+	return rules
+
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by `_ready`.
 var config_binder: DotGameConfigBinder = null

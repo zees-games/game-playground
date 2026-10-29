@@ -453,3 +453,80 @@ func _test_armed_npcs_2() -> void:
 
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	_done()
+
+
+var _nc_tick := 100000
+
+## Presses V once (a fresh edge) and returns whether the body is in noclip afterwards.
+func _press_noclip(player: PlaygroundPlayer) -> bool:
+	for pressed in [true, false]:
+		var cmd := DotFpsCommand.new()
+		cmd.yaw = player.controller.state.yaw
+		cmd.pitch = player.controller.state.pitch
+		cmd.buttons = DotFpsCommand.BUTTON_NOCLIP if pressed else 0
+		player.controller.apply_command(cmd)
+		_nc_tick += 1
+		player.controller.simulate_tick(_nc_tick, 1.0 / 60.0)
+	return player.controller.state.mode == DotFpsState.Mode.NOCLIP
+
+
+func _test_noclip_is_a_permission() -> void:
+	_section("noclip is a permission")
+
+	var player := playground.add_player(&"nc_bot", "Nc")
+	await get_tree().physics_frame
+	var saved_mode := playground.config.noclip
+
+	playground.config.noclip = "permission"
+	playground.noclip_policy = Callable()
+	playground._sync_noclip_permits()
+	_check(_press_noclip(player), "solo: V toggles noclip on")
+	_check(not _press_noclip(player), "solo: and off again")
+
+	playground.noclip_policy = func(_id: StringName) -> bool: return false
+	playground._sync_noclip_permits()
+	_check(not _press_noclip(player), "online without permission: V does nothing")
+
+	playground.noclip_policy = func(id: StringName) -> bool: return id == &"nc_bot"
+	playground._sync_noclip_permits()
+	_check(_press_noclip(player), "online with the group's permission: V toggles noclip")
+
+	playground.noclip_policy = func(_id: StringName) -> bool: return false
+	playground._sync_noclip_permits()
+	_check(player.controller.state.mode != DotFpsState.Mode.NOCLIP, "losing the permission ends noclip")
+	_check(not _press_noclip(player), "and the key is dead again")
+
+	playground.config.noclip = "everyone"
+	playground._sync_noclip_permits()
+	_check(_press_noclip(player), "mode everyone ignores the policy")
+	_check(not _press_noclip(player), "and toggles off")
+
+	playground.config.noclip = "off"
+	playground.noclip_policy = Callable()
+	playground._sync_noclip_permits()
+	_check(not _press_noclip(player), "mode off: not even solo")
+
+	playground.config.noclip = saved_mode
+	playground.noclip_policy = Callable()
+	playground.remove_player(&"nc_bot")
+	_done()
+
+
+func _test_view_cycle() -> void:
+	_section("the view key cycles first, third, selfie")
+
+	var rules := playground.make_view_rules()
+	_check(rules.next_mode(&"fp") == &"tp", "fp goes to third person first")
+	_check(rules.next_mode(&"tp") == &"selfie", "third person goes to the playground's selfie")
+	_check(rules.next_mode(&"selfie") == &"fp", "selfie wraps to first person")
+
+	var stock := DotPlayerViewRules.new()
+	_check(stock.next_mode(&"tp") == &"fp" and stock.next_mode(&"fp") == &"tp", "the addon's own cycle is first and third only")
+
+	_check(rules.set_cvar("mp_viewcycle", "fp,selfie") and rules.next_mode(&"fp") == &"selfie", "mp_viewcycle reorders the cycle")
+	_check(not rules.set_cvar("mp_viewcycle", ""), "an empty mp_viewcycle is refused")
+	_check(rules.set_cvar("mp_viewcycle", "fp,bogus,tp") and rules.next_mode(&"fp") == &"tp", "an unknown id in the cycle is skipped")
+
+	rules.force_view = DotPlayerViewRules.FIRST_ONLY
+	_check(rules.next_mode(&"fp") == &"fp", "a forced view does not cycle")
+	_done()

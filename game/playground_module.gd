@@ -157,6 +157,7 @@ func _module_load() -> DotResult:
 			"No Playground is registered. Create one before loading this module."
 		)
 
+	game.noclip_policy = _session_may_noclip
 	_add_delivered_maps()
 
 	var netted := _build_netcode()
@@ -1117,6 +1118,16 @@ func _bag_key_for(session_id: int) -> String:
 		return ""
 	var key := PlaygroundPlatform.key_for_session(server, session)
 	return "" if key == "" or key.begins_with("local:") else "bag:" + key
+
+
+## Whether this player's admin session holds the configured noclip flag, `cheats` or root. A player with no session (a bot) may not.
+func _session_may_noclip(player_id: StringName) -> bool:
+	var session := server.session_by_userid(_session_of(player_id)) if server != null else null
+	if session == null:
+		return false
+	var flag := game.config.noclip_flag if game.config != null else DotAdminFlags.NOCLIP
+	return session.has_permission(flag) or session.has_permission(DotAdminFlags.CHEATS) \
+		or session.has_permission(DotAdminFlags.ROOT)
 
 
 ## A world player id back to a dot-server session id, or zero.

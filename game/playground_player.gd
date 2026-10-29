@@ -360,6 +360,10 @@ func build_character(def: DotPlayerCharDef, colour: Color) -> void:
 	refresh_body()
 
 
+## True while the client's camera is left standing in the world (the `selfie` view), so the body shows.
+var detached_view := false
+
+
 ## Whether this player's body is drawn: always, except by the person looking out of it in
 ## first person.
 ##
@@ -369,7 +373,7 @@ func build_character(def: DotPlayerCharDef, colour: Color) -> void:
 ## with its body hidden. It was invisible offline because offline there is nobody else,
 ## and in the one frame anybody had looked at, the body in it was the local player's own.
 func body_shown() -> bool:
-	return not samples_input or view_mode() == &"tp"
+	return not samples_input or view_mode() == &"tp" or detached_view
 
 
 ## Puts [method body_shown] onto the body. Called whenever either half of it can change: the

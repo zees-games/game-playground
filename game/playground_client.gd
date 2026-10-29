@@ -738,6 +738,12 @@ func _net_physics(delta: float) -> void:
 				PlaygroundZee.note_drawn(player, rig, drawn_command, 1.0 / float(maxi(playground.tick_rate, 1)))
 
 
+const VIEW_NAMES := {&"fp": "first person", &"tp": "third person", &"selfie": "selfie"}
+
+## The camera of the `selfie` view, left standing where the player was.
+var selfie_camera: Camera3D = null
+
+
 func _build_view() -> void:
 	camera = Camera3D.new()
 	camera.name = "Camera"
@@ -2813,29 +2819,71 @@ func _toggle_view() -> void:
 	if player == null or player.controller_switch == null:
 		return
 
-	# Where the server's `mp_forceview` allows: the other view, or a line saying why not.
-	var third := player.view_mode() == &"tp"
-	var wanted := playground.view_rules.toggled(third)
-	if wanted == third:
+	# The next view in `mp_viewcycle` that `mp_forceview` allows, or a line saying why not.
+	var current := view_id()
+	var wanted := playground.view_rules.next_mode(current)
+	if wanted == current:
 		if hud != null and playground.view_rules.refusal() != "":
 			hud.notice(playground.view_rules.refusal())
 		return
 
-	var now := player.set_view_mode(wanted)
+	apply_view(wanted)
+
+
+## Shows [param mode] (`fp`, `tp` or `selfie`) and says which.
+func apply_view(mode: StringName) -> void:
+	var selfie := mode == &"selfie"
+	player.detached_view = selfie
+	var now := player.set_view_mode(mode == &"tp")
 	_guard_rig()
+	if selfie:
+		_place_selfie_camera()
+	else:
+		_adopt_view_camera(now)
 	if hud != null:
-		hud.notice("View: %s" % ("third person" if now == &"tp" else "first person"))
+		hud.notice("View: %s" % VIEW_NAMES.get(mode, str(mode)))
+
+
+## The view on screen: `selfie` is the first-person motor seen from a camera left standing in front of the player.
+func view_id() -> StringName:
+	if player == null:
+		return &"fp"
+	return &"selfie" if player.detached_view else player.view_mode()
+
+
+## Leaves a camera standing 3 m in front of the player, looking back at them, and keeps it there while they move.
+func _place_selfie_camera() -> void:
+	if selfie_camera == null or not is_instance_valid(selfie_camera):
+		selfie_camera = Camera3D.new()
+		selfie_camera.name = "SelfieCamera"
+		selfie_camera.top_level = true
+		add_child(selfie_camera)
+	var eye := player.render_eye_position()
+	var forward := -camera.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized() if forward.length() > 0.001 else Vector3.FORWARD
+	selfie_camera.fov = 75.0
+	selfie_camera.global_position = eye + forward * 3.0 + Vector3.UP * 0.4
+	selfie_camera.look_at(eye - Vector3.UP * 0.3, Vector3.UP)
+	selfie_camera.make_current()
 
 
 ## The server changed `mp_forceview`: the view it allows now.
 func _on_view_rules_changed() -> void:
 	if player == null or player.controller_switch == null:
 		return
-	var third := player.view_mode() == &"tp"
+	var current := view_id()
+	var third := current != &"fp"
 	var allowed := playground.view_rules.resolve(third)
 	if allowed != third:
-		var _now := player.set_view_mode(allowed)
-		_guard_rig()
+		apply_view(&"tp" if allowed else &"fp")
+
+
+## The first-person camera holds the hands, so it must be the current one again on the way back
+## from third person (the rig took the viewport's camera and nothing gave it back).
+func _adopt_view_camera(mode: StringName) -> void:
+	if mode == &"fp" and camera != null and is_instance_valid(camera):
+		camera.make_current()
 
 
 ## The third-person rig's boom stops at the level and props, never people, and its fade is
@@ -3063,11 +3111,11 @@ func _present_zee() -> Vector2:
 	if rig == null or zee_view == null:
 		return Vector2.ZERO
 
-	zee_view.visible = player.view_mode() != &"tp"
+	zee_view.visible = view_id() == &"fp"
 	# Down the sights: only first person, with the pointer on the view and no menu up.
 	var hands := zee_view as ZeeViewModel
 	if hands != null:
-		hands.aim(_aiming and mouse_drives_view() and not _menu_is_open() and player.view_mode() != &"tp")
+		hands.aim(_aiming and mouse_drives_view() and not _menu_is_open() and view_id() == &"fp")
 	var state := player.controller.state
 	rig.drive_view(Vector2.ZERO, player.speed(), state.is_grounded(), state.is_crouched())
 	return rig.view_punch()

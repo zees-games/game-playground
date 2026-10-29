@@ -74,6 +74,12 @@ extends DotConfig
 ## Fraction of the players who must rock the vote to end a map early.
 @export_range(0.0, 1.0, 0.05) var rtv_fraction: float = 0.6
 
+## Who may toggle noclip with V: `off` nobody, `permission` a player holding [member noclip_flag] (or `cheats`, or root) on a server and everybody in solo, `everyone` every player.
+@export var noclip: String = "permission"
+
+## The admin flag (cfg groups.yml) that grants noclip under `permission`.
+@export var noclip_flag: String = "noclip"
+
 @export_group("Undo")
 
 ## Whether undoing something plays a cue for the player who undid it.

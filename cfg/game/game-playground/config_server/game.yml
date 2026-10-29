@@ -22,6 +22,10 @@
 # map_rotation_file: "cfg/maps.yml"
 # Fraction of the players who must rock the vote to end a map early. [0.0..1.0]
 # rtv_fraction: 0.6
+# Who may toggle noclip with V: `off` nobody, `permission` a player holding noclip_flag (or `cheats`, or root...
+# noclip: "permission"
+# The admin flag (cfg groups.yml) that grants noclip under `permission`.
+# noclip_flag: "noclip"
 
 # --- Records
 # Where records are kept. Empty keeps them in memory only.
