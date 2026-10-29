@@ -27,7 +27,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 149
+const CHECKS := 152
 
 var _entered := 0
 var _completed := 0
@@ -429,6 +429,17 @@ func _test_sounds_and_effects() -> void:
 		refused.priority > landed.priority,
 		"and outranks a crate hitting the floor, because it answers something you did"
 	)
+
+	OS.delay_msec(150)
+	sink.forget()
+	p.on_undo(Vector3(3, 0, 3), 1.0, false)
+	_check(sink.count_of(&"undo") == 1, "an undo makes a noise")
+	OS.delay_msec(150)
+	sink.forget()
+	var spatial := p.on_undo(Vector3(3, 0, 3), 1.0, true)
+	_check(sink.count_of(&"undo_at") == 1 and spatial["at"] == Vector3(3, 0, 3), "which can come from where the thing was")
+	sink.forget()
+	_check(p.on_undo(Vector3.ZERO, 0.0, false).is_empty() and sink.count_of(&"undo") == 0, "and is silent at volume zero")
 
 	p.settings.set_value(&"shake_scale", 0.0)
 	p.on_tool_punt(Vector3.ZERO, true)

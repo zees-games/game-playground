@@ -299,7 +299,33 @@ func playground_receive(msg: Dictionary) -> void:
 		var hook: Node = playground.find_child("Addon_pg_natural_disasters", true, false)
 		_check(hook != null and bool(hook.manager.call("is_active", &"tornado")), "and it is running")
 		_check(not told_everyone.is_empty(), "and every client is told")
+		_check(hook.manager.get("players_fn").is_valid() and hook.manager.get("player_push_fn").is_valid(),
+			"and players are wired to be pushed by it")
 		hook.manager.call("stop")
+
+		# Undo takes a disaster away like a prop, in spawn order, with a cue.
+		var heard: Array = []
+		playground.undone.connect(func(who: StringName, _at: Vector3) -> void: heard.append(who))
+		var announced: Array = []
+		playground.addon_message.connect(func(a: String, b: Dictionary) -> void: announced.append(a))
+		playground.props.spawn(&"barrel", &"bot", Vector3(0, 2, 0))
+		for kind in ["tornado", "blizzard"]:
+			var begun := playground.activate_addon_item("pg_natural_disasters/" + kind, 0, Vector3(30, 0, 30), &"bot")
+			_check(begun.ok and bool(hook.manager.call("is_active", StringName(kind))), "%s runs" % kind)
+			heard.clear()
+			announced.clear()
+			_check(playground.undo(&"bot") and not bool(hook.manager.call("is_active", StringName(kind))),
+				"undo stops the %s" % kind)
+			_check(heard == [&"bot"] and announced.has(PlaygroundAddons.UNDO_ADDON),
+				"and the cue is asked for and announced to the clients")
+		var count_before: int = playground.props.world_count()
+		_check(playground.undo(&"bot") and playground.props.world_count() == count_before - 1,
+			"and the prop spawned before them is the next to go")
+		_check(not playground.undo(&"bot"), "then nothing is left to undo")
+		var told_heard: Array = []
+		playground.undone.connect(func(who: StringName, at: Vector3) -> void: told_heard.append([who, at]))
+		_check(playground.addons.deliver(PlaygroundAddons.UNDO_ADDON, {"undo": "me", "at": [1.0, 2.0, 3.0]})
+			and told_heard == [[&"me", Vector3(1, 2, 3)]], "a client hears who undid, and where")
 
 	# --- The waypoint tool ------------------------------------------------------------------------
 	var def := playground.weapon_def(&"toolgun")

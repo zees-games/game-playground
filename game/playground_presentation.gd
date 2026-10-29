@@ -371,6 +371,27 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	grab.priority = 60
 	c.add(grab)
 
+	var undo := DotAudioDef.new()
+	undo.id = &"undo"
+	undo.path = "%s/undo.ogg" % SOUND_DIR
+	undo.bus = &"UI"
+	undo.cooldown_ms = 120
+	undo.priority = 60
+	undo.pitch_min = 0.7
+	undo.pitch_max = 0.8
+	c.add(undo)
+
+	var undo_at := DotAudioDef.new()
+	undo_at.id = &"undo_at"
+	undo_at.path = "%s/undo.ogg" % SOUND_DIR
+	undo_at.kind = DotAudioDef.Kind.POSITIONAL_3D
+	undo_at.bus = &"SFX"
+	undo_at.cooldown_ms = 120
+	undo_at.priority = 60
+	undo_at.pitch_min = 0.7
+	undo_at.pitch_max = 0.8
+	c.add(undo_at)
+
 	var punt := DotAudioDef.new()
 	punt.id = &"tool_punt"
 	punt.path = "%s/tool_punt.ogg" % SOUND_DIR
@@ -494,6 +515,8 @@ static func sound_recipes() -> Dictionary:
 		&"glass_break": DotAudioSynth.Voice.SHOT_TIGHT,
 		&"splash": DotAudioSynth.Voice.SHOT_HEAVY,
 		&"tool_grab": DotAudioSynth.Voice.CLICK,
+		&"undo": DotAudioSynth.Voice.SPAWN,
+		&"undo_at": DotAudioSynth.Voice.SPAWN,
 		&"tool_punt": DotAudioSynth.Voice.SHOT,
 		&"buy": DotAudioSynth.Voice.PICKUP,
 		&"refused": DotAudioSynth.Voice.DENY,
@@ -958,6 +981,17 @@ func on_tool_punt(at: Vector3, mine: bool) -> void:
 
 func on_bought() -> void:
 	audio.play(&"buy")
+
+
+## The undo cue. Returns what was asked of the audio, so a test can see the request without ears.
+func on_undo(at: Vector3, volume: float, spatial: bool) -> Dictionary:
+	if volume <= 0.0:
+		return {}
+	if spatial and at != Vector3.ZERO:
+		audio.play_at(&"undo_at", at, volume)
+	else:
+		audio.play(&"undo", volume)
+	return {"id": &"undo", "at": at if spatial else Vector3.ZERO, "volume": volume}
 
 
 func on_refused() -> void:

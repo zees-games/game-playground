@@ -27,6 +27,10 @@ func playground_register(menu) -> void:
 	manager.set("authority", menu.authoritative)
 	# The sandbox's props are the bodies a tornado should throw, wherever they were put.
 	manager.set("bodies_fn", _bodies)
+	# Without these a tornado never reaches a player: they are not in the addon's group, and a
+	# controller overwrites a plain velocity write on its next tick.
+	manager.set("players_fn", _players)
+	manager.set("player_push_fn", _push_player)
 	manager.set("send_fn", menu.send_fn)
 	add_child(manager)
 
@@ -52,7 +56,33 @@ func _start(ctx, kind_id: StringName) -> DotResult:
 		return DotResult.fail(DotError.CODE_STATE, "natural-disasters is not linked")
 
 	var overrides := {"origin": ctx.at}
-	return manager.call("start", kind_id, overrides)
+	var started: DotResult = manager.call("start", kind_id, overrides)
+	if started.ok and started.value != null:
+		# One undo entry per spawn; stopping it sends the stop message every client's view obeys.
+		var event_id: int = int(started.value.get("id"))
+		ctx.push_undo(_stop.bind(event_id))
+	return started
+
+
+func _stop(event_id: int) -> void:
+	if manager != null:
+		manager.call("stop", event_id)
+
+
+func _players() -> Array:
+	var out: Array = []
+	var game: Variant = _host.get("players") if _host != null else null
+	if game is Dictionary:
+		for body in (game as Dictionary).values():
+			if body is Node3D and is_instance_valid(body):
+				out.append(body)
+	return out
+
+
+func _push_player(player: Node3D, dv: Vector3, _ev: Object) -> void:
+	var controller: Variant = player.get("controller")
+	if controller is Object and (controller as Object).has_method("apply_external_velocity"):
+		(controller as Object).call("apply_external_velocity", dv)
 
 
 func _bodies() -> Array:

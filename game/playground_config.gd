@@ -74,6 +74,17 @@ extends DotConfig
 ## Fraction of the players who must rock the vote to end a map early.
 @export_range(0.0, 1.0, 0.05) var rtv_fraction: float = 0.6
 
+@export_group("Undo")
+
+## Whether undoing something plays a cue for the player who undid it.
+@export var undo_sound: bool = true
+
+## Volume of that cue, 0 to 2 (1 is the catalogue's level).
+@export_range(0.0, 2.0, 0.05) var undo_sound_volume: float = 1.0
+
+## Whether the cue comes from where the undone thing was instead of the player's own ears.
+@export var undo_sound_spatial: bool = false
+
 @export_group("Records")
 
 ## Where records are kept. Empty keeps them in memory only.
@@ -188,7 +199,7 @@ extends DotConfig
 
 ## `@export_group` -> the cfg file it lives in: `cfg/game/game-playground/config_<file>/game.yml`.
 const CFG_FILES := {
-	"Content": "server", "Rules": "server", "Records": "server", "Server": "server",
+	"Content": "server", "Rules": "server", "Undo": "props", "Records": "server", "Server": "server",
 	"Props": "props",
 	"Arena": "arena", "Economy": "arena",
 }

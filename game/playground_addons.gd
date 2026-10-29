@@ -28,6 +28,8 @@ const CHANNEL := "pg.addons"
 const HOOK_FILE := "playground_hook.gd"
 const REGISTER := "playground_register"
 const RECEIVE := "playground_receive"
+## The "addon" a game-made message carries when the game itself, not a hook, speaks to the clients.
+const UNDO_ADDON := "playground.undo"
 
 ## The spawn provider contract: `res://addons/<pack>/spawn_provider.gd`, or any object registered
 ## in [DotRegistry] under a name starting with [constant REGISTRY_PREFIX]. See docs/spawn-providers.md.
@@ -79,6 +81,12 @@ class Context:
 	## The player's id in the simulation, where [member player_id] is the network session.
 	var who: StringName = &""
 	var _sender: Callable = Callable()
+	var _undo_sink: Callable = Callable()
+
+	## Makes [param undo_fn] what the undo key does next for [member who], in order among their props. Runs on the authority.
+	func push_undo(undo_fn: Callable) -> void:
+		if _undo_sink.is_valid() and who != &"":
+			_undo_sink.call(who, undo_fn, at)
 
 	## Tells every client, as a dictionary. The hook's `playground_receive` gets it there.
 	func send(message: Dictionary) -> void:
@@ -112,6 +120,12 @@ class Menu:
 
 ## Fired when something wants every client told: the addon's folder name and the message.
 signal message(addon: String, body: Dictionary)
+
+## The authority said [param who] undid something; the game plays the cue for its own player.
+signal undo_heard(who: StringName, at: Vector3)
+
+## Set by the game: `(who, undo_fn, at)`, the undo stack's push.
+var undo_sink: Callable = Callable()
 
 var _items: Array[Item] = []
 var _hooks: Dictionary = {}
@@ -553,6 +567,7 @@ func activate(key: String, ctx: Context) -> DotResult:
 		return DotResult.fail(DotError.CODE_INVALID, "no addon item %s" % key)
 
 	ctx._sender = func(body: Dictionary) -> void: message.emit(item.addon, body)
+	ctx._undo_sink = undo_sink
 	var out: Variant = item.callback.call(ctx)
 
 	if out is DotResult:
@@ -563,6 +578,12 @@ func activate(key: String, ctx: Context) -> DotResult:
 
 ## A message the authority sent, on a client: handed to the hook that sent it.
 func deliver(addon: String, body: Dictionary) -> bool:
+	if addon == UNDO_ADDON:
+		var at: Variant = body.get("at", [])
+		var point := Vector3(float(at[0]), float(at[1]), float(at[2])) if at is Array and (at as Array).size() == 3 else Vector3.ZERO
+		undo_heard.emit(StringName(str(body.get("undo", ""))), point)
+		return true
+
 	var hook: Variant = _hooks.get(addon)
 
 	if hook == null or not hook.has_method(RECEIVE):

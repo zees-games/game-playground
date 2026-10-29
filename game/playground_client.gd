@@ -68,6 +68,9 @@ const SPAWN_REACH := 3.0
 const FALLBACK_MAP := &"pg_flatgrass"
 
 @export var player_id: StringName = &"local"
+
+## What the last undo cue asked of the audio (tests read it).
+var last_undo_cue: Dictionary = {}
 @export var display_name: String = "Player"
 
 ## Configuration handed to the [Playground] this builds, or null for the defaults.
@@ -480,6 +483,8 @@ func _wire_presentation() -> void:
 	playground.pane_broken.connect(func(_index: int, at: Vector3, _material: StringName) -> void:
 		presentation.on_pane_broken(at)
 	)
+
+	playground.undone.connect(_on_undone)
 
 	if bridge != null:
 		bridge.prop_arrived.connect(func(at: Vector3, owner_session: int) -> void:
@@ -1687,7 +1692,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if bridge != null:
 			bridge.ask_undo()
 		else:
-			playground.props.undo(player_id)
+			playground.undo(player_id)
 	elif key.is_action(PlaygroundBindings.VEHICLE):
 		_use_vehicle()
 	elif key.is_action(PlaygroundBindings.RELOAD):
@@ -2690,12 +2695,20 @@ func _on_build_chosen(build_name: String) -> void:
 		bridge.ask_load_build(build_name)
 
 
+## The cue for this player's own undo; the others' undos are not their business.
+func _on_undone(who: StringName, at: Vector3) -> void:
+	var cfg: PlaygroundConfig = playground.config
+	if who != player_id or presentation == null or (cfg != null and not cfg.undo_sound):
+		return
+	last_undo_cue = presentation.on_undo(at, cfg.undo_sound_volume if cfg != null else 1.0, cfg != null and cfg.undo_sound_spatial)
+
+
 func _on_menu_action(action: StringName) -> void:
 	match action:
 		&"undo":
 			if bridge != null:
 				bridge.ask_undo()
-			elif not playground.props.undo(player_id) and hud != null:
+			elif not playground.undo(player_id) and hud != null:
 				hud.notice("Nothing to undo.")
 		&"unfreeze":
 			_unfreeze_all()

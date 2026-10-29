@@ -1504,7 +1504,7 @@ func _on_request(message: DotNetMessage) -> void:
 						if toy != null:
 							toy.armed = prop_id
 		PlaygroundEvents.Ask.UNDO:
-			game.props.undo(id)
+			game.undo(id)
 		PlaygroundEvents.Ask.CLEAR_MINE:
 			game.props.clear_player(id)
 		PlaygroundEvents.Ask.RESTART:

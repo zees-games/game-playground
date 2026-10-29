@@ -1895,7 +1895,7 @@ func _cmd_build_delete(ctx: DotCmdContext) -> void:
 func _cmd_undo(ctx: DotCmdContext) -> void:
 	var id := _target(ctx, false)
 
-	if id == &"" or not game.props.undo(id):
+	if id == &"" or not game.undo(id):
 		ctx.reply("Nothing to undo.")
 		return
 

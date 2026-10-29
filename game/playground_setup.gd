@@ -26,6 +26,7 @@ const ToolPhysprop := preload("toolgun/tool_physprop.gd")
 const PlaygroundMaterials := preload("playground_materials.gd")
 const PlaygroundAddons := preload("playground_addons.gd")
 const PlaygroundProfiles := preload("playground_profiles.gd")
+const PlaygroundUndo := preload("playground_undo.gd")
 
 ## The playground: a sandbox on a flat grass plate with spawnable props and a physics gun. Any map a server adds plays here too;
 ## a run timer comes only from `addons/pg_timer` (see [member run_timer]). Nothing is networked here: the bridge is dot-net's.
@@ -113,6 +114,13 @@ var profile_roots := PackedStringArray()
 
 ## An addon's callback has something every client must be told; the net bridge sends it.
 signal addon_message(addon: String, body: Dictionary)
+
+## [param who] undid something (a prop, or a disaster an addon registered); [param at] is where it was, or zero. Fires on
+## the authority, and on a client when the authority says so, so a client plays its own player's cue from this.
+signal undone(who: StringName, at: Vector3)
+
+## What each player may undo, props and addon-made things in spawn order. See [PlaygroundUndo].
+var undo_stack: PlaygroundUndo = null
 
 ## Whether [signal ready_for_players] has been emitted. See that signal.
 var booted: bool = false
@@ -425,6 +433,11 @@ func _build_addons() -> void:
 	addons.message.connect(func(addon: String, body: Dictionary) -> void:
 		addon_message.emit(addon, body)
 	)
+	undo_stack = PlaygroundUndo.new()
+	undo_stack.attach(props)
+	addons.undo_sink = undo_stack.push
+	undo_stack.undone.connect(_on_undone)
+	addons.undo_heard.connect(func(who: StringName, at: Vector3) -> void: undone.emit(who, at))
 	profiles = PlaygroundProfiles.new()
 	profiles.setup(profile_roots)
 	profiles.apply_npcs(props.catalogue)
@@ -433,6 +446,16 @@ func _build_addons() -> void:
 	var count := addons.scan(self, authoritative)
 	var providers := addons.scan_providers(self)
 	DotLog.info(CHANNEL, "addons folder scanned", {"hooks": count, "providers": providers, "plain": addons.skipped().size()})
+
+
+## Undoes [param who]'s newest spawn, prop or disaster. False when there is nothing to undo.
+func undo(who: StringName) -> bool:
+	return undo_stack != null and undo_stack.undo(who)
+
+
+func _on_undone(who: StringName, at: Vector3) -> void:
+	undone.emit(who, at)
+	addon_message.emit(PlaygroundAddons.UNDO_ADDON, {"undo": String(who), "at": [at.x, at.y, at.z]})
 
 
 ## A profile edit landed (here, or from the server): new spawns read the new numbers at once; live
