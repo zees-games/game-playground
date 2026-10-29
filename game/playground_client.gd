@@ -759,6 +759,7 @@ func _build_view() -> void:
 	camera.current = true
 	player.add_child(camera)
 	_build_view_arms()
+	_arm_toy_view(tool)
 
 	# Somebody walking into the first-person camera is hidden at the lens. The third-person
 	# camera is dot-player-controller's rig, which has a fade of its own (`_build_view_switch`).
@@ -3117,7 +3118,7 @@ func _arm_toy_view(id: StringName) -> void:
 	if zee_view != null or camera == null or id == &"":
 		return
 	var def := playground.weapon_def(id) if playground != null else null
-	var colour := def.colour if def != null else Color(0.9, 0.55, 0.2)
+	var colour := def.colour if def != null else (Color(0.55, 0.4, 0.9) if id == TOOL_GRAV else Color(0.9, 0.55, 0.2))
 	toy_view = PlaygroundToyView.make(id, colour)
 	camera.add_child(toy_view)
 

@@ -44,14 +44,15 @@ func _process(delta: float) -> void:
 func _build(tool_id: StringName, colour: Color) -> void:
 	var grip := Node3D.new()
 	grip.name = "Grip"
-	grip.position = Vector3(0.22, -0.2, -0.45)
+	grip.position = Vector3(0.2, -0.22, -0.5)
+	grip.rotation_degrees = Vector3(0.0, 6.0, 0.0)
 	add_child(grip)
 	var long_barrel := tool_id != &"impulse"
-	var body := _box(Vector3(0.07, 0.1, 0.28), colour)
+	var body := _box(Vector3(0.07, 0.08, 0.26), colour)
 	grip.add_child(body)
 	if long_barrel:
-		var barrel := _box(Vector3(0.035, 0.035, 0.22), colour.darkened(0.35))
-		barrel.position = Vector3(0.0, 0.02, -0.24)
+		var barrel := _box(Vector3(0.05, 0.05, 0.22), colour.darkened(0.35))
+		barrel.position = Vector3(0.0, 0.01, -0.24)
 		grip.add_child(barrel)
 	else:
 		var dome := MeshInstance3D.new()
@@ -62,6 +63,9 @@ func _build(tool_id: StringName, colour: Color) -> void:
 		dome.material_override = _material(colour.lightened(0.2))
 		dome.position = Vector3(0.0, 0.0, -0.17)
 		grip.add_child(dome)
+	var handle := _box(Vector3(0.045, 0.1, 0.05), colour.darkened(0.5))
+	handle.position = Vector3(0.0, -0.08, 0.08)
+	grip.add_child(handle)
 
 
 func _box(size: Vector3, colour: Color) -> MeshInstance3D:
