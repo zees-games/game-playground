@@ -263,6 +263,7 @@ func _build_npc_world() -> void:
 	projectiles.catalogue = PlaygroundZee.catalogue()
 	projectiles.rules = grenade_rules
 	projectiles.add_board(npc_sounds, npc_world.now)
+	projectiles.effects.senses = npc_senses
 	add_child(projectiles)
 
 

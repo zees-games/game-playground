@@ -308,6 +308,13 @@ func _test_aw_grenades() -> void:
 		await get_tree().physics_frame
 	_check(smoke != null and fire != null and zones.active_smokes() == 1, "a smoke grenade leaves a cloud")
 	_check(zones.active_fires() == 1, "an incendiary leaves a fire zone")
+	var senses: DotNpcSenses = zones.senses
+	var through := senses != null and senses.sight_blocked(Vector3(40, 1.0, 34), Vector3(40, 1.0, 46))
+	var beside := senses != null and senses.sight_blocked(Vector3(60, 1.0, 34), Vector3(60, 1.0, 46))
+	_check(through and not beside, "smoke blocks an NPC's sight through the cloud and nowhere else")
+	zones.clear()
+	_check(senses != null and not senses.sight_blocked(Vector3(40, 1.0, 34), Vector3(40, 1.0, 46)),
+		"and the blocker goes with the cloud")
 
 	# A flash two metres from the bot, in the open: it is blinded, once, and the ledger holds it.
 	_g_bot.teleport(Vector3(50, 1.0, 50), 0.0)

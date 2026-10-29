@@ -1199,6 +1199,13 @@ func _admit(peer_id: int) -> void:
 			behaviour.net_position
 		))
 
+	# Grenades already in the air: a launch is sent once, so a joiner never saw them.
+	if game.projectiles != null:
+		for launch: Dictionary in game.projectiles.join_launches():
+			_tell(peer_id, PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_launch(
+				int(launch["serial"]), launch["spawn"], launch["owner_id"], bool(launch["sticks"])
+			))
+
 	# And their own bag, whole — to them and to nobody else. A player who reconnects is
 	# somebody with a bag already, and a client that waited for the next change to learn
 	# what it is carrying would show an empty grid until it bought something.

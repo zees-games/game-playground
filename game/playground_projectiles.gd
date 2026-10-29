@@ -217,6 +217,26 @@ func in_flight() -> Array:
 	return out
 
 
+## Each live projectile as a launch a joining client can fly on from where it is now: `{serial, spawn, owner_id, sticks}`,
+## with the fuse and life left rather than the ones it left the hand with.
+func join_launches() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+
+	for f in _live:
+		var s := DotWeaponSpawn.new()
+		s.id = f.spawn.id
+		s.origin = f.position
+		s.velocity = f.velocity
+		s.gravity_scale = f.spawn.gravity_scale
+		s.radius = f.spawn.radius
+		s.splash_radius = f.spawn.splash_radius
+		s.fuse_ticks = maxi(f.grenade.fuse, 0) if f.grenade != null else 0
+		s.life_ticks = maxi(f.spawn.life_ticks - f.age_ticks, 1)
+		out.append({"serial": f.serial, "spawn": s, "owner_id": f.owner_id, "sticks": f.sticks})
+
+	return out
+
+
 ## Takes everything out of the air without detonating any of it. For a map change: the
 ## geometry they are flying through is about to stop existing.
 func clear() -> void:

@@ -38,6 +38,10 @@ func _run() -> void:
 	await get_tree().create_timer(0.25).timeout
 	for i in 3:
 		await get_tree().process_frame
+	# Frames under xvfb are slow and the flash fades on wall time: freeze it at the config's cap for the shot.
+	_client.hud.set_process(false)
+	_client.hud.flash_overlay.color = Color(1, 1, 1, _client.presentation.fx.config.flash_cap)
+	await get_tree().process_frame
 	await _shot("flash")
 	get_tree().quit(0)
 

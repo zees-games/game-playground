@@ -25,6 +25,10 @@ var projectiles: Node = null
 var _regions: Array[Dictionary] = []
 var _bodies: Array = []
 var _owners: Array[StringName] = []
+## dot-npc's senses, when the game has them: a smoke cloud registers a sight blocker there. Set by the world.
+var senses: DotNpcSenses = null
+## Smoke clouds up: `{id, left}`, the blocker's id in [member senses] and its seconds to go.
+var _blockers: Array[Dictionary] = []
 ## What the last [method detonate] left, for the wire: `{fx, seconds}` or empty.
 var _last: Dictionary = {}
 
@@ -51,6 +55,7 @@ func detonate(g: AwGrenade, def: DotWeaponDef, owner_id: StringName, radius: flo
 
 func tick(delta: float) -> void:
 	zones.tick(delta)
+	_age_blockers(delta)
 	for i in range(_regions.size() - 1, -1, -1):
 		_regions[i]["left"] = float(_regions[i]["left"]) - delta
 		if float(_regions[i]["left"]) <= 0.0:
@@ -59,6 +64,7 @@ func tick(delta: float) -> void:
 
 func clear() -> void:
 	zones.clear()
+	_drop_blockers()
 	_regions.clear()
 
 
@@ -82,9 +88,39 @@ func _on_effect(info: Dictionary) -> void:
 				blinded.emit(StringName(str(body.get("player_id"))), float(info["seconds"]))
 		AwUtilityZones.Fx.SMOKE, AwUtilityZones.Fx.FIRE:
 			_last = {"fx": int(info["fx"]), "seconds": float(info["seconds"])}
+			if int(info["fx"]) == AwUtilityZones.Fx.SMOKE:
+				_block_sight(info["position"], float(info["radius"]), float(info["seconds"]))
 			if int(info["fx"]) == AwUtilityZones.Fx.FIRE:
 				_regions.append({"position": info["position"], "radius": float(info["radius"]), "left": float(info["seconds"])})
 			effect.emit(info)
+
+
+## Zombies and NPCs stop seeing through a cloud (hearing passes) until it ends; dot-npc API 6.
+func _block_sight(at: Vector3, radius: float, seconds: float) -> void:
+	if senses == null or DotAddonApi.build_level("dot_npc") < 6:
+		return
+
+	# Until removed (seconds 0): the senses' own clock is only set when an NPC decides.
+	_blockers.append({"id": senses.add_sight_blocker(at + Vector3(0.0, 1.0, 0.0), radius), "left": seconds})
+
+
+func _age_blockers(delta: float) -> void:
+	for i in range(_blockers.size() - 1, -1, -1):
+		_blockers[i]["left"] = float(_blockers[i]["left"]) - delta
+
+		if float(_blockers[i]["left"]) <= 0.0:
+			if senses != null:
+				senses.remove_sight_blocker(int(_blockers[i]["id"]))
+
+			_blockers.remove_at(i)
+
+
+func _drop_blockers() -> void:
+	for b in _blockers:
+		if senses != null:
+			senses.remove_sight_blocker(int(b["id"]))
+
+	_blockers.clear()
 
 
 ## Everyone in a fire or in this blast. Ids are indexes into [member _bodies], good until the next call.

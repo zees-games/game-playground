@@ -783,6 +783,42 @@ func _test_drawn_ammo_corrected_2() -> void:
 	_done()
 
 
+func _test_grenade_for_a_joiner() -> void:
+	_section("a grenade already in the air is sent to a player who joins")
+	await _disconnect()
+	_server_game.projectiles.clear()
+	_client_game.projectiles.clear()
+
+	var outcome := DotWeaponOutcome.new()
+	var spawn := DotWeaponSpawn.new()
+	spawn.id = &"frag"
+	spawn.origin = Vector3(-40, 8, -40)
+	spawn.velocity = Vector3(1, 3, 0)
+	spawn.gravity_scale = 1.0
+	spawn.radius = 0.08
+	spawn.splash_radius = 5.2
+	spawn.fuse_ticks = _server_game.tick_rate * 3
+	spawn.life_ticks = _server_game.tick_rate * 4
+	outcome.spawns.append(spawn)
+	_server_game.projectiles.accept(outcome, &"u1")
+	await _steps(6)
+	_check(_server_game.projectiles.live_count() == 1 and _client_game.projectiles.live_count() == 0,
+		"it flies on the server while nobody is connected to be told")
+
+	await _reconnect(SESSION)
+	_check(_client_game.projectiles.live_count() == 1,
+		"the joiner is told about it on join, not only about launches after",
+		"%d on the client" % _client_game.projectiles.live_count())
+	var theirs := _client_game.projectiles.flying()
+	var ours := _server_game.projectiles.flying()
+	_check(not theirs.is_empty() and not ours.is_empty()
+			and theirs[0].position.distance_to(ours[0].position) < 3.0,
+		"and its copy is near where the server's is, not back at the thrower's hand")
+	_server_game.projectiles.clear()
+	_client_game.projectiles.clear()
+	_done()
+
+
 func _test_leave() -> void:
 	_section("leaving")
 
