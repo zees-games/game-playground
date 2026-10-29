@@ -25,25 +25,9 @@ const PlaygroundInventory := preload("../game/playground_inventory.gd")
 const PlaygroundInventoryNet := preload("../game/net/playground_inventory_net.gd")
 const PlaygroundRequest := preload("../game/net/playground_request.gd")
 
-## game-playground over the wire: a real server, a real client, and a lossy loopback
-## between them.
+## game-playground over the wire: a real server, a real client, and a lossy loopback between them.
 ##
-## [codeblock]
-## godot --headless --path . res://examples/headless_net.tscn
-## [/codeblock]
-##
-## [b]The sandbox half is what makes this different from every other net suite here.[/b]
-## Every one of them replicates players and nothing else. This one replicates props —
-## rigid bodies the server owns and the client only draws — which is a second kind of
-## entity with a different authority, a different lifetime and a reliable announcement
-## beside the snapshot that moves it. Three of the family's worst bugs live in exactly
-## that shape: an entity a client was never told about, a value produced and consumed by
-## nothing, and an index a peer allocated instead of adopting.
-##
-## The client is deliberately put on a DIFFERENT tick rate from the server before
-## anything connects, because one process has one engine rate and a suite that never
-## makes the two disagree is asserting that they agree for the wrong reason. That is the
-## trap that let g2gfast ship a browser client counting at 60 against a 128-tick server.
+## The sandbox half replicates props: server-owned rigid bodies a client only draws, with a reliable announcement beside the snapshot. The client runs on a DIFFERENT tick rate from the server, because one process has one engine rate and agreeing would pass for the wrong reason. Run: `godot --headless --path . res://examples/headless_net.tscn`
 
 const CLIENT_PEER := 2
 const SESSION := 7
@@ -71,10 +55,9 @@ var _to_client: Array[Dictionary] = []
 var _to_server: Array[Dictionary] = []
 var _drop_every: int = 0
 
-## One-way transit, in ticks, that the loopback holds every message for before delivering
-## it. Zero everywhere but the vehicle's round-trip measurement, which is the one place a
-## link with no transit time would flatter the answer. Deliveries stay in order when it
-## changes: see [method _enqueue].
+## One-way transit, in ticks, that the loopback holds every message for. Zero except the vehicle's
+## round-trip measurement, where no transit time would flatter the answer; deliveries stay in order
+## when it changes (see [method _enqueue]).
 var _delay_ticks: int = 0
 var _last_due_to_client: int = 0
 var _last_due_to_server: int = 0
@@ -286,7 +269,7 @@ func _done() -> void:
 	_completed += 1
 
 
-# --- The wire, on its own --------------------------------------------------
+# The wire, on its own
 
 func _test_command_wire() -> void:
 	_section("a command survives the wire")
@@ -314,10 +297,7 @@ func _test_command_wire() -> void:
 
 ## Every encoder against its own decoder.
 ##
-## [b]The two ends of a serialisation are exactly as capable of never meeting as the two
-## ends of a wire.[/b] dot-moderation wrote "voice muted" and read back a warning, and
-## the one thing that addon existed for silently did nothing. These are cheap and they
-## are the only thing that checks the pairs.
+## The two ends of a serialisation can fail to meet as easily as the two ends of a wire, and only these pair checks see it.
 var _ew_wire: Dictionary
 
 func _test_event_wire() -> void:
@@ -375,11 +355,7 @@ func _test_event_wire() -> void:
 	_check(str(notice["text"]) == "Budget reached.", "notice: the text")
 
 	# --- chat, and the one meta field this wire carries ---
-	#
-	# [b]Every encoder against its decoder, which is what this section is for.[/b] The two
-	# have to be exact inverses and nothing can check that for you: dot-moderation shipped
-	# a store whose writer and reader never met, and every voice mute loaded back as a
-	# warning — which enforces nothing.
+	# Every encoder against its decoder: they must be exact inverses and nothing else checks it.
 	var line := DotChatMessage.make(
 		DotChatMessage.Kind.SAY, PlaygroundServices.CHANNEL_NEAR, "7", "Ada", "over here"
 	)
@@ -564,7 +540,7 @@ func _test_event_wire_4() -> void:
 	_done()
 
 
-# --- Bringing both halves up -----------------------------------------------
+# Bringing both halves up
 
 func _make_game(server: bool, scope: StringName, parent: Node) -> Playground:
 	var config := PlaygroundConfig.new()
@@ -620,24 +596,9 @@ func _build() -> bool:
 	_b_server_side.name = "ServerSide"
 	add_child(_b_server_side)
 
-	# [b]The client gets its own physics space, and a prop is what proves it must.[/b]
-	# One process is one World3D unless somebody asks for a second, so without this the
-	# server's real bodies and the client's frozen mirrors of them are in the SAME
-	# cubic metres -- and a mirror is written to the exact position of the thing it
-	# mirrors, so the two boxes overlap perfectly, every frame, by construction. There
-	# is no spawn point that avoids it.
-	#
-	# What that looks like is not a collision, which is why it went unread for so long:
-	# Godot resolves the overlap with positional recovery, which moves a body WITHOUT
-	# touching its velocity. So the server's crate slides a metre sideways with
-	# linear_velocity.x still reading 0.0, and the prop assertions fail claiming gravity
-	# did not reach the client. How far it slides, and whether the last shove is up or
-	# down, depends on how many physics substeps fall between two net ticks -- so it
-	# passes on an idle machine and fails on a loaded one, which is the shape of a bug
-	# that reaches CI and nowhere else.
-	#
-	# Two processes have two spaces for free. This is the one line that makes one
-	# process honest about that.
+	# The client gets its own physics space, and a prop is what proves it must. In one World3D
+	# the server's bodies and the client's frozen mirrors overlap exactly, and positional
+	# recovery slides a body without touching its velocity, so it looks like gravity never arrived.
 	var client_view := SubViewport.new()
 	client_view.name = "ClientView"
 	client_view.own_world_3d = true
@@ -666,11 +627,9 @@ func _build() -> bool:
 		"both games load the map"
 	)
 
-	# [b]Put the client on a rate the server is not on.[/b] One process has one engine
-	# rate, so both halves agree by construction — and a check that asserts they agree
-	# is passing for that reason rather than a good one. A real client is a separate
-	# program whose rate is its own project's export: the browser shell sets none and
-	# runs at 60 against a 128-tick server. Make them disagree, and let HELLO correct it.
+	# Put the client on a rate the server is not on: one process has one engine rate, so both
+	# halves agree by construction. The browser shell sets none and runs at 60 against a 128-tick
+	# server; make them disagree and let HELLO correct it.
 	_check(
 		_client_game.set_tick_rate(CLIENT_ENGINE_TICK_RATE),
 		"the client is put on %d, as a host project with its own export would be"
@@ -697,11 +656,9 @@ func _build_2() -> bool:
 	_client_net = _make_manager(
 		false, &"client", CLIENT_PEER, _b_client_side, _client_game.tick_rate
 	)
-	# This suite stamps every command itself (`_tick + INPUT_LEAD`), not from the client's
-	# clock, so the client must not ask for dot-net's input-lead report: steered by reports
-	# about commands it never stamped, the clock ran away from them, a sixth of a tick more
-	# lead every five ticks, and drew the other player in uneven steps. By the constant map,
-	# so this parses against a dot-net from before the report.
+	# This suite stamps every command itself (`_tick + INPUT_LEAD`), so the client must not ask for
+	# dot-net's input-lead report: steered by reports about commands it never stamped, the clock
+	# ran away. Set by constant map, so it parses against a dot-net without the report.
 	var lead_bit := int((DotNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
 	_client_net.messages.features &= ~lead_bit
 

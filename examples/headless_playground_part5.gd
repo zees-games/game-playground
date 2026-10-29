@@ -15,16 +15,16 @@ var _erts_refused: DotPropInstance
 func _test_entities_run_their_scripts() -> void:
 	_section("entities that run their own scripts")
 
-		# On the sandbox, deliberately: an NPC on the bhop map's gapped blocks falls off, and the
-		# test would measure the terrain rather than the script.
+	# On the sandbox, deliberately: an NPC on the bhop map's gapped blocks falls off, and the
+	# test would measure the terrain rather than the script.
 	var loaded: DotResult = await playground.change_map(&"pg_flatgrass")
 	_check(loaded.ok, "the sandbox loads")
 
 	playground.spawn_player(&"bot")
 
-		# Driven with an EMPTY command: `apply_command` leaves the pending command set, so the bot
-		# arrives still holding forward and jump and auto-hops away; it also needs the third of a
-		# second to fall onto the floor.
+	# Driven with an EMPTY command: `apply_command` leaves the pending command set, so the bot
+	# arrives still holding forward and jump and auto-hops away; it also needs the third of a
+	# second to fall onto the floor.
 	await _drive(&"bot", DotFpsCommand.new(), 60)
 
 	playground.props.limits.spawn_interval = 0.0
@@ -126,8 +126,8 @@ func _test_entities_run_their_scripts_2() -> void:
 
 	_test_a_chaser_commits(playground)
 
-		# A definition whose script is missing must not leave a body: it would sit there as a crate,
-		# indistinguishable from an NPC with nothing to do.
+	# A definition whose script is missing must not leave a body: it would sit there as a crate,
+	# indistinguishable from an NPC with nothing to do.
 	var broken := DotPropDef.make(&"npc_broken", PlaygroundSpawnables.SCENE_ENTITY)
 	broken.meta = {"kind": "entity", "script": "res://game/entities/nope.gd"}
 	playground.props.catalogue.add(broken)
@@ -655,8 +655,8 @@ func _test_weapons_2() -> void:
 
 	var blast := impulse.primary(null, Vector3.ZERO, Vector3.FORWARD)
 
-		# Two steps, not one: an impulse is not readable in `linear_velocity` until the step that
-		# consumes it has run, and one physics frame lands before that step.
+	# Two steps, not one: an impulse is not readable in `linear_velocity` until the step that
+	# consumes it has run, and one physics frame lands before that step.
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 

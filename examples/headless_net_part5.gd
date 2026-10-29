@@ -26,8 +26,8 @@ func _test_somebody_else_is_drawn() -> void:
 		_check(false, "both ends have them, and this client has its own player")
 		return
 
-		# The real client's manager is RUNNING (`present_frame` asks) and has told its player it is
-		# the local one, which hides the first-person body (`PlaygroundClient._build_view_switch`).
+	# The real client's manager is RUNNING (`present_frame` asks) and has told its player it is
+	# the local one, which hides the first-person body (`PlaygroundClient._build_view_switch`).
 	if not _client_net.is_running():
 		var _started := _client_net.start()
 	mine.samples_input = true
@@ -120,8 +120,8 @@ func _test_somebody_else_is_drawn_2() -> void:
 		"last drawn %s" % str(last)
 	)
 
-		# Smoothness: at a steady speed each frame should advance the body by about the same
-		# distance; a client that draws only when a snapshot lands judders.
+	# Smoothness: at a steady speed each frame should advance the body by about the same
+	# distance; a client that draws only when a snapshot lands judders.
 	var mean := 0.0
 	var largest := 0.0
 	var smallest := INF

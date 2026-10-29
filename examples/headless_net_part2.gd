@@ -2,10 +2,7 @@ extends "res://examples/headless_net_part1.gd"
 
 ## The map's time left, from the server's vote to what the client's HUD draws.
 ##
-## The HUD drew the client's own map session, which starts when the client loads the map
-## and hears nothing the server decides — so an extend changed the server's clock and
-## not one pixel on a client, and the deployed `trigger: rtv_only` with no limit showed
-## thirty minutes counting down to nothing. This is the check that both reach the screen.
+## The HUD drew the client's own map session, which hears nothing the server decides, so an extend must reach the screen.
 var _cw_vote: PlaygroundVote
 var _cw_arrived: Array[Dictionary]
 var _cw_on_clock
@@ -127,18 +124,9 @@ func _exchange() -> void:
 	_flush()
 
 
-## One tick on both ends, with a real physics frame between them.
-##
-## [b]The awaited physics frame is not padding.[/b] A player's movement is swept by
-## dot-player-controller and lands wherever the arithmetic says, so a suite that drives
-## ticks in a tight loop moves players perfectly — which is why every other net suite in
-## this family gets away without one. A PROP is a [RigidBody3D], integrated by Godot's
-## physics server on the physics frame and by nothing else. Without this await the
-## server's props never move, the client's copies match them exactly, and every
-## assertion about replicated props passes while nothing has been replicated at all.
-##
-## That is this family's own "a test that passes for the wrong reason", reached by the
-## one route a sandbox has and a shooter does not.
+# One tick on both ends, with a real physics frame between them: a prop is a RigidBody3D that
+# only the physics server moves, so without the await replicated props pass while nothing moves.
+
 ## The Q menu's Builds tab: the list is asked for and sent back, and a click asks for one
 ## build by name. The module answers both (dedicated's saved builds); this is the wire.
 func _test_builds_over_the_wire() -> void:
@@ -250,13 +238,9 @@ func _test_edit_over_the_wire() -> void:
 	_done()
 
 
-## A map document's props over the wire: the server puts them down, a client draws the
-## server's and spawns none of its own, and changing back takes them away on both ends.
+## A map document's props over the wire: the server puts them down, a client draws the server's and spawns none of its own, and changing back takes them away on both ends.
 ##
-## [b]"None of its own" is held by dot-props, not by Playground's own guard.[/b] Armed by
-## dropping `authoritative` from `spawn_map_props`'s call, every check still passed: a
-## non-authoritative spawner refuses every spawn. The guard stays because without it each
-## client would log that the map names props this server lacks, once per map, falsely.
+## "None of its own" is held by dot-props; Playground's guard stays to avoid a false per-map log line.
 func _test_map_props_over_the_wire() -> void:
 	_section("a map's own props over the wire")
 
@@ -295,8 +279,7 @@ func _test_map_props_over_the_wire() -> void:
 
 
 ## Who holds what on the physics gun, told to every client (`Kind.HELD`), so a connected
-## client can draw the beams. Before 2026-10-07 the encoder and decoder existed and nothing
-## sent or read them: a connected player saw nobody's beam, their own included.
+## client can draw the beams.
 func _test_held_over_the_wire() -> void:
 	_section("who holds what on the physics gun reaches the client")
 
@@ -404,9 +387,8 @@ func _toy_of(game: Playground, id: String) -> DotPropToy:
 
 
 ## dot-props' toys on the lobby, over the wire: an entity per toy on both ends paired by index
-## (TOYS), the client's frozen and posed from the server's state, a kicked ball followed, a
-## switch's lamps lit on the client, a roundabout's spin measured there so a rider is carried,
-## and a map change and back re-pairing them all.
+## (TOYS), posed from the server's state on the client, with a kicked ball, switch lamps, a
+## roundabout's carry and a map change and back re-pairing them.
 func _test_map_toys_over_the_wire() -> void:
 	_section("the map's toys over the wire")
 
@@ -486,15 +468,8 @@ func _test_map_toys_over_the_wire_2() -> void:
 
 
 ## A connected client predicts its own player swimming (pgc_harbour's basin): the swim mode
-## is entered from `PlaygroundPlayer._on_simulated`, which a prediction replay runs too, and
-## its water is a list of boxes both ends built from the one map document. Measured: what a
-## swim costs in corrections, and where the two ends end up.
-##
-## [b]What this cannot see:[/b] armed by entering the mode on the server only, it still
-## passes. The mode travels in the snapshot, and on this suite's short link the server's
-## snapshot puts the client in the water before its prediction has drifted past a correction.
-## The client's own entry is what keeps a real round trip from showing the player walking on
-## the bed for 100 ms; this asserts the swim agrees, not that.
+## is entered from `PlaygroundPlayer._on_simulated`, which a prediction replay runs too.
+## Armed by entering the mode on the server only, it still passes: this asserts the swim agrees.
 func _test_swimming_over_the_wire() -> void:
 	_section("swimming, predicted by a connected client")
 
@@ -627,7 +602,7 @@ func _client_player() -> PlaygroundPlayer:
 	return _client_game.players.get(&"u%d" % SESSION)
 
 
-# --- The tests -------------------------------------------------------------
+# The tests
 
 func _test_handshake() -> void:
 	_section("a client joins")
@@ -675,13 +650,9 @@ func _test_handshake() -> void:
 		"both ends are on the same map"
 	)
 
-	# [b]The style table has to be built from a DECLARED order, not a sort of the ids.[/b]
-	# Godot compares StringNames by their interned pointer, so `Array.sort()` on them
-	# gives two peers two different tables — and this suite CANNOT see that, because one
-	# process has one intern table and both ends agree no matter how the table was built.
-	# It took a browser client joining and putting itself on "Sideways" to show it. So
-	# assert the SOURCE instead: the table must match the declared ordering
-	# (`Playground.style_order`, dot-player-controller's list), the same on every machine.
+	# Build the style table from a DECLARED order, not a sort of the ids: StringNames compare by
+	# interned pointer, so two peers sort differently, and one process cannot see that. Assert the
+	# SOURCE (`Playground.style_order`) instead.
 	var declared := PackedStringArray()
 	for style_id in _server_game.style_order:
 		declared.append(String(style_id))
@@ -729,15 +700,9 @@ func _test_prediction() -> void:
 	_done()
 
 
-## [b]The section above passes for a client that predicts nobody[/b], and did until
-## 2026-09-25: `_apply_join` mirrored every player — this client's own included — with owner
-## 0, so `registry.predicted()` was empty, `client_tick` simulated nobody, and the local
-## player moved only when a snapshot came back. "It moves" and "the server agrees" both hold
-## for a client that simply adopts every snapshot, and the correction rate is lowest of all
-## for a predictor that never runs. So this asks the four things only prediction answers:
-## who owns the mirror, who is in `predicted()`, whether a key moves the player on the tick
-## it is pressed with nothing from the server in between, and whether a move only the server
-## made still wins.
+## The section above passes for a client that predicts nobody, so this asks what only prediction
+## answers: who owns the mirror, who is in `predicted()`, whether a key moves the player the tick
+## it is pressed, and whether a move only the server made still wins.
 func _corrections_and_snaps() -> int:
 	var d := _client_net.predictor.describe()
 	return int(d.get("corrections", 0)) + int(d.get("snaps", 0))
