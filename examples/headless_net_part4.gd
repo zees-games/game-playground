@@ -25,13 +25,7 @@ func _test_prop_removal() -> void:
 
 ## A vehicle spawned, driven and ridden with a real socket between the two ends.
 ##
-## [b]This is the only thing that has ever run [DotVehicleNetSync] across a wire.[/b]
-## dot-vehicle's 122 checks and game-playground's own vehicle test both run in one
-## process, where the client IS the server's dictionary and every id agrees by
-## construction. What only this can catch: a spec dot-net will not accept, a wheel angle
-## that arrives as a body rotation, a seat mask nobody reads, a driver whose input is
-## applied on the client and never sent, and a rider drawn on the other machine at the
-## spot where they got in.
+## The only run of [DotVehicleNetSync] across a wire: a spec dot-net refuses, a wheel angle arriving as a body rotation, an unread seat mask, an unsent driver input, a rider drawn at the wrong spot.
 var _votw_driver: PlaygroundPlayer
 var _votw_spawned: DotPropInstance
 var _votw_vehicle: DotVehicleInstance
@@ -78,13 +72,9 @@ func _test_vehicle_over_the_wire() -> void:
 		"with its wheels built on the client too"
 	)
 
-	# [b]The mirror is taken out of the physics world for the drive, and that is a fact
-	# about this HARNESS rather than about the game.[/b] Both halves are plain nodes in
-	# one scene tree, so they share one physics space — and the client's frozen copy of
-	# the car sits at exactly the coordinates the server's car is trying to drive out of.
-	# The first version of this test measured 1.24 m and a car reversing at half a metre
-	# a second, which was the server's buggy wedged against its own reflection. On two
-	# machines there is no such body.
+	# The mirror is taken out of the physics world for the drive, a fact about this HARNESS: both
+	# halves share one physics space, so the frozen copy sits where the server's car drives out of.
+	# On two machines there is no such body.
 	if _votw_mirror != null:
 		_votw_mirror.collision_layer = 0
 		_votw_mirror.collision_mask = 0
@@ -112,10 +102,8 @@ func _test_vehicle_over_the_wire() -> void:
 
 func _test_vehicle_over_the_wire_2() -> void:
 
-	# Sat down, not standing. A rider's node is carried to the seat, and the body hanging off
-	# it was a standing 1.8 m figure — legs through the floor of the car, head two metres over
-	# it. The client learns it from the same SEAT event, and the vehicle with it, so the body
-	# faces the way the car does rather than where the rider happens to look.
+	# Sat down, not standing: a rider's node is carried to the seat, and a standing 1.8 m body hung off
+	# it. The client learns the seat and vehicle from the same SEAT event, so the body faces the car.
 	var rider := _client_player()
 	# Looking out of the side, a quarter turn off the car's heading: otherwise the rider's
 	# look and the car's heading agree, and "faces the car" cannot be told from "faces where
@@ -147,16 +135,9 @@ func _test_vehicle_over_the_wire_2() -> void:
 	var before := _votw_vehicle.position()
 	var mirror_before := _votw_mirror.global_position if _votw_mirror != null else Vector3.ZERO
 
-	# The driver's own input goes round trip. That is dot-vehicle's decision rather than
-	# a gap here: a rigid body is not reproducible across machines, so a predicted
-	# vehicle is a corrected vehicle and a correction on something a player is steering
-	# reads worse than the latency does.
-	# [b]Sampled while it drives, not read off the end.[/b] 320 ticks at full throttle
-	# is further than the clear ground round the spawn: the car reaches about 10 m/s and
-	# then arrives at map geometry, and the reading taken after it has stopped against
-	# something is the rebound rather than the drive. It was -0.47 m/s, deterministically,
-	# while the car had plainly driven twelve metres in the direction it was pointed —
-	# a check measuring the wrong instant rather than a vehicle refusing to move.
+	# The driver's own input goes round trip (a rigid body is not reproducible across machines, so
+	# a predicted vehicle is a corrected one). Sampled while it drives, not read off the end: after
+	# 320 ticks the car has hit map geometry and the reading is the rebound.
 	var fastest := 0.0
 
 	for _leg in range(16):
@@ -167,10 +148,8 @@ func _test_vehicle_over_the_wire_2() -> void:
 	await _steps(6)
 
 	var travelled := _votw_vehicle.position().distance_to(before)
-	# Deliberately well under what the car can do in 320 ticks. The client is on a
-	# different tick rate from the server here on purpose, so how many of its inputs land
-	# in a given wall-clock stretch is not a constant — and a threshold set at the
-	# measured figure is a test that fails on a loaded machine rather than on a bug.
+	# Deliberately well under what the car can do in 320 ticks: the client's tick rate differs from
+	# the server's, so inputs landing per stretch vary, and a tight threshold fails on a loaded machine.
 	_check(travelled > 3.0, "keys sent over the wire drive it", "%.2f m" % travelled)
 	_check(fastest > 0.5, "forwards", "%.2f m/s at its fastest" % fastest)
 	_check(
@@ -258,24 +237,9 @@ func _test_vehicle_over_the_wire_4() -> void:
 	_done()
 
 
-## [b]What the driver feels: how far their own car is behind their keys.[/b] See `[veh-3]`.
+## What the driver feels: how far their own car is behind their keys. See `[veh-3]`.
 ##
-## dot-vehicle does not predict a vehicle, so the driver's throttle goes to the server and
-## comes back as a snapshot, and what they see is the client's MIRROR of the car — drawn
-## where [method DotNetManager.interpolate_frame] puts it, an interpolation buffer
-## behind the newest snapshot. Measured here on the drawn mirror, over a loopback holding
-## every message [constant VEHICLE_TRANSIT_TICKS] ticks each way and dropping every
-## [constant VEHICLE_DROP_EVERY]rd snapshot:
-##
-## - per tick, the gap between the drawn mirror and the server's car (metres, degrees),
-##   and the same gap as TIME: how many ticks back along the server's own path the mirror is;
-## - key to visible: throttle on from rest, and steer on at speed, to the first tick the
-##   server's car responds and the first tick the mirror does;
-## - how long the mirror takes to land on the car once the car has stopped.
-##
-## The figures are printed; what is asserted is only that the mirror follows (key to
-## visible under a generous bound) and converges once the car stops. The decision taken on
-## these numbers is in docs/vehicles.md, "What a driver feels".
+## The mirror is drawn where [method DotNetManager.interpolate_frame] puts it, behind the newest snapshot, over a loopback with [constant VEHICLE_TRANSIT_TICKS] transit and every [constant VEHICLE_DROP_EVERY]rd snapshot dropped. Figures are printed; asserted is that the mirror follows and converges once the car stops (decision: docs/vehicles.md, "What a driver feels").
 func _measure_round_trip(
 	vehicle: DotVehicleInstance, mirror: Node3D, brake: DotFpsCommand
 ) -> void:
@@ -304,11 +268,8 @@ func _measure_round_trip(
 	# One tick: step, draw the mirror as the renderer would, and record the gap.
 	var sample := func(command: DotFpsCommand) -> void:
 		await _step(command)
-		# The interpolation `PlaygroundClient.present_frame` does once a frame, called
-		# directly: present_frame asks whether the manager is RUNNING first, and this
-		# suite's hand-driven client is not started until a later section. The first run
-		# of this measurement went through present_frame, drew the newest snapshot every
-		# tick, and measured a mirror stepping at the snapshot rate that no real client has.
+		# The interpolation `present_frame` does, called directly: it asks whether the manager is RUNNING,
+		# which this hand-driven client is not yet, and going through it drew the newest snapshot every tick.
 		_client_net.interpolate_frame(0.0)
 		trail.append(car.global_position)
 		gaps_m.append(mirror.global_position.distance_to(car.global_position))
@@ -456,10 +417,8 @@ func _measure_round_trip(
 		"and the mirror lands on the car within %d ticks of it stopping" % CONVERGE_LIMIT_TICKS,
 		"%d ticks (stopped at %d)" % [converged_after, stopped_at]
 	)
-	# `[veh-heading-1]`: the rotation crossed as four INTs, which the interpolator
-	# switches at the midpoint, so the body snapped round at the snapshot rate while its
-	# position slid -- still on 26 of 31 turning ticks. A few still ticks are the lossy
-	# link's stalls, not the format; armed with the INTs back, this fails.
+	# `[veh-heading-1]`: the rotation crossed as four INTs, which the interpolator switches at the
+	# midpoint, so the body snapped at the snapshot rate; armed with the INTs back, this fails.
 	_check(
 		turning_ticks > 10 and held_ticks * 5 <= turning_ticks,
 		"and the mirror's heading turns on nearly every tick, not once a snapshot",
@@ -497,17 +456,7 @@ func _find_vehicle_node(game: Playground) -> PlaygroundVehicle:
 
 ## A line typed on the client, through the real services layer, and back to the client.
 ##
-## [b]Every other chat check in this file is the codec[/b] — an encoder against its
-## decoder. This is the path: the client's SAY over the link, the server bridge's
-## `say_requested`, [PlaygroundServices] on [DotGameServices]' sequence with a real dot-chat
-## router and dot-moderation manager behind it, the bridge's CHAT event, and the client's
-## `chat_received`. With no [DotServer], which the subclass's bridge-shaped answers
-## (`_key_of`, `_chat_peers`, `_subject_for_peer`) are what make possible — the base's own
-## answer to "who is this peer" is a session, and there is none here.
-##
-## Then a gag, through the moderation the base built first, keyed the way the subclass keys
-## a peer with no session. Armed: without the subclass's `_subject_for_peer` the gagged line
-## is delivered; without its `_send_chat` the line arrives with nobody's id on it.
+## The path rather than the codec: SAY over the link, the bridge's `say_requested`, [PlaygroundServices] with a real dot-chat router and moderation manager, the CHAT event and `chat_received`, then a gag. Armed: without `_subject_for_peer` the gagged line is delivered; without `_send_chat` the line carries no id.
 var _cete_store: String
 var _cete_services: PlaygroundServices
 var _cete_heard: Array[Dictionary]
@@ -666,12 +615,7 @@ func _test_lossy() -> void:
 
 ## An administrator's blind and beacon, through the real handlers, over the wire.
 ##
-## [b]The audience is the whole point of both.[/b] This client (peer 2) owns player 7; a
-## second player, 8, is added on the server with a peer of its own that has no client in
-## this process — which makes THIS client the "somebody else" for player 8. A blind on 8
-## is 8's screen and nobody else's, so this client must never be told; a blind on 7 is
-## this client's own screen, so it must be; a beacon is for everybody. Asserted on the
-## client's own copy of each player, which is what its HUD and its renderer read.
+## The audience is the point: a blind on player 8 must not reach this client (peer 2, player 7), one on 7 must, a beacon is for everybody; asserted on the client's own copy of each player.
 var _bab_theirs: PlaygroundPlayer
 
 func _test_blind_and_beacon() -> void:

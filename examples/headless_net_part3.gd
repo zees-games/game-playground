@@ -120,14 +120,9 @@ func _test_local_is_predicted_2() -> void:
 		"and the player is still predicted afterwards"
 	)
 
-	# [b]Both orders HELLO and this player's JOIN can arrive in, and each is its own half of
-	# the fix.[/b] `add_player` broadcasts JOIN to every connected peer, the joiner included,
-	# BEFORE that peer has asked to be admitted — so in this suite's handshake, as on any
-	# server whose client is listening by then, JOIN comes first and the mirror is built
-	# before the client knows it is its own: HELLO has to CLAIM it. Admitted again, `_admit`
-	# sends HELLO first and JOIN after it, and the mirror has to be built owned. Each is
-	# forced here, and each was armed on its own: without the claim, the first nine checks
-	# above fail and so does the claim below; without the owned mirror, only the rebuild does.
+	# Both orders HELLO and this player's JOIN can arrive in, each its own half of the fix:
+	# JOIN first (the mirror is built before the client knows it is its own, so HELLO has to CLAIM it),
+	# or HELLO first (the mirror has to be built owned). Each is forced and was armed on its own.
 	var _given := _client_net.registry.change_owner(_lip_identity.net_id, 0)
 	_check(not _lip_identity.is_predicted(), "a mirror handed back to the server stops being predicted")
 	_client_bridge.ask_ready()
@@ -164,7 +159,7 @@ func _test_local_is_predicted_3() -> void:
 	_done()
 
 
-# --- Props, which is what makes this a sandbox -----------------------------
+# Props, which is what makes this a sandbox
 
 var _pr_client_node: Node3D
 var _pr_server_node: Node3D
@@ -187,10 +182,8 @@ func _test_prop_replication() -> void:
 
 	if def == null:
 		return
-	# Well clear of the spawn pad and high above it. Dropped on the player's head it is
-	# pushed sideways and UP by the capsule it is resting on, which is a perfectly real
-	# physics result and a useless test: the assertion below is that gravity reaches the
-	# client, not that two bodies collide.
+	# Well clear of the spawn pad and high above it: dropped on the player's head it is pushed
+	# sideways and up, a real result but a useless test, since this asserts gravity reaches the client.
 	var spawned := _server_game.props.spawn(
 		def.id, &"u%d" % SESSION, Vector3(18.0, 24.0, 18.0)
 	)
@@ -220,17 +213,9 @@ func _test_prop_replication() -> void:
 	if _pr_client_node == null:
 		return
 
-	# [b]Measured against the server's drop, not a fixed number of exchanges.[/b] This
-	# was `_steps(64)` and then "has the mirror fallen 0.5 m", and it was reported failing
-	# about one run in three with the mirror HIGHER than it started (23.99 -> 25.02). The
-	# two ends tick at different rates, so a fixed count asks the client at a point in the
-	# fall that differs from run to run; the server's crate is now watched until it has
-	# really fallen a metre, and the client is then asked whether its copy is where the
-	# server's is. [b]Not the cause, measured:[/b] the server's crate and the client's
-	# mirror are in different `World3D`s (two space RIDs), so they cannot touch; a crate
-	# pushed UP is the server's, or the interpolation's, and the print and the separate
-	# server check below say which the next time it happens. 12 of 12 old-form runs
-	# passed on 2026-09-24, so the 25.02 was not reproduced.
+	# Measured against the server's drop, not a fixed number of exchanges: the ends tick at different
+	# rates, so a fixed count asked the client at a different point of the fall each run and
+	# failed about one in three. The server's crate is watched until it has fallen a metre.
 	_pr_server_node = _server_prop_node()
 	_check(_pr_server_node != null, "the server has a body for it")
 
@@ -303,11 +288,7 @@ func _test_prop_replication_2() -> void:
 
 ## The tool gun's resize and paint, and an armed NPC's weapon, over the wire.
 ##
-## [b]Last, and that placement is the point[/b], for the reason the comment in `_run` gives:
-## both halves are one physics space and one snapshot stream, and the vehicle check drops
-## every third snapshot — so steps added anywhere before it move its phase. Put inside the
-## prop section first, these checks took that check from passing to "held still on 7 of 33"
-## every run, with the new prop fields themselves ruled out by turning them off.
+## Last on purpose: the vehicle check drops every third snapshot, so steps added before it move its phase.
 var _tlaan_crate: DotPropInstance
 var _tlaan_soldier: DotPropInstance
 var _tlaan_armed_mirror: PlaygroundNpcNet
@@ -346,8 +327,7 @@ func _test_tool_look_and_armed_npcs() -> void:
 	_check((client_node.get("tint") as Color).r > 0.8 and (client_node.get("tint") as Color).g < 0.3,
 		"and so does a coat of paint")
 
-	# Two ropes on the one crate are both drawn. One slot per prop used to be replicated,
-	# so the second rope on a prop was simulated by the server and drawn by nobody.
+	# Two ropes on the one crate are both drawn; one slot per prop would leave the second undrawn.
 	var crate_body := server_node as RigidBody3D
 	var first: DotResult = _server_game.constraints.rope(&"u%d" % SESSION, crate_body,
 		crate_body.global_position, null, crate_body.global_position + Vector3(0, 4, 0), 0.0, false)
@@ -545,10 +525,7 @@ func _test_prop_request() -> void:
 
 ## The physics gun, over the wire.
 ##
-## [b]A tool that never grabs anything is invisible to every other check here.[/b] The
-## props still replicate, the player still moves, and the only symptom is that clicking
-## does nothing — which is exactly the shape of bug this family keeps shipping: a value
-## produced and consumed by nothing, or in this case a button sent and read by nobody.
+## A tool that never grabs anything is invisible to every other check: props replicate, players move, and clicking does nothing.
 func _test_tools() -> void:
 	_section("the physics gun, over the wire")
 
@@ -584,11 +561,8 @@ func _test_tools() -> void:
 	_exchange()
 	await _steps(2)
 
-	# [b]Aimed at where the crate ended up, not at where it was put.[/b] It is a rigid
-	# body dropped at eye height and it falls about a third of a metre before the button
-	# is held — so a grab command that carries the default pitch is a ray over the top of
-	# it, and whether the tool fires depends on how many ticks the sections above happened
-	# to take. Aiming at the settled body is what makes this a test of the button.
+	# Aimed at where the crate ended up, not where it was put: it falls about a third of a metre
+	# before the button is held, so a default pitch is a ray over the top of it.
 	var grab := DotFpsCommand.new()
 	grab.set_button(DotFpsCommand.BUTTON_USER_0, true)
 	_aim_at(grab, player, (crate.node as Node3D).global_position)
@@ -625,9 +599,7 @@ func _test_tools() -> void:
 
 ## Points [param command] at [param target] from [param player]'s eye.
 ##
-## The inverse of [method DotFpsMotor.aim_for], and it is written as the inverse rather
-## than copied from it: a test that restates the view convention is a second place for
-## it to be wrong.
+## Written as the inverse of [method DotFpsMotor.aim_for] rather than copied, so the view convention lives in one place.
 func _aim_at(command: DotFpsCommand, player: PlaygroundPlayer, target: Vector3) -> void:
 	var to := target - player.eye_position()
 
@@ -641,15 +613,7 @@ func _aim_at(command: DotFpsCommand, player: PlaygroundPlayer, target: Vector3) 
 
 ## A weapon is a purchase, and the client has to ask for it.
 ##
-## [b]This is the check that was missing, and the hole it left was money.[/b]
-## `PlaygroundClient._set_tool` told the server which TOOL it held and said nothing at
-## all about a weapon — so `_give_weapon`, the only thing that calls `charge_fn`, was
-## called by nobody. `pg_shop` prices every weapon at 350 credits and every one of them
-## was free on a networked server, with the props beside them correctly charged. Nothing
-## errors: a client that arms itself looks exactly like a client that was given one.
-##
-## The other half is the same bug pointing the other way — the server broadcast what
-## each player was holding and the client's reader was a bare `pass`.
+## `PlaygroundClient._set_tool` once said nothing about a weapon, so `_give_weapon`, the only caller of `charge_fn`, ran for nobody and every weapon was free on a networked server. The server must also broadcast what each player holds, and the client must read it.
 func _test_weapon_request() -> void:
 	_section("a weapon is asked for, paid for and announced")
 
@@ -716,9 +680,7 @@ func _test_weapon_request() -> void:
 
 ## A spawn the prop budget refuses costs nothing.
 ##
-## [b]It cost the price.[/b] `_spawn_for` charged and then spawned, so a spawn the spawner
-## refused had been paid for — credits gone and nothing in the world. It asks now, spawns,
-## and charges only what exists; the check below fails on the old order.
+## `_spawn_for` must ask, spawn, and charge only what exists; the check fails on the old charge-first order.
 func _test_refused_spawn_is_free() -> void:
 	_section("a spawn the prop budget refuses costs nothing")
 
