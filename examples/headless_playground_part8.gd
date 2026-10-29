@@ -110,6 +110,21 @@ func _test_the_client_boots_2() -> void:
 		str(body.describe()) if body != null else "no body")
 	_tcb_client.rise(&"u66")
 	_check(other.character.body().visible, "and a return draws the figure again")
+	var gun := Node3D.new()
+	var gun_mesh := MeshInstance3D.new()
+	gun_mesh.mesh = BoxMesh.new()
+	gun.add_child(gun_mesh)
+	other.character.body().add_child(gun)
+	other.zee_world = gun
+	gun.position = Vector3(0.0, 1.0, 0.0)
+	var _slain := _tcb_client.fall(&"u66", crumple)
+	var dropped := _tcb_client.ragdolls.get_node_or_null("DroppedWeapon") as RigidBody3D
+	_check(dropped != null and not gun.visible,
+		"a slain player's gun drops as a prop while the hand's copy hides")
+	other.zee_world = null
+	gun.queue_free()
+	_tcb_client.ragdolls.clear()
+	_tcb_client.rise(&"u66")
 	_tcb_client.ragdolls.clear()
 	var _off := _tcb_client.playground.ragdoll_rules.set_cvar("sv_ragdoll", "0")
 	var toppled := _tcb_client.fall(&"u66", crumple)

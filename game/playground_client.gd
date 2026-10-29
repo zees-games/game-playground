@@ -974,7 +974,13 @@ func fall(id: StringName, death: DotPlayerDeath) -> DotPlayerRagdoll:
 		return null
 	_land_on_the_world()
 	var velocity := who.controller.state.velocity if who.controller != null else Vector3.ZERO
-	return ragdolls.spawn(body, death if death != null else DotPlayerDeath.new(), velocity)
+	var fell := ragdolls.spawn(body, death if death != null else DotPlayerDeath.new(), velocity)
+	# The gun in the hand falls as a short-lived prop (sv_ragdoll_weapon_drop); the hand's copy hides.
+	var held := who.zee_world as Node3D
+	if held != null and is_instance_valid(held) and held.is_inside_tree() and held.visible:
+		if ragdolls.drop_prop(held, velocity) != null:
+			held.visible = false
+	return fell
 
 
 ## The level is on `world` and props on their two layers; a body lands on those and on no
