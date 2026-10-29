@@ -1,4 +1,4 @@
 # Normalize EOL for all files that Git considers text files.
 * text=auto eol=lf
-# Vendored licence texts stay byte-identical to the weapon addon (CRLF), or the sync check fails.
+# Vendored licence texts stay byte-identical to the weapon addon, or the sync check fails.
 assets/*/LICENSE-*.txt -text
