@@ -1,19 +1,8 @@
 extends "res://examples/headless_net_part4.gd"
 
-## Another player has a body on this client, it stands where the server has them, and it
-## moves every frame rather than every snapshot.
+## Another player has a body on this client, it stands where the server has them, and it moves every frame rather than every snapshot.
 ##
-## [b]On a networked client nobody else had a body until 2026-09-24, for two reasons at
-## once[/b], and every section above passed throughout because each reads the simulation
-## and none reads the screen: the body was hidden (the "first person hides your own body"
-## rule was applied to every player, and a remote one's view mode reads "fp"), and it was
-## at the world origin (the rig hung off a plain `Node`, which a `Node3D` does not inherit a
-## transform through). The lobby's spawn IS the origin, which is why a body standing on the
-## spawn pad looked right — so this runs them well away from it before asking.
-##
-## Driven through `PlaygroundClient.present_frame`, the function the real client's
-## `_process` calls, so a client that stops interpolating or stops placing bodies fails
-## here rather than in a screenshot.
+## Every section passed while remote bodies were hidden and sat at the origin, because each reads the simulation, not the screen. Bodies run well away from the spawn, which is the origin. Driven through `PlaygroundClient.present_frame`.
 var _seid_session: int
 var _seid_server_bea: PlaygroundPlayer
 var _seid_theirs: PlaygroundPlayer
@@ -37,10 +26,8 @@ func _test_somebody_else_is_drawn() -> void:
 		_check(false, "both ends have them, and this client has its own player")
 		return
 
-	# What the real client has done by now and this suite's hand-driven halves have not: its
-	# manager is RUNNING, which `present_frame` asks before it interpolates, and it has told
-	# its own player that it is the local one, which is when a first-person body is hidden
-	# (`PlaygroundClient._build_view_switch`, in the same two lines).
+		# The real client's manager is RUNNING (`present_frame` asks) and has told its player it is
+		# the local one, which hides the first-person body (`PlaygroundClient._build_view_switch`).
 	if not _client_net.is_running():
 		var _started := _client_net.start()
 	mine.samples_input = true
@@ -133,10 +120,8 @@ func _test_somebody_else_is_drawn_2() -> void:
 		"last drawn %s" % str(last)
 	)
 
-	# Smoothness: at a steady running speed each frame should advance the body by about the
-	# same distance. A client that draws only when a snapshot lands moves it on one frame in
-	# several and not at all on the rest — the judder the family measured as a 47% change in
-	# apparent speed.
+		# Smoothness: at a steady speed each frame should advance the body by about the same
+		# distance; a client that draws only when a snapshot lands judders.
 	var mean := 0.0
 	var largest := 0.0
 	var smallest := INF
@@ -170,7 +155,7 @@ func _test_somebody_else_is_drawn_3() -> void:
 	_done()
 
 
-# --- The inventory ------------------------------------------------------------
+# The inventory
 
 ## The inventory's wire on its own: every encoder against its decoder, and the one field a
 ## client must not be able to write.
@@ -262,12 +247,9 @@ func _client_bag() -> DotInvManager:
 	return _client_bridge.inventory_manager()
 
 
-## A bag as the things two ends have to agree about: every entry's uid, item, cell and
-## rotation, and the next uid either end will hand out.
+## A bag as what two ends must agree on: every entry's uid, item, cell and rotation, and the next uid.
 ##
-## [b]The uids are the point.[/b] The next op names an entry by uid, so two bags laid out
-## identically under different uids are two bags in which "move #4" means different
-## things — which is a duplication or a loss one op later, and invisible in any picture.
+## The uids are the point: the next op names an entry by uid, so identical layouts under different uids diverge one op later.
 static func _bag_summary(m: DotInvManager) -> String:
 	if m == null or m.doc == null:
 		return "-"

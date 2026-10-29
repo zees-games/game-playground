@@ -4,12 +4,9 @@ const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 
-## Renders the real offline client with a zee gun in hand, through every F5 view, into `screenshots/views/`, and prints one line a
-## frame about the first-person hands: whether they exist, are visible in the tree, and have a mesh inside the camera's frustum.
+## Renders the offline client with a zee gun through every F5 view into `screenshots/views/`, printing per frame whether the hands exist, are visible and have a mesh in the frustum.
 ##
-## [codeblock]
-## xvfb-run -a godot --path . --resolution 1280x720 res://tools/render_views_client.tscn
-## [/codeblock]
+## Run: `xvfb-run -a godot --path . --resolution 1280x720 res://tools/render_views_client.tscn`
 
 const OUT_DIR := "res://screenshots/views"
 

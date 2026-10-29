@@ -4,11 +4,7 @@ const WorkshopScript := preload("res://game/playground_workshop.gd")
 
 ## An entity is a prop with a script, and the script is loaded by path.
 ##
-## [b]This is the whole "spawning things that carry code" mechanism.[/b] The scene is a
-## bare `RigidBody3D`; the script comes from `meta`, is loaded by PATH rather than by
-## class, and is attached by `Playground._configure_entity`. The path matters: a
-## mounted dot-cloud pack's `class_name` globals are not registered in the host, so an
-## entity named by class could only ever ship inside the build.
+## The scene is a bare `RigidBody3D`; the script comes from `meta` and is loaded by PATH, because a mounted pack's `class_name` globals are not registered in the host.
 var _erts_at: Vector3
 var _erts_npc: DotPropInstance
 var _erts_body: PlaygroundEntity
@@ -19,23 +15,16 @@ var _erts_refused: DotPropInstance
 func _test_entities_run_their_scripts() -> void:
 	_section("entities that run their own scripts")
 
-	# On the sandbox, deliberately. The previous tests leave the game on whichever map
-	# they finished with, and an NPC walking about on the bhop map's blocks-with-gaps
-	# falls off one — so "does the chaser close the distance" would be measuring the
-	# terrain rather than the script. Flat ground is the only surface on which the
-	# answer is about the entity.
+		# On the sandbox, deliberately: an NPC on the bhop map's gapped blocks falls off, and the
+		# test would measure the terrain rather than the script.
 	var loaded: DotResult = await playground.change_map(&"pg_flatgrass")
 	_check(loaded.ok, "the sandbox loads")
 
 	playground.spawn_player(&"bot")
 
-	# Driven with an EMPTY command for a moment, which is not busywork.
-	# `DotFpsController.apply_command` sets the pending command and it stays set: the
-	# bot arrives here still holding forward and jump from the bhop test several
-	# tests ago, so it auto-hops across the sandbox for the whole of this one — and
-	# "does the chaser close the distance" then measures a player who is running
-	# away. It also gives them the third of a second it takes to fall the metre from
-	# the spawn onto the floor.
+		# Driven with an EMPTY command: `apply_command` leaves the pending command set, so the bot
+		# arrives still holding forward and jump and auto-hops away; it also needs the third of a
+		# second to fall onto the floor.
 	await _drive(&"bot", DotFpsCommand.new(), 60)
 
 	playground.props.limits.spawn_interval = 0.0
@@ -137,10 +126,8 @@ func _test_entities_run_their_scripts_2() -> void:
 
 	_test_a_chaser_commits(playground)
 
-	# A definition whose script is missing does not leave a body in the world. One
-	# that did would sit there being a crate, which is indistinguishable from an NPC
-	# with nothing to do — and "the NPC does not move" sends the next person to the
-	# movement code.
+		# A definition whose script is missing must not leave a body: it would sit there as a crate,
+		# indistinguishable from an NPC with nothing to do.
 	var broken := DotPropDef.make(&"npc_broken", PlaygroundSpawnables.SCENE_ENTITY)
 	broken.meta = {"kind": "entity", "script": "res://game/entities/nope.gd"}
 	playground.props.catalogue.add(broken)
@@ -192,13 +179,9 @@ func _test_entities_run_their_scripts_3() -> void:
 	_done()
 
 
-## zee-dot-weapons: the pack in the menu, a server's rig firing from the eye, and a shot
-## that shoves a crate.
+## zee-dot-weapons: the pack in the menu, a server's rig firing from the eye, and a shot that shoves a crate.
 ##
-## [b]The aim is the check that matters.[/b] Without `PlaygroundPlayer.component()`
-## dot-weapon's bridge takes a shot from the body's transform, whose basis is identity here
-## — so every shot leaves northwards from the feet, fires, costs ammunition and hits
-## nothing, and every other number about it is right.
+## The aim is the check that matters: without `PlaygroundPlayer.component()` a shot leaves northwards from the feet and every other number is still right.
 var _zw_player: PlaygroundPlayer
 var _zw_eye: Vector3
 var _zw_aim: Vector3
@@ -672,10 +655,8 @@ func _test_weapons_2() -> void:
 
 	var blast := impulse.primary(null, Vector3.ZERO, Vector3.FORWARD)
 
-	# Two steps, not one. `apply_central_impulse` is not readable in
-	# `linear_velocity` until the step that consumes it has run — dot-props' own
-	# suite found the same thing and says so — and awaiting a physics frame lands
-	# before that step rather than after it.
+		# Two steps, not one: an impulse is not readable in `linear_velocity` until the step that
+		# consumes it has run, and one physics frame lands before that step.
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 

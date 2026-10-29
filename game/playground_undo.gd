@@ -2,9 +2,7 @@ extends RefCounted
 
 ## The undo stack: one entry per thing a player spawned, props and addon-made disasters alike, newest first.
 ##
-## [b]Props keep their own stack in dot-props; this one only orders the other entries among them.[/b] A prop entry
-## only marks its place, and undoing it asks [method DotPropSpawner.undo], so the two stacks cannot disagree about
-## what a prop is. An addon entry carries the callable that takes its thing away.
+## A prop entry only marks its place and undoing it asks [method DotPropSpawner.undo], so the two stacks cannot disagree.
 
 signal undone(who: StringName, at: Vector3)
 
