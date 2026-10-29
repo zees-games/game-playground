@@ -25,7 +25,7 @@ static func update(old: DotViewGrip, anchor: Node3D, grip: Vector3, fore: Vector
 	return made
 
 
-## Metres from each hand's middle-finger bone to its grip point, or -1 when the arms are not holding.
+## Metres from each hand's middle-finger bone to where the arms aim it (the grip point plus the arms' palm offset), or -1 when the arms are not holding.
 static func hand_error(arms: DotPlayerViewArms, grip: DotViewGrip) -> float:
 	if arms == null or not arms.shown or grip == null or not grip.is_valid() or not (arms.arms() is DotHumanoidFigure):
 		return -1.0
@@ -33,9 +33,11 @@ static func hand_error(arms: DotPlayerViewArms, grip: DotViewGrip) -> float:
 	if skeleton == null:
 		return -1.0
 	var worst := 0.0
-	var pairs := [["Middle1.R", grip.grip_world()]]
+	var palm: Vector3 = arms.get("palm_offset") if arms.get("palm_offset") != null else Vector3.ZERO
+	var shift := arms.global_transform.basis * palm
+	var pairs := [["Middle1.R", grip.grip_world() + shift]]
 	if grip.is_two_hand():
-		pairs.append(["Middle1.L", grip.support_world()])
+		pairs.append(["Middle1.L", grip.support_world() + arms.global_transform.basis * Vector3(-palm.x, palm.y, palm.z)])
 	for pair: Array in pairs:
 		var bone := skeleton.find_bone(pair[0])
 		if bone < 0:
