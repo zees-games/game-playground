@@ -433,8 +433,14 @@ func set_alive(alive: bool) -> void:
 		_crosshair.call(&"set_alive", alive)
 
 
-## A zee gun's aim this frame, from the client: dot-ui's DotCrosshair fades as the gun comes up
-## (`set_aim`, API 5, as game-arena's), and a scope replaces it for its own reticle.
+## The client's hands this frame: the scope follows their progressive fade-in and the crosshair gives way as it rises.
+func follow_hands(hands: ZeeViewModel) -> void:
+	set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.scope_fraction() > 0.0)
+	if scope != null and hands != null:
+		scope.follow(hands)
+
+
+## The aim this frame: the dot fades as the gun comes up; [param scoped] hides it for the scope.
 func set_aim(fraction: float, scoped: bool) -> void:
 	if scope != null:
 		scope.fraction = fraction if scoped else 0.0

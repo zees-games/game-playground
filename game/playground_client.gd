@@ -926,6 +926,8 @@ func _on_combat(state: Dictionary) -> void:
 	if int(state["player_id"]) != bridge.local_player_id:
 		return
 
+	if int(state["health"]) < health:
+		platform.note_hit(float(health - int(state["health"])))
 	health = int(state["health"])
 	armour = int(state["armour"])
 	if hud != null:
@@ -1157,6 +1159,10 @@ func _build_pause() -> void:
 	platform.board_prepare_fn = _prepare_board
 	platform.adopt_menu(game_menu)
 	var _platform_up := platform.setup()
+	var _flinch := platform.add_hit_flinch(
+		active_sampler,
+		func() -> Variant: return camera if view_id() == &"fp" else null,
+		func() -> bool: return _aiming and mouse_drives_view() and not _menu_is_open() and view_id() == &"fp")
 	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
 	DotLog.result("playground.client", "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	_add_noblock_and_workbench()
@@ -1396,7 +1402,7 @@ func _process(_delta: float) -> void:
 	var zoom := hands.aim_fov_scale() if hands != null else 1.0
 	player.present_camera(camera, _delta, fov, shake, punch, zoom)
 	if hud != null:
-		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
+		hud.follow_hands(hands)
 
 
 ## What a frame draws that a tick does not: the netcode's interpolation, then every player's
