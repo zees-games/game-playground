@@ -5,14 +5,6 @@ examples/headless_presentation.gd::_answer::duplicate	1
 examples/headless_presentation.gd::_answer::string_build	2
 examples/headless_presentation.gd::_process::duplicate	1
 examples/headless_presentation.gd::_process::string_build	3
-game/playground.gd::_liquid_tick::alloc_array	1
-game/playground.gd::_liquid_tick::alloc_dict	1
-game/playground.gd::_pane_impacts::alloc_array	1
-game/playground.gd::_physics_process::string_build	1
-game/playground.gd::_rebuild_npc_candidates::duplicate	1
-game/playground.gd::_simulate_tick::duplicate	1
-game/playground.gd::_throw_shards::alloc_array	1
-game/playground.gd::npc_id_of::string_build	1
 game/playground_client.gd::_present_splashes::alloc_array	1
 game/playground_client.gd::_present_splashes::alloc_dict	1
 game/playground_client.gd::fit_selection_box::node_lookup	1

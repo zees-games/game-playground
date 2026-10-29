@@ -1,5 +1,11 @@
 extends "playground_noclip.gd"
 
+## Reused per-tick buffers; none escapes the function that fills it.
+var _entity_buf: Array[PlaygroundEntity] = []
+var _burning_buf: Array = []
+var _melting_next: Dictionary = {}
+var _hits_buf: Array = []
+
 func _ready() -> void:
 	if config == null:
 		config = PlaygroundConfig.new()
@@ -104,7 +110,7 @@ func _physics_process(delta: float) -> void:
 
 	if _accumulator >= step:
 		DotLog.debug(CHANNEL, "tick budget exhausted; dropping simulation time", {
-			"dropped": "%.3f s" % _accumulator
+			"dropped_s": snappedf(_accumulator, 0.001)
 		})
 		_accumulator = 0.0
 
@@ -130,7 +136,8 @@ func _simulate_tick(step: float) -> void:
 
 	# Entities before players, as the timer runs after them: an NPC moved after the player lags what collided with it by a tick.
 	# Iterated over a copy because an entity may remove itself (a pit, a script) and `_on_prop_removed` erases from this list.
-	for entity in entities.duplicate():
+	_entity_buf.assign(entities)
+	for entity in _entity_buf:
 		if is_instance_valid(entity):
 			entity.entity_tick(step)
 
@@ -236,7 +243,8 @@ func _liquid_tick(step: float) -> void:
 
 	_float_props(step)
 
-	var burning: Array = []
+	var burning := _burning_buf
+	burning.clear()
 	for liquid: Dictionary in liquids:
 		var s := PlaygroundMaterials.surface(String(liquid["material"]))
 		if s != null and s.hazard_damage > 0.0:
@@ -259,7 +267,8 @@ func _liquid_tick(step: float) -> void:
 
 	# Once a prop has touched lava it is burning, and goes MELT_SECONDS later whether or not it
 	# bounced clear in between: a timer reset by every bounce let a light crate ride a lava lake.
-	var still: Dictionary = {}
+	var still := _melting_next
+	still.clear()
 	for prop: DotPropInstance in props.all_props():
 		var node := prop.node as Node3D
 		if node == null or not prop.is_alive():
@@ -274,6 +283,7 @@ func _liquid_tick(step: float) -> void:
 			if (each[0] as AABB).grow(0.1).has_point(underside):
 				still[prop.instance_id] = float(_melting.get(prop.instance_id, 0.0)) + step
 				break
+	_melting_next = _melting
 	_melting = still
 	for instance_id: int in still.keys():
 		if float(still[instance_id]) >= MELT_SECONDS:
@@ -345,9 +355,8 @@ static func _pane_bounds(node: Node3D) -> AABB:
 func _throw_shards(bounds: AABB, material: StringName) -> void:
 	if props == null or config == null:
 		return
-	var faces := [bounds.size.x * bounds.size.y, bounds.size.x * bounds.size.z, bounds.size.y * bounds.size.z]
-	faces.sort()
-	var count := clampi(int(ceil(float(faces[2]) * SHARDS_PER_M2)), 3, SHARDS_MAX)
+	var largest := maxf(bounds.size.x * bounds.size.y, maxf(bounds.size.x * bounds.size.z, bounds.size.y * bounds.size.z))
+	var count := clampi(int(ceil(largest * SHARDS_PER_M2)), 3, SHARDS_MAX)
 	var colour := PlaygroundMaterials.look(String(material), Color.WHITE)
 	colour.a = 1.0
 	var rng := RandomNumberGenerator.new()
@@ -377,7 +386,8 @@ func _pane_impacts() -> void:
 	if not authoritative or not panes_break or panes.is_empty():
 		_last_speed.clear()
 		return
-	var hits: Array = []
+	var hits := _hits_buf
+	hits.clear()
 	for index: int in panes.keys():
 		var node := (panes[index] as Dictionary)["node"] as Node3D
 		if node == null or not is_instance_valid(node):
@@ -539,7 +549,7 @@ func _rebuild_npc_candidates() -> void:
 
 		# The armed NPCs see the players and each other: a soldier on `hostile` and a rebel on `player` are candidates for one
 		# another and the senses skip the perceiver's own faction, so a rebel never picks a player. Older entities keep [member npc_candidates].
-	npc_candidates_all = npc_candidates.duplicate()
+	npc_candidates_all.assign(npc_candidates)
 
 	for entity in armed_npcs:
 		if not is_instance_valid(entity):
@@ -589,7 +599,9 @@ func register_armed_npc(entity: Node) -> void:
 
 ## The candidate id an armed NPC is known by: `n` and its instance id.
 static func npc_id_of(entity: Node) -> StringName:
-	return StringName("n%d" % entity.get_instance_id())
+	if not entity.has_meta(&"pg_npc_id"):
+		entity.set_meta(&"pg_npc_id", StringName(String.num_int64(entity.get_instance_id()).insert(0, "n")))
+	return entity.get_meta(&"pg_npc_id")
 
 
 ## The armed NPC a candidate id names, or null.
