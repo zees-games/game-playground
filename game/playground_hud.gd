@@ -119,6 +119,10 @@ var armed_prop: StringName = &""
 ## hurt by in a dark room, and taking the picture away is the whole of the point.
 var blind_overlay: ColorRect = null
 
+## Whose `flash_colour` is drawn as a white screen flash (a thrown flash grenade). Null draws none.
+var flash_source: Object = null
+var flash_overlay: ColorRect = null
+
 ## Seconds a blind takes to come down and to lift. Short, so it is unmistakably on, and
 ## not instant, so it reads as something done to the screen rather than a frame dropped.
 const BLIND_FADE_SEC := 0.25
@@ -149,6 +153,14 @@ func _ready() -> void:
 	blind_overlay.modulate.a = 0.0
 	blind_overlay.visible = false
 	add_child(blind_overlay)
+
+	flash_overlay = ColorRect.new()
+	flash_overlay.name = "Flash"
+	flash_overlay.color = Color.WHITE
+	flash_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	flash_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash_overlay.visible = false
+	add_child(flash_overlay)
 
 	_notice = _add_line("Notice", 240.0)
 
@@ -269,6 +281,7 @@ func notice(text: String) -> void:
 
 func _process(delta: float) -> void:
 	present_blind(delta)
+	present_flash()
 
 	if playground == null:
 		return
@@ -392,6 +405,21 @@ func present_blind(delta: float) -> void:
 		var inverse := get_global_transform().affine_inverse()
 		blind_overlay.position = inverse * Vector2.ZERO
 		blind_overlay.size = inverse.basis_xform(get_viewport_rect().size)
+
+
+## Draws the flash source's colour over the whole viewport; the manager fades it itself.
+func present_flash() -> void:
+	if flash_overlay == null:
+		return
+
+	var colour: Color = flash_source.get("flash_colour") if flash_source != null else Color(0, 0, 0, 0)
+	flash_overlay.visible = colour.a > 0.0
+
+	if flash_overlay.visible and is_inside_tree():
+		flash_overlay.color = colour
+		var inverse := get_global_transform().affine_inverse()
+		flash_overlay.position = inverse * Vector2.ZERO
+		flash_overlay.size = inverse.basis_xform(get_viewport_rect().size)
 
 
 func _armed_name() -> String:

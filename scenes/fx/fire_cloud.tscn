@@ -1,0 +1,55 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="Gradient" id="soft"]
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.55, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="soft_tex"]
+gradient = SubResource("soft")
+width = 64
+height = 64
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="fire_mat"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
+albedo_texture = SubResource("soft_tex")
+
+[sub_resource type="QuadMesh" id="fire_quad"]
+material = SubResource("fire_mat")
+size = Vector2(1.2, 1.2)
+
+[sub_resource type="Gradient" id="fire_ramp"]
+offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
+colors = PackedColorArray(1, 0.9, 0.5, 0.9, 1, 0.5, 0.12, 0.8, 0.6, 0.15, 0.03, 0.4, 0.2, 0.05, 0.02, 0)
+
+[node name="FireCloud" type="Node3D"]
+
+[node name="Flames" type="CPUParticles3D" parent="."]
+position = Vector3(0, 0.2, 0)
+amount = 60
+lifetime = 0.9
+preprocess = 1.0
+mesh = SubResource("fire_quad")
+emission_shape = 3
+emission_box_extents = Vector3(1, 0.1, 1)
+direction = Vector3(0, 1, 0)
+spread = 12.0
+gravity = Vector3(0, 2.5, 0)
+initial_velocity_min = 0.5
+initial_velocity_max = 1.6
+scale_amount_min = 0.7
+scale_amount_max = 1.6
+color_ramp = SubResource("fire_ramp")
+
+[node name="Light" type="OmniLight3D" parent="."]
+position = Vector3(0, 1.0, 0)
+light_color = Color(1, 0.55, 0.2, 1)
+light_energy = 2.5
+omni_range = 6.0

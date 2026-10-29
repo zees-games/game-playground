@@ -589,6 +589,61 @@ func _test_grenade_over_the_wire() -> void:
 	_done()
 
 
+## A smoke, a fire and a flash the server throws reach a client that never simulated them.
+##
+## Armed without the fx bits on DETONATE, the client's utility signal never fires and the first two checks fail.
+func _test_utility_over_the_wire() -> void:
+	_section("utility grenades over the wire")
+	_server_game.projectiles.clear()
+	_client_game.projectiles.clear()
+	var seen: Array = []
+	var on_fx := func(info: Dictionary) -> void: seen.append(info)
+	_client_game.projectiles.utility.connect(on_fx)
+	var far := Vector3(-60, 4, -60)
+	for id: StringName in [&"aw_smoke", &"aw_incendiary"]:
+		var outcome := DotWeaponOutcome.new()
+		var spawn := DotWeaponSpawn.new()
+		spawn.id = id
+		spawn.origin = far
+		spawn.gravity_scale = 1.0
+		spawn.radius = 0.08
+		spawn.splash_radius = 4.0
+		spawn.fuse_ticks = _server_game.tick_rate / 2
+		spawn.life_ticks = _server_game.tick_rate * 2
+		outcome.spawns.append(spawn)
+		_server_game.projectiles.accept(outcome, &"u1")
+		far += Vector3(20, 0, 0)
+	await _steps(_server_game.tick_rate)
+	_client_game.projectiles.utility.disconnect(on_fx)
+	var kinds: Array = seen.map(func(i: Dictionary) -> int: return int(i["fx"]))
+	_check(kinds.has(AwUtilityZones.Fx.SMOKE), "the client is told a smoke went off", str(kinds))
+	_check(kinds.has(AwUtilityZones.Fx.FIRE), "and a fire", str(kinds))
+	_check(not kinds.has(AwUtilityZones.Fx.BLIND), "and no one is told a blind that was not thrown", str(kinds))
+	_check(seen.all(func(i: Dictionary) -> bool: return float(i["seconds"]) > 0.0), "each with its duration")
+
+	# A flash beside the connected player: that player's client is blinded, and the earlier smoke and fire told no blind.
+	seen.clear()
+	_client_game.projectiles.utility.connect(on_fx)
+	var flash := DotWeaponOutcome.new()
+	var fs := DotWeaponSpawn.new()
+	fs.id = &"aw_flash"
+	var target := _server_player()
+	fs.origin = target.global_position + Vector3(0, 0.9, 0) - target.global_basis.z * 1.5
+	fs.gravity_scale = 0.0
+	fs.radius = 0.08
+	fs.splash_radius = 4.0
+	fs.fuse_ticks = _server_game.tick_rate / 4
+	fs.life_ticks = _server_game.tick_rate
+	flash.spawns.append(fs)
+	_server_game.projectiles.accept(flash, &"u1")
+	await _steps(_server_game.tick_rate)
+	_client_game.projectiles.utility.disconnect(on_fx)
+	var blind_seen := seen.filter(func(i: Dictionary) -> bool: return int(i["fx"]) == AwUtilityZones.Fx.BLIND)
+	_check(blind_seen.size() == 1 and float(blind_seen[0]["seconds"]) > 0.0,
+		"a flash beside the player blinds that player's client, once", str(seen))
+	_done()
+
+
 ## The gun a connected client draws takes the server's count once it has gone quiet.
 ##
 ## The drawn rig fires shots the server never hears, then both fire and the gun is refilled; armed without `PlaygroundPlayerNet._correct_drawn`, the "takes the server's count" and refill checks fail.

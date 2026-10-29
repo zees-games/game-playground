@@ -113,10 +113,16 @@ var rules := AwGrenadeRules.new()
 ## What a utility grenade leaves behind: smoke, fire and blindness. Built with this layer.
 var effects: PlaygroundGrenades = null
 
+## A smoke cloud, a fire or a blind to draw, as [method AwGrenadeFx.show] reads it: from this
+## end's own blast offline, from the server's word on a client. A dedicated server has no listener.
+signal utility(info: Dictionary)
+
 var _live: Array[Flying] = []
 var _next_serial: int = 1
 var _gravity: float = 9.8
 var _flashes: Array = []
+## serial -> `{fx, seconds}` of a smoke or fire that went off, until the bridge sends it.
+var _told: Dictionary = {}
 
 ## A projectile left a weapon. What the server tells clients about.
 signal launched(flying: Flying)
@@ -128,7 +134,8 @@ signal detonated(serial: int, at: Vector3, radius: float)
 func _init() -> void:
 	name = "Projectiles"
 	effects = PlaygroundGrenades.new()
-	effects.projectiles = self
+	effects.bind(self)
+	effects.effect.connect(utility.emit)
 	add_child(effects)
 	_gravity = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 
@@ -217,6 +224,8 @@ func clear() -> void:
 		_undraw(f)
 
 	_live.clear()
+	_told.clear()
+	effects.clear()
 
 
 ## One tick: fly, bounce, stick, detonate what is due, and announce the danger.
@@ -263,7 +272,7 @@ func tick(delta: float) -> void:
 
 ## A client's half of a detonation: the server said serial [param serial] went off at
 ## [param at]. The local copy goes and the flash is drawn where the server put it.
-func detonate_remote(serial: int, at: Vector3, radius: float) -> void:
+func detonate_remote(serial: int, at: Vector3, radius: float, fx: int = 0, seconds: float = 0.0) -> void:
 	for i in range(_live.size() - 1, -1, -1):
 		if _live[i].serial == serial:
 			_undraw(_live[i])
@@ -271,7 +280,24 @@ func detonate_remote(serial: int, at: Vector3, radius: float) -> void:
 			break
 
 	_flash(at, radius)
+
+	# The wire's fx is [enum AwUtilityZones.Fx] plus one, so 0 is a blast that leaves nothing.
+	if fx > 0:
+		utility.emit({"fx": fx - 1, "position": at, "radius": radius, "seconds": seconds, "victim": 0})
+
 	detonated.emit(serial, at, radius)
+
+
+## The server said this client was blinded for [param seconds]. Only ever the local player.
+func blind_remote(seconds: float) -> void:
+	utility.emit({"fx": AwUtilityZones.Fx.BLIND, "position": Vector3.ZERO, "radius": 0.0, "seconds": seconds, "victim": 0})
+
+
+## What serial [param serial]'s smoke or fire told, once: `{fx, seconds}` with fx as on the wire, else empty.
+func take_told(serial: int) -> Dictionary:
+	var told: Dictionary = _told.get(serial, {})
+	var _gone := _told.erase(serial)
+	return told
 
 
 ## One step of a fused projectile by [AwGrenade]. True when its fuse has run out. A client's
@@ -372,7 +398,12 @@ func _detonate(f: Flying, at: Vector3) -> void:
 		g.position = at
 		var events := AwGrenadeBlast.detonate(g, def, _victims(colliders), _clear_to.bind(space, at))
 		_apply(events, colliders, f, at)
-		effects.blasted(events, f.owner_id)
+
+		if AwUtilityZones.is_utility(def):
+			var told := effects.detonate(g, def, f.owner_id, radius)
+			if not told.is_empty():
+				_told[f.serial] = {"fx": int(told["fx"]) + 1, "seconds": float(told["seconds"])}
+
 		# Map panes too (glass), which the blast's shape query does not return: they are world.
 		if game != null and game.has_method("hurt_panes_in"):
 			game.call("hurt_panes_in", at, radius, f.spawn.splash_damage, f.owner_id)
@@ -471,8 +502,6 @@ func _apply(events: Array[Dictionary], colliders: Array, f: Flying, at: Vector3)
 			"damage":
 				hurt(body, float(event["damage"]), f.owner_id, at.distance_to(_centre(body)))
 				_shove(body, float(event["damage"]), at)
-			"blind":
-				effects.blind(body, float(event["seconds"]))
 
 
 ## Damage to [param body] from [param owner_id]: an armed NPC takes it, a player takes it through

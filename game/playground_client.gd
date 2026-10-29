@@ -346,6 +346,7 @@ func _ready() -> void:
 	hud.name = "Hud"
 	hud.key_fn = key_for
 	add_child(hud)
+	hud.flash_source = presentation.fx if presentation != null else null
 	_follow_hud()
 	if link == null:
 		hud.bind(playground, player_id)
@@ -440,6 +441,15 @@ func _wire_presentation() -> void:
 	)
 
 	playground.undone.connect(_on_undone)
+
+	if playground.projectiles != null:
+		var layer := playground.projectiles
+		layer.utility.connect(presentation.on_grenade_fx)
+		# Connected, the server's BLIND says it; offline this world decides who a flash caught.
+		if bridge == null:
+			layer.effects.blinded.connect(func(id: StringName, seconds: float) -> void:
+				if id == player_id:
+					layer.blind_remote(seconds))
 
 	if bridge != null:
 		bridge.prop_arrived.connect(func(at: Vector3, owner_session: int) -> void:

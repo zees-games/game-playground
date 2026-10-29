@@ -635,6 +635,8 @@ static func fx_catalogue() -> DotFxCatalogue:
 	wave.flash_decay_ms = 450
 	c.add(wave)
 
+	AwGrenadeFx.add_defs(c, FX_DIR)
+
 	return c
 
 
@@ -997,6 +999,11 @@ func on_beacon(at: Vector3) -> int:
 		return 0
 
 	return audio.play_at(BEACON_SOUND, at)
+
+
+## A utility grenade's cloud, fire or blind; the blind is the local player's, so [param info]'s victim is 0.
+func on_grenade_fx(info: Dictionary) -> void:
+	var _shown := AwGrenadeFx.show(fx, get_tree(), info, 0)
 
 
 func on_wave_incoming() -> void:

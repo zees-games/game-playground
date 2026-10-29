@@ -1,0 +1,43 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="Gradient" id="soft"]
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.55, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="soft_tex"]
+gradient = SubResource("soft")
+width = 64
+height = 64
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="smoke_mat"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.62, 0.62, 0.64, 0.8)
+billboard_mode = 3
+billboard_keep_scale = true
+albedo_texture = SubResource("soft_tex")
+
+[sub_resource type="QuadMesh" id="smoke_quad"]
+material = SubResource("smoke_mat")
+size = Vector2(2.4, 2.4)
+
+[node name="SmokeCloud" type="Node3D"]
+
+[node name="Cloud" type="CPUParticles3D" parent="."]
+position = Vector3(0, 1.2, 0)
+amount = 40
+lifetime = 5.0
+preprocess = 3.0
+mesh = SubResource("smoke_quad")
+emission_shape = 1
+emission_sphere_radius = 1.0
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, 0.05, 0)
+initial_velocity_min = 0.1
+initial_velocity_max = 0.5
+scale_amount_min = 1.2
+scale_amount_max = 2.0

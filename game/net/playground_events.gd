@@ -84,8 +84,11 @@ enum Kind {
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
-enum ProjectileTell { LAUNCH, DETONATE }
+## BLIND goes to the one player a flash caught: how long.
+enum ProjectileTell { LAUNCH, DETONATE, BLIND }
 const PROJECTILE_SUB_BITS := 2
+## A detonation's utility kind: 0 none, 1 smoke, 2 fire.
+const DETONATE_FX_BITS := 2
 
 enum Ask {
 	## I have loaded and can receive. Tell me everything.
@@ -990,12 +993,17 @@ static func read_launch(r: DotNetReader) -> Dictionary:
 	return {"serial": serial, "spawn": spawn, "owner_id": owner_id, "ok": r.ok()}
 
 
-static func write_detonate(serial: int, at: Vector3, radius: float) -> PackedByteArray:
+## [param fx] is 0 for a blast that leaves nothing, else AwUtilityZones.Fx plus one (a smoke or a fire),
+## with the seconds it lasts; a client draws the cloud from it.
+static func write_detonate(serial: int, at: Vector3, radius: float, fx: int = 0, seconds: float = 0.0) -> PackedByteArray:
 	var w := _w()
 	w.write_uint(ProjectileTell.DETONATE, PROJECTILE_SUB_BITS)
 	w.write_varint(serial)
 	w.write_vector3_range(at, -WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
 	w.write_float32(radius)
+	w.write_uint(fx, DETONATE_FX_BITS)
+	if fx > 0:
+		w.write_float32(seconds)
 	return w.to_bytes()
 
 
@@ -1003,7 +1011,21 @@ static func read_detonate(r: DotNetReader) -> Dictionary:
 	var serial := r.read_varint()
 	var at := r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
 	var radius := r.read_float32()
-	return {"serial": serial, "position": at, "radius": radius, "ok": r.ok()}
+	var fx := r.read_uint(DETONATE_FX_BITS)
+	var seconds := r.read_float32() if fx > 0 else 0.0
+	return {"serial": serial, "position": at, "radius": radius, "fx": fx, "seconds": seconds, "ok": r.ok()}
+
+
+static func write_blind(seconds: float) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(ProjectileTell.BLIND, PROJECTILE_SUB_BITS)
+	w.write_float32(seconds)
+	return w.to_bytes()
+
+
+static func read_blind(r: DotNetReader) -> Dictionary:
+	var seconds := r.read_float32()
+	return {"seconds": seconds, "ok": r.ok()}
 
 
 # --- ADDON ---------------------------------------------------------------------

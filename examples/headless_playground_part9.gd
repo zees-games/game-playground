@@ -309,12 +309,30 @@ func _test_aw_grenades() -> void:
 	_check(smoke != null and fire != null and zones.active_smokes() == 1, "a smoke grenade leaves a cloud")
 	_check(zones.active_fires() == 1, "an incendiary leaves a fire zone")
 
+	# A flash two metres from the bot, in the open: it is blinded, once, and the ledger holds it.
+	_g_bot.teleport(Vector3(50, 1.0, 50), 0.0)
 	var told := []
 	var on_blind := func(who: StringName, seconds: float) -> void: told.append([who, seconds])
 	zones.blinded.connect(on_blind)
-	zones.blind(_g_bot, 2.0)
+	var flash := layer.launch(_aw_spawn(&"aw_flash", Vector3(50, 1.4, 47), Vector3.ZERO, 2), &"u9")
+	for i in 8:
+		await get_tree().physics_frame
 	zones.blinded.disconnect(on_blind)
-	_check(told.size() == 1 and absf(float(told[0][1]) - 2.0) < 0.01, "a flash blinds a player through the blinded signal")
+	_check(flash != null and told.size() == 1 and told[0][0] == &"bot" and float(told[0][1]) > 0.0,
+		"a flash blinds a player through the blinded signal", str(told))
+	var wire_fire := PlaygroundEvents.write_detonate(3, Vector3(1, 2, 3), 4.0, 2, 7.5)
+	var wr := DotNetReader.new(wire_fire)
+	var _sub := wr.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
+	var rd := PlaygroundEvents.read_detonate(wr)
+	_check(bool(rd["ok"]) and int(rd["fx"]) == 2 and absf(float(rd["seconds"]) - 7.5) < 0.001,
+		"a detonation carries the utility kind and its seconds", str(rd))
+	var plain := DotNetReader.new(PlaygroundEvents.write_detonate(3, Vector3(1, 2, 3), 4.0))
+	var _sub2 := plain.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
+	var pr := PlaygroundEvents.read_detonate(plain)
+	_check(bool(pr["ok"]) and int(pr["fx"]) == 0, "and a plain blast carries none")
+	var bl := DotNetReader.new(PlaygroundEvents.write_blind(3.5))
+	_check(bl.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS) == PlaygroundEvents.ProjectileTell.BLIND
+		and absf(float(PlaygroundEvents.read_blind(bl)["seconds"]) - 3.5) < 0.01, "a blind tell carries its seconds")
 	layer.clear()
 	_done()
 

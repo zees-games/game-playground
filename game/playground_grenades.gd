@@ -1,131 +1,125 @@
-extends Node3D
+extends Node
 
 const PlaygroundPlayer := preload("playground_player.gd")
 
-## What flash, smoke and incendiary grenades leave behind. arena_weapons' [AwGrenadeBlast] decides
-## what a blast does and hands back events; this turns the smoke, fire and blind ones into a
-## cloud, a burning zone and a signal. The projectile layer builds one and ticks it.
-##
-## Authority only: a connected client is told a grenade went off, not what kind it was, so it
-## draws the flash and none of this.
+## What flash, smoke and incendiary grenades leave behind, on the authority: arena_weapons' [AwUtilityZones]
+## does the zones and the blinds, and this plugs the sandbox's bodies, world trace and hurt path into it.
+## The projectile layer builds one, hands it each utility blast and ticks it.
 
-## Seconds between a fire zone's damage pulses.
-const FIRE_PULSE := 0.5
+## Owner ids start high so they never equal a victim's index, which the blast reads as "the thrower".
+const OWNER_BASE := 1000000
 
-## How far above or below a fire's origin a body still stands in it.
-const FIRE_HEIGHT := 2.0
-
-## The layer whose blasts are turned into zones. Set by [PlaygroundProjectiles].
-var projectiles: Node = null
-
-var _smokes: Array[Dictionary] = []
-var _fires: Array[Dictionary] = []
+## A cloud or a fire to draw, as [method AwGrenadeFx.show] reads it. Offline play shows it; a server sends it.
+signal effect(info: Dictionary)
 
 ## A flash blinded the player [param player_id] for [param seconds].
 signal blinded(player_id: StringName, seconds: float)
 
+## The zones, ticked by [method tick].
+var zones := AwUtilityZones.new()
 
-## Takes the smoke, fire and blind events of one blast from [param owner_id].
-func blasted(events: Array[Dictionary], owner_id: StringName) -> void:
-	for event in events:
-		match String(event["event"]):
-			"smoke":
-				_smokes.append(_zone(event, Color(0.72, 0.74, 0.78, 0.55), {}))
-			"fire":
-				_fires.append(_zone(event, Color(1.0, 0.42, 0.1, 0.4), {
-					"dps": float(event["dps"]), "owner": owner_id, "pulse": 0.0,
-				}))
+## The layer whose blasts are turned into zones; set by [method bind].
+var projectiles: Node = null
+
+## Fire zones in the world: `{position, radius, left}`, so a pulse can find who stands in one.
+var _regions: Array[Dictionary] = []
+var _bodies: Array = []
+var _owners: Array[StringName] = []
+## What the last [method detonate] left, for the wire: `{fx, seconds}` or empty.
+var _last: Dictionary = {}
 
 
-## A flash blinded [param body], if it is a player.
-func blind(body: Node3D, seconds: float) -> void:
-	if body is PlaygroundPlayer:
-		blinded.emit(StringName(str(body.get("player_id"))), seconds)
+func bind(layer: Node) -> void:
+	projectiles = layer
+	zones.victims = _victims
+	zones.los = AwUtilityZones.los_from_ray(_blocked)
+	zones.damage = _damage
+	zones.effect.connect(_on_effect)
+
+
+## Sets off a utility grenade [param g] at its position. Returns `{fx, seconds}` for a smoke or a fire, else empty.
+func detonate(g: AwGrenade, def: DotWeaponDef, owner_id: StringName, radius: float) -> Dictionary:
+	_last = {}
+	zones.rules = projectiles.rules
+	g.owner_entity = _owner_index(owner_id)
+	var mine := _regions.size()
+	_regions.append({"position": g.position, "radius": radius, "left": 0.0})
+	var _events := zones.detonate(g, def)
+	_regions.remove_at(mine)
+	return _last
 
 
 func tick(delta: float) -> void:
-	for i in range(_smokes.size() - 1, -1, -1):
-		if _age(_smokes[i], delta):
-			_smokes.remove_at(i)
+	zones.tick(delta)
+	for i in range(_regions.size() - 1, -1, -1):
+		_regions[i]["left"] = float(_regions[i]["left"]) - delta
+		if float(_regions[i]["left"]) <= 0.0:
+			_regions.remove_at(i)
 
-	for i in range(_fires.size() - 1, -1, -1):
-		var zone := _fires[i]
-		zone["pulse"] = float(zone["pulse"]) - delta
 
-		if float(zone["pulse"]) <= 0.0:
-			zone["pulse"] = FIRE_PULSE
-			_burn(zone)
-
-		if _age(zone, delta):
-			_fires.remove_at(i)
+func clear() -> void:
+	zones.clear()
+	_regions.clear()
 
 
 func active_smokes() -> int:
-	return _smokes.size()
+	return zones.active_smokes()
 
 
 func active_fires() -> int:
-	return _fires.size()
+	return zones.active_fires()
 
 
 func describe() -> Dictionary:
-	return {"smokes": _smokes.size(), "fires": _fires.size()}
+	return zones.describe()
 
 
-## Everyone standing in the fire takes a pulse, from the thrower, through the same path a blast
-## uses, so the arena's own rules for friendly fire and armour apply.
-func _burn(zone: Dictionary) -> void:
-	var at: Vector3 = zone["position"]
-	var radius: float = zone["radius"]
-
-	for body: Node3D in projectiles.colliders_in(at, radius):
-		var feet := body.global_position
-
-		if Vector2(feet.x - at.x, feet.z - at.z).length() < radius and absf(feet.y - at.y) <= FIRE_HEIGHT:
-			projectiles.hurt(body, float(zone["dps"]) * FIRE_PULSE, zone["owner"], at.distance_to(feet))
-
-
-func _zone(event: Dictionary, colour: Color, extra: Dictionary) -> Dictionary:
-	var zone := {
-		"position": event["position"], "radius": float(event["radius"]),
-		"left": float(event["seconds"]), "total": float(event["seconds"]), "alpha": colour.a, "node": _draw(event, colour),
-	}
-	zone.merge(extra)
-	return zone
+func _on_effect(info: Dictionary) -> void:
+	match int(info["fx"]):
+		AwUtilityZones.Fx.BLIND:
+			var body: Node3D = _bodies[int(info["victim"])] if int(info["victim"]) < _bodies.size() else null
+			if body is PlaygroundPlayer:
+				blinded.emit(StringName(str(body.get("player_id"))), float(info["seconds"]))
+		AwUtilityZones.Fx.SMOKE, AwUtilityZones.Fx.FIRE:
+			_last = {"fx": int(info["fx"]), "seconds": float(info["seconds"])}
+			if int(info["fx"]) == AwUtilityZones.Fx.FIRE:
+				_regions.append({"position": info["position"], "radius": float(info["radius"]), "left": float(info["seconds"])})
+			effect.emit(info)
 
 
-## Counts a zone down. True when it is over, and its node is gone.
-func _age(zone: Dictionary, delta: float) -> bool:
-	zone["left"] = float(zone["left"]) - delta
-	var node: MeshInstance3D = zone["node"]
+## Everyone in a fire or in this blast. Ids are indexes into [member _bodies], good until the next call.
+func _victims() -> Array:
+	_bodies.clear()
+	var out: Array = []
 
-	if float(zone["left"]) > 0.0:
-		# Thins over its last second, so a cloud does not vanish between two frames.
-		var material := node.mesh.material as StandardMaterial3D
-		material.albedo_color.a = minf(1.0, float(zone["left"])) * float(zone["alpha"])
-		return false
+	for region in _regions:
+		for body: Node3D in projectiles.colliders_in(region["position"], float(region["radius"])):
+			if _bodies.has(body):
+				continue
+			var eye := body.global_position + (Vector3.UP * 0.9 if body is PlaygroundPlayer else Vector3.ZERO)
+			out.append(AwUtilityZones.victim(_bodies.size(), body.global_position, eye, -body.global_basis.z))
+			_bodies.append(body)
 
-	node.queue_free()
-	return true
+	return out
 
 
-func _draw(event: Dictionary, colour: Color) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = float(event["radius"])
-	mesh.height = mesh.radius * 2.0
-	mesh.radial_segments = 16
-	mesh.rings = 8
+## Only static geometry blocks sight, so a flash is not stopped by the crate it is about to throw.
+func _blocked(from: Vector3, direction: Vector3, dist: float) -> bool:
+	var space: PhysicsDirectSpaceState3D = projectiles.get_world_3d().direct_space_state
+	var found := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + direction * dist))
+	return not found.is_empty() and found["collider"] is StaticBody3D
 
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = colour
-	mesh.material = material
 
-	var node := MeshInstance3D.new()
-	node.mesh = mesh
-	node.top_level = true
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(node)
-	node.global_position = event["position"]
-	return node
+## Through the layer's own hurt, so an armed NPC, a player's arena health and a breakable prop all take a pulse.
+func _damage(attacker: int, victim: int, amount: float, _type: Variant, _weapon: StringName) -> void:
+	var owner_index := attacker - OWNER_BASE
+	if victim < _bodies.size() and is_instance_valid(_bodies[victim]) and owner_index >= 0 and owner_index < _owners.size():
+		projectiles.hurt(_bodies[victim], amount, _owners[owner_index], 0.0)
+
+
+func _owner_index(owner_id: StringName) -> int:
+	var at := _owners.find(owner_id)
+	if at < 0:
+		_owners.append(owner_id)
+		at = _owners.size() - 1
+	return OWNER_BASE + at

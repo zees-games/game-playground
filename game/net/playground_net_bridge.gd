@@ -327,6 +327,7 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 		if game.projectiles != null:
 			game.projectiles.launched.connect(_on_projectile_launched)
 			game.projectiles.detonated.connect(_on_projectile_detonated)
+			game.projectiles.effects.blinded.connect(_on_flash_blinded)
 
 		# A map loaded before the bridge was attached has its toys already.
 		if game.toys != null:
@@ -2010,7 +2011,15 @@ func _on_projectile_launched(flying: RefCounted) -> void:
 ## Where it went off, which the client's copy does not decide for itself — see
 ## PlaygroundProjectiles.
 func _on_projectile_detonated(serial: int, at: Vector3, radius: float) -> void:
-	_broadcast(PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_detonate(serial, at, radius))
+	var told: Dictionary = game.projectiles.take_told(serial)
+	_broadcast(PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_detonate(
+		serial, at, radius, int(told.get("fx", 0)), float(told.get("seconds", 0.0))
+	))
+
+
+## A flash caught [param player_id]: only they are told, because only they see white.
+func _on_flash_blinded(player_id: StringName, seconds: float) -> void:
+	_tell(peer_for_player(session_of(player_id)), PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_blind(seconds))
 
 
 func _apply_projectile(reader: DotNetReader) -> void:
@@ -2028,8 +2037,13 @@ func _apply_projectile(reader: DotNetReader) -> void:
 			var blast := PlaygroundEvents.read_detonate(reader)
 			if bool(blast["ok"]):
 				game.projectiles.detonate_remote(
-					int(blast["serial"]), blast["position"], float(blast["radius"])
+					int(blast["serial"]), blast["position"], float(blast["radius"]),
+					int(blast["fx"]), float(blast["seconds"])
 				)
+		PlaygroundEvents.ProjectileTell.BLIND:
+			var blind := PlaygroundEvents.read_blind(reader)
+			if bool(blind["ok"]):
+				game.projectiles.blind_remote(float(blind["seconds"]))
 
 
 func _apply_hello(reader: DotNetReader) -> void:

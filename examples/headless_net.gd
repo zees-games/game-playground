@@ -1,12 +1,12 @@
 extends "res://examples/headless_net_part6.gd"
 
-const CHECKS := 395
+const CHECKS := 400
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 46
+const SECTIONS := 47
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
@@ -68,6 +68,7 @@ func _run() -> void:
 		await _test_tool_look_and_armed_npcs()
 		# Adds no body: a grenade is a ray swept each tick, not a physics object.
 		await _test_grenade_over_the_wire()
+		await _test_utility_over_the_wire()
 		# Spawns a platform and takes it out again; nothing after it but the leave.
 		await _test_riding_over_the_wire()
 		await _test_button_over_the_wire()
