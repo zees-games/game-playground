@@ -118,6 +118,9 @@ var effects: PlaygroundGrenades = null
 signal utility(info: Dictionary)
 
 var _live: Array[Flying] = []
+## The thrower's own launches flown before the server said (negative serials), until it does.
+var _predicted: Array[Flying] = []
+var _next_predicted: int = -1
 var _next_serial: int = 1
 var _gravity: float = 9.8
 var _flashes: Array = []
@@ -190,6 +193,40 @@ func launch(spawn: DotWeaponSpawn, owner_id: StringName, owner_rid: RID = RID(),
 	return f
 
 
+## A client flies its own throw now rather than after the round trip. [method launch_told] adopts it.
+func predict(spawn: DotWeaponSpawn, owner_id: StringName, owner_rid: RID = RID()) -> Flying:
+	var f := launch(spawn, owner_id, owner_rid)
+	f.serial = _next_predicted
+	_next_predicted -= 1
+	_predicted.append(f)
+	return f
+
+
+## The server's launch on a client. [param mine] adopts the thrower's predicted copy of the same
+## spawn (taking the server's serial) instead of flying a second one.
+func launch_told(spawn: DotWeaponSpawn, owner_id: StringName, serial: int, mine: bool) -> Flying:
+	if mine:
+		for i in _predicted.size():
+			var p := _predicted[i]
+			if p.spawn.id == spawn.id and _live.has(p):
+				_predicted.remove_at(i)
+				p.serial = serial
+				return p
+
+	return launch(spawn, owner_id, RID(), serial)
+
+
+## A prediction the server never confirmed (it refused the throw) goes after two seconds.
+func _expire_predicted(rate: int) -> void:
+	for i in range(_predicted.size() - 1, -1, -1):
+		var p := _predicted[i]
+
+		if p.age_ticks > rate * 2 or not _live.has(p):
+			_undraw(p)
+			_live.erase(p)
+			_predicted.remove_at(i)
+
+
 func _sticks(spawn: DotWeaponSpawn) -> bool:
 	if spawn.meta.has(&"sticks"):
 		return bool(spawn.meta[&"sticks"])
@@ -244,6 +281,7 @@ func clear() -> void:
 		_undraw(f)
 
 	_live.clear()
+	_predicted.clear()
 	_told.clear()
 	effects.clear()
 
@@ -254,6 +292,7 @@ func clear() -> void:
 func tick(delta: float) -> void:
 	var space := get_world_3d().direct_space_state if is_inside_tree() else null
 	var rate := maxi(roundi(1.0 / delta), 1)
+	_expire_predicted(rate)
 
 	for i in range(_live.size() - 1, -1, -1):
 		var f: Flying = _live[i]

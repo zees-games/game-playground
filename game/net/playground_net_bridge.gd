@@ -2015,6 +2015,20 @@ func _on_projectile_launched(flying: RefCounted) -> void:
 	))
 
 
+## The local thrower's own launches, flown now; [method _apply_projectile] adopts them when
+## the server's launch arrives. Returns how many.
+func predict_launches(outcome: DotWeaponOutcome, owner_body: Node = null) -> int:
+	if game.projectiles == null or game.projectiles.authority or outcome == null:
+		return 0
+
+	var rid := (owner_body as CollisionObject3D).get_rid() if owner_body is CollisionObject3D else RID()
+
+	for spawn: DotWeaponSpawn in outcome.spawns:
+		var _f: Variant = game.projectiles.predict(spawn, _player_key(local_player_id), rid)
+
+	return outcome.spawns.size()
+
+
 ## Where it went off, which the client's copy does not decide for itself — see
 ## PlaygroundProjectiles.
 func _on_projectile_detonated(serial: int, at: Vector3, radius: float) -> void:
@@ -2037,8 +2051,9 @@ func _apply_projectile(reader: DotNetReader) -> void:
 		PlaygroundEvents.ProjectileTell.LAUNCH:
 			var launch := PlaygroundEvents.read_launch(reader)
 			if bool(launch["ok"]):
-				var _flying: Variant = game.projectiles.launch(
-					launch["spawn"], launch["owner_id"], RID(), int(launch["serial"])
+				var _flying: Variant = game.projectiles.launch_told(
+					launch["spawn"], launch["owner_id"], int(launch["serial"]),
+					launch["owner_id"] == _player_key(local_player_id)
 				)
 		PlaygroundEvents.ProjectileTell.DETONATE:
 			var blast := PlaygroundEvents.read_detonate(reader)

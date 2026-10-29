@@ -589,6 +589,59 @@ func _test_grenade_over_the_wire() -> void:
 	_done()
 
 
+## The thrower's own grenade flies the frame it is thrown, and the server's launch adopts it.
+##
+## Without the prediction the first check fails (nothing flies until the round trip); without the
+## adoption the count after the echo is two.
+func _test_own_grenade_predicted() -> void:
+	_section("the thrower's own grenade is predicted")
+	_server_game.projectiles.clear()
+	_client_game.projectiles.clear()
+	var mine := StringName("u%d" % SESSION)
+
+	var make := func() -> DotWeaponOutcome:
+		var outcome := DotWeaponOutcome.new()
+		var spawn := DotWeaponSpawn.new()
+		spawn.id = &"frag"
+		spawn.origin = Vector3(-40, 4, -40)
+		spawn.velocity = Vector3(3, 2, 0)
+		spawn.gravity_scale = 1.0
+		spawn.radius = 0.08
+		spawn.splash_radius = 5.2
+		spawn.fuse_ticks = _server_game.tick_rate
+		spawn.life_ticks = _server_game.tick_rate * 2
+		outcome.spawns.append(spawn)
+		return outcome
+
+	var blasts: Array = []
+	var on_blast := func(_serial: int, at: Vector3, _radius: float) -> void: blasts.append(at)
+	_client_game.projectiles.detonated.connect(on_blast)
+
+	var _n := _client_bridge.predict_launches(make.call())
+	_check(_client_game.projectiles.live_count() == 1, "the client flies it the moment it is thrown",
+		"%d live before any round trip" % _client_game.projectiles.live_count())
+
+	var _thrown := _server_game.projectiles.accept(make.call(), mine)
+	await _steps(6)
+	_check(_client_game.projectiles.live_count() == 1, "the server's echo adds no second one",
+		"%d live on the client" % _client_game.projectiles.live_count())
+	var theirs := _client_game.projectiles.flying()
+	var ours := _server_game.projectiles.flying()
+	_check(not theirs.is_empty() and not ours.is_empty() and theirs[0].serial == ours[0].serial,
+		"and it took the server's serial, so the server's blast finds it")
+
+	await _steps(_server_game.tick_rate + 8)
+	_client_game.projectiles.detonated.disconnect(on_blast)
+	_check(_client_game.projectiles.live_count() == 0 and blasts.size() == 1,
+		"the server's blast ends it once", "%d blasts, %d live" % [blasts.size(), _client_game.projectiles.live_count()])
+
+	# A throw the server never confirms is taken back.
+	var _m := _client_bridge.predict_launches(make.call())
+	await _steps(_server_game.tick_rate * 3)
+	_check(_client_game.projectiles.live_count() == 0, "a refused throw is taken back after a while")
+	_done()
+
+
 ## A smoke, a fire and a flash the server throws reach a client that never simulated them.
 ##
 ## Armed without the fx bits on DETONATE, the client's utility signal never fires and the first two checks fail.

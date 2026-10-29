@@ -697,7 +697,8 @@ func _net_physics(delta: float) -> void:
 				var drawn_command := PlaygroundZee.command_for(
 					command.buttons, command.yaw, command.pitch, PlaygroundZee.slot_of(rig)
 				)
-				var _drawn := rig.simulate_tick(drawn_command, tick)
+				var drawn := rig.simulate_tick(drawn_command, tick)
+				var _flown := bridge.predict_launches(drawn, player)
 				# How long it has been quiet, so the server's count may correct it
 				# (`PlaygroundPlayerNet._correct_drawn`) without undoing a shot in flight.
 				PlaygroundZee.note_drawn(player, rig, drawn_command, 1.0 / float(maxi(playground.tick_rate, 1)))
