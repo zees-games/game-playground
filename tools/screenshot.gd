@@ -31,6 +31,8 @@ var _index := 0
 var _camera: Camera3D = null
 var _blood_from: PlaygroundPresentation = null
 var _blood_delay := 0
+var _arms_pending := false
+var _arms: DotPlayerViewArms = null
 
 
 func _initialize() -> void:
@@ -82,6 +84,11 @@ func _initialize() -> void:
 		# root is inside the tree yet, so a global transform set on an effect is refused
 		# and every effect is drawn at the origin.
 		_fx_pending = true
+		return
+
+	if args.has("--arms"):
+		_arms_pending = true
+		_action_id = id
 		return
 
 	var action_at := args.find("--action")
@@ -294,6 +301,22 @@ var _armed := false
 var _fx_pending := false
 
 
+## `--arms`: the downed first-person arms (`DotPlayerViewArms`) seen from the eye, level and at the steepest look-down.
+func _stage_arms(id: String) -> Array[Dictionary]:
+	var pivot := Node3D.new()
+	root.add_child(pivot)
+	pivot.global_position = Vector3(0.0, 1.0, 0.0)
+	_arms = DotPlayerViewArms.new()
+	pivot.add_child(_arms)
+	_arms.build()
+	_arms.set_downed(true)
+	var eye := pivot.global_position
+	return [
+		{"name": "%s_arms_level" % id, "from": eye, "at": eye + Vector3(0.0, 0.0, -1.0), "wait": 12},
+		{"name": "%s_arms_down" % id, "from": eye, "at": eye + Vector3(0.0, -1.0, -0.02), "wait": 6},
+	]
+
+
 # --- --action --------------------------------------------------------------
 
 ## `--action <kind> <id>` (`--action emote dance`): a person playing an avatar action from the
@@ -423,6 +446,14 @@ func _process(_delta: float) -> bool:
 		_fx_pending = false
 		_shots = _stage_fx()
 		return false
+
+	if _arms_pending:
+		_arms_pending = false
+		_shots = _stage_arms(_action_id)
+		return false
+
+	if _arms != null:
+		_arms.tick(0.0, _delta)
 
 	if not _action_args.is_empty():
 		_shots = _stage_action(_action_id, _action_args[0], _action_args[1])

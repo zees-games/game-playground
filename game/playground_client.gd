@@ -695,8 +695,37 @@ func _net_physics(delta: float) -> void:
 
 const VIEW_NAMES := {&"fp": "first person", &"tp": "third person", &"selfie": "selfie"}
 
+const VIEW_ARMS_SCRIPT := "res://addons/dot_player_char/nodes/dot_player_view_arms.gd"
+
 ## The camera of the `selfie` view, left standing where the player was.
 var selfie_camera: Camera3D = null
+## Yaw-only pivot at the eye; the downed first-person arms hang under it, not the pitching camera.
+var arms_pivot: Node3D = null
+var view_arms: Node = null
+
+
+## The downed player's own arms (dot-player-char API 7); nothing on an older build.
+func _build_view_arms() -> void:
+	if DotAddonApi.build_level("dot_player_char") < 7 or not ResourceLoader.exists(VIEW_ARMS_SCRIPT):
+		return
+	arms_pivot = Node3D.new()
+	arms_pivot.name = "ArmsYaw"
+	arms_pivot.top_level = true
+	player.add_child(arms_pivot)
+	view_arms = load(VIEW_ARMS_SCRIPT).new()
+	view_arms.name = "ViewArms"
+	arms_pivot.add_child(view_arms)
+	view_arms.call("build")
+
+
+## Shows the arms only while downed in first person, and drives them at the player's speed.
+func _present_view_arms(delta: float) -> void:
+	if view_arms == null or not is_instance_valid(view_arms):
+		return
+	view_arms.call("set_downed", player.downed and view_id() == &"fp")
+	arms_pivot.global_position = camera.global_position
+	arms_pivot.global_rotation = Vector3(0.0, deg_to_rad(player.controller.state.yaw), 0.0)
+	view_arms.call("tick", player.speed(), delta)
 
 
 func _build_view() -> void:
@@ -705,6 +734,7 @@ func _build_view() -> void:
 	camera.fov = 100.0
 	camera.current = true
 	player.add_child(camera)
+	_build_view_arms()
 
 	# Somebody walking into the first-person camera is hidden at the lens. The third-person
 	# camera is dot-player-controller's rig, which has a fade of its own (`_build_view_switch`).
@@ -1407,6 +1437,7 @@ func _process(_delta: float) -> void:
 	var hands := zee_view as ZeeViewModel if zee_view != null and is_instance_valid(zee_view) and _zee_rig() != null else null
 	var zoom := hands.aim_fov_scale() if hands != null else 1.0
 	player.present_camera(camera, _delta, fov, shake, punch, zoom)
+	_present_view_arms(_delta)
 	if hud != null:
 		hud.follow_hands(hands)
 

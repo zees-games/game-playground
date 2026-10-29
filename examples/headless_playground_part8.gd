@@ -14,6 +14,25 @@ var _tcb_dead_hidden: bool
 var _tcb_sink
 var _tcb_edited
 
+func _the_client_mounts_the_downed_arms() -> void:
+	if DotAddonApi.build_level("dot_player_char") < 7:
+		return
+	var arms := _tcb_client.view_arms as DotPlayerViewArms
+	_check(arms != null and arms.arms() != null and _tcb_client.arms_pivot != null and arms.get_parent() == _tcb_client.arms_pivot,
+		"the client mounts the downed arms under a yaw pivot, not the camera")
+	if arms == null:
+		return
+	_tcb_client.player.downed = false
+	_tcb_client._present_view_arms(0.016)
+	_check(not arms.arms().visible, "the arms are hidden while on their feet")
+	_tcb_client.player.downed = true
+	_tcb_client._present_view_arms(0.016)
+	_check(arms.arms().visible and arms.shown, "and shown while downed in first person")
+	_tcb_client.player.downed = false
+	_tcb_client._present_view_arms(0.016)
+	_check(not arms.arms().visible, "and hidden again on a revive")
+
+
 func _test_the_client_boots() -> void:
 	_section("the client boots")
 
@@ -71,6 +90,7 @@ func _test_the_client_boots() -> void:
 		and _tcb_client.player.sampler != null,
 		"and the player samples input, with a sampler actually built"
 	)
+	_the_client_mounts_the_downed_arms()
 	await _test_the_client_boots_2()
 	await _test_the_client_boots_3()
 	await _test_the_client_boots_4()
