@@ -2,13 +2,7 @@ extends "res://examples/headless_net_part5.gd"
 
 ## A peer dot-server has spawned but that has not said READY hears NOTHING on this link.
 ##
-## [b]A real join, in the order a real one happens.[/b] [DotClientLink] reports LOADED the
-## moment it has added the game scene, which fires `client_spawn` and adds the player; the
-## client builds `Server/Playground` only once its first map is up, and says READY after
-## that. The JOIN the add produced went out as `rpc()` to every socket, and on every real
-## join the new one logged "Failed to get path from RPC: Server/Playground". The loopback
-## hands a broadcast over as peer 0, so "nothing to peer 0" is what that looks like here.
-## `pg-rpc-before-scene`.
+## A real join, in the real order: the JOIN the add produced went out as `rpc()` before the client built `Server/Playground`, so every join logged "Failed to get path from RPC". The loopback hands a broadcast over as peer 0. `pg-rpc-before-scene`.
 var _nbr_late: int
 
 func _test_nothing_before_ready() -> void:
@@ -98,11 +92,7 @@ func _test_nothing_before_ready_2() -> void:
 
 ## A connected client standing on a prop the server moves (prop surfing).
 ##
-## [b]Measured, because the client cannot carry itself the way the server does.[/b] Riding is
-## `DotPropCarry`, resolved from the body underfoot; on a client that body is a frozen mirror
-## the bridge moves by interpolation, with no velocity, so the client's own prediction stands
-## still on a moving deck and only the server's corrections move it. This counts what that
-## costs against standing on the same deck while it is still.
+## Measured because a client's riding (`DotPropCarry`) needs a body underfoot with a velocity, and its frozen mirror has none, so only the server's corrections move it; this counts the cost against a still deck.
 func _test_riding_over_the_wire() -> void:
 	_section("riding a moving prop, connected")
 
@@ -140,15 +130,9 @@ func _test_riding_over_the_wire() -> void:
 
 	_check(carried > 2.0, "the server carries a connected player on a moving deck", "%.2f m" % carried)
 	_check(worst < 0.5, "and the client stays within half a metre of where the server has them", "%.3f m" % worst)
-	# Measured 2026-10-06: before the client carried itself, 32 (one every snapshot) moving
-	# and 32 still, the second because the client's player had mask 1 and stood on nothing.
-	# With both fixed, 8 moving and 0 still: the 8 are the start, while the mirror's
-	# interpolated motion catches up from rest. That 8 was really 7 to 12 idle and up to 16
-	# under load: the mirror's velocity was measured against the wall clock between draws.
-	# Measured 2026-10-11 from the server's positions per snapshot tick instead: 4, in 30 runs
-	# out of 30, idle and loaded alike. No room for a loaded machine is needed, because
-	# nothing here reads a clock; 6 is margin for a schedule change, and the old wall-clock
-	# measure never came in under 7.
+	# Measured: 32 moving before the client carried itself, then 8, then 4 in 30 runs of 30
+	# (idle and loaded) once counted from the server's positions per snapshot tick rather than the
+	# wall clock. 6 is margin; the wall-clock measure never came in under 7.
 	_check(still <= 2 and moving <= 6,"and a client stands on a still deck with no corrections, and rides a moving one with few",
 		"%d moving, %d still" % [moving, still])
 
@@ -204,7 +188,7 @@ func _test_button_over_the_wire() -> void:
 
 
 ## The toys are run by the SERVER too (`[game-playground-1]` part 2): a connected player's
-## launcher used to grab crates, because its buttons went to the physics gun.
+## launcher must not grab crates, because its buttons went to the physics gun.
 func _test_toys_over_the_wire() -> void:
 	_section("the toys are run by the server")
 
@@ -252,10 +236,7 @@ func _test_toys_over_the_wire() -> void:
 
 ## A zee-dot-weapons gun is run by the SERVER, from the buttons the client holds.
 ##
-## [b]Unlike the toys, which a client actuates itself.[/b] A gun the server did not run is a
-## client deciding what it hit, so `_give_weapon` puts a deciding rig on the server's copy of
-## the player and `_drive_tools` ticks it. Armed by skipping that branch: the two firing
-## checks fail (0 uses in 256 ticks).
+## A gun the server did not run is a client deciding what it hit, so `_give_weapon` puts a deciding rig on the server's player. Armed by skipping that branch, the two firing checks fail.
 var _zotw_theirs: PlaygroundPlayer
 var _zotw_uses: Array[int]
 var _zotw_resolved: Array[int]
@@ -299,9 +280,8 @@ func _test_zee_over_the_wire() -> void:
 		str((drawn as ZeeWorldModel).equipped()) if drawn is ZeeWorldModel else "nothing"
 	)
 
-	# Outside the body, not inside it. The mount named the torso until 2026-10-03, which hung
-	# every gun at the capsule's centre with two pixels of barrel showing (rendered with
-	# `tools/screenshot_net.sh --zee=rifle`). Armed: mounted on "Torso" this is 0.00 m.
+	# Outside the body, not inside it: mounted on "Torso" the gun hung at the capsule's centre,
+	# 0.00 m out (`tools/screenshot_net.sh --zee=rifle`).
 	var torso: Variant = _zotw_mirror.character.rig.find_child("Torso", true, false) if _zotw_mirror != null and _zotw_mirror.character != null else null
 	var torso_radius := ((torso as MeshInstance3D).mesh as CapsuleMesh).radius if torso is MeshInstance3D and (torso as MeshInstance3D).mesh is CapsuleMesh else 0.0
 	# A body drawn as the character kit's figure has no capsule: its torso is the kit's own
@@ -387,9 +367,8 @@ func _disconnect() -> void:
 
 
 ## A client flooding its bag. Its own section, just before the rejoin, because it spends the
-## peer's whole budget and every client op for the next second is refused for it — which is
-## the rule working, and would read as a bug in whatever section came next. The rejoin's
-## disconnect is what resets it.
+## peer's whole budget and refuses every client op for the next second; the rejoin's
+## disconnect resets it.
 func _test_inventory_flood() -> void:
 	_section("a client flooding its bag is told no past thirty a second, and rolls every no back")
 
@@ -544,9 +523,7 @@ func _test_inventory_rejoin_2() -> void:
 
 ## A grenade the server throws is flown by the client too, and goes off where the server says.
 ##
-## The client is told the launch (one PROJECTILE event) and flies its own copy so the arc is
-## drawn, and its copy never goes off by itself: the blast, the damage and the shove are the
-## server's, and the client is told where with a DETONATE.
+## The client flies its own copy for the arc and never detonates it: blast, damage and shove are the server's, told by a DETONATE.
 func _test_grenade_over_the_wire() -> void:
 	_section("a grenade over the wire")
 	_server_game.projectiles.clear()
@@ -614,14 +591,10 @@ func _test_grenade_over_the_wire() -> void:
 
 ## The gun a connected client draws takes the server's count once it has gone quiet.
 ##
-## [b]Nothing used to write the server's count back.[/b] The drawn rig simulates from the same
-## buttons, so the two agree until a shot is refused or the server refills the gun; from then
-## the HUD read the client's own sum for good (game-zombie-zone's 15 / 105). Here the drawn rig
-## fires shots the server never hears (a refused shot), and then both fire and the gun in hand
-## is asked for again (a refill). Armed: without `PlaygroundPlayerNet._correct_drawn` the
-## "takes the server's count" and "the refill reaches the drawn gun" checks fail.
+## The drawn rig fires shots the server never hears, then both fire and the gun is refilled; armed without `PlaygroundPlayerNet._correct_drawn`, the "takes the server's count" and refill checks fail.
+
 ## A downed player is the server's (`PlaygroundDowns` sets `PlaygroundPlayer.downed` every
-## tick); the client draws them crawling. Before `net_downed` they stood for the ninety seconds.
+## tick); the client draws them crawling.
 func _test_downed_over_the_wire() -> void:
 	_section("a downed player is drawn down on the client, and up again")
 

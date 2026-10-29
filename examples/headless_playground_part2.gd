@@ -87,7 +87,7 @@ func _test_buttons_and_doors() -> void:
 	_done()
 
 
-# --- Saved builds ----------------------------------------------------------
+# Saved builds
 
 var _sb_at: Vector3
 var _sb_yaw: float
@@ -233,7 +233,7 @@ func _test_saved_builds_2() -> void:
 	_done()
 
 
-# --- Boot ------------------------------------------------------------------
+# Boot
 
 func _test_boots() -> void:
 	_section("booting")
@@ -249,11 +249,9 @@ func _test_boots() -> void:
 	_check(playground.props != null, "the prop spawner exists")
 	_check(playground.boards != null, "the leaderboards exist")
 
-	# Two built in: the flat grass plane and `pg_generated` -- the one map in this family
-	# that is not written down -- and the custom maps game-playground-maps links in, each
-	# built by `pg_data`. The count is asserted rather than the ids because a map added
-	# and not registered is the failure this is here to catch, and a list of ids would be
-	# a second copy of `Playground.map_catalogue()`.
+	# Two built in (the flat grass plane and `pg_generated`) and the custom maps linked in, each
+	# built by `pg_data`. The count is asserted, not the ids: a list of ids would be a second
+	# copy of `Playground.map_catalogue()`.
 	var data_maps := 0
 	for map: DotMapDef in playground.maps.catalogue.maps:
 		if map.meta.has("doc"):
@@ -307,10 +305,8 @@ static func _timer_linked() -> bool:
 func _test_tick_rate_comes_from_the_engine() -> void:
 	_section("the tick rate comes from the engine, which is what a server sets")
 
-	# The chain: an operator writes `sv_tickrate` in server.cfg; dot-server writes
-	# `Engine.physics_ticks_per_second`; the playground reads it, and a run timer (when a
-	# server links one) adopts it. Getting it wrong does not fail loudly, which is why
-	# this is a test rather than a comment; the timer's half is in `_test_the_run_timer`.
+	# The chain: `sv_tickrate` in server.cfg, dot-server writes `Engine.physics_ticks_per_second`,
+	# the playground reads it, and a run timer adopts it; a wrong chain fails quietly, hence the test.
 	_check(
 		playground.tick_rate == Engine.physics_ticks_per_second,
 		"the playground counts in the engine's rate",
@@ -377,10 +373,8 @@ func _test_styles() -> void:
 
 
 ## `addons/pg_timer`, the adapter that turns dot-timer on when a server links it: run only
-## when `res://addons/dot_timer` is there. What it proves is the chain the playground no
-## longer names: the hook found and attached, the manager on the engine's rate, a style
-## reaching both halves, a checkpoint, and a run from a START to an END on this map filed
-## back through `Playground.run_filed`.
+## when `res://addons/dot_timer` is there. It proves the hook attaches, the manager runs on the
+## engine's rate, and a run from START to END is filed through `Playground.run_filed`.
 func _test_the_run_timer() -> void:
 	_section("the run timer, from addons/pg_timer")
 
@@ -523,7 +517,7 @@ func _test_leaderboards() -> void:
 	_done()
 
 
-# --- Props -----------------------------------------------------------------
+# Props
 
 func _test_props() -> void:
 	_section("props")
@@ -586,7 +580,7 @@ func _test_props() -> void:
 	_done()
 
 
-# --- Changing maps ---------------------------------------------------------
+# Changing maps
 
 func _test_map_change() -> void:
 	_section("changing map under a live player")

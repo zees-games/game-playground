@@ -32,29 +32,9 @@ const ToolPhysprop := preload("../game/toolgun/tool_physprop.gd")
 const PlaygroundLimits := preload("../game/playground_limits.gd")
 const PlaygroundNpcNet := preload("../game/net/playground_npc_net.gd")
 
-## Runs the whole playground: a bot surfs a map from start to finish, its run is
-## timed and filed, props are spawned and moved, and the map is changed underneath.
+## Runs the whole playground: a bot surfs a map from start to finish, its run is timed and filed, props are spawned and moved, and the map is changed underneath.
 ##
-## [codeblock]
-## godot --headless --path . res://examples/headless_playground.tscn
-## [/codeblock]
-##
-## [b]This is the only thing in the family that runs the joins between these five
-## addons.[/b] Each has its own suite and each passes with the others absent, and the
-## family's own history says that proves very little: every bug that has cost a day
-## here was in a seam — a bridge reconciling on top of another bridge, a client
-## message keyed on the wrong id, a value computed and consumed by nothing. So this
-## test is about the joins, not about the parts:
-##
-## - the timer is ticked from the movement loop, with the position the move produced;
-## - a style change moves both halves together;
-## - a zone's effect reaches the player through the game and not through the timer;
-## - a record is filed, scored, and reaches the leaderboard;
-## - a map change tears down runs, props and geometry in an order that survives;
-## - a prop can be spawned, held, and freed without leaking a node.
-##
-## The bot's input is a scripted [DotFpsCommand] rather than a device, which is the
-## whole reason [DotFpsSampler] is a separate object.
+## The only run of the joins between the five addons, where the bugs live: timer ticked from the move, style change, zone effect, record to leaderboard, map change teardown, prop spawn and free. The bot's input is a scripted [DotFpsCommand]. Run: `godot --headless --path . res://examples/headless_playground.tscn`
 
 const TICK := 1.0 / 128.0
 
@@ -334,7 +314,6 @@ func _test_profile_workbench_2() -> void:
 ## The first-person camera's motion, through the client's own `PlaygroundPlayer.present_camera`
 ## once a physics tick: a drop dips and comes back, a hop does not, a strafe leans each way,
 ## speed widens the lens, a teleport drops it all, and with every setting at 0 nothing moves.
-## Before 2026-10-11 none of it reached the screen (the DotFpsView nothing ran).
 func _test_camera_motion() -> void:
 	_section("the camera dips, leans and widens, and only when it should")
 
@@ -420,9 +399,7 @@ func _done() -> void:
 
 ## Runs the simulation for [param ticks], driving [param id] with [param command].
 ##
-## Commands are applied per tick and the physics is stepped per tick, which is what
-## makes this reproducible: a test that awaited frames would run a different number of
-## simulation ticks on a loaded machine.
+## Commands are applied and physics stepped per tick, so it reproduces on a loaded machine.
 func _drive(
 	id: StringName, command: DotFpsCommand, ticks: int
 ) -> void:
@@ -433,7 +410,7 @@ func _drive(
 		await get_tree().physics_frame
 
 
-# --- Picking players up ----------------------------------------------------
+# Picking players up
 
 ## Points [param id] at [param pitch] degrees (yaw 0, so along -Z) for [param ticks] ticks.
 func _look(id: StringName, pitch: float, ticks: int) -> void:
@@ -571,7 +548,7 @@ func _test_picking_players_up_2() -> void:
 	_done()
 
 
-# --- Prop surfing ----------------------------------------------------------
+# Prop surfing
 
 ## Moves [param body] at [param velocity] for [param ticks] ticks, written every tick so
 ## nothing but this moves it, while [param rider] stands still on top.
@@ -634,7 +611,7 @@ func _test_riding_a_moving_prop() -> void:
 	_done()
 
 
-# --- Destruction -----------------------------------------------------------
+# Destruction
 
 func _test_breaking_props() -> void:
 	_section("breaking props")
@@ -740,4 +717,4 @@ func _fire_at_crates(rig: ZeeWeaponRig, player: PlaygroundPlayer, ticks: int, un
 	return fired
 
 
-# --- Buttons and doors -----------------------------------------------------
+# Buttons and doors
