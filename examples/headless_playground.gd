@@ -1,6 +1,6 @@
 extends "res://examples/headless_playground_part9.gd"
 
-const CHECKS := 776 + 22 + 9 + 10 + 8 + 1 + 4 + 15 + 2 + 1 + 26
+const CHECKS := 776 + 22 + 9 + 10 + 8 + 1 + 4 + 15 + 2 + 1 + 26 + 3
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that

@@ -183,6 +183,9 @@ var weapon: PlaygroundWeapon = null
 ## The hands and the gun, under the first-person camera, while a zee weapon is in them.
 var zee_view: Node3D = null
 
+## The model of a toy or tool in hand (physics gun, launcher, tool gun, ...); null with a zee gun.
+var toy_view: Node3D = null
+
 ## Fire, alt and reload for a zee weapon offline, as command bits. A connected client sends
 ## the same bits in [member _net_buttons] instead, and the server runs the shot.
 var _zee_buttons: int = 0
@@ -2116,6 +2119,7 @@ func _set_tool(id: StringName) -> void:
 	if menu != null:
 		menu.tool = tool
 
+	_arm_toy_view(tool)
 	_sync_hud()
 
 	if hud != null:
@@ -2175,6 +2179,8 @@ func _cycle_weapon() -> void:
 
 
 func _primary_down() -> void:
+	if toy_view != null and is_instance_valid(toy_view):
+		(toy_view as PlaygroundToyView).kick()
 	if bridge != null:
 		_net_buttons |= DotFpsCommand.BUTTON_USER_0
 		return
@@ -2606,6 +2612,7 @@ func _apply_server_tool(id: StringName) -> void:
 			weapon.wielder = player_id
 			weapon.armed = selected_prop
 
+	_arm_toy_view(tool)
 	_sync_hud()
 
 
@@ -3102,6 +3109,19 @@ func _disarm_zee() -> void:
 	_net_buttons &= ~DotFpsCommand.BUTTON_USER_2
 
 
+## Builds the first-person model for a toy or tool, after [method _disarm_zee] cleared the last.
+func _arm_toy_view(id: StringName) -> void:
+	if toy_view != null and is_instance_valid(toy_view):
+		toy_view.queue_free()
+	toy_view = null
+	if zee_view != null or camera == null or id == &"":
+		return
+	var def := playground.weapon_def(id) if playground != null else null
+	var colour := def.colour if def != null else Color(0.9, 0.55, 0.2)
+	toy_view = PlaygroundToyView.make(id, colour)
+	camera.add_child(toy_view)
+
+
 func _set_reload(down: bool) -> void:
 	# Offline, a toy's reload — the tool gun's third button — is run here, on the press.
 	# Online it rides the same bit the zee weapons' reload does, and the server runs it.
@@ -3121,6 +3141,9 @@ func _set_reload(down: bool) -> void:
 ## command's angles and so the shot are untouched. It went to a `DotFpsView` that nothing ran
 ## until 2026-10-11, so no zee gun ever kicked the view here.
 func _present_zee() -> Vector2:
+	if toy_view != null and is_instance_valid(toy_view):
+		toy_view.visible = view_id() == &"fp"
+
 	var rig := _zee_rig()
 
 	if rig == null or zee_view == null:

@@ -726,6 +726,19 @@ func _test_the_client_boots_12() -> void:
 		_tcb_client.player.zee_rig == null and _tcb_client.zee_view == null and _tcb_client.player.zee_world == null,
 		"and the physics gun takes it back out of their hands"
 	)
+	var toy_in_hand: Node3D = _tcb_client.toy_view
+	_check(
+		toy_in_hand != null and toy_in_hand.get_parent() == _tcb_client.camera
+			and toy_in_hand.is_in_group(&"dot_view_model"),
+		"a toy in hand draws a first-person model under the camera, in the viewmodel_fov group"
+	)
+	_tcb_client._set_tool(&"launcher")
+	_check(_tcb_client.toy_view != null and _tcb_client.toy_view != toy_in_hand,
+		"and picking another toy swaps the model")
+	(_tcb_client.toy_view as PlaygroundToyView).set_hands_fov_at_4_3(40.0)
+	(_tcb_client.toy_view as PlaygroundToyView)._process(0.016)
+	_check(_tcb_client.toy_view.scale.x != 1.0, "and viewmodel_fov scales it like a gun")
+	_tcb_client._set_tool(&"phys")
 
 	# Water splashes: a crate dropped into Nature's pond, heard on the client's own frames.
 	var _wet_map: DotResult = await _tcb_client.playground.change_map(&"pgc_nature")
