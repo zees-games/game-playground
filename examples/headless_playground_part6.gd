@@ -14,16 +14,11 @@ func _built_map_ids() -> Array[String]:
 	return out
 
 
-# --- A run -----------------------------------------------------------------
+# A run
 
 ## The spawn menu, driven the way a player drives it.
 ##
-## [b]dot-ui's suite cannot reach this and neither can dot-props'.[/b] A menu built
-## out of a catalogue is exactly the seam this project exists to run: the screen stack
-## is one addon, the catalogue is another, and the code joining them is here. It is
-## also a `Control` built entirely in code, which is the shape that produced the
-## family's `set_anchors_preset` bug — so the sizes are checked, not just the
-## contents.
+## A menu built from a catalogue is a seam between the screen stack and the catalogue that no addon suite reaches; it is a `Control` built in code, so sizes are checked, not just contents.
 var _sm_menu: PlaygroundSpawnMenu
 var _sm_stack: DotScreenStack
 var _sm_servers: PlaygroundBrowser
@@ -62,12 +57,9 @@ func _test_spawn_menu() -> void:
 		"%.0f x %.0f" % [_sm_menu.size.x, _sm_menu.size.y]
 	)
 
-	# [b]The server browser, on the same stack and measured the same way.[/b] It is the
-	# second screen this game has built in code, and the failure it can have is the one
-	# dot-ui had five of: `set_anchors_preset` describes how a rectangle FOLLOWS its
-	# parent and changes nothing until something resizes it, so a Control keeps the zero
-	# size it was created with — and every child then lays out inside nothing while being,
-	# by every property, correctly configured. Only a size says so.
+	# The server browser, on the same stack and measured the same way. `set_anchors_preset` changes
+	# nothing until something resizes the Control, which keeps its zero size with every property
+	# correctly configured; only a size says so.
 	_sm_servers = PlaygroundBrowser.new()
 	add_child(_sm_servers)
 
@@ -90,10 +82,8 @@ func _test_spawn_menu() -> void:
 		"%d" % (_sm_servers.browser.count() if _sm_servers.browser != null else -1)
 	)
 
-	# [b]Filtering is local and always will be.[/b] A server that decided which of its own
-	# properties to report is a server that reports whatever gets it listed — so the
-	# filter lives on the model, and a screen that filtered its own rows would be a second
-	# filter that disagrees with the one favourites are pinned by.
+	# Filtering is local and always will be: a server that chose which properties to report would
+	# report whatever gets it listed, and a screen filtering its own rows would be a second filter.
 	_check(
 		_sm_servers.browser.filter != null,
 		"and a filter the client owns rather than one the server answers"
@@ -126,9 +116,8 @@ func _test_spawn_menu_2() -> void:
 		listing.config.page_url(1) if listing != null else str(on.error)
 	)
 	# Where the site comes from when nobody passed a flag. Web: ?backbone= > page origin;
-	# native: argv > env > the exported default (argv over env is DotConfig.load_layered's
-	# order and cannot be injected here). Each result is also the one a reversed order
-	# would get wrong, so a swap fails a check.
+	# native: argv > env > the exported default. Each result is one a reversed order would get
+	# wrong, so a swap fails a check.
 	OS.unset_environment(env_key)
 	var web_both := PlaygroundBrowser.resolve_default_site({
 		"web": true, "origin": "https://site.example", "query": "https://other.example"
@@ -165,7 +154,7 @@ func _test_spawn_menu_2() -> void:
 	_sm_stack.pop()
 	_sm_servers.queue_free()
 
-	# --- Props tab -----------------------------------------------------------
+	# Props tab
 
 	_sm_props_shown = _sm_menu.shown()
 	_sm_prop_count = 0
@@ -250,7 +239,7 @@ func _test_spawn_menu_4() -> void:
 	_sm_menu._on_search_changed("")
 	await get_tree().process_frame
 
-	# --- Entities tab --------------------------------------------------------
+	# Entities tab
 
 	_sm_menu.show_tab(PlaygroundSpawnMenu.Tab.ENTITIES)
 	await get_tree().process_frame
@@ -263,7 +252,7 @@ func _test_spawn_menu_4() -> void:
 		"and no props"
 	)
 
-	# --- Weapons tab ---------------------------------------------------------
+	# Weapons tab
 
 	_sm_menu.show_tab(PlaygroundSpawnMenu.Tab.WEAPONS)
 	await get_tree().process_frame
@@ -331,16 +320,11 @@ func _test_spawn_menu_5() -> void:
 	_done()
 
 
-# --- The sandbox, and the course in the corner of it ------------------------
+# The sandbox, and the course in the corner of it
 
 ## A car spawned from the prop catalogue, driven, ridden in and got out of.
 ##
-## [b]The whole point of this test is that a vehicle here is BOTH things at once.[/b]
-## dot-vehicle's own 122 checks drive real bodies through real physics, and every one of
-## them spawns through [method DotVehicleSpawner.spawn] into a world with nothing else in
-## it. What has never run anywhere is a vehicle that is also a [DotPropInstance] — on a
-## prop budget, on an undo stack, adopted rather than spawned, with its wheels built by
-## the game after the body was created by somebody else.
+## A vehicle here is BOTH a vehicle and a [DotPropInstance]: on a prop budget, an undo stack, adopted rather than spawned, with wheels built by the game after the body, which no other suite runs.
 var _v_driver: PlaygroundPlayer
 var _v_at: Vector3
 var _v_spawned: DotPropInstance
@@ -358,10 +342,8 @@ func _test_vehicles() -> void:
 	_v_driver = playground.add_player(&"bot", "Bot")
 	playground.props.limits.spawn_interval = 0.0
 
-	# The corner of the plate opposite the jump course and the tower, which is the one
-	# part of this map that is flat and empty for sixty metres in every direction. A car
-	# is not a player: it covers the width of the sandbox in a few seconds, and the first
-	# version of this test drove into the scenery and measured a stationary car.
+	# The corner of the plate opposite the jump course and the tower: flat and empty for sixty
+	# metres, because a car crosses the sandbox in seconds and would measure the scenery.
 	_v_at = Vector3(-60.0, 1.2, -60.0)
 	_v_driver.teleport(_v_at + Vector3(2.5, 0.0, 0.0), 0.0)
 
@@ -476,15 +458,9 @@ func _test_vehicles_2() -> void:
 		"%.2f m" % _v_passenger.controller.state.position.distance_to(passenger_before)
 	)
 
-	# Getting out, which is the half dot-vehicle says the bugs are in.
-	#
-	# Asserted on the SPEED first. A refusal test run against a car that happens to be
-	# stationary passes without testing anything, which is how the first version of this
-	# read: "not ok, or slow enough" is true for a car nobody managed to move.
-	# Put back on a clean patch and pointed down the plate before anything about SPEED is
-	# measured. Not tidiness: everything up to here has been steering it, and a test that
-	# measures a speed at the end of a drive it did not control is a test that measures
-	# whatever it happened to hit.
+	# Getting out, the half dot-vehicle says the bugs are in. Asserted on the SPEED first: a refusal
+	# test against a stationary car passes without testing anything. Put back on a clean patch
+	# pointed down the plate first, since the steering up to here leaves the end speed uncontrolled.
 	(_v_vehicle.node as Node3D).global_transform = Transform3D(Basis.IDENTITY, _v_at)
 	_v_vehicle.body().linear_velocity = Vector3.ZERO
 	_v_vehicle.body().angular_velocity = Vector3.ZERO
@@ -528,10 +504,9 @@ func _test_vehicles_3() -> void:
 		"and handed back to whoever had them before"
 	)
 
-	# How far it takes to stop, which "the brake stops it" never said. dot-vehicle handed
-	# Godot's wheels the brake in newtons where Godot reads an impulse per physics step, so
-	# the buggy stopped from 50 km/h within a couple of metres on either brake, at this
-	# project's 128 ticks as at 60. Since dot-vehicle 4f4afaf they are forces.
+	# How far it takes to stop, which "the brake stops it" never said: the brake once went to
+	# Godot's wheels in newtons where it reads an impulse per step, stopping the buggy within a
+	# couple of metres. Forces since dot-vehicle 4f4afaf.
 	var foot := await _stopping(_v_vehicle, _v_at, &"bot", DotFpsCommand.BUTTON_CROUCH)
 	var hand := await _stopping(_v_vehicle, _v_at, &"bot", DotFpsCommand.BUTTON_JUMP)
 	print("  ..    the buggy from 50 km/h: brake (crouch) %.2f m, handbrake (jump) %.2f m" % [foot, hand])
@@ -646,16 +621,11 @@ func _stopping(vehicle: DotVehicleInstance, at: Vector3, id: StringName, button:
 	return Vector2(end.x - start.x, end.z - start.z).length()
 
 
-# --- The jump course -------------------------------------------------------
+# The jump course
 
-## Every hand-built map, swept for closed slots, standable ground no spawn reaches, and
-## ground a spawn reaches that leads nowhere (`[gate-sweep-2]`). `pg_generated` is not in
-## it: it is not hand-built, and `PlaygroundWorldGen`'s own validator floods it from its
-## spawn on every seed.
+## Every hand-built map, swept for closed slots and ground no spawn reaches or that leads nowhere (`[gate-sweep-2]`).
 ##
-## [b]The survey is asked about a fixture first, so a sweep that finds nothing is known to
-## be looking.[/b] Three maps passing clean says nothing about a detector that cannot fire;
-## the fixture has one of each thing it looks for, and each is asserted found.
+## The survey is asked about a fixture first, so a sweep that finds nothing is known to be looking.
 var _tmas_data_script: GDScript
 
 func _test_the_maps_are_surveyed() -> void:
@@ -738,7 +708,7 @@ func _test_the_maps_are_surveyed_2() -> void:
 	_done()
 
 
-# --- The collision audit ---------------------------------------------------------
+# The collision audit
 
 ## A floor with one of everything on it: a 0.5 m slot between two walls, a platform 5 m
 ## up, and a cellar a player drops into and cannot climb out of.

@@ -138,12 +138,7 @@ func _test_model_props_2() -> void:
 
 ## Every prop this build ships is one scene, and the definition is what differs.
 ##
-## [b]The mass column is the one that matters.[/b] `DotPropDef.mass` is read by
-## exactly one thing in dot-props — a physics gun's `grab_mass_limit` — so before the
-## spawner put it on the body, a catalogue that said 900 kg and a scene saved at 20 kg
-## gave a prop that was refused for being too heavy and then punted like a beach ball.
-## Nothing errored, and the two numbers were only ever compared by a player wondering
-## why.
+## The mass column matters: `DotPropDef.mass` is read only by a physics gun's `grab_mass_limit`, so unless the spawner puts it on the body a 900 kg catalogue entry on a 20 kg scene is punted like a beach ball and nothing errors.
 func _test_props_are_built_from_their_definitions() -> void:
 	_section("props built from their definitions")
 
@@ -314,11 +309,7 @@ func _test_limits_per_kind() -> void:
 
 ## Points the tool gun at [param body] from three metres away and presses [param button].
 ##
-## [b]After a physics step, not in the same frame as the last press.[/b] A resize rebuilds
-## the body's collision shape, and the physics server's queries do not see a new shape
-## until it has stepped: the first version of this pressed four buttons in one frame and
-## every press after a resize traced straight through the crate. No player can click twice
-## inside one physics step, so the wait is the real sequence, not a workaround.
+## After a physics step, not in the same frame as the last press: a resize rebuilds the collision shape and queries do not see it until the server steps, and no player clicks twice inside one step.
 func _tool_at(gun: Object, body: Node3D, button: StringName) -> DotResult:
 	await get_tree().physics_frame
 	var space := body.get_world_3d().direct_space_state
@@ -348,7 +339,7 @@ func _test_the_tool_gun() -> void:
 	_ttg_gun.equip(playground, def)
 	_ttg_gun.wielder = &"bot"
 
-	# --- Inflate and deflate ---------------------------------------------------------
+	# Inflate and deflate
 	var crate := playground.props.spawn(&"crate", &"bot", Vector3(0, 0.6, 0))
 	await get_tree().physics_frame
 	_ttg_body = crate.node as RigidBody3D
@@ -378,7 +369,7 @@ func _test_the_tool_gun() -> void:
 	_check(float(_ttg_body.get("size_scale")) <= PlaygroundProp.MAX_SCALE, "and nothing grows past the largest")
 	var _reset := await _tool_at(_ttg_gun, _ttg_body, &"reload")
 
-	# --- Paint -----------------------------------------------------------------------
+	# Paint
 	var _c: Variant = _ttg_gun.call("set_mode", &"colour", {"colour": "6fbf5a"})
 	var _p := await _tool_at(_ttg_gun, _ttg_body, &"primary")
 	_check((_ttg_body.get("tint") as Color).is_equal_approx(Color.html("6fbf5a")), "the colour tool paints")
@@ -391,7 +382,7 @@ func _test_the_tool_gun() -> void:
 	var _unpaint := await _tool_at(_ttg_gun, _ttg_body, &"reload")
 	_check((_ttg_body.get("tint") as Color).a == 0.0, "and reload takes the paint off")
 
-	# --- Weld ------------------------------------------------------------------------
+	# Weld
 	_ttg_other_body = _ttg_other.node as RigidBody3D
 	var _w: Variant = _ttg_gun.call("set_mode", &"weld", {})
 	var first: DotResult = await _tool_at(_ttg_gun, _ttg_body, &"primary")
@@ -408,7 +399,7 @@ func _test_the_tool_gun_2() -> void:
 	var _unweld := await _tool_at(_ttg_gun, _ttg_body, &"reload")
 	_check(playground.constraints.size() == 0, "and reload takes the weld off")
 
-	# --- The constraint limit ----------------------------------------------------------
+	# The constraint limit
 	playground.spawn_limits.defaults[PlaygroundLimits.CONSTRAINTS] = 1
 	var _w1 := await _tool_at(_ttg_gun, _ttg_body, &"secondary")
 	var refused: DotResult = await _tool_at(_ttg_gun, _ttg_other_body, &"secondary")
@@ -418,7 +409,7 @@ func _test_the_tool_gun_2() -> void:
 	playground.spawn_limits.defaults[PlaygroundLimits.CONSTRAINTS] = 100
 	playground.constraints.remove_owned(&"bot")
 
-	# --- No-collide --------------------------------------------------------------------
+	# No-collide
 	var _n: Variant = _ttg_gun.call("set_mode", &"nocollide", {})
 	var _n1 := await _tool_at(_ttg_gun, _ttg_body, &"primary")
 	var _n2 := await _tool_at(_ttg_gun, _ttg_other_body, &"primary")
@@ -427,7 +418,7 @@ func _test_the_tool_gun_2() -> void:
 	var _n3 := await _tool_at(_ttg_gun, _ttg_body, &"reload")
 	_check(not _ttg_body.get_collision_exceptions().has(_ttg_other_body), "and reload puts their collision back")
 
-	# --- Rope ----------------------------------------------------------------------------
+	# Rope
 	var anchor := playground.props.spawn(&"crate", &"bot", Vector3(10, 8, 0))
 	var hanging := playground.props.spawn(&"crate", &"bot", Vector3(10, 6, 0))
 	await get_tree().physics_frame
@@ -447,7 +438,7 @@ func _test_the_tool_gun_2() -> void:
 	_check(not (anchor_body.get("ropes") as Array).is_empty(),
 		"and one of its props carries the rope for a client to draw")
 
-	# --- Balloon ---------------------------------------------------------------------------
+	# Balloon
 	var lifted := playground.props.spawn(&"crate", &"bot", Vector3(-10, 0.6, 0))
 	await get_tree().physics_frame
 	var lifted_body := lifted.node as RigidBody3D
@@ -457,17 +448,15 @@ func _test_the_tool_gun_2() -> void:
 	_check(tied.ok, "a balloon is tied on")
 	_check(playground.props.group_count(&"bot", &"balloons") == 1,
 		"counted as a balloon, not as a prop")
-	# Forty ticks, not four seconds. Under an open sky a 3000 N balloon on its rope goes
-	# unstable once the crate is a few metres up (16 m/s at tick 40, thousands at tick 60,
-	# 1e9 m by tick 240), which it did not on the old lobby map. That is the balloon's to
-	# fix, not this check's: what is asserted is that it lifts.
+	# Forty ticks, not four seconds: under open sky a 3000 N balloon goes unstable once the crate
+	# is a few metres up (1e9 m by tick 240). That is the balloon's to fix; this asserts it lifts.
 	for i in 40:
 		await get_tree().physics_frame
 	_check(lifted_body.global_position.y > start_y + 1.0, "and lifts the crate",
 		"%.2f m up" % (lifted_body.global_position.y - start_y))
 	lifted_body.freeze = true
 
-	# --- Physical properties ------------------------------------------------------------------
+	# Physical properties
 	var _pp: Variant = _ttg_gun.call("set_mode", &"physprop", {"gravity": false, "weight": 2.0})
 	var _pp1 := await _tool_at(_ttg_gun, _ttg_other_body, &"primary")
 	_check(_ttg_other_body.gravity_scale == 0.0 and is_equal_approx(_ttg_other_body.mass, _ttg_other.def.mass * 2.0),
@@ -475,7 +464,7 @@ func _test_the_tool_gun_2() -> void:
 
 func _test_the_tool_gun_3() -> void:
 
-	# --- Ownership -----------------------------------------------------------------------------
+	# Ownership
 	var theirs := playground.props.spawn(&"crate", &"someone", Vector3(-4, 0.6, 6))
 	await get_tree().physics_frame
 	var was := playground.config.touch_others_props
@@ -486,7 +475,7 @@ func _test_the_tool_gun_3() -> void:
 		"and on a server that says so, it cannot touch somebody else's")
 	playground.config.touch_others_props = was
 
-	# --- The remover ------------------------------------------------------------------------------
+	# The remover
 	var _rm: Variant = _ttg_gun.call("set_mode", &"weld", {})
 	var _w2 := await _tool_at(_ttg_gun, _ttg_body, &"primary")
 	var _w3 := await _tool_at(_ttg_gun, _ttg_other_body, &"primary")
@@ -536,7 +525,7 @@ func _test_editing_a_selected_prop() -> void:
 	_easp_body.call("set_tint", Color.html("e05252"))
 	await get_tree().physics_frame
 
-	# --- Selecting reads the prop -----------------------------------------------------
+	# Selecting reads the prop
 	var picked: DotResult = await _tool_at(_easp_gun, _easp_body, &"primary")
 	var report: Dictionary = picked.value if picked.ok and picked.value is Dictionary else {}
 	_check(report.get("node") == _easp_body, "left click selects the prop under the crosshair")
@@ -548,7 +537,7 @@ func _test_editing_a_selected_prop() -> void:
 		"its gravity, its freeze and its weight", str(read))
 	_check(str(report.get("name", "")) != "", "and its name, for the HUD")
 
-	# --- A change lands on it as it arrives ------------------------------------------
+	# A change lands on it as it arrives
 	var changed := read.duplicate()
 	changed["size"] = 2.0
 	changed["colour"] = "6fbf5a"
@@ -568,7 +557,7 @@ func _test_editing_a_selected_prop() -> void:
 	_check(is_equal_approx(float(_easp_other_body.get("size_scale")), 1.0) and (_easp_other_body.get("tint") as Color).a == 0.0,
 		"and nothing else")
 
-	# --- The second prop's settings are its own, not the first's ------------------------
+	# The second prop's settings are its own, not the first's
 	var second: DotResult = await _tool_at(_easp_gun, _easp_other_body, &"primary")
 	var second_read: Dictionary = (second.value as Dictionary).get("settings", {}) if second.ok else {}
 	_check(is_equal_approx(float(second_read.get("size", 0.0)), 1.0) and bool(second_read.get("gravity", false)),
@@ -585,13 +574,13 @@ func _test_editing_a_selected_prop() -> void:
 
 func _test_editing_a_selected_prop_2() -> void:
 
-	# --- Its own colour takes the paint off -----------------------------------------------
+	# Its own colour takes the paint off
 	var own := _easp_only_colour.duplicate()
 	own["colour"] = PlaygroundProp.colour_of(_easp_other.def).to_html(false)
 	var _o: Variant = _easp_gun.call("set_mode", &"edit", own)
 	_check((_easp_other_body.get("tint") as Color).a == 0.0, "choosing the catalogue's own colour takes the paint off")
 
-	# --- Freezing asks the freeze limit, unfreezing does not ------------------------------
+	# Freezing asks the freeze limit, unfreezing does not
 	var freeze := own.duplicate()
 	freeze["frozen"] = true
 	var _f: Variant = _easp_gun.call("set_mode", &"edit", freeze)
@@ -609,7 +598,7 @@ func _test_editing_a_selected_prop_2() -> void:
 		str(after_refusal.get("refused")))
 	playground.props.limits.per_player_frozen = was_frozen_cap
 
-	# --- Reload puts it back --------------------------------------------------------------
+	# Reload puts it back
 	var _back: DotResult = await _tool_at(_easp_gun, _easp_body, &"reload")
 	_check(is_equal_approx(float(_easp_body.get("size_scale")), 1.0) and (_easp_body.get("tint") as Color).a == 0.0
 		and _easp_body.gravity_scale == 1.0 and is_equal_approx(_easp_body.mass, _easp_crate.def.mass),
@@ -617,7 +606,7 @@ func _test_editing_a_selected_prop_2() -> void:
 	var re_other: DotResult = await _tool_at(_easp_gun, _easp_other_body, &"reload")
 	_check(re_other.ok and _easp_other.frozen, "and leaves a frozen prop frozen")
 
-	# --- Letting go -----------------------------------------------------------------------
+	# Letting go
 	var gone: DotResult = await _tool_at(_easp_gun, _easp_body, &"secondary")
 	_check(gone.ok and (gone.value as Dictionary).get("node") == null, "right click lets go of it")
 	var after := (_easp_mode.get("settings") as Dictionary).duplicate()
@@ -632,7 +621,7 @@ func _test_editing_a_selected_prop_2() -> void:
 	_check(is_equal_approx(float(_easp_body.get("size_scale")), 1.0),
 		"switching to another tool lets go too, so switching back never lands old settings on it")
 
-	# --- Ownership is asked again on every change -------------------------------------------
+	# Ownership is asked again on every change
 	var theirs := playground.props.spawn(&"crate", &"someone", Vector3(-5, 0.6, 0))
 	await get_tree().physics_frame
 	var was_touch := playground.config.touch_others_props
@@ -649,7 +638,7 @@ func _test_editing_a_selected_prop_2() -> void:
 		str(refused.get("refused")))
 	playground.config.touch_others_props = was_touch
 
-	# --- A selected prop that is removed ------------------------------------------------------
+	# A selected prop that is removed
 	_easp_doomed = playground.props.spawn(&"crate", &"bot", Vector3(0, 0.6, 6))
 	await get_tree().physics_frame
 
@@ -661,7 +650,7 @@ func _test_editing_a_selected_prop_3() -> void:
 	_check((_easp_mode.call("selection_report") as Dictionary).get("node") == null,
 		"a selected prop that is removed is simply no longer selected")
 
-	# --- The wire ---------------------------------------------------------------------------------
+	# The wire
 	var bytes := PlaygroundEvents.write_selection(42, "Wooden crate", {"size": 2.0, "frozen": true}, "")
 	var back := PlaygroundEvents.read_selection(DotNetReader.new(bytes))
 	_check(bool(back["ok"]) and int(back["net_id"]) == 42 and str(back["name"]) == "Wooden crate"
@@ -680,4 +669,4 @@ func _tool_at_ground(gun: Object, x: float, z: float, button: StringName) -> Dot
 	return gun.call(button, space, Vector3(x, 4.0, z), Vector3.DOWN)
 
 
-# --- The circuit -----------------------------------------------------------
+# The circuit

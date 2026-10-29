@@ -2,14 +2,7 @@ extends "res://examples/headless_playground_part3.gd"
 
 ## The chaser goes through dot-npc's perception, not "the nearest player this tick".
 ##
-## [b]Every check here fails on the version this replaced.[/b] The old chaser called
-## `nearest_player()` on every one of the 128 ticks a second this game runs at, and both
-## of the failures below are what that produces: two players a metre apart make it turn
-## back and forth for ever, and one who steps out of range makes it forget mid-stride.
-##
-## Driven by hand rather than by letting the simulation run, because the thing being
-## tested is the decision and not the walking — and a suite that moved real players
-## around would be measuring the movement code.
+## Every check fails on the old chaser, which called `nearest_player()` every tick and so turned back and forth between two close players and forgot one mid-stride. Driven by hand, because the decision is under test and not the walking.
 var _acc_spawned
 var _acc_chaser
 
@@ -102,12 +95,9 @@ func _test_a_chaser_commits_2(playground: Playground) -> void:
 	_test_a_hunter_decides(playground)
 
 
-## The same NPC with a **decision** instead of an `if`: dot-npc-ai's state machine and
-## the arena shooters' characteristics table.
+## The same NPC with a **decision** instead of an `if`: dot-npc-ai's state machine and characteristics table.
 ##
-## [b]`npc_chaser` is still in the catalogue and is still correct.[/b] What this one adds
-## is a reaction time, a character per NPC, and a machine whose transitions are the design
-## — and keeping both is the only honest way to say what the addon actually bought.
+## `npc_chaser` stays in the catalogue; this one adds a reaction time, a character per NPC and a machine whose transitions are the design.
 var _ahd_spawned
 var _ahd_hunter
 var _ahd_machine: DotNpcAiMachine
@@ -157,14 +147,9 @@ func _test_a_hunter_decides(playground: Playground) -> void:
 		"a hunter starts on patrol (%s)" % String(_ahd_machine.current())
 	)
 
-	# Somebody walks into view. [b]It must NOT go straight to chasing[/b] — the reaction
-	# time is spent in ALERT, and an NPC that skipped it is one no player can surprise.
-	#
-	# [b]A REAL player, and that is not incidental.[/b] `PlaygroundEntity.target` resolves
-	# a candidate id back through `game.players` and clears the target when it finds
-	# nothing — deliberately, because a disconnected player has no position and steering at
-	# their last one walks the NPC to an empty corner for the whole grace period. A test
-	# with a candidate and no player is therefore a test of that clearing, not of this.
+	# Somebody walks into view. It must NOT go straight to chasing: the reaction time is spent in ALERT.
+	# A REAL player, not incidental: `PlaygroundEntity.target` resolves a candidate through
+	# `game.players` and clears it when it finds none, so a bare candidate tests that clearing.
 	var seen := playground.add_player(&"seen", "Seen")
 	seen.teleport(Vector3(0.0, 2.0, -8.0))
 
@@ -213,7 +198,7 @@ func _test_a_hunter_decides_2(playground: Playground) -> void:
 	playground.remove_player(&"seen")
 
 
-# --- Limits per kind, the tool gun, armed NPCs -------------------------------------
+# Limits per kind, the tool gun, armed NPCs
 
 func _write_fake_addon(root: String, name: String, hook_source: String) -> void:
 	DirAccess.make_dir_recursive_absolute("%s/%s" % [root, name])
@@ -232,7 +217,7 @@ func _test_addon_hook_and_npc_tools() -> void:
 	_section("the addons hook, waypoints and the NPC spawner")
 	await _sandbox_floor()
 
-	# --- The hook, against a scratch folder shaped like res://addons ------------------------------
+	# The hook, against a scratch folder shaped like res://addons
 	var root := "user://pg_addon_scratch"
 	var hooked := """extends Node
 var got: Array = []
@@ -281,7 +266,7 @@ func playground_receive(msg: Dictionary) -> void:
 	_check(preload("../game/net/playground_event.gd").fits(), "and every event kind still fits its field")
 	host.queue_free()
 
-	# --- The real folder: dot_core has no hook, natural-disasters has an adapter -------------------
+	# The real folder: dot_core has no hook, natural-disasters has an adapter
 	_check(playground.addons != null and playground.addons.skipped().has("dot_core"),
 		"the game scanned the real addons folder, and the libraries in it were left alone")
 	var tornado: Object = playground.addons.find("pg_natural_disasters/tornado")
@@ -327,7 +312,7 @@ func playground_receive(msg: Dictionary) -> void:
 		_check(playground.addons.deliver(PlaygroundAddons.UNDO_ADDON, {"undo": "me", "at": [1.0, 2.0, 3.0]})
 			and told_heard == [[&"me", Vector3(1, 2, 3)]], "a client hears who undid, and where")
 
-	# --- The waypoint tool ------------------------------------------------------------------------
+	# The waypoint tool
 	var def := playground.weapon_def(&"toolgun")
 	var gun := PlaygroundWeapons.make(def)
 	gun.equip(playground, def)
@@ -356,7 +341,7 @@ func playground_receive(msg: Dictionary) -> void:
 	await get_tree().physics_frame
 	_check(cleared.ok and playground.waypoints.size() == points_before, "reload removes my points")
 
-	# --- A route is walked --------------------------------------------------------------------------
+	# A route is walked
 	var route: Array = []
 	var last: Node = null
 	for x in [-10.0, 10.0]:
@@ -379,7 +364,7 @@ func playground_receive(msg: Dictionary) -> void:
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	await get_tree().physics_frame
 
-	# --- The NPC spawner tool -----------------------------------------------------------------------
+	# The NPC spawner tool
 	_check(gun.call("set_mode", &"npc_spawn", {"kind": "npc_soldier", "weapon": "zee_shotgun", "count": 2.0}).ok,
 		"the tool gun takes the NPC spawner")
 	var squad: DotResult = await _tool_at_ground(gun, 40.0, 0.0, &"primary")
@@ -404,7 +389,7 @@ func playground_receive(msg: Dictionary) -> void:
 			break
 	_check(fired, "NPCs the tool spawned use their weapons")
 
-	# --- A spawn point ------------------------------------------------------------------------------
+	# A spawn point
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	await get_tree().physics_frame
 	var _sp: Variant = gun.call("set_mode", &"npc_spawn", {
@@ -612,6 +597,4 @@ func _test_spawn_providers_3() -> void:
 
 ## A zee grenade is thrown, flies, bounces, goes off, and NPCs get out from under it.
 ##
-## [b]This game used to drop a weapon outcome's spawns[/b], so a thrown frag cost a grenade
-## and never existed. Every check here goes through the real path: a rig, its outcome, and
-## `player_shots_fired`, which is what the server's bridge and the offline client both call.
+## Every check goes through the real path: a rig, its outcome, and `player_shots_fired`, which the server's bridge and the offline client both call.
