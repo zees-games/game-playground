@@ -635,7 +635,7 @@ static func fx_catalogue() -> DotFxCatalogue:
 	wave.flash_decay_ms = 450
 	c.add(wave)
 
-	AwGrenadeFx.add_defs(c, FX_DIR)
+	AwGrenadeFx.add_defs(c)
 
 	return c
 

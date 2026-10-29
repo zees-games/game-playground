@@ -712,6 +712,8 @@ var selfie_camera: Camera3D = null
 ## Yaw-only pivot at the eye; the downed first-person arms hang under it, not the pitching camera.
 var arms_pivot: Node3D = null
 var view_arms: Node = null
+## Where the arms hold the zee weapon in hand (dot-player-char API 8); null with nothing held.
+var held_grip: DotViewGrip = null
 
 
 ## The downed player's own arms (dot-player-char API 7); nothing on an older build.
@@ -732,7 +734,10 @@ func _build_view_arms() -> void:
 func _present_view_arms(delta: float) -> void:
 	if view_arms == null or not is_instance_valid(view_arms):
 		return
-	view_arms.call("set_downed", player.downed and view_id() == &"fp")
+	var first := view_id() == &"fp"
+	view_arms.call("set_downed", player.downed and first)
+	var hands := zee_view as ZeeViewModel if zee_view != null and is_instance_valid(zee_view) else null
+	arms_pivot.visible = first and (hands == null or not hands.is_scoped())
 	arms_pivot.global_position = camera.global_position
 	arms_pivot.global_rotation = Vector3(0.0, deg_to_rad(player.controller.state.yaw), 0.0)
 	view_arms.call("tick", player.speed(), delta)
@@ -3036,6 +3041,10 @@ func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 
 	zee_view = ZeeViewModel.new()
 	zee_view.name = "ZeeViewModel"
+	var own_hands := PlaygroundViewGrip.available() and view_arms is DotPlayerViewArms
+	(zee_view as ZeeViewModel).show_arms = not own_hands
+	if own_hands:
+		(zee_view as ZeeViewModel).hands_reached.connect(_on_hands_reached)
 	camera.add_child(zee_view)
 
 	var rig := PlaygroundZee.arm(
@@ -3055,6 +3064,14 @@ func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 	return true
 
 
+## The weapon's own measured grip and fore-end, onto the arms.
+func _on_hands_reached(anchor: Node3D, grip: Vector3, fore: Vector3, pose: StringName) -> void:
+	var made := PlaygroundViewGrip.update(held_grip, anchor, grip, fore, pose)
+	if made != held_grip:
+		held_grip = made
+		(view_arms as DotPlayerViewArms).set_held(held_grip)
+
+
 func _disarm_zee() -> void:
 	if player != null and is_instance_valid(player):
 		PlaygroundZee.disarm(player)
@@ -3064,6 +3081,9 @@ func _disarm_zee() -> void:
 	if zee_view != null and is_instance_valid(zee_view):
 		zee_view.queue_free()
 	zee_view = null
+	held_grip = null
+	if view_arms is DotPlayerViewArms:
+		(view_arms as DotPlayerViewArms).set_held(null)
 
 	_zee_buttons = 0
 	_net_buttons &= ~DotFpsCommand.BUTTON_USER_2
