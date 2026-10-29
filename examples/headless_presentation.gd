@@ -679,13 +679,9 @@ func _test_party_does_not_migrate() -> void:
 
 # --- 8b ---------------------------------------------------------------------
 
-## A stand-in rendezvous: the four routes `DotP2PSignallerHttp` speaks, on a real socket,
-## answering each request [member delay] frames after it arrives.
-##
-## [b]The delay is the point.[/b] Every other party check here uses the loopback
-## signaller, which answers inside the call — and a coroutine that never suspends is
-## indistinguishable from a function, so a caller that forgot `await` passes against it.
-## A rendezvous that answers frames later is the shape the real one has.
+## A stand-in rendezvous: the four routes `DotP2PSignallerHttp` speaks, on a real socket, answering each request
+## [member delay] frames after it arrives. The delay is the point: the loopback signaller answers inside the call,
+## so a caller that forgot `await` passes against it.
 class RendezvousStub:
 	extends Node
 
@@ -776,18 +772,9 @@ class RendezvousStub:
 		return {}
 
 
-## `[p2p-await-games]`: a party over the HTTP rendezvous, host and join, each awaited
-## end to end — through `PlaygroundParty`, `DotP2PSession` and `DotP2PSignallerHttp` to a
-## socket and back.
-##
-## [b]What "awaited" is asserted as.[/b] The answer the caller gets back is the one the
-## stub sent, and it arrives at least [member RendezvousStub.delay] frames after the call:
-## a link in the chain that dropped its `await` hands its caller null (GDScript refuses a
-## coroutine called as a function at runtime) or returns before the stub has answered,
-## and either fails here. Armed 2026-09-25 by taking the `await` off `DotP2PSession.join`'s
-## call to its signaller (typed as the base, so nothing at compile time can see it): a
-## runtime "async function without await", join back in 0 frames, three checks fire. The
-## same edit in `PlaygroundParty` is a parse error instead — the compiler guards that link.
+## `[p2p-await-games]`: a party over the HTTP rendezvous, host and join, each awaited end to end through
+## `PlaygroundParty`, `DotP2PSession` and `DotP2PSignallerHttp`. The caller's answer must be the stub's, arriving at
+## least [member RendezvousStub.delay] frames after the call: a link that dropped its `await` fails here.
 func _test_party_over_http() -> void:
 	_section("A party that meets over HTTP waits for the answer")
 

@@ -9,12 +9,9 @@ const PlaygroundProfiles := preload("playground_profiles.gd")
 const PlaygroundServices := preload("playground_services.gd")
 const PlaygroundVote := preload("playground_vote.gd")
 
-## Settings, randomness, audio, effects and a console.
-##
-## This is the only game that holds dot-randomness as well: the generated map, the scattered
-## props and the wave composition all come from one seed, so two people can compare notes.
-## The manager is here rather than in `Playground` because it owns the session's seed, and
-## `Playground` must run without it (a fixed seed, said so).
+## Settings, randomness, audio, effects and a console. This is the only game that holds dot-randomness as well:
+## the generated map, props and wave composition come from one seed. The manager is here rather than in
+## `Playground` because it owns the session's seed, and `Playground` must run without it.
 
 const CHANNEL := "playground.presentation"
 
@@ -193,12 +190,9 @@ static func schema() -> DotSettingsSchema:
 	s.add(DotSettingsDef.boolean(&"prop_sounds", true, &"sandbox").with_description(
 		"Whether other people's props make a noise when they land."
 	))
-	# The window, the frame rate, the theme and the frame-rate counter: dot-menu's stock
-	# settings, applied by the client's DotMenuApplier and its DotMenu. The keys above that
-	# are also stock (volumes, field of view, effects, shake) stay as declared here.
-	# GROUP_CONTROLS for `invert_mouse` (sensitivity is declared above, so it is skipped):
-	# the Controls page drew its row only once the key existed, and the applier inverts the
-	# sampler's look with it.
+	# The window, the frame rate, the theme and the counter: dot-menu's stock settings, applied by the client's
+	# DotMenuApplier and DotMenu. GROUP_CONTROLS adds `invert_mouse` (sensitivity is declared above), which the
+	# applier inverts the sampler's look with.
 	DotMenuStock.declare(s, [DotMenuStock.GROUP_VIDEO, DotMenuStock.GROUP_INTERFACE, DotMenuStock.GROUP_CONTROLS] as Array[StringName])
 	# One binding setting per key the client reads ([PlaygroundBindings]), so the Controls page
 	# can move every one and the help screen shows where each is now.
@@ -215,14 +209,9 @@ const CAMERA_MOTION_KEYS := {
 }
 
 
-## Points every [PlaygroundPresentation] made after this at a fresh, empty settings
-## directory named [param tag], and returns it.
-##
-## [b]For a suite or a render tool, never a player.[/b] `headless_presentation` drove the
-## Escape menu's volume to 0.15 through the real `user://playground_settings`, so every
-## real session after a test run started nearly silent. Swapping the store after
-## [method setup] is too late for a tool, which has already drawn from what the player
-## saved; a scratch directory emptied first means a run starts from the defaults.
+## Points every [PlaygroundPresentation] made after this at a fresh, empty settings directory named [param tag], and
+## returns it. For a suite or a render tool, never a player: a suite once drove the real
+## `user://playground_settings` volume to 0.15 and left every real session nearly silent.
 static func use_scratch_settings(tag: String) -> String:
 	var dir := "user://scratch/%s" % tag
 	var abs_dir := ProjectSettings.globalize_path(dir)
@@ -371,26 +360,7 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	grab.priority = 60
 	c.add(grab)
 
-	var undo := DotAudioDef.new()
-	undo.id = &"undo"
-	undo.path = "%s/undo.ogg" % SOUND_DIR
-	undo.bus = &"UI"
-	undo.cooldown_ms = 120
-	undo.priority = 60
-	undo.pitch_min = 0.7
-	undo.pitch_max = 0.8
-	c.add(undo)
-
-	var undo_at := DotAudioDef.new()
-	undo_at.id = &"undo_at"
-	undo_at.path = "%s/undo.ogg" % SOUND_DIR
-	undo_at.kind = DotAudioDef.Kind.POSITIONAL_3D
-	undo_at.bus = &"SFX"
-	undo_at.cooldown_ms = 120
-	undo_at.priority = 60
-	undo_at.pitch_min = 0.7
-	undo_at.pitch_max = 0.8
-	c.add(undo_at)
+	_add_undo_cues(c)
 
 	var punt := DotAudioDef.new()
 	punt.id = &"tool_punt"
@@ -432,12 +402,9 @@ static func sound_catalogue() -> DotAudioCatalogue:
 		cue.priority = 70
 		c.add(cue)
 
-	# An administrator's beacon: a ping once a second from the beaconed player, heard by
-	# everybody. Positional, because the beacon's whole job is to say WHERE somebody is and
-	# a flat ping would say only that somebody somewhere is beaconed. And the furthest
-	# reach in this table — a sandbox is two hundred metres across and a beacon that went
-	# quiet halfway would fail in the one case it is for. Pitched an octave under the vote's
-	# warning, which shares its voice, so a ping is never heard as a ballot closing.
+	# An administrator's beacon: a ping a second from the beaconed player, heard by everybody and positional, because
+	# it says WHERE somebody is. The furthest reach in this table, an octave under the vote's warning, which shares
+	# its voice, so a ping is never heard as a ballot closing.
 	var ping := DotAudioDef.new()
 	ping.id = BEACON_SOUND
 	ping.path = "%s/beacon.ogg" % SOUND_DIR
@@ -498,16 +465,33 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	return c
 
 
-## Which synthesised voice stands in for each id until real audio is dropped into
-## [constant SOUND_DIR].
-##
-## [b]A sandbox makes noise for a different reason than a shooter does.[/b] Almost nothing
-## here is information a player has to act on — it is confirmation that the thing they just
-## did happened, which is why `refused` gets a voice of its own rather than silence: a buy
-## that does nothing and a buy that was refused are indistinguishable without it.
-##
-## `wave_incoming` is the exception and is the only ominous sound in the table, because it
-## is the one thing in this game that arrives whether the player asked for it or not.
+## The undo cue and its positional twin, split out of [method sound_catalogue] to keep it short.
+static func _add_undo_cues(c: DotAudioCatalogue) -> void:
+	var undo := DotAudioDef.new()
+	undo.id = &"undo"
+	undo.path = "%s/undo.ogg" % SOUND_DIR
+	undo.bus = &"UI"
+	undo.cooldown_ms = 120
+	undo.priority = 60
+	undo.pitch_min = 0.7
+	undo.pitch_max = 0.8
+	c.add(undo)
+
+	var undo_at := DotAudioDef.new()
+	undo_at.id = &"undo_at"
+	undo_at.path = "%s/undo.ogg" % SOUND_DIR
+	undo_at.kind = DotAudioDef.Kind.POSITIONAL_3D
+	undo_at.bus = &"SFX"
+	undo_at.cooldown_ms = 120
+	undo_at.priority = 60
+	undo_at.pitch_min = 0.7
+	undo_at.pitch_max = 0.8
+	c.add(undo_at)
+
+
+## Which synthesised voice stands in for each id until real audio is dropped into [constant SOUND_DIR].
+## Almost nothing here is information to act on, only confirmation, so `refused` gets a voice of its own; `wave_incoming`
+## is the only ominous one, because it arrives whether the player asked or not.
 static func sound_recipes() -> Dictionary:
 	return {
 		&"prop_spawn": DotAudioSynth.Voice.SPAWN,
@@ -699,13 +683,9 @@ func _build_fx() -> DotResult:
 
 # --- Chat -------------------------------------------------------------------
 
-## The box a player types in, and the three settings that decide it.
-##
-## [b]The channels come from [code]PlaygroundServices.chat_channels[/code], not from a
-## list here.[/b] Two copies of one list is this tree's most repeated bug; the server
-## routes with those definitions and the composer offers exactly what it routes. The
-## admin channel is filtered out because it is admin-only and a channel a player cannot
-## send on is a channel that should not be in the cycle.
+## The box a player types in, and the three settings that decide it. The channels come from
+## `PlaygroundServices.chat_channels`, not a copy here; the admin channel is filtered out because a player
+## cannot send on it.
 func _build_chat() -> void:
 	_chat_layer = CanvasLayer.new()
 	_chat_layer.name = "ChatLayer"
@@ -781,16 +761,9 @@ func _apply_chat_visibility() -> void:
 			chat_window.enabled = not _chat_relayed
 
 
-## dot-console's kit: `help`, `clear`, `settings`, every setting by its own name, the
-## in-process server's console, and the panel on layer 128, registered with [param menu].
-## This game adds `quit` and `seed`, ahead of the server's console so a listen server's own
-## `quit` is not the one that answers.
-##
-## Called by [PlaygroundClient] after its [DotMenu] exists, not from [method setup]: the
-## menu is built from this layer's settings, and the kit makes the console one of the
-## menu's overlays, which is what stops the player. A console that is not an overlay walks
-## the player while they type: the sampler polls the keys, and a focused line edit does
-## not stop `Input.is_action_pressed`.
+## dot-console's kit, registered with [param menu]; this game adds `quit` and `seed`, ahead of the server's console.
+## Called by [PlaygroundClient] after its [DotMenu] exists, not from [method setup]: the kit makes the console a
+## menu overlay, which is what stops the player walking while they type.
 func build_console(menu: Object = null) -> void:
 	adopt_console(DotConsoleKit.build(self, settings, menu))
 
@@ -909,16 +882,9 @@ static func beam_between(from: Vector3, to: Vector3) -> Transform3D:
 	return t
 
 
-## The physics gun's beam, from in front of the eye to what it holds, this frame.
-##
-## [b]One node, moved every frame, not one spawned per frame.[/b] `tool_beam` lives
-## 100 ms, and a spawn a frame would stack six additive beams at 60 fps and a different
-## number at every other frame rate. The 100 ms is still the ceiling: when it retires the
-## node, the next frame spawns another, so a beam nobody updates is gone within it. Call
-## it after [method present], which is where the retiring happens, and there is no gap.
-##
-## [param key] says whose: a connected client draws one per player holding something, each
-## moved every frame on its own node, so two people building side by side are two beams.
+## The physics gun's beam, from in front of the eye to what it holds, this frame. One node moved every frame,
+## not one spawned per frame: `tool_beam` lives 100 ms, and a spawn a frame would stack beams. Call it after
+## [method present]. [param key] says whose: a connected client draws one beam per player holding something.
 func on_tool_beam(eye: Vector3, aim: Vector3, to: Vector3, key: int = 0) -> Node3D:
 	if fx == null:
 		return null

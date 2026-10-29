@@ -194,31 +194,12 @@ func _module_load() -> DotResult:
 		game.run_timer.call("bind_commands", add_command, _target)
 
 
-	# **`.with_chat()` says a command is typable whatever the server's default is.**
-	# The default used to be "no": `chat_allowed` was false, `DotConsole._run_command`
-	# refused a `Source.CHAT` context without it, and dot-server's chat manager dispatches
-	# with exactly that source — so this module registered thirty-two commands and not one
-	# could be reached from chat. `!pg_rtv`, on a server whose whole point is rocking the
-	# vote, answered "'pg_rtv' cannot be run from chat." `sv_chat_commands` is that default
-	# turned around, and it ships on.
-	#
-	# Marking still means something: these survive an operator turning it off, because they
-	# are what a player is expected to type. The map commands below carry CHANGEMAP and
-	# rely on it: what plays is a question about the flag rather than about the prefix.
-	# --- Maps --------------------------------------------------------------
-	#
-	# `map`, `maps` and `mapinfo` come from dot-map itself now. They used to be dot-server's
-	# `map`, which changed the GAME -- so on this server, which runs one game and several
-	# maps, the plain name an operator reached for did the one thing they did not mean.
-	#
-	# `install_with` rather than `install`, because `Playground.change_map` resets the
-	# props, the NPCs and any run timer before it touches the session: handing the session
-	# straight to the command would change the world out from under all three.
-	#
-	# `allow_chat_change` is ON, which is now also the default -- it was off, and the
-	# sandbox was the first place the old default read as an obstruction rather than a
-	# policy. What a map change destroys on a records server is a run, and there are no
-	# ranked runs here; `pg_map` beside it has been `.with_chat()` since it was written.
+	# `.with_chat()` makes a command typable from chat whatever `sv_chat_commands` says; these survive an
+	# operator turning it off, and the map commands below rely on the flag.
+
+	# Maps: `map`, `maps` and `mapinfo` come from dot-map. `install_with` rather than `install`, because
+	# `Playground.change_map` resets the props, NPCs and run timer before it touches the session.
+	# `allow_chat_change` is on: a map change destroys no ranked run here.
 	var _rotation := game.load_rotation()
 	add_cvar(
 		"sv_map_rotation_file", game.config.map_rotation_file,

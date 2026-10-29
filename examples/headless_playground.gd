@@ -28,8 +28,7 @@ func _run() -> void:
 	playground = Playground.new()
 
 	var config := PlaygroundConfig.new()
-	# Records in memory: a headless run must not write into the user's data
-	# directory, and a suite that did could not be run twice with the same result.
+	# Records in memory: a headless run must not write into the user's data directory.
 	config.records_directory = ""
 	# No map on boot: the tests below load their own and would race a boot load.
 	config.initial_map = &"pg_flatgrass"
@@ -38,8 +37,7 @@ func _run() -> void:
 
 	add_child(playground)
 
-	# Two frames: the playground's own `_ready` awaits its first map change, so one
-	# is not enough for it to have finished booting.
+	# Two frames: `_ready` awaits its first map change, so one is not enough to finish booting.
 	await get_tree().process_frame
 	await get_tree().process_frame
 
@@ -59,8 +57,7 @@ func _run() -> void:
 	await _test_boots()
 	await _test_tick_rate_comes_from_the_engine()
 	await _test_styles()
-	# The two that need dot-timer, run only when a server would have it. Skipped, they add
-	# nothing to either total (see `_expected`).
+	# The two that need dot-timer, run only when linked; skipped, they add to neither total.
 	if _timer_linked():
 		await _test_the_run_timer()
 		await _test_leaderboards()

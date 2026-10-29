@@ -232,22 +232,10 @@ func _ready() -> void:
 		DotFpsSampler.register_default_actions(sampler)
 
 
-## Gives this player a third-person controller and the switch that hands between them.
-##
-## [b]The sandbox is where third person belongs, and the other two 3D games are where it
-## does not.[/b] game-g2gfast has a third-person view already and it is deliberately
-## *cosmetic* — `G2GCamera` flips between two cameras over one motor, because a run set in
-## third person has to be comparable with one set in first and a second movement model
-## would make it a different game. game-arena is lag-compensated and analytic: its server
-## and its clients agree because there is exactly one motor to agree about. A sandbox has
-## neither constraint — nothing here is ranked and nothing is rewound — so it is the one
-## place a genuinely different motor is free.
-##
-## [b]Built on demand, not for everybody.[/b] `DotTpsController` drives a
-## `CharacterBody3D` through Godot's physics, which is real per-tick cost, and a
-## dedicated server full of remote players that will never be looked at through a camera
-## should not pay it. Only a player that samples input gets one.
-##
+## Gives this player a third-person controller and the switch that hands between them. A different motor, not a
+## moved camera: a sandbox ranks and rewinds nothing, so it is free to use one (the racing and arena games keep one).
+## Built on demand, only for a player that samples input: `DotTpsController` drives a CharacterBody3D, a real
+## per-tick cost a dedicated server full of remote players should not pay.
 ## Returns whether it was built.
 func build_view_switch() -> bool:
 	if tps != null:

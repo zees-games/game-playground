@@ -295,26 +295,9 @@ func _ready() -> void:
 			for dir: String in host.call(&"map_dirs", "maps"):
 				var _added := playground.add_map_directory(dir)
 
-	# The playground loads its own first map and this waits for it, rather than
-	# loading one here.
-	#
-	# [b]Two reasons, and the second is the one that bites.[/b] `initial_map` is
-	# layered configuration, so a client that picked its own would ignore `--pg-map`
-	# and every server-side default with it. And loading it twice builds the whole
-	# map twice — the second change tears the first down, which frees the geometry
-	# anything already placed on it is standing on.
-	#
-	# By this line `Playground._ready` has run as far as its own `await`, so the
-	# config is layered and final while the map is not up yet: waiting on the signal
-	# cannot miss it.
-	#
-	# `booted` is checked BEFORE the await, and that is not defensive. `change_map`
-	# can complete without ever suspending — a built-in map is a scene already in the
-	# build — in which case the playground finishes booting inside `add_child` above
-	# and `ready_for_players` has already been emitted by the time this line runs.
-	# Awaiting it then waits for ever, and the symptom is a black screen with no
-	# error at all: no camera, no HUD, no player. It is the family's own fan-out trap
-	# in its smallest form, and this file had it for exactly one screenshot.
+	# The playground loads its own first map and this waits for it: `initial_map` is layered config, so loading
+	# one here would ignore --pg-map. `booted` is checked BEFORE the await: change_map can finish without
+	# suspending, ready_for_players is then already emitted, and awaiting it hangs on a black screen.
 	if not playground.booted:
 		await playground.ready_for_players
 
@@ -340,16 +323,9 @@ func _ready() -> void:
 			})
 			return
 
-		# [b]The view is NOT built here on a networked client, and that is the whole
-		# ordering.[/b] The camera is parented to the player, and on a server the player
-		# does not exist yet: HELLO names you and JOIN creates you, both of them packets
-		# that have not arrived. Building it now calls `add_child` on null, the camera is
-		# never in the tree, and `_process` then writes a global transform to a node that
-		# has no parent — once a frame, for ever.
-		#
-		# On desktop that is a red line per frame and a black screen. In a WASM build it
-		# is a hard `RuntimeError: null function` with no GDScript trace at all, which is
-		# what this cost to find. [method _adopt] builds it the moment JOIN lands.
+		# The view is NOT built here on a networked client: the camera is parented to the player, which does not
+		# exist until JOIN lands (HELLO names you, JOIN creates you), so add_child would run on null.
+		# In a WASM build that is a hard `RuntimeError: null function`. [method _adopt] builds it on JOIN.
 	else:
 
 		player = playground.add_player(player_id, display_name)
@@ -395,30 +371,9 @@ func _ready() -> void:
 	set_process(true)
 
 
-## Hands what happened in the world to the presentation layer, which is what turns it into
-## a noise, a puff and a shake.
-##
-## [b]Nothing called these, and the client was silent.[/b] `PlaygroundPresentation` had a
-## hook per event, a synthesised voice per sound id, a probe that proved a speaker moved and
-## a suite that called the hooks directly — and not one line of the game called any of them,
-## so every check about sound passed while the playable client never made one. A value
-## produced and consumed by nothing, with the ends swapped: the consumer was there and the
-## producer was the suite.
-##
-## [b]On a networked client only YOUR props make a noise.[/b] A joining client is sent every
-## prop already in the world through the same PROP event a new spawn uses, and the wire
-## cannot tell the two apart; sounding somebody else's would greet every join with a burst
-## of an hour's building. Your own cannot be in that backlog — the session is new — and it
-## is the one sound that answers something you just did.
-## The load gate: the screen stays covered, and the local body and the input stay still, until
-## the level is built, the local player exists and its camera is current.
-##
-## [b]Without it the player moved before the world was whole.[/b] Offline the player spawns in
-## the tick the first map lands, and a connected client draws from the first frame with no
-## player, no camera and a HUD that has nobody to read; a map change tore the old level down
-## and rebuilt it in front of a body that kept falling through the gap. The gate does not stop
-## the simulation by itself: a frozen player is skipped by [method Playground._simulate_tick]
-## (`can_process`), and this client's own sampling and keys check [method _covered].
+## Hands world events to the presentation layer. On a networked client only YOUR props make a noise:
+## the join backlog replays every existing prop through the same PROP event.
+## The load gate: the screen stays covered, and the body and input stay still, until the level, player and camera are ready.
 func _build_gate() -> void:
 	platform = DotGameClient.new()
 	platform.name = "Platform"
@@ -1540,21 +1495,8 @@ var mouse_capture_override: Variant = null
 
 
 ## Whether the pointer is currently a look input rather than a pointer.
-##
-## [b]A released cursor is not a look input, and [method _menu_is_open] does not answer
-## that.[/b] KEY_ESCAPE releases the capture with no screen open, so after one press the
-## cursor is free, the menu check is false, and every motion of a pointer the player is
-## using as a pointer was still spent turning the view or twisting the prop in the gun.
-## `game-arena` has always guarded on the mode here; this file and `game-g2gfast` did
-## not, and it is the second half of the same "the mouse and the tick disagree" bug that
-## [method active_sampler] fixed the first half of.
-##
-## [b]A method with an override rather than a read of `Input.mouse_mode` at the call
-## site, because that read cannot be tested here.[/b] The dummy display server pins the
-## mode to `MOUSE_MODE_VISIBLE` and drops every write to it without erroring, so a suite
-## can neither put a client into the state a player plays in nor out of it — which is
-## why arena's identical guard has never been exercised by anything, and why this one
-## would not have been either.
+## An override rather than a read of `Input.mouse_mode` at the call site, because the dummy display server
+## pins the mode to VISIBLE and a suite could not put a client into the state a player plays in.
 func mouse_drives_view() -> bool:
 	if mouse_capture_override != null:
 		return bool(mouse_capture_override)
@@ -2733,22 +2675,9 @@ func _on_menu_action(action: StringName) -> void:
 				])
 
 
-## Thaws every prop this player has frozen.
-##
-## [b]Never refused, deliberately.[/b] `DotPropSpawner.may_freeze` gates freezing
-## against `per_player_frozen`, and the reverse has no limit to check — a cap that
-## stopped somebody tidying up would be a limit fighting its own purpose.
-## Gets in, or gets out. One key for both.
-##
-## [b]F rather than E, because E already spawns here.[/b] Worth saying out loud: the
-## sandboxes this copies bind "use" to E, and a player arriving from one of those will
-## press it — so the day this game gains a use verb of its own, these two want swapping
-## together rather than one at a time.
-##
-## [b]The client never decides the answer.[/b] It asks; the server owns the seats, the
-## exit sweep and the refusal, exactly as it owns a spawn. On a client with no bridge —
-## single player, and the suite — the same call goes straight to the simulation, which is
-## the same division every other verb in this file makes.
+## Thaws every prop this player has frozen. Never refused: a cap on tidying up would fight its own purpose.
+## Gets in, or gets out, on one key. F rather than E, because E spawns here; the client only asks and the
+## server owns the seats, the exit sweep and the refusal (no bridge: the same call goes to the simulation).
 func _use_vehicle() -> void:
 	if bridge != null:
 		bridge.ask_use_vehicle()
