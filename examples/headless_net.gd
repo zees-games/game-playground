@@ -1,6 +1,6 @@
 extends "res://examples/headless_net_part6.gd"
 
-const CHECKS := 409
+const CHECKS := 410
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that

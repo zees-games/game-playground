@@ -212,9 +212,14 @@ func move_person(motion: Dictionary) -> void:
 	var person := _parts.get_node_or_null(^"Figure") as DotHumanoidFigure if _parts != null else null
 	if person == null:
 		return
-	var now := Time.get_ticks_usec()
-	var delta := 0.0 if _moved_usec < 0 else clampf((now - _moved_usec) / 1e6, 0.0, 0.1)
-	_moved_usec = now
+	var delta: float
+	if DotAddonApi.build_level("dot_player_char") >= 11:
+		# Game time, as the body moves: a wall-clock step skated the feet in slow motion.
+		delta = person.frame_delta()
+	else:
+		var now := Time.get_ticks_usec()
+		delta = 0.0 if _moved_usec < 0 else clampf((now - _moved_usec) / 1e6, 0.0, 0.1)
+		_moved_usec = now
 	var wanted := motion.duplicate()
 	if _seated_pose:
 		# The made sitting pose: thighs along the cushion, shins hanging, whatever the car's speed.
