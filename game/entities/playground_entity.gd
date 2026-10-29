@@ -195,6 +195,17 @@ func target() -> PlaygroundPlayer:
 	return found
 
 
+## A flash blinds this NPC for [param seconds] on the clock its senses read; dot-npc API 6.
+func blind_npc(seconds: float) -> void:
+	if npc != null and DotAddonApi.build_level("dot_npc") >= 6:
+		npc.blind_for(_senses_now(), seconds)
+
+
+## The clock [member npc] is handed to [method DotNpcSenses.update_target]; the soldier overrides it.
+func _senses_now() -> float:
+	return age
+
+
 ## A tuning STRING from the definition's `meta`, or [param fallback].
 ##
 ## Beside [method tune] rather than folded into it: a faction is a name and a speed is a

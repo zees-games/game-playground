@@ -127,7 +127,7 @@ func _entity_tick(delta: float) -> void:
 
 	# Players AND the other armed NPCs, so rebels and soldiers find each other.
 	var _target := game.npc_senses.update_target(
-		npc, game.npc_candidates_all, game.npc_world.now(), game.npc_candidates_all.size()
+		npc, game.npc_candidates_all, _senses_now(), game.npc_candidates_all.size()
 	)
 
 	brain.set("wants_fire", false)
@@ -229,3 +229,7 @@ func describe() -> Dictionary:
 		out["brain"] = brain.call("describe")
 
 	return out
+
+
+func _senses_now() -> float:
+	return game.npc_world.now()

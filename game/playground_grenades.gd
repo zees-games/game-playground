@@ -84,6 +84,8 @@ func _on_effect(info: Dictionary) -> void:
 	match int(info["fx"]):
 		AwUtilityZones.Fx.BLIND:
 			var body: Node3D = _bodies[int(info["victim"])] if int(info["victim"]) < _bodies.size() else null
+			if body != null and body.has_method("blind_npc"):
+				body.call("blind_npc", float(info["seconds"]))
 			if body is PlaygroundPlayer:
 				blinded.emit(StringName(str(body.get("player_id"))), float(info["seconds"]), float(info.get("strength", 1.0)))
 		AwUtilityZones.Fx.SMOKE, AwUtilityZones.Fx.FIRE:

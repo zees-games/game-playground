@@ -327,6 +327,29 @@ func _test_aw_grenades() -> void:
 	zones.blinded.disconnect(on_blind)
 	_check(flash != null and told.size() == 1 and told[0][0] == &"bot" and float(told[0][1]) > 0.0,
 		"a flash blinds a player through the blinded signal", str(told))
+	# A flash beside a chaser blinds its senses on its own clock: it stops perceiving the player, then does again.
+	if DotAddonApi.build_level("dot_npc") >= 6:
+		_g_bot.teleport(Vector3(50, 1.0, 50), 0.0)
+		var spawned := playground.props.spawn(&"npc_chaser", &"bot", Vector3(53, 1.2, 47))
+		var chaser: PlaygroundEntity = spawned.node as PlaygroundEntity if spawned != null else null
+		var cand := DotNpcSenses.Candidate.new(&"u9", Vector3(53, 1.2, 50), &"player", 0.0)
+		var cn: DotNpcInstance = chaser.npc if chaser != null else null
+		var before: bool = cn != null and cn.blind_until <= chaser.age
+		var _f2 := layer.launch(_aw_spawn(&"aw_flash", Vector3(50, 1.4, 47), Vector3.ZERO, 2), &"u9")
+		for i in 8:
+			await get_tree().physics_frame
+		_check(before and cn != null and cn.blind_until > chaser.age, "a flash blinds an NPC in its radius", str(cn.blind_until if cn else -1.0))
+		if cn != null:
+			zones.senses.now = chaser.age
+			cn.def.faction = &"npc"
+			var blind_sees: bool = zones.senses.perceives(cn, cand)
+			zones.senses.now = cn.blind_until + 0.1
+			_check(not blind_sees and zones.senses.perceives(cn, cand), "a blinded NPC does not perceive the player, and does again after the time")
+		else:
+			_check(false, "a blinded NPC does not perceive the player, and does again after the time")
+		if spawned != null:
+			var _gone := playground.props.remove(spawned.instance_id)
+
 	var wire_fire := PlaygroundEvents.write_detonate(3, Vector3(1, 2, 3), 4.0, 2, 7.5)
 	var wr := DotNetReader.new(wire_fire)
 	var _sub := wr.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
