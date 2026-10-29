@@ -641,6 +641,8 @@ func _test_utility_over_the_wire() -> void:
 	var blind_seen := seen.filter(func(i: Dictionary) -> bool: return int(i["fx"]) == AwUtilityZones.Fx.BLIND)
 	_check(blind_seen.size() == 1 and float(blind_seen[0]["seconds"]) > 0.0,
 		"a flash beside the player blinds that player's client, once", str(seen))
+	var got := float(blind_seen[0].get("strength", 1.0)) if not blind_seen.is_empty() else 1.0
+	_check(got > 0.05 and got < 0.9, "and the client is told how hard (a flash 1.5 m off in a 4 m radius is not full cover)", str(got))
 	_done()
 
 

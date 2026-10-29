@@ -1016,16 +1016,19 @@ static func read_detonate(r: DotNetReader) -> Dictionary:
 	return {"serial": serial, "position": at, "radius": radius, "fx": fx, "seconds": seconds, "ok": r.ok()}
 
 
-static func write_blind(seconds: float) -> PackedByteArray:
+## [param strength] (0..1, five bits) is how hard the flash hit.
+static func write_blind(seconds: float, strength: float = 1.0) -> PackedByteArray:
 	var w := _w()
 	w.write_uint(ProjectileTell.BLIND, PROJECTILE_SUB_BITS)
 	w.write_float32(seconds)
+	w.write_float_range(strength, 0.0, 1.0, 5)
 	return w.to_bytes()
 
 
 static func read_blind(r: DotNetReader) -> Dictionary:
 	var seconds := r.read_float32()
-	return {"seconds": seconds, "ok": r.ok()}
+	var strength := r.read_float_range(0.0, 1.0, 5)
+	return {"seconds": seconds, "strength": strength, "ok": r.ok()}
 
 
 # --- ADDON ---------------------------------------------------------------------

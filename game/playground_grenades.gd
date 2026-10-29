@@ -13,7 +13,7 @@ const OWNER_BASE := 1000000
 signal effect(info: Dictionary)
 
 ## A flash blinded the player [param player_id] for [param seconds].
-signal blinded(player_id: StringName, seconds: float)
+signal blinded(player_id: StringName, seconds: float, strength: float)
 
 ## The zones, ticked by [method tick].
 var zones := AwUtilityZones.new()
@@ -85,7 +85,7 @@ func _on_effect(info: Dictionary) -> void:
 		AwUtilityZones.Fx.BLIND:
 			var body: Node3D = _bodies[int(info["victim"])] if int(info["victim"]) < _bodies.size() else null
 			if body is PlaygroundPlayer:
-				blinded.emit(StringName(str(body.get("player_id"))), float(info["seconds"]))
+				blinded.emit(StringName(str(body.get("player_id"))), float(info["seconds"]), float(info.get("strength", 1.0)))
 		AwUtilityZones.Fx.SMOKE, AwUtilityZones.Fx.FIRE:
 			_last = {"fx": int(info["fx"]), "seconds": float(info["seconds"])}
 			if int(info["fx"]) == AwUtilityZones.Fx.SMOKE:

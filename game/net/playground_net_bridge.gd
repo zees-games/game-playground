@@ -2025,8 +2025,8 @@ func _on_projectile_detonated(serial: int, at: Vector3, radius: float) -> void:
 
 
 ## A flash caught [param player_id]: only they are told, because only they see white.
-func _on_flash_blinded(player_id: StringName, seconds: float) -> void:
-	_tell(peer_for_player(session_of(player_id)), PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_blind(seconds))
+func _on_flash_blinded(player_id: StringName, seconds: float, strength: float) -> void:
+	_tell(peer_for_player(session_of(player_id)), PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_blind(seconds, strength))
 
 
 func _apply_projectile(reader: DotNetReader) -> void:
@@ -2050,7 +2050,7 @@ func _apply_projectile(reader: DotNetReader) -> void:
 		PlaygroundEvents.ProjectileTell.BLIND:
 			var blind := PlaygroundEvents.read_blind(reader)
 			if bool(blind["ok"]):
-				game.projectiles.blind_remote(float(blind["seconds"]))
+				game.projectiles.blind_remote(float(blind["seconds"]), float(blind["strength"]))
 
 
 func _apply_hello(reader: DotNetReader) -> void:

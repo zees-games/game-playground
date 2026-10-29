@@ -4,7 +4,7 @@ const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 
-## Renders the offline client with a smoke cloud ahead and then a flash going off into `screenshots/grenades/`.
+## Renders the offline client with a smoke cloud, a fire and then a flash going off into `screenshots/grenades/`.
 ##
 ## Run: `xvfb-run -a godot --path . --resolution 1280x720 res://tools/render_grenades.tscn`
 
@@ -34,6 +34,9 @@ func _run() -> void:
 	layer.launch(_spawn(&"aw_smoke", eye + ahead * 7.0 + Vector3.DOWN * 1.0), &"render")
 	await get_tree().create_timer(1.5).timeout
 	await _shot("smoke")
+	layer.launch(_spawn(&"aw_incendiary", eye + ahead * 5.0 + Vector3.DOWN * 1.2), &"render")
+	await get_tree().create_timer(1.5).timeout
+	await _shot("fire")
 	layer.launch(_spawn(&"aw_flash", eye + ahead * 1.5), &"render")
 	await get_tree().create_timer(0.25).timeout
 	for i in 3:

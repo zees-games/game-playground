@@ -309,8 +309,8 @@ func detonate_remote(serial: int, at: Vector3, radius: float, fx: int = 0, secon
 
 
 ## The server said this client was blinded for [param seconds]. Only ever the local player.
-func blind_remote(seconds: float) -> void:
-	utility.emit({"fx": AwUtilityZones.Fx.BLIND, "position": Vector3.ZERO, "radius": 0.0, "seconds": seconds, "victim": 0})
+func blind_remote(seconds: float, strength: float = 1.0) -> void:
+	utility.emit({"fx": AwUtilityZones.Fx.BLIND, "position": Vector3.ZERO, "radius": 0.0, "seconds": seconds, "victim": 0, "strength": strength})
 
 
 ## What serial [param serial]'s smoke or fire told, once: `{fx, seconds}` with fx as on the wire, else empty.

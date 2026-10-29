@@ -447,9 +447,9 @@ func _wire_presentation() -> void:
 		layer.utility.connect(presentation.on_grenade_fx)
 		# Connected, the server's BLIND says it; offline this world decides who a flash caught.
 		if bridge == null:
-			layer.effects.blinded.connect(func(id: StringName, seconds: float) -> void:
+			layer.effects.blinded.connect(func(id: StringName, seconds: float, strength: float) -> void:
 				if id == player_id:
-					layer.blind_remote(seconds))
+					layer.blind_remote(seconds, strength))
 
 	if bridge != null:
 		bridge.prop_arrived.connect(func(at: Vector3, owner_session: int) -> void:

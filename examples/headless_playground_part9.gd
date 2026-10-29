@@ -319,7 +319,7 @@ func _test_aw_grenades() -> void:
 	# A flash two metres from the bot, in the open: it is blinded, once, and the ledger holds it.
 	_g_bot.teleport(Vector3(50, 1.0, 50), 0.0)
 	var told := []
-	var on_blind := func(who: StringName, seconds: float) -> void: told.append([who, seconds])
+	var on_blind := func(who: StringName, seconds: float, _strength: float) -> void: told.append([who, seconds])
 	zones.blinded.connect(on_blind)
 	var flash := layer.launch(_aw_spawn(&"aw_flash", Vector3(50, 1.4, 47), Vector3.ZERO, 2), &"u9")
 	for i in 8:
@@ -340,6 +340,13 @@ func _test_aw_grenades() -> void:
 	var bl := DotNetReader.new(PlaygroundEvents.write_blind(3.5))
 	_check(bl.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS) == PlaygroundEvents.ProjectileTell.BLIND
 		and absf(float(PlaygroundEvents.read_blind(bl)["seconds"]) - 3.5) < 0.01, "a blind tell carries its seconds")
+	var soft := DotNetReader.new(PlaygroundEvents.write_blind(3.5, 0.4))
+	var _sub3 := soft.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
+	var sr := PlaygroundEvents.read_blind(soft)
+	var full := DotNetReader.new(PlaygroundEvents.write_blind(3.5))
+	var _sub4 := full.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
+	_check(absf(float(sr["strength"]) - 0.4) < 0.04 and absf(float(PlaygroundEvents.read_blind(full)["strength"]) - 1.0) < 0.001,
+		"a blind tell carries the flash strength, full by default")
 	layer.clear()
 	_done()
 
