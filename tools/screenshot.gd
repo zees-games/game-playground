@@ -3,6 +3,7 @@ extends SceneTree
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PlaygroundFigure := preload("../game/playground_figure.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
+const PlaygroundProjectiles := preload("../game/playground_projectiles.gd")
 
 ## Renders a playground map to PNGs so a person can look at it.
 ##
@@ -84,6 +85,10 @@ func _initialize() -> void:
 		# root is inside the tree yet, so a global transform set on an effect is refused
 		# and every effect is drawn at the origin.
 		_fx_pending = true
+		return
+
+	if args.has("--grenades"):
+		_grenades_pending = true
 		return
 
 	if args.has("--arms"):
@@ -299,6 +304,7 @@ func _shots_for(id: String) -> Array[Dictionary]:
 var _wait := 0
 var _armed := false
 var _fx_pending := false
+var _grenades_pending := false
 
 
 ## `--arms`: the downed first-person arms (`DotPlayerViewArms`) seen from the eye, level and at the steepest look-down.
@@ -419,6 +425,24 @@ func _stage_fx() -> Array[Dictionary]:
 	]
 
 
+## `--grenades`: a grenade in the air over a smoke cloud and a fire zone, drawn by the real layer.
+func _stage_grenades() -> Array[Dictionary]:
+	var layer := PlaygroundProjectiles.new()
+	root.add_child(layer)
+	var spawn := DotWeaponSpawn.new()
+	spawn.id = &"aw_frag"
+	spawn.origin = Vector3(0, 2.2, -3)
+	spawn.radius = 0.2
+	spawn.velocity = Vector3(0, 0, -1)
+	spawn.life_ticks = 400
+	var _f := layer.launch(spawn, &"shot")
+	var smoke := {"event": "smoke", "position": Vector3(-3.5, 1.5, -7), "radius": 3.0, "seconds": 20.0}
+	var fire := {"event": "fire", "position": Vector3(3.5, 0.5, -7), "radius": 2.5, "seconds": 20.0, "dps": 12.0}
+	var events: Array[Dictionary] = [smoke, fire]
+	layer.effects.blasted(events, &"shot")
+	return [{"name": "playground_grenades", "from": Vector3(0, 2.0, 3), "at": Vector3(0, 1.5, -6)}]
+
+
 ## [b]Frame-counted rather than awaited.[/b] `SceneTree._process` is expected to return a
 ## bool synchronously; making it a coroutine returns a signal object instead, which is
 ## truthy, so the tree quits on the first frame and writes nothing. That is what
@@ -445,6 +469,11 @@ func _process(_delta: float) -> bool:
 	if _fx_pending:
 		_fx_pending = false
 		_shots = _stage_fx()
+		return false
+
+	if _grenades_pending:
+		_grenades_pending = false
+		_shots = _stage_grenades()
 		return false
 
 	if _arms_pending:

@@ -78,6 +78,13 @@ static func add_provider_def(def: PlaygroundWeaponDef) -> void:
 		_with_packs = null
 
 
+## The pack's definition of the weapon [param id]: the zee catalogue's, a Workshop weapon's or a provider's.
+static func pack_def(id: StringName) -> DotWeaponDef:
+	if catalogue().has(id):
+		return catalogue().get_def(id)
+	return _pack_defs.get(id, _provider_defs.get(id))
+
+
 ## Replaces the Workshop weapons the rigs may be given. [param defs] are [PlaygroundWeaponDef]s whose
 ## `meta.pack_def` is the pack's [DotWeaponDef].
 static func set_pack_defs(defs: Array) -> void:

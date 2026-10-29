@@ -89,9 +89,9 @@ func _test_grenades() -> void:
 	_g_bot.teleport(Vector3(0, 1.0, 12.0), 0.0)
 	await get_tree().physics_frame
 
-	# A crate and a soldier where it will land, a little apart.
-	var crate := playground.props.spawn(&"crate", &"bot", Vector3(1.5, 0.6, 2.0))
-	var soldier := playground.props.spawn(&"npc_soldier", &"bot", Vector3(-1.5, 1.2, 2.0))
+	# A crate and a soldier where it rolls to under sv_grenade_friction's default, a little apart.
+	var crate := playground.props.spawn(&"crate", &"bot", Vector3(1.5, 0.6, -10.0))
+	var soldier := playground.props.spawn(&"npc_soldier", &"bot", Vector3(-1.5, 1.2, -10.0))
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
@@ -136,7 +136,7 @@ func _test_grenades() -> void:
 	if not await _test_grenades_2():
 		return
 	await _test_grenades_3()
-	_test_grenades_4()
+	await _test_grenades_4()
 	_g_bot = null
 	_g_launched_at = null
 	_g_lowest = null
@@ -271,6 +271,67 @@ func _test_grenades_3() -> void:
 		if not _g_rocket_blasts.is_empty():
 			break
 
+## arena_weapons' thrown set, through the projectile layer: provider ids, AwGrenade flight, zones.
+func _test_aw_grenades() -> void:
+	_section("arena_weapons grenades")
+	var layer: PlaygroundProjectiles = playground.projectiles
+	for id: StringName in [&"aw_frag", &"aw_sticky", &"aw_flash", &"aw_smoke", &"aw_incendiary"]:
+		_check(PlaygroundZee.pack_def(id) != null, "the provider taught the game %s" % id)
+	_check(layer.rules is AwGrenadeRules and layer.rules == playground.grenade_rules
+		and playground.grenade_rules.prefix() == "sv_grenade" and playground.grenade_rules.fields().has(&"smoke_seconds"),
+		"sv_grenade_* rules are the layer's")
+
+	var frag := _aw_spawn(&"aw_frag", Vector3(30, 1.0, 30), Vector3(3, 2, 0), 40)
+	var f := layer.launch(frag, &"bot")
+	_check(f != null and f.grenade != null, "a thrown aw_frag flies as an AwGrenade")
+	var blasts := []
+	var on_blast := func(_s: int, at: Vector3, _r: float) -> void: blasts.append(at)
+	layer.detonated.connect(on_blast)
+	for i in 80:
+		await get_tree().physics_frame
+		if not blasts.is_empty():
+			break
+	layer.detonated.disconnect(on_blast)
+	_check(blasts.size() == 1 and layer.live_count() == 0, "and goes off when its fuse runs out")
+
+	var sticky := _aw_spawn(&"aw_sticky", Vector3(30, 1.0, 30), Vector3(0, -2, 0), 200)
+	var st := layer.launch(sticky, &"bot")
+	for i in 40:
+		await get_tree().physics_frame
+	_check(st != null and st.grenade != null and st.grenade.stuck, "a sticky grenade sticks where it lands")
+	layer.clear()
+
+	var zones := layer.effects
+	var smoke := layer.launch(_aw_spawn(&"aw_smoke", Vector3(40, 1.0, 40), Vector3.ZERO, 2), &"bot")
+	var fire := layer.launch(_aw_spawn(&"aw_incendiary", Vector3(44, 1.0, 44), Vector3.ZERO, 2), &"bot")
+	for i in 8:
+		await get_tree().physics_frame
+	_check(smoke != null and fire != null and zones.active_smokes() == 1, "a smoke grenade leaves a cloud")
+	_check(zones.active_fires() == 1, "an incendiary leaves a fire zone")
+
+	var told := []
+	var on_blind := func(who: StringName, seconds: float) -> void: told.append([who, seconds])
+	zones.blinded.connect(on_blind)
+	zones.blind(_g_bot, 2.0)
+	zones.blinded.disconnect(on_blind)
+	_check(told.size() == 1 and absf(float(told[0][1]) - 2.0) < 0.01, "a flash blinds a player through the blinded signal")
+	layer.clear()
+	_done()
+
+
+func _aw_spawn(id: StringName, at: Vector3, velocity: Vector3, fuse: int) -> DotWeaponSpawn:
+	var spawn := DotWeaponSpawn.new()
+	spawn.id = id
+	spawn.origin = at
+	spawn.velocity = velocity
+	spawn.gravity_scale = 1.0
+	spawn.radius = 0.08
+	spawn.splash_radius = 4.0
+	spawn.splash_damage = 50.0
+	spawn.fuse_ticks = fuse
+	spawn.life_ticks = 128 * 3
+	return spawn
+
 func _test_grenades_4() -> void:
 	playground.projectiles.detonated.disconnect(_g_on_rocket)
 	_check(_g_rocket_blasts.size() == 1 and absf((_g_rocket_blasts[0] as Vector3).y) < 0.3,
@@ -308,6 +369,7 @@ func _test_grenades_4() -> void:
 	_check(mirror.live_count() == 0 and copy.view == null, "and goes when the server says it went off")
 	mirror.queue_free()
 
+	await _test_aw_grenades()
 	_done()
 
 

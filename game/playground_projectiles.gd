@@ -1,6 +1,8 @@
 extends Node3D
 
 const PlaygroundPlayer := preload("playground_player.gd")
+const PlaygroundGrenades := preload("playground_grenades.gd")
+const PlaygroundZee := preload("playground_zee.gd")
 
 ## Grenades and rockets in flight in the sandbox, and what happens where they go off.
 ##
@@ -12,6 +14,11 @@ const PlaygroundPlayer := preload("playground_player.gd")
 ## This one is written separately, as the family's rule says, because the sandbox's world
 ## is Godot physics: crates, welds and whatever somebody built. A grenade has to bounce off
 ## those as well as the floor.
+##
+## [b]A fused grenade is arena_weapons' [AwGrenade], and every blast is its [AwGrenadeBlast].[/b]
+## This layer only supplies the world: the swept ray, the thrower's grace, what a crate does
+## to a stuck grenade, and who stands in the splash. Bounce, stick and fuse are the addon's,
+## tuned by `sv_grenade_*`.
 ##
 ## [b]It flies on the simulation tick, swept with a ray each tick.[/b] A rocket at 40 m/s
 ## moves 31 cm a tick at 128 Hz, and a plank is thinner than that. A point test would let
@@ -44,27 +51,15 @@ class Flying extends RefCounted:
 	var resting: bool = false
 	var stuck_to: Node3D = null
 	var stuck_offset: Vector3 = Vector3.ZERO
-	var bounces: int = 0
+	## Null for a rocket: it flies straight and goes off on the first thing it meets.
+	var grenade: AwGrenade = null
+	## Bounces so far, the grenade's count (0 for a rocket).
+	var bounces: int:
+		get: return grenade.bounces if grenade != null else 0
+	## What the last sweep met, for [member stuck_to].
+	var last_hit: Dictionary = {}
 	var view: MeshInstance3D = null
 
-
-## Speed a fused grenade keeps off a bounce, into the surface and along it. game-arena's
-## numbers, for its reason: low into a wall so it does not read as rubber, higher along it
-## so it still rolls into the room it was thrown into.
-const RESTITUTION := 0.3
-const SURFACE_KEEP := 0.7
-
-## What a bounce off a FLOOR keeps along it, which is less than a wall: the floor is what
-## a grenade rubs along. At the wall's 0.7 a frag thrown at the ground three metres ahead
-## skipped twenty-two metres down the sandbox in hops, and went off past everything it was
-## thrown at.
-const FLOOR_KEEP := 0.45
-
-## Below this it stops on a floor rather than hopping on the spot. Metres per second.
-const REST_SPEED := 1.2
-
-## Bounces before it simply stops, so one wedged in a corner is not swept every tick.
-const MAX_BOUNCES := 12
 
 ## Ticks a thrown grenade ignores its thrower, against one for a rocket. A grenade lobbed
 ## while running forward is overtaken by the thrower's own hull on the second or third tick.
@@ -112,6 +107,12 @@ var _boards: Array = []
 ## bouncer.
 var catalogue: DotWeaponCatalogue = null
 
+## `sv_grenade_*`: bounce, friction and how long smoke, fire and a flash last.
+var rules := AwGrenadeRules.new()
+
+## What a utility grenade leaves behind: smoke, fire and blindness. Built with this layer.
+var effects: PlaygroundGrenades = null
+
 var _live: Array[Flying] = []
 var _next_serial: int = 1
 var _gravity: float = 9.8
@@ -126,6 +127,9 @@ signal detonated(serial: int, at: Vector3, radius: float)
 
 func _init() -> void:
 	name = "Projectiles"
+	effects = PlaygroundGrenades.new()
+	effects.projectiles = self
+	add_child(effects)
 	_gravity = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 
 
@@ -168,6 +172,11 @@ func launch(spawn: DotWeaponSpawn, owner_id: StringName, owner_rid: RID = RID(),
 	f.owner_id = owner_id
 	f.owner_rid = owner_rid
 	f.sticks = _sticks(spawn)
+
+	if spawn.fuse_ticks > 0 or spawn.velocity == Vector3.ZERO:
+		f.grenade = AwGrenade.from_spawn(spawn, _def_of(spawn), rules)
+		f.grenade.sticks = f.sticks
+
 	_live.append(f)
 	_draw(f)
 	launched.emit(f)
@@ -178,10 +187,7 @@ func _sticks(spawn: DotWeaponSpawn) -> bool:
 	if spawn.meta.has(&"sticks"):
 		return bool(spawn.meta[&"sticks"])
 
-	if catalogue == null:
-		return false
-
-	var def := catalogue.get_def(spawn.id)
+	var def := _def_of(spawn)
 	return def != null and bool(def.params.get(&"sticks", false))
 
 
@@ -218,38 +224,21 @@ func clear() -> void:
 ## Iterated backwards so a detonation can remove its own entry without skipping the next.
 func tick(delta: float) -> void:
 	var space := get_world_3d().direct_space_state if is_inside_tree() else null
+	var rate := maxi(roundi(1.0 / delta), 1)
 
 	for i in range(_live.size() - 1, -1, -1):
 		var f: Flying = _live[i]
 		f.age_ticks += 1
 
-		if authority and _due(f):
+		if f.grenade != null:
+			if _fly_grenade(space, f, rate) and authority:
+				_detonate(f, f.position)
+				_live.remove_at(i)
+				continue
+		elif _fly_rocket(space, f, delta) and authority:
 			_detonate(f, f.position)
 			_live.remove_at(i)
 			continue
-
-		if f.resting:
-			_follow(f)
-		else:
-			if f.spawn.gravity_scale > 0.0:
-				f.velocity.y -= _gravity * f.spawn.gravity_scale * delta
-
-			var step := f.velocity * delta
-			var hit := _sweep(space, f, step)
-
-			if hit.is_empty():
-				f.position += step
-			elif f.spawn.fuse_ticks <= 0 and authority:
-				_detonate(f, hit["position"])
-				_live.remove_at(i)
-				continue
-			elif f.spawn.fuse_ticks <= 0:
-				# A client's rocket stops where it met something and waits to be told.
-				f.position = hit["position"]
-				f.velocity = Vector3.ZERO
-				f.resting = true
-			else:
-				_touch(f, hit)
 
 		if f.age_ticks >= f.spawn.life_ticks:
 			if authority:
@@ -268,6 +257,7 @@ func tick(delta: float) -> void:
 
 		_place(f)
 
+	effects.tick(delta)
 	_age_flashes(delta)
 
 
@@ -284,63 +274,82 @@ func detonate_remote(serial: int, at: Vector3, radius: float) -> void:
 	detonated.emit(serial, at, radius)
 
 
-## Whether [param f] goes off this tick without touching anything: a fuse run out, or a
-## spawn with no fuse and no speed, which is dot-weapon's grenade cooked past its fuse.
-func _due(f: Flying) -> bool:
-	if f.spawn.fuse_ticks > 0:
-		return f.age_ticks >= f.spawn.fuse_ticks
+## One step of a fused projectile by [AwGrenade]. True when its fuse has run out. A client's
+## copy goes on past that, because only the server's DETONATE ends it.
+func _fly_grenade(space: PhysicsDirectSpaceState3D, f: Flying, rate: int) -> bool:
+	var g := f.grenade
+	var was_stuck := g.stuck
+	var done := g.step(_tracer(space, f), rate)
 
-	return f.age_ticks <= 1 and f.velocity == Vector3.ZERO
+	if g.stuck and not was_stuck:
+		_stick_to(f)
+
+	if g.stuck and f.stuck_to != null:
+		_follow(f)
+
+	f.position = g.position
+	f.velocity = g.velocity
+	f.resting = g.stuck or (g.bounces > 0 and g.velocity == Vector3.ZERO)
+	return done
 
 
-func _touch(f: Flying, hit: Dictionary) -> void:
-	var normal: Vector3 = hit["normal"]
+## A rocket: straight, and off on the first thing it meets. True when it did, and a client's
+## stops there to wait for the server.
+func _fly_rocket(space: PhysicsDirectSpaceState3D, f: Flying, delta: float) -> bool:
+	if f.resting:
+		return false
 
-	if normal.length_squared() < 0.0001:
-		normal = -f.velocity.normalized()
+	if f.spawn.gravity_scale > 0.0:
+		f.velocity.y -= _gravity * f.spawn.gravity_scale * delta
 
-	f.position = (hit["position"] as Vector3) + normal * maxf(f.spawn.radius, 0.02)
+	var step := f.velocity * delta
+	var hit := _cast(space, f, f.position, f.position + step, 1)
 
-	if f.sticks:
+	if hit.is_empty():
+		f.position += step
+		return false
+
+	f.position = hit["position"]
+
+	if not authority:
 		f.velocity = Vector3.ZERO
 		f.resting = true
+		return false
 
-		# Stuck to a crate it rides the crate, and stuck to a person it is on the person.
-		var collider: Variant = hit["collider"]
-		if collider is Node3D and not (collider is StaticBody3D):
-			f.stuck_to = collider as Node3D
-			f.stuck_offset = f.position - f.stuck_to.global_position
-		return
+	return true
 
-	var into := f.velocity.dot(normal)
-	var along := f.velocity - normal * into
-	f.velocity = along * (FLOOR_KEEP if normal.y > 0.7 else SURFACE_KEEP) - normal * into * RESTITUTION
-	f.bounces += 1
 
-	if (normal.y > 0.7 and f.velocity.length() < REST_SPEED) or f.bounces >= MAX_BOUNCES:
-		f.velocity = Vector3.ZERO
-		f.resting = true
+## Stuck to a crate it rides the crate, and stuck to a person it is on the person.
+func _stick_to(f: Flying) -> void:
+	var collider: Variant = f.last_hit.get("collider")
+
+	if collider is Node3D and not (collider is StaticBody3D):
+		f.stuck_to = collider as Node3D
+		f.stuck_offset = f.grenade.position - f.stuck_to.global_position
 
 
 func _follow(f: Flying) -> void:
-	if f.stuck_to == null:
-		return
-
 	if not is_instance_valid(f.stuck_to) or not f.stuck_to.is_inside_tree():
 		# What it stuck to is gone. It falls from where it was rather than hanging in air.
 		f.stuck_to = null
-		f.resting = false
+		f.grenade.stuck = false
 		return
 
-	f.position = f.stuck_to.global_position + f.stuck_offset
+	f.grenade.position = f.stuck_to.global_position + f.stuck_offset
 
 
-func _sweep(space: PhysicsDirectSpaceState3D, f: Flying, step: Vector3) -> Dictionary:
-	if space == null or step.length_squared() <= 0.0:
+## [AwGrenade]'s world: a ray that remembers what it met, and skips the thrower at first.
+func _tracer(space: PhysicsDirectSpaceState3D, f: Flying) -> Callable:
+	return func(from: Vector3, to: Vector3) -> Dictionary:
+		f.last_hit = _cast(space, f, from, to, THROWER_GRACE_TICKS)
+		return f.last_hit
+
+
+func _cast(space: PhysicsDirectSpaceState3D, f: Flying, from: Vector3, to: Vector3, grace: int) -> Dictionary:
+	if space == null or from == to:
 		return {}
 
-	var query := PhysicsRayQueryParameters3D.create(f.position, f.position + step)
-	var grace := 1 if f.spawn.fuse_ticks <= 0 else THROWER_GRACE_TICKS
+	var query := PhysicsRayQueryParameters3D.create(from, to)
 
 	if f.owner_rid.is_valid() and f.age_ticks <= grace:
 		query.exclude = [f.owner_rid]
@@ -348,22 +357,27 @@ func _sweep(space: PhysicsDirectSpaceState3D, f: Flying, step: Vector3) -> Dicti
 	return space.intersect_ray(query)
 
 
-## What a blast does, on the authority. Everything inside the splash and in sight of its
-## centre is hurt by linear falloff: an armed NPC through `take_damage`, a player through
-## the arena (unset when the arena is off, so nobody dies in a sandbox), a loose prop shoved
-## away from the centre. The thrower is not spared, which is a grenade.
+## What a blast does, on the authority. [AwGrenadeBlast] decides who is hurt, blinded or
+## burned (linear falloff, nothing through cover); this applies it: an armed NPC through
+## `take_damage`, a player through the arena (unset when the arena is off, so nobody dies in
+## a sandbox), a loose prop shoved away from the centre. The thrower is not spared.
 func _detonate(f: Flying, at: Vector3) -> void:
-	var radius := f.spawn.splash_radius
+	var def := _blast_def(f)
+	var radius := float(def.params.get(&"effect_radius", f.spawn.splash_radius))
 	var space := get_world_3d().direct_space_state if is_inside_tree() else null
 
 	if space != null and radius > 0.0:
-		for collider in _in_blast(space, at, radius):
-			_blast(space, f, at, radius, collider)
+		var colliders := colliders_in(at, radius)
+		var g := f.grenade if f.grenade != null else AwGrenade.from_spawn(f.spawn, def, rules)
+		g.position = at
+		var events := AwGrenadeBlast.detonate(g, def, _victims(colliders), _clear_to.bind(space, at))
+		_apply(events, colliders, f, at)
+		effects.blasted(events, f.owner_id)
 		# Map panes too (glass), which the blast's shape query does not return: they are world.
 		if game != null and game.has_method("hurt_panes_in"):
 			game.call("hurt_panes_in", at, radius, f.spawn.splash_damage, f.owner_id)
 		# And the map's toys, by dot-props' own blast: a damage-sized impulse sends a beach
-		# ball off at a hundred metres a second (see [method _blast], which skips them).
+		# ball off at a hundred metres a second (see [method _apply], which skips them).
 		if game != null and game.has_method("blast_toys"):
 			var _thrown: int = game.call("blast_toys", at, radius)
 
@@ -373,7 +387,37 @@ func _detonate(f: Flying, at: Vector3) -> void:
 	detonated.emit(f.serial, at, radius)
 
 
-func _in_blast(space: PhysicsDirectSpaceState3D, at: Vector3, radius: float) -> Array:
+## The definition [AwGrenadeBlast] reads: the weapon's own params (`kind`, `effect_radius`) over
+## the splash this spawn carries, which is what the weapon's modifiers left of it.
+func _blast_def(f: Flying) -> DotWeaponDef:
+	var def := DotWeaponDef.new()
+	def.id = f.spawn.id
+	var source := _def_of(f.spawn)
+
+	if source != null:
+		def.params = source.params
+
+	var b := DotWeaponBallistics.new()
+	b.splash_radius = f.spawn.splash_radius
+	b.splash_damage = f.spawn.splash_damage
+	def.tuning = b
+	return def
+
+
+## The weapon definition behind [param spawn], from this game's catalogue or a pack's.
+func _def_of(spawn: DotWeaponSpawn) -> DotWeaponDef:
+	var def: DotWeaponDef = catalogue.get_def(spawn.id) if catalogue != null else null
+	return def if def != null else PlaygroundZee.pack_def(spawn.id)
+
+
+## What a blast can reach: bodies that are not the map, and not a toy, which is the toy box's.
+func colliders_in(at: Vector3, radius: float) -> Array:
+	var space := get_world_3d().direct_space_state if is_inside_tree() else null
+	var out: Array = []
+
+	if space == null:
+		return out
+
 	var sphere := SphereShape3D.new()
 	sphere.radius = radius
 	var query := PhysicsShapeQueryParameters3D.new()
@@ -381,67 +425,79 @@ func _in_blast(space: PhysicsDirectSpaceState3D, at: Vector3, radius: float) -> 
 	query.transform = Transform3D(Basis(), at)
 	query.collide_with_areas = false
 
-	var out: Array = []
-
 	for result in space.intersect_shape(query, BLAST_MAX_RESULTS):
 		var collider: Variant = result.get("collider")
 
-		if collider is Node3D and not (collider is StaticBody3D) and not out.has(collider):
+		if collider is Node3D and not (collider is StaticBody3D) and not out.has(collider) \
+				and DotPropToyBox.toy_of(collider) == null:
 			out.append(collider)
 
 	return out
 
 
-func _blast(space: PhysicsDirectSpaceState3D, f: Flying, at: Vector3, radius: float, collider: Node3D) -> void:
-	# A toy is the toy box's to push ([method _detonate]), never this impulse.
-	if DotPropToyBox.toy_of(collider) != null:
-		return
+func _victims(colliders: Array) -> Array:
+	var out: Array = []
 
-	var target := collider.global_position
+	for i in colliders.size():
+		var body: Node3D = colliders[i]
+		var target := _centre(body)
+		out.append({"id": i, "position": target, "eye": target, "forward": -body.global_basis.z})
 
-	if collider is PlaygroundPlayer:
-		target += Vector3.UP * 0.9
-
-	var distance := at.distance_to(target)
-
-	if distance > radius or not _in_sight(space, at, collider, target):
-		return
-
-	var falloff := clampf(1.0 - distance / radius, 0.0, 1.0)
-	var damage := f.spawn.splash_damage * falloff
-
-	if collider.has_method("take_damage"):
-		collider.call("take_damage", damage, f.owner_id)
-	elif collider is PlaygroundPlayer:
-		var hurt: Variant = game.get("arena_hurt") if game != null else null
-		if hurt is Callable and (hurt as Callable).is_valid():
-			(hurt as Callable).call(f.owner_id, StringName(str(collider.get("player_id"))), damage, distance)
-
-	# A breakable prop takes the blast too (`destruction`); one it breaks is not there to throw.
-	if collider is RigidBody3D and game != null and game.has_method("hurt_prop"):
-		var _hurt: bool = game.call("hurt_prop", collider, damage, f.owner_id)
-		if not is_instance_valid(collider) or collider.is_queued_for_deletion():
-			return
-
-	if collider is RigidBody3D and not (collider as RigidBody3D).freeze:
-		var away := (target - at)
-		away = away.normalized() if away.length_squared() > 0.0001 else Vector3.UP
-		(collider as RigidBody3D).apply_central_impulse(
-			(away + Vector3.UP * 0.3).normalized() * f.spawn.splash_damage * falloff * BLAST_IMPULSE
-		)
+	return out
 
 
-## Whether nothing static stands between the blast and [param target]. A crate between a
+func _centre(body: Node3D) -> Vector3:
+	return body.global_position + (Vector3.UP * 0.9 if body is PlaygroundPlayer else Vector3.ZERO)
+
+
+## Whether nothing static stands between the blast and [param to]. A crate between a
 ## grenade and a soldier takes the blast; a wall does more than that. Only static geometry
 ## blocks, so a blast is not stopped by the prop it is about to throw.
-func _in_sight(space: PhysicsDirectSpaceState3D, at: Vector3, collider: Node3D, target: Vector3) -> bool:
-	var query := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.05, target)
-
-	if collider is CollisionObject3D:
-		query.exclude = [(collider as CollisionObject3D).get_rid()]
-
-	var found := space.intersect_ray(query)
+func _clear_to(_from: Vector3, to: Vector3, space: PhysicsDirectSpaceState3D, at: Vector3) -> bool:
+	var found := space.intersect_ray(PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.05, to))
 	return found.is_empty() or not (found["collider"] is StaticBody3D)
+
+
+func _apply(events: Array[Dictionary], colliders: Array, f: Flying, at: Vector3) -> void:
+	for event in events:
+		var index := int(event.get("victim", -1))
+
+		if index < 0 or index >= colliders.size() or not is_instance_valid(colliders[index]):
+			continue
+
+		var body: Node3D = colliders[index]
+
+		match String(event["event"]):
+			"damage":
+				hurt(body, float(event["damage"]), f.owner_id, at.distance_to(_centre(body)))
+				_shove(body, float(event["damage"]), at)
+			"blind":
+				effects.blind(body, float(event["seconds"]))
+
+
+## Damage to [param body] from [param owner_id]: an armed NPC takes it, a player takes it through
+## the arena, a breakable prop takes it as a prop.
+func hurt(body: Node3D, damage: float, owner_id: StringName, distance: float) -> void:
+	if body.has_method("take_damage"):
+		body.call("take_damage", damage, owner_id)
+	elif body is PlaygroundPlayer:
+		var arena: Variant = game.get("arena_hurt") if game != null else null
+		if arena is Callable and (arena as Callable).is_valid():
+			(arena as Callable).call(owner_id, StringName(str(body.get("player_id"))), damage, distance)
+
+	if body is RigidBody3D and game != null and game.has_method("hurt_prop"):
+		var _hurt: bool = game.call("hurt_prop", body, damage, owner_id)
+
+
+func _shove(body: Node3D, damage: float, at: Vector3) -> void:
+	# One a breakable prop broke is not there to throw.
+	if not is_instance_valid(body) or body.is_queued_for_deletion():
+		return
+
+	if body is RigidBody3D and not (body as RigidBody3D).freeze:
+		var away := _centre(body) - at
+		away = away.normalized() if away.length_squared() > 0.0001 else Vector3.UP
+		(body as RigidBody3D).apply_central_impulse((away + Vector3.UP * 0.3).normalized() * damage * BLAST_IMPULSE)
 
 
 func _announce_danger(f: Flying) -> void:

@@ -1,12 +1,12 @@
 extends "res://examples/headless_playground_part9.gd"
 
-const CHECKS := 776 + 22 + 9 + 10 + 8 + 1 + 4
+const CHECKS := 776 + 22 + 9 + 10 + 8 + 1 + 4 + 12
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 42
+const SECTIONS := 43
 
 ## What `_test_the_run_timer` and `_test_leaderboards` add when dot-timer is linked.
 const TIMER_SECTIONS := 2

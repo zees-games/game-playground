@@ -305,6 +305,8 @@ func _module_load() -> DotResult:
 	# NOTIFY, because players should know the NPCs just got harder.
 	game.npc_skill.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
 
+	# Thrown grenades: arena_weapons' sv_grenade_* set (bounce, friction, flash, smoke and fire times).
+	var _grenades := game.grenade_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
 	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's
 	# reaction from them; REPLICATED, because the clients draw the bodies.
 	var _ragdolls := game.ragdoll_rules.bind_cvars(

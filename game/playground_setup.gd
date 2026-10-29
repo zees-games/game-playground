@@ -277,6 +277,8 @@ var toys: DotPropToyBox = null
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
+## `sv_grenade_*`, kept across maps so a cvar bound once survives the projectile layer's rebuild.
+var grenade_rules := AwGrenadeRules.new()
 
 ## The map's toys are about to go (a map change), on both ends. What the bridge releases their
 ## entities on, before the nodes are freed.

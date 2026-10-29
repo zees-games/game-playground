@@ -81,7 +81,10 @@ func _test_menu() -> void:
 	var rows := _game.addons.describe_items()
 	for row in rows:
 		match str(row["kind"]):
-			"weapon": _weapon_rows.append(row)
+			"weapon":
+				# arena_weapons rows are the grenade kit's, counted by the grenade suite.
+				if not str(row["key"]).begins_with("arena_weapons/"):
+					_weapon_rows.append(row)
 			"npc": _npc_rows.append(row)
 	var declared := 0
 	for pack in ["zz_modern_weapons", "zz_medieval_weapons"]:
@@ -100,7 +103,7 @@ func _test_menu() -> void:
 	stack.register(menu)
 	stack.push(menu.screen_id())
 	await get_tree().process_frame
-	menu.addon_items = rows
+	menu.addon_items = rows.filter(func(r: Dictionary) -> bool: return not str(r["key"]).begins_with("arena_weapons/"))
 	menu.show_tab(PlaygroundSpawnMenu.Tab.PACK_WEAPONS)
 	await get_tree().process_frame
 	var shown := menu.shown()
