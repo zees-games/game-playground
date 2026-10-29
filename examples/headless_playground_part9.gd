@@ -225,7 +225,7 @@ func _test_grenades_3() -> void:
 	_check(playground.projectiles.flashes_live() >= 1, "a flash is drawn where it went off")
 	PlaygroundZee.disarm(_g_bot)
 
-	# --- An NPC gets out from under one ----------------------------------------------------------
+	# An NPC gets out from under one
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	await get_tree().physics_frame
 	var runner := playground.props.spawn(&"npc_soldier", &"bot", Vector3(10, 1.2, -10))
@@ -254,7 +254,7 @@ func _test_grenades_3() -> void:
 		await get_tree().physics_frame
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 
-	# --- A rocket goes off on contact -------------------------------------------------------------
+	# A rocket goes off on contact
 	var rocket := DotWeaponSpawn.new()
 	rocket.id = &"launcher"
 	rocket.origin = Vector3(0, 1.5, 0)
@@ -276,7 +276,7 @@ func _test_grenades_4() -> void:
 	_check(_g_rocket_blasts.size() == 1 and absf((_g_rocket_blasts[0] as Vector3).y) < 0.3,
 		"a rocket with no fuse goes off where it meets the floor", str(_g_rocket_blasts))
 
-	# --- What a client is told, and its copy decides nothing --------------------------------------
+	# What a client is told, and its copy decides nothing
 	var spawn := DotWeaponSpawn.new()
 	spawn.id = &"sticky"
 	spawn.origin = Vector3(1, 2, 3)
@@ -346,7 +346,7 @@ func _test_armed_npcs() -> void:
 	if shotgunner != null:
 		playground.props.remove(shotgunner.instance_id)
 
-	# --- A player's shot hurts it -------------------------------------------------------------
+	# A player's shot hurts it
 	_an_bot = playground.players[&"bot"]
 	_an_bot.teleport(Vector3(0, 1.0, 12.0), 0.0)
 	await get_tree().physics_frame
@@ -371,14 +371,14 @@ func _test_armed_npcs() -> void:
 		"%.0f of %.0f" % [float(_an_body.get("health")), _an_before])
 	PlaygroundZee.disarm(_an_bot)
 
-	# --- Replicated --------------------------------------------------------------------------
+	# Replicated
 	var net := PlaygroundNpcNet.new()
 	net.prop = _an_body
 	net.pull()
 	_check(net.net_weapon == "zee_smg", "a client is told which weapon it holds")
 	net.free()
 
-	# --- Soldiers and rebels fight each other -------------------------------------------------
+	# Soldiers and rebels fight each other
 	_an_bot.teleport(Vector3(-60.0, 1.0, -60.0), 0.0)
 	# Healed first: the player's shots above already hurt it, and a fight measured against
 	# that would end before it began.
@@ -409,7 +409,7 @@ func _test_armed_npcs_2() -> void:
 		or (rebel_body != null and is_instance_valid(rebel_body) and int((rebel_body.get("zee_rig") as ZeeWeaponRig).fire_seq) > 0),
 		"with their own weapons")
 
-	# --- Death drops the weapon, and walking over it picks it up ---------------------------------
+	# Death drops the weapon, and walking over it picks it up
 	playground.props.clear_all(DotPropSpawner.REASON_ADMIN)
 	await get_tree().physics_frame
 	var doomed := playground.props.spawn(&"npc_soldier", &"bot", Vector3(0, 1.2, 0))
@@ -446,7 +446,7 @@ func _test_armed_npcs_2() -> void:
 		"and the player who walks over it picks it up", str(picked))
 	playground.weapon_picked_up.disconnect(on_pick)
 
-	# --- A weapon spawned from the menu counts against `weapons` ----------------------------------
+	# A weapon spawned from the menu counts against `weapons`
 	var placed := playground.props.spawn(Playground.pickup_id_of(&"zee_pistol"), &"bot", Vector3(8, 1, 8))
 	_check(placed != null and playground.props.group_count(&"bot", &"weapons") == 1,
 		"a weapon put on the ground counts against the weapons limit")

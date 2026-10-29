@@ -94,10 +94,9 @@ func _test_the_client_boots() -> void:
 
 func _test_the_client_boots_2() -> void:
 
-	# [b]A death draws the server's fall from the body this client draws.[/b] Connected the
-	# reaction comes on COMBAT; here it is handed over, which is the half no wire check sees.
-	# Armed by spawning from the character node instead of its body (the parts check fails:
-	# the capsule-and-marker node is not the figure) and by ignoring the rules (the topple).
+	# A death draws the server's fall from the body this client draws; connected, the reaction comes on COMBAT.
+	# Armed by spawning from the character node instead of its body (the parts check fails) and by
+	# ignoring the rules (the topple).
 	_tcb_client._build_ragdolls()
 	var other := _tcb_client.playground.add_player(&"u66", "Fallen")
 	other.teleport(_tcb_client.player.controller.state.position + Vector3(0.0, 0.0, -4.0))
@@ -123,11 +122,9 @@ func _test_the_client_boots_2() -> void:
 		"no ragdoll of your own body in first person")
 	_tcb_client.playground.remove_player(&"u66")
 
-	# [b]The sensitivity slider reaches the sampler.[/b] It was declared, shown and saved,
-	# and nothing called `bind_look`, so the view turned at DotFpsTunables' default (0.25
-	# degrees per count) whatever the player chose. Read off the tunables the sampler turns
-	# the view with, offline and for the connected client's own sampler, which `_adopt`
-	# hands a fresh tunables object. Armed: without `_bind_look` all four fail.
+	# The sensitivity slider reaches the sampler: nothing called `bind_look`, so the view turned at
+	# DotFpsTunables' default whatever the player chose. Read off the tunables the sampler turns the
+	# view with, offline and connected. Armed: without `_bind_look` all four fail.
 	_tcb_look_settings = (
 		_tcb_client.presentation.settings if _tcb_client.presentation != null else null
 	)
@@ -170,11 +167,8 @@ func _test_the_client_boots_3() -> void:
 	if _tcb_look_settings != null:
 		_tcb_look_settings.set_value(&"invert_mouse", false)
 
-	# [b]The mouse, end to end.[/b] Nothing in this family had ever delivered an
-	# `InputEventMouseMotion` to a client and looked at what happened, which is how a
-	# dead mouse survived: `_on_mouse_motion` fed `player.sampler` and `_net_physics`
-	# sampled `_sampler`, two different objects, and `DotFpsSampler.sample` polls the
-	# `InputMap` for movement so everything except the view kept working.
+	# The mouse, end to end. `_on_mouse_motion` fed `player.sampler` while `_net_physics` sampled `_sampler`,
+	# two objects, and `DotFpsSampler.sample` polls the `InputMap` for movement, so only the view died.
 	var before_yaw: float = (
 		_tcb_client.player.controller.state.yaw if _tcb_client.player != null else 0.0
 	)
@@ -182,11 +176,8 @@ func _test_the_client_boots_3() -> void:
 	var motion := InputEventMouseMotion.new()
 	motion.relative = Vector2(120.0, 0.0)
 
-	# [b]Captured, because a look input is only a look input while it is.[/b] Headless
-	# starts VISIBLE, which is the state a player is in after one press of Escape, and
-	# the guard in `_on_mouse_motion` is what stops a free cursor from turning the view
-	# under itself. Setting it here makes this check model somebody playing rather than
-	# somebody with a menu key stuck down.
+	# Captured, because a look input is only a look while it is: headless starts VISIBLE, as after one
+	# Escape, and `_on_mouse_motion` ignores a free cursor. Setting it models somebody playing.
 	_tcb_client.mouse_capture_override = true
 	_tcb_client._unhandled_input(motion)
 
@@ -205,14 +196,9 @@ func _test_the_client_boots_3() -> void:
 		]
 	)
 
-	# [b]And the other half: a released cursor turns nothing.[/b] Escape frees the
-	# pointer with no screen open, so `_menu_is_open` is false and every check above
-	# still passes while the view spins under a cursor the player is aiming at a
-	# spawn menu with. Same event, same client, one property different.
-	#
-	# Driven through `mouse_capture_override` because `Input.mouse_mode` is a no-op
-	# under the dummy display server -- it reads VISIBLE however it is written, so a
-	# suite that set it directly would prove nothing and pass anyway.
+	# The other half: a released cursor turns nothing. Escape frees the pointer with no screen open,
+	# so `_menu_is_open` is false. Driven through `mouse_capture_override`, because `Input.mouse_mode`
+	# is a no-op under the dummy display server and a suite setting it would prove nothing.
 	_tcb_released_yaw = _tcb_client.player.controller.state.yaw
 
 func _test_the_client_boots_4() -> void:
@@ -232,11 +218,9 @@ func _test_the_client_boots_4() -> void:
 		"yaw %.3f -> %.3f" % [_tcb_released_yaw, _tcb_client.player.controller.state.yaw]
 	)
 
-	# [b]Escape releases and never captures; a click captures -- the platform's job now.[/b]
-	# game-g2gfast's contract, for the browser. `Input.mouse_mode` is a no-op under the dummy
-	# display server, so what is checked is the configuration (dot-game's own suite drives
-	# the release), that no screen is up for the pointer rule, and that Escape on a pointer
-	# that is not captured is the second press and opens the menu, never a capture.
+	# Escape releases and never captures; a click captures (game-g2gfast's contract, for the browser).
+	# `Input.mouse_mode` is a no-op under the dummy display server, so this checks the configuration,
+	# that no screen is up, and that Escape on an uncaptured pointer opens the menu.
 	var plat: DotGameClient = _tcb_client.platform
 	_check(
 		plat != null and plat.escape_releases_pointer and plat.capture_pointer
@@ -403,12 +387,9 @@ func _test_the_client_boots_7() -> void:
 
 	_tcb_client.mouse_capture_override = true
 
-	# And the routing rule itself, for the deployment this suite does not build. A
-	# networked client's mouse must reach `_sampler`, because that is the sampler
-	# `_net_physics` stamps a command from; `player.sampler` is null on one and the
-	# events went there. Asserted on the accessor rather than by standing a whole
-	# networked client up, because the bug was the disagreement between two lines and
-	# an accessor both of them go through is what fixed it.
+	# The routing rule for the deployment this suite does not build: a networked client's mouse must reach
+	# `_sampler`, which `_net_physics` stamps from, while `player.sampler` is null there. Asserted on the
+	# accessor both lines go through, not by standing a whole networked client up.
 	_check(
 		_tcb_client.active_sampler() == _tcb_client.player.sampler,
 		"a local client's mouse feeds the player's own sampler"
@@ -428,10 +409,9 @@ func _test_the_client_boots_7() -> void:
 		"a theme picked in the menu reaches the pieces, and a run timer's block when there is one, at once, the accent kept")
 	_themed = _tcb_client.game_menu.settings.set_value(&"ui_theme", &"midnight")
 
-	# [b]Typing at the console must not walk the player.[/b] The sampler polls the keys
-	# every tick and a focused line edit does not stop `Input.is_action_pressed`; the
-	# console is one of dot-menu's overlays (DotConsoleKit registers it), and the menu's
-	# `overlays_changed` is what suspends the sampler. W held, measured in metres.
+	# Typing at the console must not walk the player: the sampler polls keys every tick and a focused
+	# line edit does not stop `Input.is_action_pressed`; dot-menu's `overlays_changed` suspends the
+	# sampler. W held, measured in metres.
 	var console := _tcb_client.presentation.console if _tcb_client.presentation != null else null
 	var forward: StringName = _tcb_client.player.sampler.actions["forward"]
 	for _i in range(60):
@@ -479,12 +459,9 @@ func _test_the_client_boots_8() -> void:
 	networked.link.free()
 	networked.free()
 
-	# [b]A connected client's HUD holds the vote's clock.[/b] The netcode comes up before
-	# the HUD in `_ready`, and the hand-over used to sit with the netcode, where it found
-	# no HUD — so every connected client counted its own map session's clock through
-	# every extend while `headless_net`, which checks the bridge and not the client, said
-	# the clock arrived. Booted for real here, with a bare node for a link: the bridge
-	# needs one and the client asks every method of it before calling.
+	# A connected client's HUD holds the vote's clock. The netcode comes up before the HUD in `_ready`,
+	# so the hand-over must not sit with the netcode, where it finds no HUD. Booted for real, with a bare
+	# node for a link.
 	var connected := PlaygroundClient.new()
 	connected.name = "ConnectedClient"
 	connected.link = Node.new()
@@ -506,11 +483,9 @@ func _test_the_client_boots_8() -> void:
 	stub_link.queue_free()
 	await get_tree().process_frame
 
-	# [b]The client makes a noise when something happens, through the game and not
-	# through the hooks.[/b] headless_presentation calls `on_prop_spawned` itself, which
-	# proved every hook correct while nothing in the game called one and the playable
-	# client was silent. This goes through the client's own spawn, the spawner's own
-	# refusal and a real map change.
+	# The client makes a noise when something happens, through the game and not through the hooks:
+	# `headless_presentation` calls `on_prop_spawned` itself, so a hook nothing calls stayed silent.
+	# This goes through the client's own spawn, the spawner's refusal and a real map change.
 	_tcb_sink = _tcb_client.presentation.audio.sink as DotAudioSinkNull \
 		if _tcb_client.presentation != null and _tcb_client.presentation.audio != null else null
 	_check(_tcb_sink != null, "the headless client's presentation has a null sink to count on")
@@ -567,10 +542,9 @@ func _test_the_client_boots_9() -> void:
 		"%d" % _tcb_sink.count_of(&"refused")
 	)
 
-	# An administrator's beacon and blind, through the client's OWN frame hooks rather
-	# than the player's method: the marker and the ping are presentation, and a hook
-	# nothing in the client calls is this file's oldest bug. Stepped by hand, a quarter
-	# of a second at a time, so the count is the ripple's and not the frame rate's.
+	# An administrator's beacon and blind, through the client's OWN frame hooks rather than the
+	# player's method. Stepped by hand, a quarter of a second at a time, so the count is the ripple's
+	# and not the frame rate's.
 	_tcb_client.player.beacon = true
 	_tcb_sink.forget()
 	# The null sink never ends a sound by itself, so by here pg_flatgrass's toys have

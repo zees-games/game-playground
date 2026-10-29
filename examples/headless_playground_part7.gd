@@ -1,11 +1,8 @@
 extends "res://examples/headless_playground_part6.gd"
 
-## dot-core's [DotCollisionAudit] over every map as built: visible geometry with no shape
-## under it, which a player walks through. The strict pass: every mesh sits on its own body here, and the lenient one
-## would let a stray shape nearby cover a missing one. What is passable on purpose (liquids, foliage, panes, trigger
-## visuals) carries `dot_no_collision` where the map builds it, with the reason there; a map
-## fails on any finding left. Props are dot-props bodies and map toys are built under the
-## playground, so neither is in a map node. The audit is structural and needs no tree.
+## dot-core's [DotCollisionAudit] over every map as built: visible geometry with no shape under it, which a player walks through.
+## The strict pass: each mesh sits on its own body. What is passable on purpose carries `dot_no_collision` with the reason where the map builds it.
+## Props and map toys are not in a map node. The audit is structural and needs no tree.
 func _test_nothing_drawn_is_walked_through() -> void:
 	print("")
 	_section("every map's drawn geometry has collision or says it is passable")
@@ -42,8 +39,8 @@ func _test_nothing_drawn_is_walked_through() -> void:
 	_done()
 
 
-## A map document's `props` and `wires` (2026-10-07): put down by the server on load, owned
-## by the map, furniture frozen and loose things loose, and the wires live.
+## A map document's `props` and `wires`: put down by the server on load, owned by the map,
+## furniture frozen and loose things loose, and the wires live.
 func _test_a_maps_own_props() -> void:
 	_section("a map's own props")
 
@@ -87,7 +84,7 @@ func _test_a_maps_own_props() -> void:
 	_done()
 
 
-# --- Toys ------------------------------------------------------------------------
+# Toys
 
 func _toy_index(id: String) -> int:
 	if playground.toys == null:
@@ -98,10 +95,9 @@ func _toy_index(id: String) -> int:
 	return -1
 
 
-## dot-props' toys on the sandbox, through the game's own paths: a walk pushes a ball, a shot
-## from the hit scan sends one off, the use key kicks, a trampoline throws a player, the
-## roundabout carries one standing on it, a grenade's blast throws a barrel, sv_toys 0 takes
-## them away and a map change takes them with it.
+## dot-props' toys on the sandbox, through the game's own paths: a walk pushes a ball, a shot sends
+## one off, the use key kicks, a trampoline throws a player, a roundabout carries one, a blast throws a
+## barrel, sv_toys 0 takes them away and a map change takes them with it.
 var _t_box: DotPropToyBox
 var _t_player: PlaygroundPlayer
 var _t_ball: DotPropToy
@@ -333,7 +329,7 @@ func _test_map_materials() -> void:
 	if bot == null:
 		bot = playground.add_player(&"bot", "Bot")
 
-	# --- A box knows what it is made of ------------------------------------------------
+	# A box knows what it is made of
 	var ice_box: StaticBody3D = null
 	var stack: Array[Node] = [playground.current_map_node()]
 	while not stack.is_empty():
@@ -348,26 +344,26 @@ func _test_map_materials() -> void:
 		and playground.liquids.any(func(l: Dictionary) -> bool: return l["material"] == &"lava"),
 		"the map's water and lava are liquid volumes", str(playground.liquids.size()))
 
-	# --- Ice keeps its speed; grass takes it off ----------------------------------------
+	# Ice keeps its speed; grass takes it off
 	var grass_kept: float = await _coast(bot, Vector3(-30.0, 1.0, 15.0))
 	var ice_kept: float = await _coast(bot, Vector3(-55.0, 1.0, -41.0))
 	print("    speed kept after 24 ticks with no input: grass %.0f%%, ice %.0f%%" % [grass_kept * 100.0, ice_kept * 100.0])
 	_check(ice_kept > 0.6 and ice_kept > grass_kept * 2.0, "a player lets go on ice and keeps sliding; on grass they stop",
 		"grass %.2f, ice %.2f" % [grass_kept, ice_kept])
 
-	# --- Mud slows a run --------------------------------------------------------------
+	# Mud slows a run
 	var grass_top: float = await _top_speed(bot, Vector3(-30.0, 1.0, 15.0))
 	var mud_top: float = await _top_speed(bot, Vector3(0.0, 1.0, -2.0))
 	print("    top speed: grass %.2f m/s, mud %.2f m/s" % [grass_top, mud_top])
 	_check(mud_top < grass_top * 0.8, "mud slows a running player", "grass %.2f, mud %.2f" % [grass_top, mud_top])
 
-	# --- Rubber throws higher -----------------------------------------------------------
+	# Rubber throws higher
 	var grass_jump: float = await _jump_height(bot, Vector3(-30.0, 1.0, 15.0))
 	var rubber_jump: float = await _jump_height(bot, Vector3(-15.0, 1.3, 30.0))
 	print("    jump height: grass %.2f m, rubber %.2f m" % [grass_jump, rubber_jump])
 	_check(rubber_jump > grass_jump * 1.4, "a jump off rubber goes higher", "grass %.2f, rubber %.2f" % [grass_jump, rubber_jump])
 
-	# --- Lava ---------------------------------------------------------------------------
+	# Lava
 	var spawn: Vector3 = playground.current_map_node().fallback_spawn
 	bot.teleport(Vector3(-50.0, 0.3, 46.0), 0.0)
 	await _drive(&"bot", DotFpsCommand.new(), 4)
@@ -378,7 +374,7 @@ func _test_map_materials() -> void:
 	await _drive(&"bot", DotFpsCommand.new(), int(playground.tick_rate * 2.0))
 	_check(crate != null and not crate.is_alive(), "and a crate that falls in melts")
 
-	# --- Water is a volume, not a floor: a crate floats on it ------------------------------
+	# Water is a volume, not a floor: a crate floats on it
 	var floater := playground.props.spawn(&"crate", &"bot", Vector3(60.0, 3.0, 50.0))
 	await _drive(&"bot", DotFpsCommand.new(), int(playground.tick_rate * 3.0))
 	var settled: float = (floater.node as Node3D).global_position.y if floater != null and floater.is_alive() else INF
@@ -439,10 +435,8 @@ func _jump_height(player: PlaygroundPlayer, at: Vector3) -> float:
 	return top - floor_y
 
 
-## Glass in a map breaks (pgc_nature's greenhouse): a real pistol through the game's shot
-## handling, a blast, a crate thrown into it; not a crate nudged into it, not a player running
-## alongside it, and nothing at all with `pg_breakable_glass` off. Shards fly and the
-## signal every client's sound hangs off fires.
+## Glass in a map breaks (pgc_nature's greenhouse): a real pistol, a blast, a thrown crate; not a nudged
+## crate, not a passing player, nothing with `pg_breakable_glass` off. Shards fly and the sound signal fires.
 var _g_west: int
 var _g_east: int
 var _g_north: int
@@ -476,7 +470,7 @@ func _test_glass() -> void:
 	_g_on_broken = func(index: int, _at: Vector3, material: StringName) -> void: heard.append([index, material])
 	playground.pane_broken.connect(_g_on_broken)
 
-	# --- Running alongside a pane at full speed is not running into it ---------------------
+	# Running alongside a pane at full speed is not running into it
 	# Starting past the north wall's end: the first version started south of it, ran into
 	# that wall's edge at full speed, and broke it, which is right and was not the question.
 	player.teleport(Vector3(8.6, 1.0, 45.8), 180.0)
@@ -490,7 +484,7 @@ func _test_glass() -> void:
 	_check(playground.panes.has(_g_east) and heard.is_empty(), "a player running alongside a pane does not break it",
 		"%.2f m/s, at %s" % [player.controller.state.velocity.length(), str(player.controller.state.position)])
 
-	# --- Off, nothing breaks it -----------------------------------------------------------------
+	# Off, nothing breaks it
 	player.teleport(Vector3(-14.0, 1.0, 50.0), -90.0)
 	# Facing the pane while it settles: a command carries absolute angles, so an empty one
 	# turns the bot to yaw 0, which put the first version's shots into the north wall.
@@ -504,7 +498,7 @@ func _test_glass() -> void:
 	_check(playground.panes.has(_g_west), "with pg_breakable_glass off, shots break no glass")
 	playground.panes_break = true
 
-	# --- A pistol breaks it ------------------------------------------------------------------------
+	# A pistol breaks it
 	var before := playground.props.all_props().size()
 	# One burst: the helper counts ticks itself, and calling it a tick at a time with no frame
 	# between hands the rig the same tick each time, which fires once.
@@ -524,12 +518,12 @@ func _test_glass_2() -> void:
 	_check(through.is_empty() or not ((through["collider"] as Node).get_meta(&"pg_box", -1) == _g_west),
 		"and nothing is left where it stood")
 
-	# --- A blast ---------------------------------------------------------------------------------
+	# A blast
 	var standing := playground.panes.has(_g_north)
 	playground.hurt_panes_in(Vector3(0.0, 1.75, 43.0), 4.0, 100.0, &"bot")
 	_check(standing and not playground.panes.has(_g_north), "a blast beside a pane breaks it")
 
-	# --- A crate thrown into it, and one nudged into it -----------------------------------------------
+	# A crate thrown into it, and one nudged into it
 	var nudged := playground.props.spawn(&"crate", &"bot", Vector3(10.5, 0.6, 52.0))
 	await get_tree().physics_frame
 	(nudged.node as RigidBody3D).linear_velocity = Vector3(-2.0, 0.0, 0.0)
