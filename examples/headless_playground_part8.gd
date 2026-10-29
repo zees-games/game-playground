@@ -33,6 +33,34 @@ func _the_client_mounts_the_downed_arms() -> void:
 	_check(not arms.arms().visible, "and hidden again on a revive")
 
 
+## One weapon of every pose the catalogue ships, in the client's own hands: the arms are up with the
+## grip the weapon measured, a hand within 5 cm of it (10 cm for a fore-end, the arm's reach), and gone again on the holster.
+func _the_arms_hold_each_weapon_class() -> void:
+	if not PlaygroundViewGrip.available():
+		return
+	var chosen: Dictionary = {}
+	for art in ZeeWeaponArtTable.all():
+		if art.has_model() and not chosen.has(art.pose):
+			chosen[art.pose] = art.id
+	_check(chosen.size() >= 4, "the catalogue offers several weapon poses to hold", str(chosen.keys()))
+	var arms := _tcb_client.view_arms as DotPlayerViewArms
+	for pose: StringName in chosen:
+		_tcb_client._set_tool(StringName("zee_%s" % chosen[pose]))
+		for _i in range(8):
+			await get_tree().process_frame
+		var grip := _tcb_client.held_grip
+		_check(grip != null and arms.shown and arms.arms().visible and _tcb_client.arms_pivot.visible,
+			"%s (%s): the arms are mounted and shown on the armed weapon" % [chosen[pose], pose])
+		var one := pose in PlaygroundViewGrip.ONE_HAND
+		_check(grip != null and grip.is_two_hand() != one, "%s: %s hands" % [pose, "one" if one else "two"])
+		var err := PlaygroundViewGrip.hand_error(arms, grip)
+		var reach := 0.05 if one else 0.10
+		_check(err >= 0.0 and err < reach, "%s: the hand is within %d cm of the grip" % [pose, roundi(reach * 100.0)], "%.3f m" % err)
+		_check(not _tcb_client.zee_view.show_arms, "%s: the view model's own hands are off" % pose)
+		_tcb_client._set_tool(&"phys")
+		await get_tree().process_frame
+		_check(_tcb_client.held_grip == null and not arms.shown, "%s: the arms are gone on the holster" % pose)
+
 func _test_the_client_boots() -> void:
 	_section("the client boots")
 
@@ -690,6 +718,8 @@ func _test_the_client_boots_12() -> void:
 
 	_check(uses.size() > 1, "held fire through the client's own tick fires it, again and again",
 		"%d uses in 120 ticks" % uses.size())
+
+	await _the_arms_hold_each_weapon_class()
 
 	_tcb_client._set_tool(&"phys")
 	_check(
