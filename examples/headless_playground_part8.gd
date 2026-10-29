@@ -735,8 +735,8 @@ func _test_the_client_boots_12() -> void:
 	_tcb_client._set_tool(&"launcher")
 	_check(_tcb_client.toy_view != null and _tcb_client.toy_view != toy_in_hand,
 		"and picking another toy swaps the model")
-	(_tcb_client.toy_view as PlaygroundToyView).set_hands_fov_at_4_3(40.0)
-	(_tcb_client.toy_view as PlaygroundToyView)._process(0.016)
+	(_tcb_client.toy_view as DotToolView).set_hands_fov_at_4_3(40.0)
+	(_tcb_client.toy_view as DotToolView)._process(0.016)
 	_check(_tcb_client.toy_view.scale.x != 1.0, "and viewmodel_fov scales it like a gun")
 	_tcb_client._set_tool(&"phys")
 

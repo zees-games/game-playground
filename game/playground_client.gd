@@ -2181,7 +2181,7 @@ func _cycle_weapon() -> void:
 
 func _primary_down() -> void:
 	if toy_view != null and is_instance_valid(toy_view):
-		(toy_view as PlaygroundToyView).kick()
+		(toy_view as DotToolView).kick()
 	if bridge != null:
 		_net_buttons |= DotFpsCommand.BUTTON_USER_0
 		return
@@ -3119,8 +3119,7 @@ func _arm_toy_view(id: StringName) -> void:
 		return
 	var def := playground.weapon_def(id) if playground != null else null
 	var colour := def.colour if def != null else (Color(0.55, 0.4, 0.9) if id == TOOL_GRAV else Color(0.9, 0.55, 0.2))
-	toy_view = PlaygroundToyView.make(id, colour)
-	camera.add_child(toy_view)
+	toy_view = DotToolView.make(colour, id == &"impulse", camera)
 
 
 func _set_reload(down: bool) -> void:

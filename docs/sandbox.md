@@ -54,7 +54,7 @@ A zee rig in a dot-npc-ai brain (`npc_soldier.gd`, `soldier_brain.gd`). Soldiers
 - **A muzzle velocity is not an impulse, and the arsenal uses both on purpose.** `PlaygroundWeapon.launch` writes a velocity (an impulse is divided by mass, wrong for a launcher); `swep_impulse` uses an impulse (a shockwave *should* throw a beach ball further than a boulder).
 - **The toys run on the server.** `_give_weapon` builds the toy on the server (`PlaygroundWeapons.make`, wielder = the player) and `_drive_tools` runs it: primary/secondary on the pressed edge, `tick` every tick. A prop it spawns is charged like a menu spawn, after the spawn. Arming locally on the client is **prediction**; `weapon_changed` is the correction (a refused purchase takes the weapon back out of the player's hands).
 
-A toy or tool in hand draws a `PlaygroundToyView` under the camera (`toy_view`), in the `dot_view_model` group so `viewmodel_fov` reaches it like a zee gun; the client hides it outside first person.
+A toy or tool in hand draws dot-props' `DotToolView` (API 8, derived into the pack's requires) under the camera (`toy_view`), in the `dot_view_model` group so `viewmodel_fov` reaches it like a zee gun; the client hides it outside first person.
 
 ## zee-dot-weapons beside the toys
 
