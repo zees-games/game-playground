@@ -1418,6 +1418,8 @@ func _process(_delta: float) -> void:
 			else Vector3.ZERO
 		var forward := -camera.global_transform.basis.z \
 			if camera != null and camera.is_inside_tree() else Vector3.FORWARD
+		if platform != null and platform.slide_sounds != null and presentation.steps != null:
+			presentation.steps.surf_rules = platform.slide_sounds.get(&"surf_rules")
 		presentation.present(_delta, eye, forward)
 		presentation.keep_walkers(playground.players.values())
 		var stack_now := playground.player_stack
