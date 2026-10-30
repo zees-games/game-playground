@@ -96,6 +96,9 @@ var downs: PlaygroundDowns = null
 ## Per-player statistics, and what they are worth.
 var progress: PlaygroundProgress = null
 
+## Only asked for keys: progress opens its own tracker sessions.
+var _stats_feed: DotGameStatsFeed = _new_stats_feed()
+
 ## What plays next, decided by the players.
 var vote: PlaygroundVote = null
 
@@ -1059,7 +1062,7 @@ func _on_earned(player_key: String, id: StringName, title: String, points: int) 
 		if session == null:
 			continue
 
-		if PlaygroundPlatform.key_for_session(server, session) != player_key:
+		if _stats_key(session) != player_key:
 			continue
 
 		bridge.broadcast_progress(session.userid, id, title, points)
@@ -1068,10 +1071,7 @@ func _on_earned(player_key: String, id: StringName, title: String, points: int) 
 
 ## The key a statistic is filed under.
 ##
-## [b]The scoped pseudonymous one when there is a dot-platform, and the session id when
-## there is not.[/b] dot-stats refuses an account id as a player key before it leaves the
-## server, and this is the one function that decides — a LAN sandbox files under something
-## that lasts as long as the session, which is honest.
+## The stats key of a world player id: dot-game's stable per-server one, never an account id.
 func _stats_key_for(player_id: StringName) -> String:
 	var text := String(player_id)
 
@@ -1083,7 +1083,18 @@ func _stats_key_for(player_id: StringName) -> String:
 	if session == null:
 		return text
 
-	return PlaygroundPlatform.key_for_session(server, session)
+	return _stats_key(session)
+
+
+static func _new_stats_feed() -> DotGameStatsFeed:
+	var feed := DotGameStatsFeed.new()
+	feed.open_sessions = false
+	return feed
+
+
+## dot-game's stable per-server key (guests too), not the platform key alone.
+func _stats_key(session: DotClientSession) -> String:
+	return String(_stats_feed.key_for(session))
 
 
 ## Who a session is, for a bag that outlasts the connection — or empty for nobody.
@@ -1369,7 +1380,7 @@ func _on_client_spawn(event: DotEvent) -> void:
 		services.add_peer(session.peer_id)
 
 	if progress != null:
-		progress.begin(PlaygroundPlatform.key_for_session(server, session))
+		progress.begin(_stats_key(session))
 
 	if arena != null and arena.enabled:
 		arena.admit(id, session.label())
@@ -1506,7 +1517,8 @@ func _on_client_disconnected(session: DotClientSession, _reason: String = "") ->
 		arena.release(id)
 
 	if progress != null:
-		progress.end(PlaygroundPlatform.key_for_session(server, session))
+		progress.end(_stats_key(session))
+		_stats_feed.forget(session.userid)
 
 	_joined.erase(session.userid)
 
