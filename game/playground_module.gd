@@ -152,9 +152,7 @@ func _module_load() -> DotResult:
 	game = DotRegistry.get_node_service(Playground.SERVICE) as Playground
 
 	if game == null:
-		# Refusing to load is right. A module that loaded and did nothing would leave
-		# a server that accepts players into a game that does not exist, and the
-		# symptom is players who connect and never spawn.
+		# Refuse: a module that loaded and did nothing accepts players into no game.
 		return DotResult.fail(
 			DotError.CODE_STATE,
 			"No Playground is registered. Create one before loading this module."
@@ -162,7 +160,6 @@ func _module_load() -> DotResult:
 
 	game.noclip_policy = _session_may_noclip
 	_add_delivered_maps()
-
 	var netted := _build_netcode()
 
 	if not netted.ok:
@@ -315,6 +312,7 @@ func _module_load() -> DotResult:
 	var _ragdolls := game.ragdoll_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
+	var _drops = game.weapon_layer.bind_cvars(add_cvar)
 	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
 	# server took away and draws the rest.
 	var _toys := game.toy_rules.bind_cvars(

@@ -2,17 +2,10 @@ extends RefCounted
 
 ## The wire format for everything that is not a snapshot or an input.
 ##
-## Encoders and decoders in pairs, because they have to be exact inverses and nothing
-## checks that for you — the headless net suite round-trips every one of them. This
-## family has already shipped a serialisation whose two ends never met: dot-moderation
-## wrote [code]"voice muted"[/code] and read back a warning, and the one thing that
-## addon existed for silently did nothing.
+## Encoders and decoders in pairs, exact inverses; the headless net suite round-trips each.
 ##
-## [b]A prop is announced, not spawned by a factory.[/b] The server sends a PROP event
-## carrying the catalogue id and the net id it registered, and the client builds the
-## same prop and mirrors that id — the same shape [PlaygroundEvents.Kind.JOIN] uses for
-## players. A spawner factory would have to name a script, and this game's props are
-## named by PATH in the catalogue precisely so a dot-cloud pack can deliver them.
+## A prop is announced (catalogue id, net id), not spawned by a factory: props are named by path
+## in the catalogue so a dot-cloud pack can deliver them.
 
 enum Kind {
 	## Tick rate, who you are, the map, the server tick.
@@ -81,6 +74,10 @@ enum Kind {
 	## A message from an addon's hook to its own client half: the addon's folder name and
 	## a dictionary as JSON. To everybody. Last, for the same reason.
 	ADDON,
+	## Zee gun dropped, settled, or taken or expired; a joiner gets every gun lying about.
+	WEAPON_DROP,
+	WEAPON_SETTLED,
+	WEAPON_GONE,
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
@@ -430,6 +427,8 @@ const ARM_LOAD_BUILD := 5
 ## Start an addon's menu entry: id is `addon/item`, payload the point the player looks at as
 ## three numbers in JSON, `[x, y, z]`, or empty.
 const ARM_ADDON_ITEM := 6
+## Throw the gun in my hands.
+const ARM_DROP_WEAPON := 7
 
 ## The most a tool's settings may take on the wire. A tool has a handful of numbers.
 const TOOL_SETTINGS_BYTES := 512

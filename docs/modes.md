@@ -52,6 +52,7 @@ A player killed in the arena, a downed player who bleeds out, and a killed NPC (
 - **A killed NPC's fall rides its PROP_GONE** (`Playground.decide_npc_death` leaves it on the body as `pg_death`; the bridge sends it when the reason is `killed`), and the client copies the mirror's `Figure` before freeing it (`body_fell`).
 - **Connected only.** A solo sandbox has no arena and nobody dies; the client's `fall` and `rise` are what a COMBAT drives (`rise` on the respawn's COMBAT with health). Bodies land on `world`, `prop` and `frozen_prop`, never on a player. No ragdoll of your own body in first person.
 - The `sv_ragdoll*` cvars are the module's, REPLICATED, followed by the client.
+- **Dropped weapons.** O (`pg_drop_weapon`; Q is the spawn menu) throws the zee gun in hand and the thrower is on the physics gun again; a death leaves the gun lying, an unarmed player in reach arms with it, ammunition as it lay, and a new round or map clears the floor. `PlaygroundWeaponLayer` wraps dot-weapon's `DotWeaponDrops` under the `sv_weapon_drop*` cvars (REPLICATED, followed by the client); `PlaygroundWeaponNet` carries the drops to clients and a snapshot to a joiner, and the request rides `ARM_PROP` as `ARM_DROP_WEAPON`. Suite: `headless_weapondrop`.
 
 ## `pg_shop`: a sandbox with prices
 

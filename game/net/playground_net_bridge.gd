@@ -16,6 +16,7 @@ const PlaygroundSpawnables := preload("../playground_spawnables.gd")
 const PlaygroundVehicleNet := preload("playground_vehicle_net.gd")
 const PlaygroundToyNet := preload("playground_toy_net.gd")
 const PlaygroundWeapon := preload("../weapons/playground_weapon.gd")
+const PlaygroundWeaponNet := preload("playground_weapon_net.gd")
 const PlaygroundWeapons := preload("../playground_weapons.gd")
 const PlaygroundZee := preload("../playground_zee.gd")
 const PlaygroundWaves := preload("../playground_waves.gd")
@@ -188,6 +189,7 @@ var _prop_nets: Dictionary = {}
 ## server is what acts: a client saying "I am holding the gravity gun" is a claim, and
 ## the tool decides what a trigger DOES to somebody else's prop.
 var _tool_of: Dictionary = {}
+var weapon_net := PlaygroundWeaponNet.new()
 
 ## Server: session id -> the net id of the prop that player's physics gun holds. Client: the
 ## same, as the server last said. What a joiner is told and what a client draws beams from.
@@ -246,21 +248,14 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 
 	game = p_game
 	net = p_net
+	weapon_net.attach(self)
 
 	_entities = Node.new()
 	_entities.name = "Entities"
 	add_child(_entities)
 
-	# [b]The styles' declared ordering, NOT a sort of the ids.[/b] The first draft
-	# collected `game.movement_styles`' keys and called `Array.sort()` on them — and
-	# Godot compares StringNames by their INTERNED POINTER, not lexicographically. Two
-	# peers therefore build two different tables, and a style index means a different
-	# style on each end: this client joined a server that said index 0 and put itself on
-	# "Sideways". It is the same bug that gave two peers two different wire ids for one
-	# message type in dot-net, and it is invisible in any one-process test, because one
-	# process has one intern table and both ends agree by construction.
-	#
-	# `style_order` is dot-player-controller's declared list, the same on every machine.
+	# The styles' declared ordering, not a sort of the ids: StringNames compare by interned pointer,
+	# so a sort gives two peers two tables and a style index that means a different style on each.
 	_style_ids.assign(game.style_order)
 
 	net.send_fn = _send
@@ -282,18 +277,13 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 	net.messages.on(PlaygroundRequest.NAME, _on_request)
 
 	link = PlaygroundNetLink.attached_to(link_parent, self, net.is_server)
-	# Not parent.add_child: the link sits under the server (RPCs route by path) but must die
-	# with this bridge. A bare add_child left a second link after a module reload and Godot
-	# renamed the live one `@Node@n`, so RPCs to clients were lost. DotGameLink frees it with
-	# the bridge without remove_child, which errors on a busy parent.
+	# Not parent.add_child: the link must sit under the server (RPC paths) yet die with this bridge;
+	# a bare add_child left a second link after a module reload and renamed the live one.
 	DotGameLink.attach(link, link_parent, self, PlaygroundNetLink.NODE_NAME)
 
 	_attach_inventory()
 
-	# Both ends: the server's tick is server_tick, and the client's is client_tick,
-	# which simulates what it predicts and leaves the rest to interpolation. A client
-	# game still running its own loop would simulate the local player twice a tick and
-	# dead-reckon every remote one from stale state.
+	# Both ends: a client game running its own loop would simulate the local player twice a tick.
 	game.external_tick = true
 
 	# The map's toys: the server's leave the registry before their nodes go and the new ones are
@@ -485,10 +475,8 @@ func remove_player(session_id: int) -> void:
 	_drop_toy(session_id)
 	_armed_of.erase(session_id)
 
-	# Released BEFORE the game is told: game.remove_player emits player_removed, which
-	# _on_player_removed answers by releasing the entity and broadcasting LEAVE.
-	# Releasing first empties _behaviours, so that handler finds nothing and this
-	# function stays the one place a leaving player is announced.
+	# Released before the game is told, so _on_player_removed finds nothing and this stays the one
+	# place a leaving player is announced.
 	_release_entity(session_id)
 
 	if inventory_net != null:
@@ -497,21 +485,16 @@ func remove_player(session_id: int) -> void:
 	game.remove_player(_player_key(session_id))
 
 	if net != null and peer_id > 0:
-		# By whether dot-net has the peer, not by `was_ready`: a real disconnect reaches
-		# here through the module, which has already called [method mark_not_ready] (so
-		# chat and LEAVE skip a closed socket), and keying this on the ready set left
-		# every disconnected peer in `net.peers()`, built a snapshot for and holding its
-		# input buffer, acks and per-behaviour records for the life of the server.
+		# By whether dot-net has the peer, not `was_ready`: a real disconnect is already off the
+		# ready set, and keying on it leaked every disconnected peer's buffers for the server's life.
 		if net.peers().has(peer_id):
 			net.remove_peer(peer_id)
 		if net.interest != null:
 			net.interest.forget_peer(peer_id)
 
 	_broadcast(PlaygroundEvents.Kind.LEAVE, PlaygroundEvents.write_player(session_id))
-	# They are off the ready set by now, so the broadcast skipped them. A player removed
-	# while still connected — a kick that has not closed the socket yet, the loopback —
-	# is told they are gone as they always were; one whose socket is already closed is
-	# not sent to at all, which `rpc_id` would log as an unknown peer.
+	# Off the ready set by now, so the broadcast skipped them; a still-connected one is told, a
+	# closed socket is not sent to (rpc_id would log an unknown peer).
 	if was_ready and link != null and link.can_reach(peer_id):
 		_tell(peer_id, PlaygroundEvents.Kind.LEAVE, PlaygroundEvents.write_player(session_id))
 	roster_changed.emit(session_id)
@@ -852,6 +835,7 @@ func announce_seat(
 func server_tick(tick: int) -> void:
 	_tick = tick
 	_game_ticked_for = -1
+	weapon_net.watch(game.weapon_layer)
 	if net != null:
 		net.server_tick(tick)
 	ensure_game_ticked(tick)
@@ -1127,7 +1111,6 @@ func receive_request(peer_id: int, payload: PackedByteArray) -> DotResult:
 func _admit(peer_id: int) -> void:
 	if peer_id <= 0:
 		return
-
 	if not _player_of_peer.has(peer_id):
 		_ready_unseated[peer_id] = true
 		return
@@ -1165,6 +1148,7 @@ func _admit(peer_id: int) -> void:
 	for holder in held_props.keys():
 		_tell(peer_id, PlaygroundEvents.Kind.HELD, PlaygroundEvents.write_held(int(holder), int(held_props[holder]), false))
 
+	weapon_net.send_snapshot(peer_id, game.weapon_layer)
 	# The map's toys, by net id in toy order: the joiner's own copies are paired with them.
 	if not _toys_body.is_empty():
 		_tell(peer_id, PlaygroundEvents.Kind.TOYS, _toys_body)
@@ -1396,6 +1380,10 @@ func ask_arm(prop_id: StringName) -> void:
 	_ask(PlaygroundEvents.Ask.ARM_PROP, PlaygroundEvents.write_id(prop_id))
 
 
+func ask_drop_weapon() -> void:
+	_ask(PlaygroundEvents.Ask.ARM_PROP, PlaygroundEvents.write_arm(PlaygroundEvents.ARM_DROP_WEAPON, &""))
+
+
 func ask_tool(tool_id: StringName) -> void:
 	_ask(PlaygroundEvents.Ask.SELECT_TOOL, PlaygroundEvents.write_id(tool_id))
 
@@ -1453,7 +1441,6 @@ func _on_request(message: DotNetMessage) -> void:
 		return
 
 	var peer_id := ask.sender_peer_id
-
 	# Before the seat check: a READY can come before the seat (see `_ready_unseated`), and
 	# `_admit` keeps it rather than drop it.
 	if ask.kind == PlaygroundEvents.Ask.READY:
@@ -1466,7 +1453,6 @@ func _on_request(message: DotNetMessage) -> void:
 
 	var id := _player_key(session_id)
 	var reader := ask.reader()
-
 	match ask.kind:
 		PlaygroundEvents.Ask.SPAWN_PROP:
 			_spawn_for(id, PlaygroundEvents.read_id(reader))
@@ -1490,6 +1476,8 @@ func _on_request(message: DotNetMessage) -> void:
 					var weapon_id := arm["id"] as StringName
 					if game.weapon_def(weapon_id) != null:
 						_spawn_for(id, Playground.pickup_id_of(weapon_id))
+				PlaygroundEvents.ARM_DROP_WEAPON:
+					var _gun = game.weapon_layer.throw_for(id)
 				PlaygroundEvents.ARM_BUILDS:
 					builds_requested.emit(peer_id)
 				PlaygroundEvents.ARM_LOAD_BUILD:
@@ -1898,7 +1886,6 @@ func _on_event(message: DotNetMessage) -> void:
 		return
 
 	var reader := event.reader()
-
 	match event.kind:
 		PlaygroundEvents.Kind.HELLO:
 			_apply_hello(reader)
@@ -2001,6 +1988,8 @@ func _on_event(message: DotNetMessage) -> void:
 			if bool(hit["ok"]):
 				hit_received.emit(int(hit["victim"]), float(hit["amount"]), hit["point"],
 					bool(hit["killed"]), bool(hit["headshot"]))
+		_:
+			var _weapon := weapon_net.apply(event.kind, reader, game.weapon_layer)
 
 
 # --- Projectiles ---------------------------------------------------------------

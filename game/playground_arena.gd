@@ -323,6 +323,10 @@ func _build_match() -> DotResult:
 		return ready.wrap("dot-match could not be set up")
 
 	match_node.state_changed.connect(_on_state_changed)
+	match_node.round_preparing.connect(func(_round: int) -> void: game.weapon_layer.clear())
+	game.weapon_layer.alive_fn = func(id: StringName) -> bool:
+		var health := health_of(id)
+		return health != null and health.alive
 	match_node.respawn_due.connect(_on_respawn_due)
 
 	return DotResult.success(null)
@@ -679,6 +683,7 @@ func _on_killed(entity_id: int, damage: DotDamage) -> void:
 	if fallen != null:
 		fallen.death = decide_death(victim, damage)
 
+	game.weapon_layer.drop_dead(victim)
 	match_node.report_kill(String(killer), String(victim), DAMAGE_ID, _tick)
 	player_killed.emit(victim, killer)
 

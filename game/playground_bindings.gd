@@ -22,6 +22,8 @@ const UNDO := &"pg_undo"
 const ROTATE := &"pg_rotate"
 const RELOAD := &"pg_reload"
 const VEHICLE := &"pg_vehicle"
+## Throws the zee gun in hand (`sv_weapon_drop_key`). H is help, G clears checkpoints, Q the menu.
+const DROP_WEAPON := &"pg_drop_weapon"
 const PHYS_GUN := &"pg_phys_gun"
 const GRAV_GUN := &"pg_grav_gun"
 const WEAPONS := &"pg_weapons"
@@ -67,6 +69,7 @@ static func make() -> DotMenuBindings:
 	# The wheel cycles tools (dot-menu API 10); a held prop keeps it for push and pull.
 	keys.add_wheel_weapons(DotMenuBindings.WEAPON_PREVIOUS_ACTION, DotMenuBindings.WEAPON_NEXT_ACTION, "Tools")
 	keys.add(VEHICLE, &"bind_vehicle", "Use what you look at, or get in or out of a vehicle", "F", "Tools")
+	keys.add(DROP_WEAPON, &"bind_drop_weapon", "Throw the gun in your hands", "O", "Tools")
 	keys.add(AIM, &"bind_aim", "Aim down a gun's sights (hold)", "Mouse 2", "Tools")
 	keys.add(BASH, &"bind_bash", "A gun's quick melee", "Mouse 3", "Tools")
 

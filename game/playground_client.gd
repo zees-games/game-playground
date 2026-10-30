@@ -547,10 +547,10 @@ func _build_netcode() -> DotResult:
 			state["settings"], str(state["refused"]))
 	)
 	bridge.combat_received.connect(_on_combat)
-	# The server's sv_ragdoll* set: this end draws the bodies. An older shell's link cannot say.
+	# The server's sv_ragdoll* set: this end draws the bodies.
 	if link != null:
 		var _bodies := playground.ragdoll_rules.follow_cvars(link)
-		# And sv_toys*: a client hides the toys a server took away.
+		var _drops = playground.weapon_layer.rules.follow_cvars(link)
 		var _toy_rules := playground.toy_rules.follow_cvars(link)
 		# The server's mp_forceview and mp_solidplayers: this end places its own camera and
 		# predicts its own player.
@@ -1680,10 +1680,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				game_menu.scoreboard.close()
 		return
 
-	# R reloads while a gun is in hand, as it does in every shooter, and unfreezes
-	# everything otherwise. Held and read on both edges like a trigger. The tool gun counts
-	# as a gun here: its R is each tool's third button — reset a size, take paint off, cut
-	# a rope — and a player resetting a balloon's size must not thaw every crate they own.
+	if key.is_action(PlaygroundBindings.DROP_WEAPON) and key.pressed and not key.is_echo() and _zee_rig() != null:
+		bridge.ask_drop_weapon()
+		return
+	# R reloads a gun (the tool gun's R is its third button), else unfreezes; read on both edges.
 	if key.is_action(PlaygroundBindings.RELOAD) and (_zee_rig() != null or tool == TOOLGUN):
 		_set_reload(key.pressed)
 		return

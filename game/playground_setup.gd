@@ -269,6 +269,9 @@ var entity_table := DotEntityTable.new()
 ## link, because the client draws the bodies. Decided with by [method PlaygroundArena.decide_death].
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
+## Zee guns lying in the world (`sv_weapon_drop*`); built in `_ready`, on both ends.
+var weapon_layer: Node = null
+
 ## The current map's toys (dot-props' [DotPropToyBox]): built from `map_toys()` on both ends, simulated where [member authoritative] and
 ## posed from snapshots on a client. A child of this node, not of the map, whose tree is classified onto `world` and would take every
 ## toy with it. Null before a map.

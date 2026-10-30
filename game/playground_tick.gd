@@ -49,6 +49,8 @@ func _ready() -> void:
 	_build_npc_senses()
 	_build_npc_world()
 	_build_maps()
+	weapon_layer = preload("playground_weapon_layer.gd").new()
+	weapon_layer.setup(self)
 	_build_player_stack()
 	_build_addons()
 
@@ -158,6 +160,7 @@ func _simulate_tick(step: float) -> void:
 	# Held players after every holder has moved and aimed, so the beam ends where the
 	# holder is looking THIS tick, and before the timers, which read where they were put.
 	pickup.tick(players, step)
+	weapon_layer.tick(step)
 
 	# After everybody has moved, so a grenade is swept against the world as the tick
 	# leaves it, which is also where anybody it could hit now is.
