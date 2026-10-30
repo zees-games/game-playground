@@ -37,7 +37,7 @@ func _run() -> void:
 		_client._set_tool(StringName("zee_%s" % chosen[pose]))
 		await get_tree().create_timer(1.2).timeout
 		await RenderingServer.frame_post_draw
-		var err := PlaygroundViewGrip.hand_error(_client.view_arms as DotPlayerViewArms, _client.held_grip)
+		var err := (_client.view_arms as DotPlayerViewArms).hand_error(_client.held_grip)
 		print("%s (%s): hand error %.3f m" % [pose, chosen[pose], err])
 		failed += 0 if err >= 0.0 and err < (0.05 if pose in PlaygroundViewGrip.ONE_HAND else (0.13 if pose == &"heavy" else 0.10)) else 1
 		get_viewport().get_texture().get_image().save_png("%s/held_%s.png" % [out, pose])

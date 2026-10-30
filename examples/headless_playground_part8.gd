@@ -53,7 +53,7 @@ func _the_arms_hold_each_weapon_class() -> void:
 			"%s (%s): the arms are mounted and shown on the armed weapon" % [chosen[pose], pose])
 		var one := pose in PlaygroundViewGrip.ONE_HAND
 		_check(grip != null and grip.is_two_hand() != one, "%s: %s hands" % [pose, "one" if one else "two"])
-		var err := PlaygroundViewGrip.hand_error(arms, grip)
+		var err := arms.hand_error(grip)
 		var reach := 0.05 if one else (0.13 if pose == &"heavy" else 0.10)
 		_check(err >= 0.0 and err < reach, "%s: the hand is within %d cm of the grip" % [pose, roundi(reach * 100.0)], "%.3f m" % err)
 		_check(not _tcb_client.zee_view.show_arms, "%s: the view model's own hands are off" % pose)
