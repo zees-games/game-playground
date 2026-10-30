@@ -6,6 +6,7 @@ const PlaygroundAddons := preload("../game/playground_addons.gd")
 const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 const PlaygroundWorkshop := preload("../game/playground_workshop.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
+const PlaygroundProfiles := preload("../game/playground_profiles.gd")
 const PlaygroundZee := preload("../game/playground_zee.gd")
 const PlaygroundWeapons := preload("../game/playground_weapons.gd")
 
@@ -76,6 +77,10 @@ func _initialize() -> void:
 	var menu := PlaygroundSpawnMenu.new()
 	menu.name = "SpawnMenu"
 	menu.catalogue = PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), "")
+	# The fixture profiles, so the Entities tab shows a regrouped, re-iconed, hidden entry.
+	var profiles := PlaygroundProfiles.new()
+	profiles.setup(PackedStringArray(["res://examples/fixtures/profiles"]))
+	var _touched := profiles.apply_npcs(menu.catalogue)
 	menu.weapons = PlaygroundWeapons.built_in()
 	menu.weapons.append_array(PlaygroundZee.defs())
 	_stack.register(menu)

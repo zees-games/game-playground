@@ -3,3 +3,4 @@ speed: 9.0
 menu:
   category: pursuers
   sort: -5
+  icon: res://assets/blaster-kit/Textures/colormap.png

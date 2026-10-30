@@ -94,6 +94,7 @@ func _restore(catalogue: DotPropCatalogue, id: String) -> void:
 			def.display_name = snap["name"]
 			def.cost = snap["cost"]
 			def.category = snap["category"]
+			def.icon_path = snap["icon"]
 			def.meta = (snap["meta"] as Dictionary).duplicate(true)
 	_snap.erase(id)
 
@@ -113,11 +114,12 @@ func _apply_npc(catalogue: DotPropCatalogue, id: String, p: DotProfile, entry: D
 			return false
 		_clones.append(id)
 	if not _snap.has(id):
-		_snap[id] = {"name": def.display_name, "cost": def.cost, "category": def.category, "meta": def.meta.duplicate(true)}
+		_snap[id] = {"name": def.display_name, "cost": def.cost, "category": def.category, "icon": def.icon_path, "meta": def.meta.duplicate(true)}
 	var snap: Dictionary = _snap[id]
 	def.display_name = snap["name"]
 	def.cost = snap["cost"]
 	def.category = snap["category"]
+	def.icon_path = snap["icon"]
 	def.meta = (snap["meta"] as Dictionary).duplicate(true)
 
 	var defaults := {}
@@ -143,6 +145,8 @@ func _apply_npc(catalogue: DotPropCatalogue, id: String, p: DotProfile, entry: D
 	var m: Dictionary = p.get_value("menu", {})
 	if str(m.get("category", "")) != "":
 		def.category = StringName(str(m["category"]))
+	if str(entry.get("icon", "")) != "":
+		def.icon_path = str(entry["icon"])
 	def.meta["menu_sort"] = int(entry.get("sort", 0))
 	if bool(entry.get("hidden", false)) or not bool(p.get_value("enabled", true)):
 		def.meta["hidden"] = true
