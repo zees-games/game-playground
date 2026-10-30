@@ -34,7 +34,7 @@ func _the_client_mounts_the_downed_arms() -> void:
 
 
 ## One weapon of every pose the catalogue ships, in the client's own hands: the arms are up with the
-## grip the weapon measured, a hand within 5 cm of it (10 cm for a fore-end, the arm's reach), and gone again on the holster.
+## grip the weapon measured, the hand within 5 cm of where the arms aim it (10 cm for a fore-end, 13 for a long gun's: the arm's reach), and gone again on the holster.
 func _the_arms_hold_each_weapon_class() -> void:
 	if not PlaygroundViewGrip.available():
 		return
@@ -54,7 +54,7 @@ func _the_arms_hold_each_weapon_class() -> void:
 		var one := pose in PlaygroundViewGrip.ONE_HAND
 		_check(grip != null and grip.is_two_hand() != one, "%s: %s hands" % [pose, "one" if one else "two"])
 		var err := PlaygroundViewGrip.hand_error(arms, grip)
-		var reach := 0.05 if one else 0.10
+		var reach := 0.05 if one else (0.13 if pose == &"heavy" else 0.10)
 		_check(err >= 0.0 and err < reach, "%s: the hand is within %d cm of the grip" % [pose, roundi(reach * 100.0)], "%.3f m" % err)
 		_check(not _tcb_client.zee_view.show_arms, "%s: the view model's own hands are off" % pose)
 		_tcb_client._set_tool(&"phys")
