@@ -674,6 +674,10 @@ func _build_extras() -> DotResult:
 
 	arena.health_changed.connect(_on_health_changed)
 	arena.player_killed.connect(_on_player_killed)
+	arena.damage_landed.connect(func(attacker: StringName, victim: StringName, damage: DotDamage) -> void:
+		if progress != null:
+			progress.report_hit(attacker, victim, damage)
+	)
 
 	# How an armed NPC's shot hurts a player: through the arena, which refuses while it is
 	# off — so a sandbox where nobody dies stays one, and `pg_arena 1` is the switch that
@@ -1079,6 +1083,7 @@ func _on_player_killed(victim: StringName, killer: StringName) -> void:
 
 		if killer != &"" and killer != victim:
 			progress.note(killer, &"kills", 1.0)
+			progress.report_kill(killer, victim)
 
 
 func _on_earned(player_key: String, id: StringName, title: String, points: int) -> void:

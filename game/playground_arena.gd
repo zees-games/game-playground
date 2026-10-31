@@ -619,6 +619,10 @@ func hurt(
 	return combat.apply_damage(damage)
 
 
+## A damage event between two players, for the stats layer.
+signal damage_landed(attacker: StringName, victim: StringName, damage: DotDamage)
+
+
 func _on_damage(damage: DotDamage) -> void:
 	var victim := game.entity_table.key_for_id(damage.victim) as StringName
 
@@ -646,6 +650,7 @@ func _on_damage(damage: DotDamage) -> void:
 	# The shooter's hit marker and number: a player's damage to somebody else, as applied.
 	var attacker := game.entity_table.key_for_id(damage.attacker) as StringName
 	if attacker != victim and not damage.refused:
+		damage_landed.emit(attacker, victim, damage)
 		var player: PlaygroundPlayer = game.players.get(victim, null)
 		var at := damage.point
 		if at == Vector3.ZERO and player != null:

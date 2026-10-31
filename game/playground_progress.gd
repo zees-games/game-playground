@@ -35,6 +35,9 @@ var link: DotAchievementStatsLink = null
 
 var game: Playground = null
 
+## Kills and hits by body zone, through dot-stats' event feed.
+var feed: DotStatsEventFeed = null
+
 ## The backbone, when an operator has configured one. Null on a LAN server.
 var backbone: Object = null
 
@@ -62,6 +65,7 @@ static func stats_schema() -> DotStatsSchema:
 	fastest.publish = true
 	fastest.decimals = 3
 
+	DotStatsHitzones.declare(schema)
 	return schema
 
 
@@ -174,6 +178,11 @@ func setup(p_game: Playground) -> DotResult:
 	stats.schema = stats_schema()
 	stats.report_to_backbone = backbone != null
 	add_child(stats)
+	feed = DotStatsEventFeed.new(stats)
+	feed.key_of = func(id: Variant) -> StringName: return StringName(_key_of(StringName(str(id))))
+	feed.extra = func() -> Dictionary: return {
+		"map": String(game.map.id) if game != null and game.get("map") != null else "",
+	}
 
 	if backbone != null:
 		stats.reporter.client = backbone
@@ -272,6 +281,25 @@ func _record(player_id: StringName, stat: StringName, value: float) -> void:
 		return
 
 	stats.record(StringName(key), stat, value)
+
+
+## The tracker key of a player id; "" when there is none yet.
+func _key_of(player_id: StringName) -> String:
+	return str(key_for.call(player_id)) if key_for.is_valid() else String(player_id)
+
+
+## A landed hit by body zone; a trace that met no hitbox has no zone.
+func report_hit(attacker: StringName, victim: StringName, damage: DotDamage) -> void:
+	if feed == null or damage.hit_group == DotHitGroup.GENERIC:
+		return
+	var side := StringName(str(damage.context.get(DotHitzone.CONTEXT_SIDE, "")))
+	var _ok := feed.report_hit(attacker, victim, String(damage.weapon_id), damage.hit_group, damage.health_lost, damage.lethal, side)
+
+
+## Files a kill for the head-to-head table.
+func report_kill(killer: StringName, victim: StringName) -> void:
+	if feed != null:
+		var _ok := feed.report_kill(killer, victim)
 
 
 ## How a world player id becomes a stats key.

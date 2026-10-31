@@ -46,8 +46,10 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
+var _stats_errors: PackedStringArray = []
+
 const SECTIONS := 32
-const CHECKS := 293
+const CHECKS := 296
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -92,7 +94,14 @@ func _module() -> DotModule:
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
+	DotLog.signals().record.connect(_on_log_record)
 	_run.call_deferred()
+
+
+## An ERROR from the stats layer would otherwise scroll past and leave a stat dead with every check green.
+func _on_log_record(rec: Dictionary) -> void:
+	if int(rec.get("level", 0)) >= DotLog.Level.ERROR and String(rec.get("channel", "")).begins_with("stats"):
+		_stats_errors.append(str(rec.get("message", rec)))
 
 
 func _run() -> void:
@@ -157,6 +166,9 @@ func _run() -> void:
 	# The copy of this suite that the exit probe runs does not run the probe itself.
 	var sections := SECTIONS - (1 if _is_exit_probe() else 0) + (TIMER_SECTIONS if _timer_linked() else 0)
 	var checks := CHECKS - (EXIT_PROBE_CHECKS if _is_exit_probe() else 0) + (TIMER_CHECKS if _timer_linked() else 0)
+
+	_check(_stats_errors.is_empty(), "the stats layer logged no error", str(_stats_errors))
+	_check(PlaygroundProgress.stats_schema().validate().ok, "the stats schema, hitzones included, validates")
 
 	_forget_learned_heat()
 
@@ -1429,6 +1441,15 @@ func _test_progress() -> void:
 	_check(
 		progress.achievements.is_unlocked("pg-test", &"under_20"),
 		"a best time keeps the LOWEST reading, not the newest"
+	)
+
+	var zoned := DotDamage.make(1, 2, 5.0, _module().get("arena").combat.damage_type(&"kinetic"))
+	zoned.hit_group = DotHitGroup.NECK
+	zoned.weapon_id = &"probe"
+	_module().get("arena").damage_landed.emit(&"pg-test", &"pg-victim", zoned)
+	_check(
+		progress.stats.session_values(&"pg-test").get_cell(DotStatsHitzones.HITS, "zone:neck") >= 1.0,
+		"a hit with a hit_group is filed by body zone through the dot-stats hitzone hook"
 	)
 
 	var written: DotResult = await progress.achievements.flush()
