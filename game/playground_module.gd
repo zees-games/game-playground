@@ -549,7 +549,7 @@ func _on_profile(event: DotEvent) -> void:
 		bridge.refresh_skins(event.get_int("userid"))
 
 
-var _stats_feed: DotGameStatsFeed = null
+var _board_feed: DotGameStatsFeed = null
 
 
 ## The Tab board's stats columns from this game's own tracker. Not on DotGameModule, so the
@@ -557,23 +557,23 @@ var _stats_feed: DotGameStatsFeed = null
 func _attach_stats_board() -> void:
 	if server == null or not ("scoreboard_fields" in server) or DotAddonApi.build_level("dot_game") < 38:
 		return
-	_stats_feed = DotGameStatsFeed.new()
-	_stats_feed.tracker = progress.stats
-	_stats_feed.open_sessions = false
-	_stats_feed.player_key_fn = func(session: DotClientSession) -> String:
+	_board_feed = DotGameStatsFeed.new()
+	_board_feed.tracker = progress.stats
+	_board_feed.open_sessions = false
+	_board_feed.player_key_fn = func(session: DotClientSession) -> String:
 		return PlaygroundPlatform.key_for_session(server, session)
 	# An unfollowed roster: no store, so no lifetime baseline to wait for.
-	var board := DotGameStatsBoard.attach(_stats_feed, DotGameRoster.new())
+	var board := DotGameStatsBoard.attach(_board_feed, DotGameRoster.new())
 	server.set(&"scoreboard_fields", func(session: Object) -> Dictionary:
 		return board.fields(session as DotClientSession) if session is DotClientSession else {})
 	server.set(&"scoreboard_extra", func() -> Dictionary: return board.extra())
 
 
 func _module_unload() -> void:
-	if _stats_feed != null and server != null and "scoreboard_fields" in server:
+	if _board_feed != null and server != null and "scoreboard_fields" in server:
 		server.set(&"scoreboard_fields", Callable())
 		server.set(&"scoreboard_extra", Callable())
-	_stats_feed = null
+	_board_feed = null
 	if map_config != null:
 		map_config.restore()
 		map_config = null
