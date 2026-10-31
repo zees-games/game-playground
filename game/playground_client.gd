@@ -1220,6 +1220,12 @@ func _build_pause() -> void:
 	platform.board_prepare_fn = _prepare_board
 	platform.adopt_menu(game_menu)
 	var _platform_up := platform.setup()
+	if DotAddonApi.build_level("dot_game") >= 38:
+		platform.add_store_panel(game_menu, func() -> String:
+			var auth: Object = DotRegistry.get_node_service(&"dot_auth_client")
+			if auth == null or not is_instance_valid(auth) or not auth.has_method(&"account_key"):
+				return ""
+			return str(auth.call(&"account_key")))
 	var _flinch := platform.add_hit_flinch(
 		active_sampler,
 		func() -> Variant: return camera if view_id() == &"fp" else null,
@@ -2987,6 +2993,9 @@ func _use_loadout_menu() -> void:
 		decorate_loadout_choice)
 	if loadout_menu != null:
 		loadout_menu.set(&"title", "Arena loadout")
+		# Connected, the menu asks the server's `/loadout locked`; there is no solo loadout here.
+		if DotAddonApi.build_level("dot_game") >= 40:
+			platform.add_loadout_store(loadout_menu, func() -> Object: return null, func() -> String: return "")
 		# Remembered on this device and sent again on the next join, never under a suite's or a
 		# render's scratch settings.
 		var scratch := PlaygroundPresentation.settings_directory.begins_with("user://scratch/")

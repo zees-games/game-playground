@@ -111,13 +111,26 @@ func _initialize() -> void:
 	# As the client does: the console after the menu, so it is one of the menu's overlays.
 	_presentation.build_console(_game_menu)
 	PlaygroundClient.add_general_rows(_game_menu)
+	# The platform wires the stats columns and the Store page exactly as the client does.
+	var platform := DotGameClient.new()
+	platform.name = "Platform"
+	platform.use_settings = false
+	platform.use_console = false
+	platform.force_offline = true
+	root.add_child(platform)
+	platform.adopt_menu(_game_menu)
+	var _up := platform.setup()
+	# Its load cover would be in every frame; this render is of the menus, not of a join.
+	_platform = platform
+	var _store := platform.add_store_panel(_game_menu, func() -> String: return "")
 	_game_menu.scoreboard.source = func() -> Dictionary:
 		return {
 			"server": {"name": "Playground  |  build anything", "map": "pg_flatgrass", "players": 4, "max": 24},
 			"you": "2",
+			"stat_columns": [{"key": "props", "title": "Props", "column": "number"}, {"key": "kills", "title": "Kills", "column": "number"}],
 			"players": [
-				{"id": "1", "name": "gamemann", "score": 42, "seconds": 1840, "ping": 23},
-				{"id": "2", "name": "builder_bo", "score": 17, "seconds": 610, "ping": 48},
+				{"id": "1", "name": "gamemann", "score": 42, "seconds": 1840, "ping": 23, "st_props": "12", "lt_props": "340", "st_kills": "3", "lt_kills": "88"},
+				{"id": "2", "name": "builder_bo", "score": 17, "seconds": 610, "ping": 48, "st_props": "30", "lt_props": "51", "st_kills": "0", "lt_kills": "2"},
 				{"id": "3", "name": "a_very_long_display_name", "score": 9, "seconds": 95, "ping": 112},
 				{"id": "4", "name": "newcomer", "score": 0, "seconds": 12, "ping": -1},
 			],
@@ -163,6 +176,7 @@ func _initialize() -> void:
 		{"id": &"game_menu", "file": "menu_audio.png", "page": &"audio"},
 		{"id": &"game_menu", "file": "menu_controls.png", "page": &"controls"},
 		{"id": &"board", "file": "menu_scoreboard.png"},
+		{"id": &"game_menu", "file": "menu_store.png", "page": &"store"},
 		# The console, open: DotConsoleKit's panel, on the layer it puts it on.
 		# The first pack tab, after Addons: zee's weapons grouped by the pack's own categories.
 		{"id": &"spawn_menu", "file": "menu_pack_weapons.png", "tab": PlaygroundSpawnMenu.Tab.size()},
@@ -170,7 +184,13 @@ func _initialize() -> void:
 	]
 
 
+var _platform: DotGameClient = null
+
+
 func _process(_delta: float) -> bool:
+	if _platform != null and _platform.gate != null:
+		for reason in _platform.gate.reasons():
+			_platform.gate.release(reason)
 	if _done:
 		return true
 
