@@ -27,6 +27,8 @@ module: game/playground_module.gd
 
 cvars:
   pg_map_seconds: "0"
+  # 1 files the players' stats with the backbone using the server's own ticket; 0 keeps them here.
+  stats_report: "0"
 
 metadata:
   # The client builds a custom map itself from its document, so a map pack the server names

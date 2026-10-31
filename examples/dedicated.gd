@@ -46,8 +46,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
 ## its last line; an early `return` after a failed check skips it deliberately, because a
 ## section that stopped early did not do what it says.
-const SECTIONS := 31
-const CHECKS := 287
+const SECTIONS := 32
+const CHECKS := 293
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -129,6 +129,7 @@ func _run() -> void:
 		await _test_downed()
 		await _test_progress()
 		_test_query()
+		_test_stats_report()
 		_test_vote()
 		_test_map_rotation_file()
 		_test_identity()
@@ -255,6 +256,38 @@ func _test_query() -> void:
 	)
 	_section_done()
 
+
+
+## The family cvar `stats_report` is registered, off, and turning it on makes the game's tracker report.
+func _test_stats_report() -> void:
+	print("")
+	print("stats_report")
+
+	var cv: DotConVar = server.console.find_cvar("stats_report")
+	var progress: Object = _module().get("progress")
+	_check(cv != null and cv.get_string() == "0", "stats_report is registered and off by default")
+	_check(progress != null and progress.stats != null and not progress.stats.report_to_backbone,
+		"and the tracker does not report at boot")
+	if cv == null or progress == null:
+		return
+	var _off := cv.set_value("1")
+	_check(not progress.stats.report_to_backbone, "on with no backbone client stays off, not a crash")
+
+	var client := Node.new()
+	var script := GDScript.new()
+	script.source_code = "extends Node\nfunc post_integration(_a = null, _b = null, _c = null): return null\n"
+	var _reloaded := script.reload()
+	client.set_script(script)
+	DotRegistry.register(&"dot_backbone_client", client)
+	var _r0 := cv.set_value("0")
+	var _r1 := cv.set_value("1")
+	_check(progress.stats.report_to_backbone, "on with a backbone client makes the tracker report")
+	_check(progress.stats.get_node_or_null(DotGameStatsReport.TIMER_NAME) != null, "and adds the flush timer")
+	var _r2 := cv.set_value("0")
+	_check(not progress.stats.report_to_backbone, "off stops it again")
+	DotRegistry.unregister_instance(&"dot_backbone_client", client)
+	client.free()
+	_section_done()
 
 
 ## Runs a console command as the local console and returns what it replied.

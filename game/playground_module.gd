@@ -570,6 +570,8 @@ func _attach_stats_board() -> void:
 
 
 func _module_unload() -> void:
+	if progress != null:
+		DotRegistry.unregister_instance(DotGameStatsFeed.SERVICE, progress.stats)
 	if _board_feed != null and server != null and "scoreboard_fields" in server:
 		server.set(&"scoreboard_fields", Callable())
 		server.set(&"scoreboard_extra", Callable())
@@ -814,6 +816,9 @@ func _build_extras() -> DotResult:
 
 	progress.earned.connect(_on_earned)
 	_attach_stats_board()
+	# The registered tracker is what DotGameStatsReport's default apply flips.
+	DotRegistry.register(DotGameStatsFeed.SERVICE, progress.stats)
+	var _report := DotGameStatsReport.bind(self)
 
 	vote = PlaygroundVote.new()
 	vote.name = "Vote"
