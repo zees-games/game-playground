@@ -447,6 +447,11 @@ func _stage_grenades() -> Array[Dictionary]:
 ## bool synchronously; making it a coroutine returns a signal object instead, which is
 ## truthy, so the tree quits on the first frame and writes nothing. That is what
 ## game-arena's first version of this file did and the reason its comment says so.
+## Frame sequence after each still (DOT_SHOT_FRAMES); see DotShotSeq.
+var _seq := DotShotSeq.new()
+var _seq_active := false
+
+
 func _process(_delta: float) -> bool:
 	# The toys build in the tree, which the root's children are not during `_initialize`.
 	if _toy_box != null and _toy_box.count() == 0 and not _toy_placements.is_empty():
@@ -515,10 +520,23 @@ func _process(_delta: float) -> bool:
 		_wait = int(shot.get("wait", 3))
 		return false
 
+	if _seq_active:
+		if _seq.step(root):
+			return false
+		_seq_active = false
+		_index += 1
+		_armed = false
+		return false
+
 	var image := root.get_texture().get_image()
 	var path := OUT_DIR.path_join("%s.png" % _shots[_index]["name"])
 	image.save_png(path)
 	print("wrote %s (%d x %d)" % [path, image.get_width(), image.get_height()])
+
+	if _seq.enabled():
+		_seq.begin(path)
+		_seq_active = true
+		return false
 
 	_index += 1
 	_armed = false
