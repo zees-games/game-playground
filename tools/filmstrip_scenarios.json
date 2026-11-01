@@ -1,0 +1,7 @@
+{
+  "defaults": {"client": "res://game/playground_client.gd", "client_props": {}, "ready_property": "player", "warmup": 3.0},
+  "clips": [
+    {"name": "forward", "duration": 3.0, "steps": [{"t": 0.0, "move": [0.0, 0.0]}, {"t": 0.5, "move": [0.0, -1.0]}]},
+    {"name": "jump", "duration": 3.0, "steps": [{"t": 0.0, "move": [0.0, -1.0]}, {"t": 0.8, "buttons": ["dot_fps_jump"]}, {"t": 1.0, "buttons": []}]}
+  ]
+}
