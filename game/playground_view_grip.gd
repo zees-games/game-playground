@@ -1,4 +1,3 @@
-class_name PlaygroundViewGrip
 extends RefCounted
 
 ## Where the first-person hands go on a zee weapon: ZeeViewModel measures the grip and fore-end

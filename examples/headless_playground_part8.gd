@@ -1,5 +1,7 @@
 extends "res://examples/headless_playground_part7.gd"
 
+const PlaygroundViewGrip := preload("res://game/playground_view_grip.gd")
+
 var _tcb_client: PlaygroundClient
 var _tcb_look_settings: DotSettingsManager
 var _tcb_look: DotFpsTunables

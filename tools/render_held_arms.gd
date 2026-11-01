@@ -2,6 +2,7 @@ extends Node
 
 const PlaygroundClient := preload("../game/playground_client.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
+const PlaygroundViewGrip := preload("../game/playground_view_grip.gd")
 const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 
 ## Renders the offline client holding one weapon of each pose, the first-person arms on the grip, and prints the hand error.
