@@ -40,3 +40,8 @@ metadata:
   map_vote:
     trigger: rtv_only
     duration_sec: 0
+
+# The stock maps pack the game suggests, not requires: a server offers it by default (suggested_maps: none turns that off)
+# and the Workshop mounts it for solo play unless the player opts out (--no-suggested, --suggested=none).
+suggested:
+  - maps=gamemann/game-playground-maps
