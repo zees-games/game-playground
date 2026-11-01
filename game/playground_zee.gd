@@ -172,6 +172,9 @@ static func arm(
 	rig.role = role
 	rig.authority = authority
 	rig.tick_rate = tick_rate
+	# The held weapon lowers at every brush that stops the player, fences and clip included.
+	var ctl: Variant = player.get("controller")
+	rig.wall_extra_mask = ctl.tunables.collision_mask if ctl != null else 0
 	rig.catalogue = catalogue_for(def)
 	rig.player_ref = DotNodeRef.of_path(player.get_path())
 

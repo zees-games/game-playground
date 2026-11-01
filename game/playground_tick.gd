@@ -778,6 +778,8 @@ func _apply_body_mask(player: PlaygroundPlayer) -> void:
 	var players_layer := layout.layer_mask(&"player") if layout != null else 0
 	body_rules.apply_to(player.controller, player_stack.player_collision_mask(), players_layer)
 	var tunables := player.controller.tunables
+	if player.zee_rig != null and is_instance_valid(player.zee_rig):
+		player.zee_rig.set("wall_extra_mask", tunables.collision_mask)
 	body_rules.apply_hull(player, tunables.stand_height, tunables.radius)
 
 
