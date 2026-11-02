@@ -35,5 +35,5 @@
 # report_to_backbone: false
 
 # --- Server
-# Player slots. Read when the roster is built, so a change takes a restart. [1..128]
+# Player slots. Read when the roster is built, so a change takes a restart. [1..]
 # max_players: 32

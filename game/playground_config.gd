@@ -200,7 +200,7 @@ extends DotConfig
 @export_group("Server")
 
 ## Player slots. Read when the roster is built, so a change takes a restart.
-@export_range(1, 128, 1) var max_players: int = 32
+@export_range(1, 4095, 1, "or_greater") var max_players: int = 32
 
 
 ## `@export_group` -> the cfg file it lives in: `cfg/game/game-playground/config_<file>/game.yml`.

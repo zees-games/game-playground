@@ -1145,7 +1145,7 @@ func _build_netcode() -> DotResult:
 	config.snapshot_rate = 32
 	config.enable_prediction = true
 	config.enable_lag_compensation = false
-	config.max_entities_per_snapshot = 64
+	config.max_entities_per_snapshot = 0
 	config.world_extent = 512.0
 	net.config = config
 	add_child(net)
