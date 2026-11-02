@@ -294,6 +294,7 @@ func _arm_for_hits() -> void:
 	if rig != null and rig.arsenal.current() != null:
 		rig.arsenal.current().magazine = 21
 	_hud.set_tool("SMG", &"")
+	_hud.show_weapon(rig)
 
 
 ## The `chat_ballot` frame: the presentation's chat box, the ballot's line through
