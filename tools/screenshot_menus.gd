@@ -89,6 +89,10 @@ func _initialize() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
 	DirAccess.make_dir_recursive_absolute(OUT_DIR)
 
+
+## Built on the first frame: from `_initialize` nothing is in the tree yet, and the
+## presentation and `DotGameClient.setup()` would set up outside it.
+func _build() -> void:
 	_presentation = PlaygroundPresentation.new()
 	_presentation.name = "Presentation"
 	root.add_child(_presentation)
@@ -215,6 +219,9 @@ func _show_menu_tab(shot: Dictionary) -> void:
 
 
 func _process(_delta: float) -> bool:
+	if _menu == null:
+		_build()
+		return false
 	if _platform != null and _platform.gate != null:
 		for reason in _platform.gate.reasons():
 			_platform.gate.release(reason)
