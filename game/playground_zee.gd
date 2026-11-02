@@ -57,6 +57,8 @@ static var _catalogue: DotWeaponCatalogue = null
 static func catalogue() -> DotWeaponCatalogue:
 	if _catalogue == null:
 		_catalogue = ZeeWeaponPack.catalogue()
+		# Built once at setup, under the loading cover; the first spawn then loads no script.
+		_catalogue.warm_scripts()
 	return _catalogue
 
 
@@ -108,6 +110,7 @@ static func catalogue_for(def: PlaygroundWeaponDef) -> DotWeaponCatalogue:
 			for id: StringName in table:
 				if not _with_packs.has(id):
 					_with_packs.add(table[id])
+		_with_packs.warm_scripts()
 	return _with_packs
 
 
