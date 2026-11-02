@@ -119,6 +119,12 @@ func npc_shots_fired(entity: Node3D, outcome: DotWeaponOutcome) -> void:
 
 
 ## The catalogue id a weapon lies in the world as.
+## Snapshots a second at [param rate] ticks: nearest to 32 that is whole ticks apart (60 gives 30).
+## dot-net divides with integers, so 32 at 60 Hz sent every tick.
+static func snapshot_rate_for(rate: int) -> int:
+	return rate / maxi(1, roundi(float(rate) / 32.0))
+
+
 static func pickup_id_of(weapon_id: StringName) -> StringName:
 	return StringName("pickup_%s" % String(weapon_id).replace(":", "_"))
 

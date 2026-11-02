@@ -470,7 +470,7 @@ func _build_netcode() -> DotResult:
 
 	var net_config := DotNetConfig.new()
 	net_config.tick_rate = playground.tick_rate
-	net_config.snapshot_rate = 32
+	net_config.snapshot_rate = Playground.snapshot_rate_for(playground.tick_rate)
 	net_config.enable_prediction = true
 	net_config.enable_lag_compensation = false
 	net_config.max_entities_per_snapshot = 0
