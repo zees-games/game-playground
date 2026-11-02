@@ -79,6 +79,8 @@ func _run(count: int) -> void:
 		c.link.name = "Server"
 		c.link.player_name = "Load%d" % i
 		c.link.transport_preference = "udp"
+		# A starved box answers the challenge slower than the 15 s default, and the watchdog drops the client.
+		c.link.signon_timeout_sec = 120.0
 		c.link.udp_address = "127.0.0.1:%d" % _port
 		holder.add_child(c.link)
 		c.stub = Stub.new()
