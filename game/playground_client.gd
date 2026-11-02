@@ -191,6 +191,7 @@ var _style_index: int = 0
 
 ## Whether the physics gun's button is down.
 var _holding: bool = false
+var _wheel: DotWeaponWheel
 
 ## Whether the gravity gun is pulling.
 var _pulling: bool = false
@@ -1568,6 +1569,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_mouse_button(event as InputEventMouseButton)
 		return
 
+	if event is InputEventJoypadButton:
+		_wheel_cycle(event)
+		return
+
 	if not (event is InputEventKey):
 		return
 
@@ -1748,18 +1753,17 @@ func _on_mouse_button(event: InputEventMouseButton) -> void:
 				_wheel_cycle(event)
 
 
-## The wheel, on dot-menu's previous and next weapon actions so a rebind works, when no prop
-## is held (a held prop keeps the wheel for push and pull). The press path for a row moved
-## onto a key is [method _unhandled_input]'s key branch; a wheel event is never a key, so one
-## tick cannot cycle on both.
+## The wheel on dot-menu's previous and next weapon actions (so a rebind works) and the pad
+## shoulders. A held prop keeps the wheel for push and pull; a wheel event is never a key, so
+## one tick cannot cycle on both paths.
 func _wheel_cycle(event: InputEvent) -> bool:
-	if event.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION):
-		_cycle_tools(1)
-		return true
-	if event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
-		_cycle_tools(-1)
-		return true
-	return false
+	if _wheel == null:
+		_wheel = DotWeaponWheel.new()
+		_wheel.ring_provider = _tool_ring
+		_wheel.current_provider = func() -> Variant: return tool
+		_wheel.blocked = func() -> bool: return _holding
+		_wheel.chosen.connect(func(id: Variant) -> void: _set_tool(id))
+	return _wheel.handle_event(event)
 
 
 ## The tools in hand-order: the physics gun, the gravity gun, then every weapon this server
@@ -1772,18 +1776,6 @@ func _tool_ring() -> Array[StringName]:
 			if not ring.has(w.id):
 				ring.append(w.id)
 	return ring
-
-
-## One step through [method _tool_ring], wrapping. Nothing while a prop is held, and nothing
-## with fewer than two tools.
-func _cycle_tools(direction: int) -> void:
-	if _holding:
-		return
-	var ring := _tool_ring()
-	if ring.size() < 2:
-		return
-	var at := ring.find(tool)
-	_set_tool(ring[posmod((at if at >= 0 else 0) + direction, ring.size())])
 
 
 ## Q down opens the menu; Q up closes it unless the press was a tap.

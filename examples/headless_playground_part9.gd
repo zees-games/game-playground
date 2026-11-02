@@ -57,6 +57,13 @@ func _test_the_wheel_cycles_tools() -> void:
 	_check(client.tool == ring[0], "while holding a prop the wheel does not change tools", str(client.tool))
 	client._holding = before_holding
 
+	var pad := InputEventJoypadButton.new()
+	pad.button_index = JOY_BUTTON_RIGHT_SHOULDER
+	pad.pressed = true
+	client._set_tool(ring[0])
+	client.call("_unhandled_input", pad)
+	_check(client.tool == ring[1], "a pad right shoulder steps to the next tool", str(client.tool))
+
 	client.queue_free()
 	await get_tree().process_frame
 	_done()
