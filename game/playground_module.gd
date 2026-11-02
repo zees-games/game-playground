@@ -1,5 +1,6 @@
 extends DotModule
 
+const PlaygroundConfig := preload("playground_config.gd")
 const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundMapConfig := preload("playground_map_config.gd")
 const PlaygroundAmbience := preload("playground_ambience.gd")
@@ -327,6 +328,7 @@ func _module_load() -> DotResult:
 	)
 
 	_bind_limits()
+	_bind_slots()
 	_bind_pickup()
 	_bind_creative()
 	_bind_props_feel()
@@ -1901,6 +1903,21 @@ func _cmd_props_clear(ctx: DotCmdContext) -> void:
 ## `pg_max_<group>` per kind, `pg_limit_roles` for who gets more, and `pg_limits` to see
 ## anybody's. A role is a dot-server admin group by name, plus `admin` (any admin flag)
 ## and `root` (the root flag) — so an operator who already has an admin file has roles.
+## One slot count: the server's `sv_maxplayers` is what it accepts and advertises (A2S clamps its
+## own byte), so the roster follows it; a non-default `pg_max_players` is the operator's and wins.
+func _bind_slots() -> void:
+	var slots: DotConVar = server.console.find_cvar("sv_maxplayers") if server != null else null
+	var roster: DotPlayerRoster = game.player_stack.roster if game.player_stack != null else null
+	if slots == null or roster == null:
+		return
+	if game.config.max_players != PlaygroundConfig.new().max_players:
+		slots.set_value(str(game.config.max_players))
+	roster.config.max_players = slots.get_int()
+	slots.changed.connect(func(_old: String, value: String) -> void:
+		roster.config.max_players = value.to_int()
+	)
+
+
 func _bind_limits() -> void:
 	var limits := game.spawn_limits
 

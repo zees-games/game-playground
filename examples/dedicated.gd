@@ -35,7 +35,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 var _stats_errors: PackedStringArray = []
 
 const SECTIONS := 32
-const CHECKS := 296
+const CHECKS := 297
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -201,6 +201,11 @@ func _test_query() -> void:
 	print("[a server browser's half]")
 
 	_check(server.query_source != null, "the server has a query source to contribute to")
+	var roster_max: int = module_roster_max()
+	_check(
+		roster_max == server.config.max_players,
+		"the roster accepts what the server advertises (%d of %d)" % [roster_max, server.config.max_players]
+	)
 
 	var module := _module()
 
@@ -2915,3 +2920,10 @@ func _line_with(text: String, needle: String) -> String:
 func _last_lines(text: String, count: int) -> String:
 	var lines := text.strip_edges().split("\n")
 	return "\n".join(lines.slice(maxi(0, lines.size() - count)))
+
+
+func module_roster_max() -> int:
+	var module := _module()
+	if module == null or module.game == null or module.game.player_stack == null:
+		return -1
+	return module.game.player_stack.roster.config.max_players
