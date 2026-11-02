@@ -362,10 +362,8 @@ func _build_gate() -> void:
 	platform.name = "Platform"
 	platform.force_offline = link == null and OS.get_cmdline_user_args().has("--offline")
 	platform.link = link
-	# Not built by the platform: the settings document is PlaygroundPresentation's, handed over by
-	# `adopt_menu`, and the console must follow that menu (`add_console` comes later, see
-	# _build_pause). The pointer is the platform's, except while the Q menu or the server browser
-	# are up. Tab is the roster's, not the platform's board.
+	# Not built by the platform: the settings document is PlaygroundPresentation's (handed over by `adopt_menu`) and the console follows that menu.
+	# The pointer is the platform's except while the Q menu or server browser is up; Tab is the roster's, not the platform's board.
 	platform.use_settings = false
 	platform.use_console = false
 	platform.escape_releases_pointer = true
@@ -654,10 +652,8 @@ func _net_physics(delta: float) -> void:
 	if sampler == null or _covered():
 		return
 
-	# Each pass is its own tick: `advance` has already moved the clock by all of them, so
-	# `input_tick()` is the LAST one on every pass, and a frame worth two ticks sent the second
-	# twice and the first never. Arithmetic here, not a new dot-net call, so a pack runs on any
-	# client shell.
+	# Each pass is its own tick: `advance` has already moved the clock by all of them, so `input_tick()` is the LAST one on every pass; subtract the passes still to come.
+	# Arithmetic here, not a new dot-net call, so a pack runs on any client shell.
 	for i in range(ticks):
 		if net.clock.is_synced():
 			var tick := net.clock.input_tick() - (ticks - 1 - i)

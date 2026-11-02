@@ -45,8 +45,7 @@ const TIMER_CHECKS := 24
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
-## A suite that writes to `user://` has a result that depends on the last run: this one used to
-## append to the real punishment store, ban and admin files and audit log.
+## A suite that writes to `user://` has a result that depends on the last run, so this one writes to its own directory, not the real punishment store, ban and admin files and audit log.
 const SERVER_DIR := "user://pg_dedicated"
 
 var _sections_done := 0

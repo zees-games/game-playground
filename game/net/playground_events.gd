@@ -1098,8 +1098,6 @@ static func read_pane(r: DotNetReader) -> Dictionary:
 	return {"index": index, "ok": r.ok()}
 
 
-# --- SHATTER -------------------------------------------------------------------
-
 static func write_shatter(at: Vector3, material: int) -> PackedByteArray:
 	var w := _w()
 	w.write_vector3_range(at, -WORLD_EXTENT, WORLD_EXTENT, POS_BITS)

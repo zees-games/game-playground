@@ -1617,10 +1617,8 @@ func _spawn_for(id: StringName, prop_id: StringName) -> void:
 				})
 		return
 
-	# Asked, spawned, and only then charged: a spawn the prop budget refused must not have been
-	# paid for, and a refund can itself be refused (dot-economy's refund is policy). The spawner's
-	# refusals are many and only known by trying; "can they afford it" is one read that changes
-	# nothing. Refused with a reason, so a silent button is not mistaken for a broken menu.
+	# Asked, spawned, and only then charged: a refused spawn must not have been paid for, and a refund can itself be refused (dot-economy's refund is policy).
+	# "Can they afford it" is one read that changes nothing; refuse with a reason so a silent button is not mistaken for a broken menu.
 	var affordable := _may_charge(id, def.id)
 
 	if not affordable.ok:
@@ -2077,11 +2075,9 @@ func _apply_hello(reader: DotNetReader) -> void:
 
 ## Puts the whole client (game, timers, netcode clock and the ENGINE) on the server's tick rate.
 ##
-## Four places hold the number and all must move together: `game.tick_rate`; `net.config.tick_rate`
-## (read by [method DotNetInput.sanitise] and the interpolator); `net.clock.tick_rate`, built at
-## `setup()` and not updated by writing the config; and `Engine.physics_ticks_per_second`, which
-## decides whether it LOOKS right: at 60 against 128 the simulation stayed correct but ran in
-## bursts, a 47% swing in apparent speed. A server never calls this: its rate is `sv_tickrate`.
+## Four places hold the tick rate and must move together: `game.tick_rate`; `net.config.tick_rate` (read by [method DotNetInput.sanitise] and the interpolator);
+## `net.clock.tick_rate`, built at `setup()` and not updated by writing the config; and `Engine.physics_ticks_per_second`, which decides whether it LOOKS right.
+## A server never calls this: its rate is `sv_tickrate`.
 func _adopt_tick_rate(rate: int) -> void:
 	if net == null or net.is_server or game == null or rate <= 0 or rate == game.tick_rate:
 		return
@@ -2154,10 +2150,8 @@ func _apply_join(reader: DotNetReader) -> void:
 
 ## Who owns a mirrored player on this client: this client for its own player, 0 otherwise.
 ##
-## Matched by session id, not sent on the wire: the id HELLO already carries is the whole answer,
-## the JOIN format is unchanged, and `is_owner` (owner == local peer) cannot disagree. Never the
-## local peer for anybody else, or this client would predict somebody whose keys it never had.
-## A local peer of 0 claims nothing: 0 is the server's owner id.
+## Matched by session id, not sent on the wire: the id HELLO already carries is the whole answer and `is_owner` (owner == local peer) cannot disagree.
+## Never the local peer for anybody else, or this client would predict somebody whose keys it never had; a local peer of 0 claims nothing (0 is the server's owner id).
 func _mirror_owner(session_id: int) -> int:
 	if net == null or net.local_peer_id <= 0:
 		return 0

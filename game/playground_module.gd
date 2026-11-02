@@ -1020,11 +1020,8 @@ func _on_loadout_requested(peer_id: int, pairs: Array) -> void:
 		var row: Array = pair
 		loadout.set_item(StringName(str(row[0])), StringName(str(row[1])))
 
-	# Validated on the way in, conformed on the way out: a client must not make the server repair
-	# its way to a legal loadout, while `conform_on_load` keeps a player whose weapon changed able
-	# to spawn.
-	# Awaited (this handler is a coroutine): a publish must not report success before the store
-	# write returned. Nothing after it depends on anything else, so suspending here is safe.
+	# Validated on the way in, conformed on the way out: a client must not make the server repair its way to a legal loadout, while `conform_on_load` keeps a player whose weapon changed able to spawn.
+	# Awaited (this handler is a coroutine): a publish must not report success before the store write returned.
 	var published: DotResult = await arena.loadouts.publish(
 		loadout_key(session_id), loadout, 0
 	)
@@ -1389,8 +1386,7 @@ func _on_client_spawn(event: DotEvent) -> void:
 
 ## The bridge has admitted a peer: now they can be told what they missed.
 ##
-## `_welcome` used to run from `client_spawn` and return unless the peer was READY, which it never
-## is on a real join, so nobody got the chat backlog, the join line or the match clock.
+## `_welcome` must not wait for the peer to be READY, which it never is on a real join, or nobody gets the chat backlog, the join line or the match clock.
 func _on_peer_admitted(peer_id: int) -> void:
 	var session := server.session_of(peer_id) if server != null else null
 	if session == null or not _joined.has(session.userid):
