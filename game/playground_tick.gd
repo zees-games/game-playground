@@ -119,32 +119,43 @@ func _physics_process(delta: float) -> void:
 ## One simulated tick for everything, in the order a dedicated server uses: move every player, then time the tick with the
 ## position the move produced. Timing first shifts every run by one tick, a different amount at each tickrate.
 func _simulate_tick(step: float) -> void:
+	var _t_props_maps := DotFrameCost.now()
 	props.advance(step)
 	maps.advance(step)
+	DotFrameCost.add(&"tick.props_maps", _t_props_maps)
 
 	# The drivers' intent, then the chassis. Before the players move, because a rider's
 	# own move is skipped entirely and what a driver's keys mean this tick is engine
 	# force rather than acceleration.
+	var _t_vehicles := DotFrameCost.now()
 	_drive_vehicles()
 	vehicles.tick(step)
+	DotFrameCost.add(&"tick.vehicles", _t_vehicles)
 
 	# What the entities can see, rebuilt before any of them thinks: a list built at the end of a tick is last tick's positions,
 	# and a chaser steering at them lags its target by one tick.
+	var _t_npc_candidates := DotFrameCost.now()
 	_rebuild_npc_candidates()
+	DotFrameCost.add(&"tick.npc_candidates", _t_npc_candidates)
 
+	var _t_npc_world := DotFrameCost.now()
 	if npc_world != null:
 		npc_world.advance(step)
+	DotFrameCost.add(&"tick.npc_world", _t_npc_world)
 
 	# Entities before players, as the timer runs after them: an NPC moved after the player lags what collided with it by a tick.
 	# Iterated over a copy because an entity may remove itself (a pit, a script) and `_on_prop_removed` erases from this list.
+	var _t_entities := DotFrameCost.now()
 	_entity_buf.assign(entities)
 	for entity in _entity_buf:
 		if is_instance_valid(entity):
 			entity.entity_tick(step)
+	DotFrameCost.add(&"tick.entities", _t_entities)
 
 	if authoritative:
 		_sync_noclip_permits()
 
+	var _t_players_simulate := DotFrameCost.now()
 	for id in players:
 		var body := players[id] as PlaygroundPlayer
 		# A body the client's load gate froze (`process_mode` DISABLED) waits for the level
@@ -152,34 +163,47 @@ func _simulate_tick(step: float) -> void:
 		if body.is_inside_tree() and not body.can_process():
 			continue
 		body.simulate(_tick, step)
+	DotFrameCost.add(&"tick.players_simulate", _t_players_simulate)
 
 	# The toys after everybody moved: a walk into a ball pushes it, weight tips a see-saw.
+	var _t_toys := DotFrameCost.now()
 	_advance_toys(step)
+	DotFrameCost.add(&"tick.toys", _t_toys)
 
 	# Held players after every holder has moved and aimed, so the beam ends where the
 	# holder is looking THIS tick, and before the timers, which read where they were put.
+	var _t_pickup_weapons := DotFrameCost.now()
 	pickup.tick(players, step)
 	weapon_layer.tick(step)
+	DotFrameCost.add(&"tick.pickup_weapons", _t_pickup_weapons)
 
 	# After everybody has moved, so a grenade is swept against the world as the tick
 	# leaves it, which is also where anybody it could hit now is.
+	var _t_projectiles := DotFrameCost.now()
 	if projectiles != null:
 		projectiles.tick(step)
+	DotFrameCost.add(&"tick.projectiles", _t_projectiles)
 
+	var _t_debris_doors_liquid := DotFrameCost.now()
 	_expire_debris()
 	_swing_doors(step)
 	_liquid_tick(step)
 	_pane_impacts()
+	DotFrameCost.add(&"tick.debris_doors_liquid", _t_debris_doors_liquid)
 
 	# After the moves and before the timers, which is the same ordering rule: a rider's
 	# position for this tick is where the vehicle carried them, not where they were.
+	var _t_riders := DotFrameCost.now()
 	_carry_riders()
+	DotFrameCost.add(&"tick.riders", _t_riders)
 
 	# And the locomotion state, from the movement that has just happened. Same rule
 	# again: a state machine fed the position a player WAS at is one tick behind them,
 	# and at a walk-to-run threshold that is a visible late change of animation.
+	var _t_drive_character := DotFrameCost.now()
 	for id in players:
 		(players[id] as PlaygroundPlayer).drive_character(step)
+	DotFrameCost.add(&"tick.drive_character", _t_drive_character)
 
 	# The run timer last, with the positions every move above produced.
 	if run_timer != null:

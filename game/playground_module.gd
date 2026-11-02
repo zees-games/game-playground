@@ -1299,7 +1299,9 @@ func _physics_process(_delta: float) -> void:
 	_tick += 1
 	if loading != null:
 		loading.poll_loading()
+	var _t_bridge_server_tick := DotFrameCost.now()
 	bridge.server_tick(_tick)
+	DotFrameCost.add(&"mod.bridge_server_tick", _t_bridge_server_tick)
 
 	# [b]After the world has ticked, and that is the ordering that matters.[/b] dot-combat
 	# rewinds to resolve a shot and the waves read where everybody is, and both have to
@@ -1308,23 +1310,35 @@ func _physics_process(_delta: float) -> void:
 	# three times now.
 	var step := 1.0 / float(maxi(game.tick_rate, 1))
 
+	var _t_arena := DotFrameCost.now()
 	if arena != null:
 		arena.tick(_tick, step)
+	DotFrameCost.add(&"mod.arena", _t_arena)
 
+	var _t_shop := DotFrameCost.now()
 	if shop != null:
 		shop.tick(step)
+	DotFrameCost.add(&"mod.shop", _t_shop)
 
+	var _t_spectate := DotFrameCost.now()
 	if spectate != null:
 		spectate.tick(step)
+	DotFrameCost.add(&"mod.spectate", _t_spectate)
 
+	var _t_downs := DotFrameCost.now()
 	if downs != null:
 		downs.tick(step)
+	DotFrameCost.add(&"mod.downs", _t_downs)
 
+	var _t_waves := DotFrameCost.now()
 	if waves != null:
 		waves.tick(_tick, step)
+	DotFrameCost.add(&"mod.waves", _t_waves)
 
+	var _t_vote := DotFrameCost.now()
 	if vote != null:
 		vote.advance(step)
+	DotFrameCost.add(&"mod.vote", _t_vote)
 
 
 # --- Sessions --------------------------------------------------------------

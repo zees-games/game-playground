@@ -19,6 +19,10 @@ var module: Object = null
 var _samples: PackedFloat64Array = PackedFloat64Array()
 var _phys: PackedFloat64Array = PackedFloat64Array()
 var _last := {}
+var _costs := {}
+var _sim_usec := 0.0
+var _send_usec := 0.0
+var _tick_n := 0
 var _second_at := 0.0
 var _cpu_last := 0.0
 var _wall_last := 0.0
@@ -26,6 +30,7 @@ var _wall_last := 0.0
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.WARN)
+	DotFrameCost.enabled = true
 	_run.call_deferred()
 
 
@@ -134,6 +139,7 @@ func _p(values: PackedFloat64Array, q: float) -> float:
 
 
 func _physics_process(_delta: float) -> void:
+	_gather_costs()
 	if module == null:
 		return
 	var net: DotNetManager = module.get("net")
@@ -153,6 +159,9 @@ func _physics_process(_delta: float) -> void:
 			var usec: float = (float(c[&"server_sim_usec"]) - float(_last[&"server_sim_usec"])
 				+ float(c[&"server_send_usec"]) - float(_last[&"server_send_usec"]))
 			_samples.append(usec / ticks / 1000.0)
+			_sim_usec += float(c[&"server_sim_usec"]) - float(_last[&"server_sim_usec"])
+			_send_usec += float(c[&"server_send_usec"]) - float(_last[&"server_send_usec"])
+			_tick_n += ticks
 			_phys.append(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
 	_last = c
 
@@ -163,18 +172,19 @@ func _physics_process(_delta: float) -> void:
 	var cpu := _cpu_seconds()
 	var d := net.describe()
 	var peers: int = int(d.get("peers", 0))
-	var sim := float(c[&"server_sim_usec"])
-	var send := float(c[&"server_send_usec"])
-	var ticks_total := maxf(1.0, float(c[&"server_ticks"]))
 	print("STAT peers=%d tick_avg=%.3f tick_p99=%.3f phys_avg=%.3f phys_p99=%.3f sim_ms=%.3f send_ms=%.3f cpu_pct=%.0f rss_mb=%.0f out_kBps=%.1f bytes_per_client_s=%.0f split=%d largest_part=%d warned_parts=%s ents=%d tps=%.0f" % [
 		peers, _mean(_samples), _p(_samples, 0.99), _mean(_phys), _p(_phys, 0.99),
-		sim / ticks_total / 1000.0, send / ticks_total / 1000.0,
+		_sim_usec / maxf(1.0, _tick_n) / 1000.0, _send_usec / maxf(1.0, _tick_n) / 1000.0,
 		(cpu - _cpu_last) / wall * 100.0, _rss_mb(),
 		net.stats.bytes_sent_per_sec / 1024.0,
 		net.stats.bytes_sent_per_sec / maxf(1.0, peers),
 		int(d.get("snapshots_split", 0)), int(d.get("largest_part_bytes", 0)),
 		str(net.get("_warned_parts")), int(d.get("entities", 0)), float(_samples.size()) / wall,
 	])
+	_print_costs()
+	_sim_usec = 0.0
+	_send_usec = 0.0
+	_tick_n = 0
 	_samples.clear()
 	_phys.clear()
 	_second_at = now
@@ -189,3 +199,25 @@ func _mean(values: PackedFloat64Array) -> float:
 	for v in values:
 		sum += v
 	return sum / values.size()
+
+
+func _gather_costs() -> void:
+	var taken := DotFrameCost.take()
+	for system: StringName in taken:
+		_costs[system] = float(_costs.get(system, 0.0)) + float(taken[system]["ms"])
+	_costs[&"frames"] = float(_costs.get(&"frames", 0.0)) + 1.0
+
+
+func _print_costs() -> void:
+	var frames := maxf(1.0, float(_costs.get(&"frames", 1.0)))
+	var rows := []
+	for system: StringName in _costs:
+		if system != &"frames":
+			rows.append([float(_costs[system]) / frames, system])
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+	var parts := PackedStringArray()
+	for row in rows:
+		if row[0] >= 0.05:
+			parts.append("%s=%.2f" % [row[1], row[0]])
+	print("COST ", " ".join(parts))
+	_costs.clear()

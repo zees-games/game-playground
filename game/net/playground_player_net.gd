@@ -139,6 +139,7 @@ func _net_simulate(tick: int, delta: float) -> void:
 
 
 func pull() -> void:
+	var t := DotFrameCost.now()
 	if player != null:
 		DotFpsNetSync.pull(player.controller.state, self)
 		net_blind = player.blinded
@@ -148,6 +149,7 @@ func pull() -> void:
 		# A rig that has gone leaves the last values: the counter stops, so nothing fires.
 		if player.zee_rig != null:
 			ZeeWeaponNet.pull(player.zee_rig, self)
+	DotFrameCost.add(&"pn.pull", t)
 
 
 ## The server's answer, adopted wholesale. On the owner it is the rewind half of

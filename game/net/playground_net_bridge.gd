@@ -832,8 +832,10 @@ func server_tick(tick: int) -> void:
 	_tick = tick
 	_game_ticked_for = -1
 	weapon_net.watch(game.weapon_layer)
+	var _t_net := DotFrameCost.now()
 	if net != null:
 		net.server_tick(tick)
+	DotFrameCost.add(&"br.dotnet_tick", _t_net)
 	ensure_game_ticked(tick)
 
 
@@ -851,19 +853,25 @@ func ensure_game_ticked(tick: int) -> void:
 				and behaviour.identity.owner_peer_id > 0:
 			behaviour.player.controller.apply_command(behaviour.last_move.duplicate_command())
 
+	var _t_g := DotFrameCost.now()
 	game.tick_once(tick)
+	DotFrameCost.add(&"br.game_tick_once", _t_g)
 
 	# The tools, from the buttons the commands carried. After the movement, because a
 	# gun is aimed from where the player ENDED the tick.
+	var _t_d := DotFrameCost.now()
 	for session_id in _behaviours:
 		_drive_tools(int(session_id), _behaviours[session_id])
+	DotFrameCost.add(&"br.drive_tools", _t_d)
 
 	# After the game moved them, before the snapshot is built. A prop pulled before the
 	# physics step would replicate where it was last tick, which is the whole family's
 	# "produced correctly and consumed by nothing" one step along: correct data, wrong
 	# instant, and nothing errors.
+	var _t_p := DotFrameCost.now()
 	for instance_id in _prop_nets:
 		(_prop_nets[instance_id] as PlaygroundPropNet).pull()
+	DotFrameCost.add(&"br.prop_pull", _t_p)
 
 	# Every bag the server changed this tick, to its owner, once. After the game ticked,
 	# because a spawn from the bag happens inside it.
