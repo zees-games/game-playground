@@ -136,11 +136,8 @@ enum Ask {
 
 ## Every decoder returns an `ok` alongside its fields, and every caller checks it.
 ##
-## [b]A reader past its end returns plausible zeros rather than failing.[/b] dot-net
-## shipped with exhaustion that was not sticky, so a decoder that skipped this check got
-## a believable value for the field AFTER the overrun — and a truncated packet decodes
-## as a valid message about nothing. dot-timer's replay format had the same hole:
-## a replay truncated inside its header parsed as a valid replay of zero frames.
+## A reader past its end returns plausible zeros, so a skipped check gets a believable value
+## after an overrun and a truncated packet decodes as a valid message about nothing.
 const NAME_BYTES := 64
 const ID_BYTES := 64
 const TEXT_BYTES := 256
@@ -168,11 +165,8 @@ static func _w() -> DotNetWriter:
 
 ## What a client needs before it can build anything, in one message.
 ##
-## [b]The tick rate is in here and it is not decoration.[/b] game-g2gfast shipped
-## without reading the one HELLO already carried, so a browser client counted at the 60
-## its export declared against a server running 128: correction rate 0.96, and every
-## replicated time wrong by 128/60. A client adopts this or it is wrong about
-## everything.
+## The tick rate is in here: a client that counted at its export's 60 against a server running
+## 128 had every replicated time wrong by 128/60.
 static func write_hello(
 	player_id: int, tick_rate: int, server_tick: int, map_id: StringName
 ) -> PackedByteArray:
@@ -483,15 +477,9 @@ static func chat_kinds_fit() -> bool:
 
 ## One chat line, from [method DotChatMessage.to_dictionary], plus who said it.
 ##
-## [b]Encoded field by field rather than as JSON.[/b] A JSON body is a variable-length blob
-## a reader cannot bound and a hostile server could make enormous, and it costs about three
-## times the bytes for a message whose whole point is that it is small and frequent.
-##
-## The `x` (meta) field is not carried as a dictionary — what this game needs from it is one
-## number, the player the line belongs to, so that is a bounded field and the reader puts it
-## back where [method DotChatMessage.from_dictionary] finds it. The kind travels as an
-## **index into [constant DotChatMessage.KIND_NAMES]**, one table used in both directions,
-## which is the lesson dot-moderation paid for when a stored voice mute loaded as a warning.
+## Encoded field by field, not JSON: a JSON body is an unbounded blob a hostile server could inflate.
+## The meta field is one bounded number (the player the line belongs to); the kind is an index into
+## [constant DotChatMessage.KIND_NAMES], one table both ways.
 static func write_chat(wire: Dictionary) -> PackedByteArray:
 	var writer := DotNetWriter.new()
 	writer.write_varint(int(wire.get("n", 0)))
@@ -564,13 +552,9 @@ const HEALTH_BITS := 8
 
 ## Somebody's health changed, or they died.
 ##
-## [b]Health is replicated as an event rather than as a [DotNetVar].[/b] It changes on a
-## hit and not on a tick, so a per-tick field would send an unchanged byte at the snapshot
-## rate for every player — and dot-net's delta encoding would still have to look at it.
-## What matters about health is the moment it moves.
-##
-## A death carries how the body falls (dot-player-char's [DotPlayerDeath], the server's pick),
-## last and optional, so a client that reads only the fields above reads the rest.
+## An event, not a [DotNetVar]: health moves on a hit, not a tick, so a field would send an
+## unchanged byte per player at the snapshot rate. A death carries how the body falls
+## ([DotPlayerDeath]) last and optional, so a reader of only the fields above still works.
 static func write_combat(
 	player_id: int, health: int, armour: int, attacker_id: int, died: bool,
 	death: DotPlayerDeath = null
@@ -736,11 +720,8 @@ static func read_clock(reader: DotNetReader) -> Dictionary:
 
 ## What a player wants to spawn with, as slot/item pairs.
 ##
-## [b]Ids only, and the server validates them against a schema and an entitlement set
-## without loading anything.[/b] That is dot-loadout's one idea, and it is why this is a
-## handful of strings rather than a document. A client that could make the server *repair*
-## its way to a legal loadout could put anything in any slot and have the server pick the
-## nearest legal thing, so the server refuses rather than conforms on this direction.
+## Ids only: the server validates them against a schema and entitlements, and refuses rather
+## than repairs a loadout it does not like.
 static func write_loadout(pairs: Array) -> PackedByteArray:
 	var writer := DotNetWriter.new()
 	var count := mini(pairs.size(), LOADOUT_MAX_SLOTS)
@@ -817,12 +798,8 @@ static func sub_kinds_fit() -> bool:
 
 ## One op, and its sequence number.
 ##
-## [b]Field by field, and deliberately without [code]state[/code].[/b] `DotInvOp.state`
-## is "whatever a game wants to carry with an ADD — durability, an enchantment, a
-## serial", which is exactly what a client must not get to write: a client ADD is refused
-## anyway, and a state that crossed the wire on a MOVE would be a way to stamp a serial
-## on something. The [code]actor[/code] is absent too, as dot-inventory insists — the
-## server sets it from the peer the request arrived on.
+## Without [code]state[/code] on purpose: it is whatever a game carries with an ADD, which a client
+## must not write. The [code]actor[/code] is absent too: the server sets it from the peer.
 static func write_inv_op(seq: int, op: Dictionary) -> PackedByteArray:
 	var w := _w()
 	w.write_uint(InvAsk.OP, INV_SUB_BITS)
@@ -917,16 +894,9 @@ static func read_inv_ack(r: DotNetReader) -> Dictionary:
 
 ## The whole bag, as the JSON [method DotInvDoc.to_dictionary] was written to survive.
 ##
-## [b]JSON rather than a field-by-field encoding, on purpose.[/b] `DotInvDoc` and
-## `DotInvContainer` write cells as two numbers because "a Vector2i does not survive JSON",
-## which makes JSON the format they claim — and the format a saved bag will be in. Sending
-## the same bytes a save would hold is what puts that claim through a real round trip every
-## time somebody joins, rather than a second encoding beside it that could drift.
-##
-## [b]Refused, not truncated, when it is too big.[/b] [method DotNetWriter.write_string]
-## truncates, and a truncated JSON document is one the client cannot parse — so it would
-## arrive as a bag the client silently fails to adopt. An empty result here is one
-## [method PlaygroundNetBridge._tell] refuses to send, and the caller logs it.
+## JSON on purpose: it is the format a saved bag is in, so every join round-trips it for real.
+## Refused, not truncated, when too big ([method DotNetWriter.write_string] truncates, leaving
+## JSON the client cannot parse); an empty result is one [method PlaygroundNetBridge._tell] refuses.
 static func write_inv_doc(through_seq: int, doc: Dictionary) -> PackedByteArray:
 	var text := JSON.stringify(doc)
 	if text.to_utf8_buffer().size() > INV_DOC_BYTES:

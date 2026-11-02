@@ -79,11 +79,8 @@ var _chat_relayed: bool = false
 
 
 func setup() -> DotResult:
-	# Randomness first, and the order is load-bearing in the same way `RoomServices`'
-	# moderation-before-chat is: the map generator asks `DotRegistry` for a seed source,
-	# and a manager registered after the map has been built is a manager the map did not
-	# use -- with nothing erroring, because falling back to a fixed seed is a legitimate
-	# configuration and therefore indistinguishable from the bug.
+	# Randomness first: the map generator asks DotRegistry for a seed source, and one registered
+	# after the map is built is silently ignored (a fixed seed is a legitimate fallback).
 	var seeded := _build_randomness()
 	if not seeded.ok:
 		return seeded
@@ -159,10 +156,8 @@ static func schema() -> DotSettingsSchema:
 		.with_description("Zero turns camera shake off entirely."))
 	s.add(DotSettingsDef.boolean(&"allow_flashes", true, &"accessibility"))
 
-	# Camera motion, each 0 (off) to 2, 1 being the game's pick
-	# (`PlaygroundPlayer.camera_motion_picks`). ACCOUNT: whether motion makes somebody sick is
-	# about the person, not the machine. One each, because a player who cannot take the lean
-	# may still want the dip.
+	# Camera motion, each 0 (off) to 2, 1 the game's pick (`PlaygroundPlayer.camera_motion_picks`).
+	# ACCOUNT: motion sickness is about the person; one each, as the lean and the dip differ.
 	for key: StringName in CAMERA_MOTION_KEYS:
 		s.add(DotSettingsDef.number(key, 1.0, 0.0, 2.0, &"accessibility", 0.05).with_scope(
 			DotSettingsDef.Scope.ACCOUNT
@@ -746,10 +741,8 @@ func set_chat_relayed(relayed: bool) -> void:
 
 ## Resolves the three-way setting against what the server said.
 ##
-## `on` is both halves at once — a relayed server AND a box in front of the game. `off` is
-## a player who chats somewhere else. `auto` draws it unless this server is already putting
-## these lines somewhere this player can see them. In every case the log keeps drawing what
-## other people said.
+## `on` is a relayed server AND a box in front of the game, `off` a player who chats elsewhere,
+## `auto` draws it unless the server already puts these lines where the player can see them.
 func _apply_chat_visibility() -> void:
 	if chat_window == null or settings == null:
 		return

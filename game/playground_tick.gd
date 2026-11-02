@@ -9,7 +9,6 @@ var _hits_buf: Array = []
 func _ready() -> void:
 	if config == null:
 		config = PlaygroundConfig.new()
-
 	if not body_rules.changed.is_connected(_on_body_rules_changed):
 		body_rules.changed.connect(_on_body_rules_changed)
 

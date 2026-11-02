@@ -27,16 +27,12 @@ const PlaygroundWaves := preload("playground_waves.gd")
 
 ## Binds a [Playground] to a [DotServer]: the console commands an operator and an admin type.
 ##
-## This is the only file in the project that names dot-server, where the family says such a
-## bridge belongs: a game that wants a dedicated server writes this one file.
+## The only file in the project that names dot-server; a game wanting a dedicated server writes
+## this one file. Zone commands: stand on one corner, run the command, stand on the other, run it again.
 ##
 ## [codeblock]
 ## server.modules.load_module("res://game/playground_module.gd")
 ## [/codeblock]
-##
-## The commands are the point: maps are changed, zones drawn, styles switched and props cleared
-## from a console, and without one each needs a code change. The zone commands reproduce the
-## usual workflow: stand on one corner, run the command, stand on the other, run it again.
 
 const CHANNEL := "playground.module"
 
@@ -62,14 +58,11 @@ var bridge: PlaygroundNetBridge = null
 ## the people connected rather than about the world.
 var services: PlaygroundServices = null
 
-## Where the services write punishments. [constant PlaygroundServices.PUNISHMENTS_PATH] —
-## the store a real server enforces — unless a host says otherwise before this loads.
+## Where the services write punishments: [constant PlaygroundServices.PUNISHMENTS_PATH], the real
+## store, unless a host says otherwise before this loads.
 ##
-## [b]Static, because nothing holds this module before it exists[/b]: dot-server constructs
-## it from a path inside `load_module`, so there is no instance for a host to set a field on
-## first. `examples/dedicated.tscn` points it at a directory of its own; before it could,
-## every run wrote its test gag and the live tools' warnings to the real store, 352 records
-## by the time anybody counted.
+## Static because dot-server constructs the module from a path, so a host has no instance to set
+## a field on first; `examples/dedicated.tscn` points it at a directory of its own.
 static var punishments_path: String = PlaygroundServices.PUNISHMENTS_PATH
 
 ## Health, weapons that hurt, and a round. Off unless an operator turns it on.
@@ -121,11 +114,9 @@ func _module_version() -> String:
 
 
 ## The custom maps delivered beside this game: every pack its descriptor names, read for a
-## `maps/` directory where it is mounted (game-playground-maps is one). A client builds the
-## map too, so such a pack is a `dependencies` entry and every client fetches it (game.yml's
-## `maps_delivery: client` asks the host to put the server owner's map packs there); the client
-## adds the same directories from what the server told it to fetch. Duck-typed through the
-## manager, so a dot-server without the field simply offers the built-in maps.
+## `maps/` directory where it is mounted. A client builds the map too, so such a pack is a
+## `dependencies` entry every client fetches. Duck-typed, so a dot-server without the field offers
+## the built-in maps.
 func _add_delivered_maps() -> void:
 	var games: Object = server.get("games") if server != null else null
 	if games == null:
@@ -375,18 +366,10 @@ func _module_load() -> DotResult:
 	return DotResult.success(null)
 
 
-## What a server browser is told about this sandbox.
+## What a server browser is told about this sandbox: the GAME part of a DQP/A2S query.
 ##
-## [b]This game ships `PlaygroundBrowser` and answered no query at all.[/b] The list half
-## was written, the screen was drawn and the address bar worked; there was nothing at the
-## other end. dot-server answers A2S and DQP once a query host is plugged in, and what a
-## query says about the GAME comes from a provider like this one — without it a listing
-## row says only that the game is called Playground.
-##
-## **The three cvars are the point of the row.** `pg_arena`, `pg_waves` and `pg_shop` each
-## turn this into a different server, and all three default to off precisely because that
-## is an operator's decision — so a person reading a list is choosing between servers that
-## share a name and not a game. That is exactly what a query section is for.
+## `pg_arena`, `pg_waves` and `pg_shop` each make a different server and default to off (an
+## operator's decision), so a list row must say which, not just that the game is Playground.
 func _build_query_provider() -> void:
 	var provider := PlaygroundQueryProvider.new()
 	provider.module = self
@@ -493,12 +476,9 @@ var _loaded_platform := false
 
 ## Resolves who a session is and what they wear, through dot-platform.
 ##
-## [b]This game's module is not a DotGameModule[/b] (see docs/simulation.md, "The server module"), so it
-## does here what that base does for the games on it: build `DotPlatformIdentity` with this
-## game's avatar schema, a stock look and the site translation, then load dot-platform's
-## module. Without it nothing on a deployed server ever resolved a member's avatar, and every
-## player in the sandbox was a coloured capsule. A platform module already loaded (the
-## dedicated example builds `PlaygroundPlatform` and loads one) is used as it is.
+## This module is not a DotGameModule, so it does what that base does: build
+## `DotPlatformIdentity` with the avatar schema, a stock look and the site translation, then load
+## dot-platform's module (an already-loaded one is used as is).
 func _build_identity() -> DotResult:
 	if bridge != null:
 		bridge.skin_fn = _skins_for
@@ -625,13 +605,26 @@ func _module_unload() -> void:
 
 
 
+## An armed NPC's shot and lava hurt through the arena, which refuses while it is off (`pg_arena 1`
+## makes the soldiers dangerous; off, lava sends the player to the spawn). A kill pays the shop.
+func _wire_arena_hooks() -> void:
+	game.arena_hurt = func(attacker: StringName, victim: StringName, amount: float, distance: float) -> void:
+		var _hurt := arena.hurt(attacker, victim, amount, distance)
+	game.hazard_hurt = func(victim: StringName, amount: float) -> bool:
+		return arena.enabled and arena.hurt(&"", victim, amount, 0.0) != null
+	arena.player_killed.connect(func(victim: StringName, killer: StringName) -> void:
+		shop.on_arena_kill(killer, victim)
+		var player: PlaygroundPlayer = game.players.get(victim, null)
+		var at := player.controller.state.position if player != null else Vector3.ZERO
+		spectate.on_death(victim, at, killer)
+	)
+
+
 ## Everything that is not the netcode.
 ##
-## [b]Built in this order because each one needs the last.[/b] The services register a mute
-## source the chat router warns about the absence of; the progress layer watches the prop
-## spawner and the timer; the arena and the waves both act on the world. None of it
-## suspends, because [method DotModuleHost.load_module] does not await `_module_load` and a
-## module whose load suspends returns null to it.
+## Built in this order because each needs the last (the services register a mute source the chat
+## router wants; the progress layer watches the spawner and timer). None of it suspends:
+## [method DotModuleHost.load_module] does not await `_module_load`.
 func _build_extras() -> DotResult:
 	services = PlaygroundServices.new()
 	services.name = "Services"
@@ -679,21 +672,7 @@ func _build_extras() -> DotResult:
 			progress.report_hit(attacker, victim, damage)
 	)
 
-	# How an armed NPC's shot hurts a player: through the arena, which refuses while it is
-	# off — so a sandbox where nobody dies stays one, and `pg_arena 1` is the switch that
-	# makes the soldiers dangerous as well as the players.
-	game.arena_hurt = func(attacker: StringName, victim: StringName, amount: float, distance: float) -> void:
-		var _hurt := arena.hurt(attacker, victim, amount, distance)
-	# Lava through the arena too, and only while it is on: off, the game sends the player
-	# back to the spawn instead (see Playground.hazard_hurt).
-	game.hazard_hurt = func(victim: StringName, amount: float) -> bool:
-		return arena.enabled and arena.hurt(&"", victim, amount, 0.0) != null
-	arena.player_killed.connect(func(victim: StringName, killer: StringName) -> void:
-		shop.on_arena_kill(killer, victim)
-		var player: PlaygroundPlayer = game.players.get(victim, null)
-		var at := player.controller.state.position if player != null else Vector3.ZERO
-		spectate.on_death(victim, at, killer)
-	)
+	_wire_arena_hooks()
 	arena.clock_changed.connect(bridge.broadcast_match)
 	_build_loadout_command()
 
@@ -905,12 +884,8 @@ func _build_extras() -> DotResult:
 	if menu_half is Object:
 		(menu_half as Object).set(&"change_fn", game.change_map)
 
-	# [b]The one signal that fires for every change however it happened.[/b] An operator
-	# typing `pg_map`, the time limit expiring and the vote applying all end at
-	# `DotMapSession.changed` — which is why the director does not announce its own change
-	# and why this is the only connection. Two of them is two entries in the play history
-	# for one play, and a "played in the last N" cooldown that is quietly half what it
-	# says: dot-vote's fifth bug, from the other side.
+	# The one signal that fires for every change however it happened (a console `pg_map`, the time
+	# limit, the vote), so the only connection: two would double the play history entries.
 	game.maps.changed.connect(func(map: DotMapDef, _world: Node) -> void:
 		vote.note_playing(map.id)
 	)
@@ -1043,16 +1018,11 @@ func _on_loadout_requested(peer_id: int, pairs: Array) -> void:
 		var row: Array = pair
 		loadout.set_item(StringName(str(row[0])), StringName(str(row[1])))
 
-	# [b]Validated on the way in, conformed on the way out.[/b] A client that can make the
-	# server repair its way to a legal loadout can put anything in any slot and have the
-	# server pick the nearest legal thing — so this direction refuses, and
-	# `conform_on_load` is on for the other one, where refusing would mean a player who
-	# has not played since a weapon changed cannot spawn.
-	# [b]Awaited, and this handler is therefore a coroutine.[/b] The store write is the
-	# suspension: a publish that reported success before the write returned would be a
-	# loadout a player believes they have and a server that has not kept it. Nothing after
-	# this line depends on anything else, so suspending here costs nothing — which is the
-	# only reason it is safe to do it inside a signal handler.
+	# Validated on the way in, conformed on the way out: a client must not make the server repair
+	# its way to a legal loadout, while `conform_on_load` keeps a player whose weapon changed able
+	# to spawn.
+	# Awaited (this handler is a coroutine): a publish must not report success before the store
+	# write returned. Nothing after it depends on anything else, so suspending here is safe.
 	var published: DotResult = await arena.loadouts.publish(
 		loadout_key(session_id), loadout, 0
 	)
@@ -1130,13 +1100,10 @@ func _stats_key(session: DotClientSession) -> String:
 	return String(_stats_feed.key_for(session))
 
 
-## Who a session is, for a bag that outlasts the connection — or empty for nobody.
+## Who a session is, for a bag that outlasts the connection, or empty for nobody.
 ##
-## [b]The same key the statistics are filed under, and for the same reason:[/b] dot-server's
-## userid is sequential and a reconnect is a new one, so a bag keyed on it would be emptied
-## by every dropped connection. With no identity stack the key is `local:<userid>`, which
-## identifies nobody next time; that is answered as empty, and the bag goes with the session
-## rather than piling up one abandoned bag per connection for the life of the server.
+## The key the statistics use: the userid is sequential and a reconnect is a new one. Without an
+## identity stack the key is `local:<userid>`, answered as empty so the bag goes with the session.
 func _bag_key_for(session_id: int) -> String:
 	if server == null:
 		return ""
@@ -1365,15 +1332,9 @@ func _physics_process(_delta: float) -> void:
 
 ## A client finished the signon and is in the world.
 ##
-## `client_spawn`, not `client_connected`: a connected client has a socket and
-## nothing else — no identity, no content, no confirmation it can load the map.
-## [b]`client_spawn` carries `userid`, and it does NOT carry `peer_id`.[/b] This handler
-## asked for one, got 0, looked a session up by it and found null — and a null session is
-## a legitimate thing to find, so it returned quietly and NOBODY EVER JOINED. Nothing
-## errored, in every configuration, for as long as this module has existed; it survived
-## because the only thing that had ever loaded it was a headless test that adds its
-## players directly. game-dev/docs/bugs-found.md has carried this exact warning since
-## game-hungario hit it.
+## `client_spawn`, not `client_connected`: a connected client has a socket and nothing else.
+## It carries `userid`, NOT `peer_id`: reading `peer_id` gave 0, a null session, a quiet return
+## and nobody ever joined (docs/bugs-found.md).
 func _on_client_spawn(event: DotEvent) -> void:
 	var session := server.session_by_userid(event.get_int("userid"))
 
@@ -1426,10 +1387,8 @@ func _on_client_spawn(event: DotEvent) -> void:
 
 ## The bridge has admitted a peer: now they can be told what they missed.
 ##
-## [b]Found 2026-10-01 reviewing `[pg-rpc-before-scene]`:[/b] `_welcome` was called from
-## `client_spawn` and returned at once unless the peer was READY, which on a real join it
-## never is yet, so no connected player had ever been sent the chat backlog, the join line
-## or the match clock.
+## `_welcome` used to run from `client_spawn` and return unless the peer was READY, which it never
+## is on a real join, so nobody got the chat backlog, the join line or the match clock.
 func _on_peer_admitted(peer_id: int) -> void:
 	var session := server.session_of(peer_id) if server != null else null
 	if session == null or not _joined.has(session.userid):
@@ -1441,10 +1400,8 @@ func _on_peer_admitted(peer_id: int) -> void:
 
 ## What somebody is told once they are in: the backlog, and the clock.
 ##
-## [b]After the admission, never before it.[/b] Nothing may be sent to a peer before it has
-## said it can receive — dot-server's signon finishes and *then* the client builds its
-## scene, and everything sent in between lands on a node that does not exist and is lost,
-## one "Node not found" per call.
+## After the admission, never before: anything sent before the client builds its scene lands on a
+## node that does not exist.
 func _welcome(session: DotClientSession) -> void:
 	if bridge == null or not bridge.peer_is_ready(session.peer_id):
 		return
@@ -1464,16 +1421,9 @@ func _welcome(session: DotClientSession) -> void:
 		arena._announce_clock()
 
 
-## [b]`client_disconnected` emits TWO arguments — the session and a reason — and this
-## took one.[/b] Godot then refuses the call outright ("Method expected 1 argument(s), but
-## called with 2") and the handler NEVER RUNS: no player was ever removed, no peer was
-## ever released, and the server went on building a snapshot for every client that had
-## ever connected and sending it to a socket that was gone. One engine error per
-## disconnect and three per tick after that.
-##
-## It survived because nothing had ever disconnected from this module: `dedicated.tscn`
-## adds its players directly and tears the module down at the end. The default keeps it
-## callable from anything that emits only the session.
+## `client_disconnected` emits TWO arguments, the session and a reason: a handler taking one is
+## refused by Godot and never runs, so nobody was ever removed. The default keeps it callable
+## from anything that emits only the session.
 func _build_mod_tools() -> void:
 	mod_tools = DotModTools.new()
 	mod_tools.name = "ModTools"
@@ -1497,14 +1447,9 @@ func _build_mod_tools() -> void:
 
 	add_child(mod_tools)
 
-	# [b]A map change clears the return history, for everybody.[/b] Every position in it
-	# is a point in the map that was just freed, so `return <player>` after a change put
-	# them where they had stood on a different map — in mid-air over a sandbox plate, or
-	# a hundred metres under a surf start. A respawn keeps the history on purpose (a
-	# teleport of the same body on the same map leaves a return meaningful); a map change
-	# is the one case where none of it can be, which game-hungario (6462f79) and the lobby
-	# (cb822cd) each found for themselves. `DotMapSession.changed` because it is the one
-	# signal every change ends at, whoever asked for it — see the vote's connection.
+	# A map change clears the return history for everybody: every position in it is a point on a
+	# map that was just freed. A respawn keeps it on purpose. `DotMapSession.changed` is the one
+	# signal every change ends at, whoever asked.
 	game.maps.changed.connect(_on_map_changed_for_mod_tools)
 
 	mod_commands = DotModToolCommands.install(self, mod_tools, server)
@@ -1568,12 +1513,8 @@ func _on_client_disconnected(session: DotClientSession, _reason: String = "") ->
 		game.remove_player(id)
 
 
-## The id the game files records under.
-##
-## [b]The session's own scoped id, not a site account.[/b] The identity layer hands a
-## server a per-scope pseudonymous id precisely so operators cannot correlate their
-## players across servers, and a records table keyed on anything global would undo
-## that for every server running this.
+## The id the game files records under: the session's own scoped id, not a site account, so
+## operators cannot correlate players across servers.
 func _player_id(session: DotClientSession) -> StringName:
 	return StringName("u%d" % session.userid)
 
@@ -2304,12 +2245,9 @@ func _cmd_spec(ctx: DotCmdContext) -> void:
 			)
 
 
-## A player id by display name, case-insensitively and by prefix.
+## A player id by display name, case-insensitively and by prefix (`!pg_spec ad` finds Ada).
 ##
-## What every server in this genre does: `!pg_spec ad` finds Ada. The first match wins
-## and the order is the roster's, which is stable — the alternative is refusing an
-## ambiguous prefix, and a player who typed two letters and got "be more specific" types
-## three letters and gives up.
+## The first match wins, in the roster's stable order; refusing an ambiguous prefix loses players.
 func _player_named(text: String) -> StringName:
 	var wanted := text.strip_edges().to_lower()
 

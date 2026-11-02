@@ -23,12 +23,9 @@ const PlaygroundWaves := preload("../playground_waves.gd")
 
 ## Joins a [Playground] to a [DotNetManager]. The netcode seam, and the only file in
 ## this project that names both.
-##
-## [b]The ordering is the whole file.[/b] dot-net drives simulation per entity, and this
-## game's tick is a whole-game property: every NPC moves, then every player, then every
-## timer is fed the position its move produced. [method ensure_game_ticked] reconciles
-## the two — the first behaviour through on a tick runs the whole game, the rest find it
-## done.
+## The ordering is the whole file: dot-net drives simulation per entity, but this game's tick is
+## whole-game (every NPC moves, then every player, then every timer is fed). [method ensure_game_ticked]
+## reconciles the two: the first behaviour through on a tick runs the whole game.
 ##
 ## [codeblock]
 ## # server
@@ -42,12 +39,9 @@ const PlaygroundWaves := preload("../playground_waves.gd")
 ## bridge.client_tick(tick, command)
 ## [/codeblock]
 ##
-## [b]What is predicted and what is not.[/b] A player's own movement is predicted, like
-## every other first-person game in this family. Props, NPCs and everything the physics
-## gun touches are server-authoritative and NOT predicted, because Godot's rigid-body
-## solver is not reproducible across machines — see [PlaygroundPropNet]. That division
-## is why the spawn menu emits rather than spawning and the tools send intent: the
-## client half was built for this bridge before the bridge existed.
+## A player's own movement is predicted; props, NPCs and everything the physics gun touches are
+## server-authoritative, as rigid-body solving is not reproducible across machines
+## (see [PlaygroundPropNet]). So the spawn menu emits and the tools send intent.
 
 const CHANNEL := "pg.net"
 const ACK_BYTES := 4
@@ -1153,21 +1147,36 @@ func _admit(peer_id: int) -> void:
 	if not _toys_body.is_empty():
 		_tell(peer_id, PlaygroundEvents.Kind.TOYS, _toys_body)
 
-	# The time left now, rather than at the clock's next change — which on a quiet map is
-	# never, and a joiner would count down nothing until it came.
+	# The time left now: on a quiet map the clock's next change never comes.
 	if clock_fn.is_valid():
 		_tell(peer_id, PlaygroundEvents.Kind.CLOCK, PlaygroundEvents.write_clock(clock_fn.call()))
 
-	# And everything already in the world. A player who joins a sandbox that has been
-	# running for an hour has to be told about the hour's worth of props, or they walk
-	# into things they cannot see.
+	_tell_world_props(peer_id)
+
+	# Grenades already in the air: a launch is sent once, so a joiner never saw them.
+	if game.projectiles != null:
+		for launch: Dictionary in game.projectiles.join_launches():
+			_tell(peer_id, PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_launch(
+				int(launch["serial"]), launch["spawn"], launch["owner_id"], bool(launch["sticks"])
+			))
+
+	# Their own bag, whole, to them alone: a reconnecting player already has one.
+	if inventory_net != null:
+		inventory_net.admit(peer_id, session_id)
+
+	# Once, so a READY said twice does not replay the backlog and the join line.
+	if fresh:
+		peer_admitted.emit(peer_id)
+
+
+## Every prop and wave NPC already in the world, so a late joiner does not walk into unseen things.
+func _tell_world_props(peer_id: int) -> void:
 	for instance_id in _prop_nets.keys():
 		var prop := game.props.get_prop(int(instance_id))
 		var behaviour: PlaygroundPropNet = _prop_nets[instance_id]
 		if behaviour == null or behaviour.identity == null:
 			continue
-		# A wave NPC: in the table, not in the prop spawner. Without this a late joiner saw
-		# none of a wave that had already arrived.
+		# A wave NPC is in the table, not in the prop spawner.
 		if prop == null and _npc_kinds.has(instance_id):
 			_tell(peer_id, PlaygroundEvents.Kind.PROP, PlaygroundEvents.write_prop(
 				behaviour.identity.net_id, _npc_kinds[instance_id], 0, true, behaviour.net_position
@@ -1182,23 +1191,6 @@ func _admit(peer_id: int) -> void:
 			PlaygroundSpawnables.kind_of(prop.def) == PlaygroundSpawnables.Kind.ENTITY,
 			behaviour.net_position
 		))
-
-	# Grenades already in the air: a launch is sent once, so a joiner never saw them.
-	if game.projectiles != null:
-		for launch: Dictionary in game.projectiles.join_launches():
-			_tell(peer_id, PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_launch(
-				int(launch["serial"]), launch["spawn"], launch["owner_id"], bool(launch["sticks"])
-			))
-
-	# And their own bag, whole — to them and to nobody else. A player who reconnects is
-	# somebody with a bag already, and a client that waited for the next change to learn
-	# what it is carrying would show an empty grid until it bought something.
-	if inventory_net != null:
-		inventory_net.admit(peer_id, session_id)
-
-	# Once, so a READY said twice does not replay the backlog and the join line.
-	if fresh:
-		peer_admitted.emit(peer_id)
 
 
 func _join_body(session_id: int) -> PackedByteArray:
@@ -1623,20 +1615,10 @@ func _spawn_for(id: StringName, prop_id: StringName) -> void:
 				})
 		return
 
-	# [b]Asked, spawned, and only THEN charged.[/b] It was charged first, so a spawn the
-	# prop budget refused had already been paid for: credits gone and nothing in the world,
-	# which is the one bug report a shop must not produce (and which `PlaygroundShop.charge`
-	# says in as many words). Refunding on a refusal is the other order and it is not
-	# atomic: dot-economy's refund is a POLICY — off on a server with `refund_ticks` 0, off
-	# for an item that is not refundable, closed with the buy window — so a refund can itself
-	# be refused, on exactly the servers that turned refunds off. The spawner's refusals, on
-	# the other hand, are many (budget, interval, size, entitlement, missing content, no
-	# world) and only known by trying, while "can they afford it" is one read that changes
-	# nothing. So: that read, then the spawn, then the charge.
-	#
-	# Refused with a reason. A refusal that says nothing is the one thing a price list must
-	# not do: the player presses the button, nothing appears, and there is no way to tell it
-	# from a broken menu.
+	# Asked, spawned, and only then charged: a spawn the prop budget refused must not have been
+	# paid for, and a refund can itself be refused (dot-economy's refund is policy). The spawner's
+	# refusals are many and only known by trying; "can they afford it" is one read that changes
+	# nothing. Refused with a reason, so a silent button is not mistaken for a broken menu.
 	var affordable := _may_charge(id, def.id)
 
 	if not affordable.ok:
@@ -1941,27 +1923,22 @@ func _on_event(message: DotNetMessage) -> void:
 			_apply_seat(reader)
 		PlaygroundEvents.Kind.CHAT:
 			var wire := PlaygroundEvents.read_chat(reader)
-
 			if bool(wire["ok"]):
 				chat_received.emit(wire)
 		PlaygroundEvents.Kind.COMBAT:
 			var hit := PlaygroundEvents.read_combat(reader)
-
 			if bool(hit["ok"]):
 				combat_received.emit(hit)
 		PlaygroundEvents.Kind.MATCH:
 			var clock := PlaygroundEvents.read_match(reader)
-
 			if bool(clock["ok"]):
 				match_received.emit(clock)
 		PlaygroundEvents.Kind.PROGRESS:
 			var earned := PlaygroundEvents.read_progress(reader)
-
 			if bool(earned["ok"]):
 				progress_received.emit(earned)
 		PlaygroundEvents.Kind.VOTE:
 			var cue := PlaygroundEvents.read_vote_cue(reader)
-
 			if bool(cue["ok"]):
 				vote_cue_received.emit(cue)
 		PlaygroundEvents.Kind.CLOCK:
@@ -2092,26 +2069,13 @@ func _apply_hello(reader: DotNetReader) -> void:
 	hello_received.emit(local_player_id)
 
 
-## Puts the whole client — game, timers, netcode clock and the ENGINE — on the server's
-## tick rate.
+## Puts the whole client (game, timers, netcode clock and the ENGINE) on the server's tick rate.
 ##
-## Four places hold this number and all four have to move together. `game.tick_rate` is
-## the step the simulation and every reconstituted run time use; `net.config.tick_rate`
-## is what [method DotNetInput.sanitise] and the interpolator's extrapolation budget
-## read; `net.clock.tick_rate` is the live one, built from the config back at `setup()`
-## and therefore NOT updated by writing the config alone; and
-## `Engine.physics_ticks_per_second` is the one that decides whether it LOOKS right.
-##
-## That last one is not cosmetic. Measured in g2gfast at 60 against 128: the simulation
-## stayed correct, because the clock is asked how many ticks a frame is worth — it just
-## ran them in bursts of two and three, and the camera advanced 74 mm on six frames out
-## of seven and 112 mm on the seventh. A 47% change in apparent speed, eight times a
-## second. Interpolating between ticks does not fix it on its own and neither does this;
-## the fraction a renderer interpolates at is a fraction through a PHYSICS frame, which
-## is a fraction through a tick only while the two rates agree.
-##
-## A server never calls this: its rate is `sv_tickrate`, and adopting a peer's would be
-## a client telling the server how fast to run.
+## Four places hold the number and all must move together: `game.tick_rate`; `net.config.tick_rate`
+## (read by [method DotNetInput.sanitise] and the interpolator); `net.clock.tick_rate`, built at
+## `setup()` and not updated by writing the config; and `Engine.physics_ticks_per_second`, which
+## decides whether it LOOKS right: at 60 against 128 the simulation stayed correct but ran in
+## bursts, a 47% swing in apparent speed. A server never calls this: its rate is `sv_tickrate`.
 func _adopt_tick_rate(rate: int) -> void:
 	if net == null or net.is_server or game == null or rate <= 0 or rate == game.tick_rate:
 		return
@@ -2182,22 +2146,12 @@ func _apply_join(reader: DotNetReader) -> void:
 	roster_changed.emit(session_id)
 
 
-## Who owns a mirrored player on this client: this client, if it is this client's own
-## player, and the server's 0 otherwise.
+## Who owns a mirrored player on this client: this client for its own player, 0 otherwise.
 ##
-## [b]Matched by session id, not sent on the wire.[/b] game-g2gfast and game-arena put the
-## owner's peer id in JOIN instead; that changes the JOIN format, and then a client can only
-## predict if its own `local_peer_id` is exactly the number the server knows it by. Here the
-## session id HELLO already carries is the whole answer, the wire is unchanged, and the
-## owner on this side is `net.local_peer_id` whatever that turns out to be — `is_owner` is
-## owner == local peer, so the two can never disagree. The server's own `until_acked` rule
-## uses the server's copy of the owner, which was always right.
-##
-## [b]Never the local peer for anybody else[/b], or this client would predict somebody whose
-## keys it never had. And a client whose local peer is 0 claims nothing: 0 is the server's
-## owner id, and on such a registry dot-net's `is_owner` is already true of every owner-0
-## mirror — which this cannot undo, and which no client here runs into, because
-## `PlaygroundClient` takes its id from the multiplayer API and that never answers 0.
+## Matched by session id, not sent on the wire: the id HELLO already carries is the whole answer,
+## the JOIN format is unchanged, and `is_owner` (owner == local peer) cannot disagree. Never the
+## local peer for anybody else, or this client would predict somebody whose keys it never had.
+## A local peer of 0 claims nothing: 0 is the server's owner id.
 func _mirror_owner(session_id: int) -> int:
 	if net == null or net.local_peer_id <= 0:
 		return 0

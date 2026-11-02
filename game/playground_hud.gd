@@ -142,25 +142,7 @@ func _ready() -> void:
 
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# First, so every widget added below draws over it. See [member blind_overlay].
-	blind_overlay = ColorRect.new()
-	blind_overlay.name = "Blind"
-	blind_overlay.color = BLIND_COLOUR
-	# Sized to the whole viewport in `present_blind`, not this rect: a HUD that insets itself by
-	# the safe area would leave a frame of world round the edge.
-	blind_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	blind_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	blind_overlay.modulate.a = 0.0
-	blind_overlay.visible = false
-	add_child(blind_overlay)
-
-	flash_overlay = ColorRect.new()
-	flash_overlay.name = "Flash"
-	flash_overlay.color = Color.WHITE
-	flash_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	flash_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	flash_overlay.visible = false
-	add_child(flash_overlay)
+	_build_overlays()
 
 	_notice = _add_line("Notice", 240.0)
 
@@ -225,6 +207,28 @@ func _ready() -> void:
 	add_child(hit_marker)
 
 	set_process(true)
+
+
+## The blind and flash overlays, added first so every widget after draws over them.
+func _build_overlays() -> void:
+	blind_overlay = ColorRect.new()
+	blind_overlay.name = "Blind"
+	blind_overlay.color = BLIND_COLOUR
+	# Sized to the whole viewport in `present_blind`, not this rect: a HUD that insets itself by
+	# the safe area would leave a frame of world round the edge.
+	blind_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	blind_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	blind_overlay.modulate.a = 0.0
+	blind_overlay.visible = false
+	add_child(blind_overlay)
+
+	flash_overlay = ColorRect.new()
+	flash_overlay.name = "Flash"
+	flash_overlay.color = Color.WHITE
+	flash_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	flash_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash_overlay.visible = false
+	add_child(flash_overlay)
 
 
 func _add_line(p_name: String, y: float) -> Label:
