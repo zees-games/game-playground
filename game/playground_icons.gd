@@ -137,7 +137,7 @@ static func _aspect_for(def: DotPropDef) -> float:
 static func generated(glyph: Glyph, aspect: float, colour: Color) -> Texture2D:
 	# Quantised into the key: two planks whose aspect differs in the fourth decimal
 	# are one drawing, and without the rounding the cache would never hit.
-	var key := "%d:%.2f:%s" % [glyph, aspect, colour.to_html(false)]
+	var key := "%d:%.2f:%s" % [glyph, aspect, colour.to_html(true)]
 
 	if _cache.has(key):
 		return _cache[key]
