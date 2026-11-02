@@ -4,14 +4,9 @@ const PlaygroundNetBridge := preload("../game/net/playground_net_bridge.gd")
 const PlaygroundNetCommand := preload("../game/net/playground_net_command.gd")
 const PlaygroundNetLink := preload("../game/net/playground_net_link.gd")
 
-## N synthetic clients in one process against tools/load_server.tscn: each is a real
-## [DotClientLink] on its own ENet connection (its own MultiplayerAPI subtree, so the RPC path
-## "LoadServer/Server/Playground" resolves for each), sends acks and random-walk inputs at
-## the server's tick rate, and decodes nothing. Driver: tools/load100.sh.
-##
-## [codeblock]
-## godot --headless --path . res://tools/load_swarm.tscn -- --port 27399 --clients 64 --seconds 30 --hz 64
-## [/codeblock]
+## N synthetic clients in one process against tools/load_server.tscn, each a real [DotClientLink]
+## on its own ENet connection; sends acks and random-walk inputs at the tick rate, decodes nothing.
+## Driver: tools/load100.sh.
 
 ## Stands in for the game bridge: acks the tick at the head of each snapshot, drops the rest.
 class Stub extends PlaygroundNetBridge:

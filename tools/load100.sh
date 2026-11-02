@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Player-count load ladder: one dedicated server (tools/load_server.tscn, sv_maxplayers 128)
-# against N synthetic clients (tools/load_swarm.tscn) per step; prints one summary line per step.
-# Run the whole script as one job: heavy -- ./tools/load100.sh   (or ./gpu.sh run on staging02)
+# Load ladder: a dedicated server (load_server.tscn) vs N synthetic clients (load_swarm.tscn) per step.
+# Run as one job: heavy -- ./tools/load100.sh   (or ./gpu.sh run on staging02)
 # usage: tools/load100.sh [--seconds 30] [steps...]   default steps: 16 32 64 100 128
 cd "$(dirname "$0")/.." || exit 1
 SECONDS_PER=30

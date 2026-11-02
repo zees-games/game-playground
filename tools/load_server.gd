@@ -5,14 +5,9 @@ const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundPlatform := preload("../game/playground_platform.gd")
 
-## A headless dedicated playground with sv_maxplayers raised, that prints one STAT line per
-## second for tools/load_swarm.gd's clients to be measured against (driver: tools/load100.sh).
-##
-## [codeblock]
-## godot --headless --path . res://tools/load_server.tscn -- --port 27399 --slots 128
-## [/codeblock]
-## Tick cost is sim+send per server tick from [method DotNetManager.perf_counters];
-## [code]phys_ms[/code] is the engine's whole physics frame, so phys - tick is physics and the rest.
+## Headless dedicated playground with sv_maxplayers raised; prints one STAT line per second
+## for tools/load_swarm.gd's clients to be measured against (driver: tools/load100.sh).
+## [code]phys_ms[/code] is the whole physics frame, so phys minus tick is physics and the rest.
 
 const CHANNEL := "load_server"
 
