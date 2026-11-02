@@ -11,7 +11,7 @@ PORT=27399
 # A box that never imported this project has no class cache and a run would hang.
 [ -f .godot/global_script_class_cache.cfg ] || godot --headless --path . --import > /dev/null 2>&1
 for n in "${STEPS[@]}"; do
-	taskset -c 0-3 timeout $((SECONDS_PER + 150)) godot --headless --path . res://tools/load_server.tscn -- --port $PORT --slots 128 +sv_maxplayers 128 > "$OUT/server_$n.log" 2>&1 &
+	taskset -c 0-3 timeout $((SECONDS_PER + 150)) godot --headless --path . res://tools/load_server.tscn -- --port $PORT --slots 128 $SERVER_ARGS +sv_maxplayers 128 > "$OUT/server_$n.log" 2>&1 &
 	SPID=$!
 	sleep 12
 	taskset -c 4-11 timeout $((SECONDS_PER + 120)) godot --headless --path . res://tools/load_swarm.tscn -- --port $PORT --clients "$n" --seconds "$SECONDS_PER" > "$OUT/swarm_$n.log" 2>&1

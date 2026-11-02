@@ -93,6 +93,13 @@ func _run() -> void:
 		var m: Object = server.modules.get_module(n)
 		if m != null and m.get("net") != null:
 			module = m
+	var tuned: DotNetManager = module.get("net") if module != null else null
+	if tuned != null:
+		tuned.config.snapshot_workers = int(_arg("--workers", "0"))
+		var far_every := int(_arg("--far-every", "1"))
+		if far_every > 1 and tuned.interest is DotNetInterestDistance:
+			(tuned.interest as DotNetInterestDistance).far_every = far_every
+			(tuned.interest as DotNetInterestDistance).far_distance = float(_arg("--far-distance", "40"))
 	var cvar: DotConVar = server.console.find_cvar("sv_maxplayers")
 	print("load_server: module loaded=%s port=%d slots=%d sv_maxplayers=%s" % [
 		loaded.ok, config.port, slots, cvar.get_int() if cvar != null else "?"])
