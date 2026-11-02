@@ -1,4 +1,4 @@
-extends "res://game/playground_tick.gd"
+extends "playground_tick.gd"
 
 ## What [param player_id] wants their NPCs to carry, or [param fallback].
 func npc_weapon_for(player_id: StringName, fallback: StringName = &"") -> StringName:

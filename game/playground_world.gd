@@ -1,4 +1,4 @@
-extends "res://game/playground_setup.gd"
+extends "playground_setup.gd"
 
 const BreakFx := preload("playground_break_fx.gd")
 
