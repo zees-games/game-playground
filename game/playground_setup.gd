@@ -64,6 +64,9 @@ signal held_changed(id: StringName, prop: DotPropInstance, held: bool)
 ## what it was made of. Emitted on every end that removes it, so a client plays the sound.
 signal pane_broken(index: int, at: Vector3, material: StringName)
 
+## A prop broke: where and what it was made of (an index into playground_break_fx.gd MATERIALS). Every end that draws it.
+signal prop_shattered(at: Vector3, material: int)
+
 ## A shot, blast or blow took health off a body, a breakable prop or a pane: the authority's confirmation (never a prediction)
 ## the shooter's hit marker is drawn from, sent to the shooter alone. [param victim] only groups hits on one thing
 ## ([method hit_victim_id]); [param point] is where the number goes up. Fed from the four damage sites ([method confirm_hit]).

@@ -418,6 +418,8 @@ func _wire_presentation() -> void:
 		presentation.on_pane_broken(at)
 	)
 
+	playground.prop_shattered.connect(presentation.break_fx.shatter)
+
 	playground.undone.connect(_on_undone)
 
 	if playground.projectiles != null:

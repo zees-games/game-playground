@@ -47,6 +47,10 @@ var ambience: DotAudioAmbience = null
 
 ## Quiet moods under the map (dot-audio's stock set); the old bed plays only when none loaded.
 var ambient: DotAmbienceDirector = null
+const BreakFx := preload("playground_break_fx.gd")
+
+## Splinters and shards where props and panes break.
+var break_fx: Node = null
 var fx: DotFxManager = null
 ## Blood on the surface behind a hit body. Visual only; the player's `gore` setting and `fx_quality` scale it.
 var blood: DotFxBlood = null
@@ -94,6 +98,10 @@ func setup() -> DotResult:
 	var drawn := _build_fx()
 	if not drawn.ok:
 		return drawn
+	break_fx = BreakFx.new()
+	break_fx.name = "BreakFx"
+	add_child(break_fx)
+	break_fx.setup(settings)
 	_build_chat()
 
 	apply_all()
@@ -922,6 +930,7 @@ func on_body_hit(victim: int, point: Vector3, from: Vector3, reach: float = 4.0)
 
 func on_pane_broken(at: Vector3) -> void:
 	audio.play_at(&"glass_break", at)
+	break_fx.shatter(at, 0)
 
 
 func on_prop_landed(at: Vector3) -> void:

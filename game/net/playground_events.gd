@@ -78,6 +78,8 @@ enum Kind {
 	WEAPON_DROP,
 	WEAPON_SETTLED,
 	WEAPON_GONE,
+	## A prop broke: where and what it was made of, to everybody, for the splinters.
+	SHATTER,
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
@@ -1094,6 +1096,21 @@ static func write_pane(index: int) -> PackedByteArray:
 static func read_pane(r: DotNetReader) -> Dictionary:
 	var index := r.read_varint()
 	return {"index": index, "ok": r.ok()}
+
+
+# --- SHATTER -------------------------------------------------------------------
+
+static func write_shatter(at: Vector3, material: int) -> PackedByteArray:
+	var w := _w()
+	w.write_vector3_range(at, -WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
+	w.write_uint(clampi(material, 0, 7), 3)
+	return w.to_bytes()
+
+
+static func read_shatter(r: DotNetReader) -> Dictionary:
+	var at := r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
+	var material := r.read_uint(3)
+	return {"at": at, "material": material, "ok": r.ok()}
 
 
 # --- TOYS ----------------------------------------------------------------------

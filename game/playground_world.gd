@@ -1,5 +1,7 @@
 extends "res://game/playground_setup.gd"
 
+const BreakFx := preload("playground_break_fx.gd")
+
 func _build_props() -> void:
 	props = DotPropSpawner.new()
 	props.name = "Props"
@@ -501,6 +503,8 @@ func _on_prop_broken(prop: DotPropInstance, at: Vector3, _by: StringName) -> voi
 
 	if not authoritative or config == null or props == null:
 		return
+
+	prop_shattered.emit(at, BreakFx.material_of(prop.def.id if prop.def != null else &""))
 
 	var colour := PlaygroundProp.colour_of(prop.def) if prop.def != null else Color.GRAY
 	var extent := PlaygroundProp.extent_of(prop.def) if prop.def != null else Vector3.ONE

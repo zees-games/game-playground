@@ -27,7 +27,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 152
+const CHECKS := 157
 
 var _entered := 0
 var _completed := 0
@@ -62,6 +62,7 @@ func _run() -> void:
 	_test_carrying_is_a_refusal()
 	_test_sounds_and_effects()
 	_test_effects_draw()
+	_test_breaks_throw_pieces()
 	await _test_blood()
 	_test_console()
 	_test_party_does_not_migrate()
@@ -456,6 +457,26 @@ func _test_sounds_and_effects() -> void:
 ## [b]Every effect scene the catalogue names exists, and the effects actually spawn.[/b]
 ## Until 2026-09-27 `scenes/fx/` did not exist, dot-fx refused both scenes at DEBUG, and
 ## no check noticed because none asked whether anything was drawn.
+func _test_breaks_throw_pieces() -> void:
+	_section("Broken props and panes throw splinters and shards")
+
+	var p := _make()
+	var at := Vector3(0, 1, -6)
+	# dot-fx draws nothing headless unless told to.
+	p.break_fx.break_fx.config.headless = true
+	p.break_fx.shatter(at, p.BreakFx.material_of(&"crate"))
+	_check(p.break_fx.break_fx.spawned == 1, "a crate breaking draws one burst", str(p.break_fx.break_fx.spawned))
+	p.on_pane_broken(at)
+	_check(p.break_fx.break_fx.spawned == 2, "a pane breaking draws glass", str(p.break_fx.break_fx.spawned))
+	_check(p.BreakFx.material_of(&"barrel") == 2 and p.BreakFx.material_of(&"die") == 3, "barrels are metal and dice plastic")
+	p.break_fx.shatter(at, 99)
+	_check(p.break_fx.break_fx.spawned == 2, "an index past the table draws nothing")
+	var _r := p.settings.set_value(&"fx_quality", 0, &"test")
+	p.break_fx.shatter(at, 1)
+	_check(p.break_fx.break_fx.spawned == 2, "fx_quality 0 draws nothing", p.break_fx.break_fx.last_refusal)
+	_done()
+
+
 func _test_effects_draw() -> void:
 	_section("The effects this game names are drawn")
 

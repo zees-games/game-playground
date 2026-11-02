@@ -300,6 +300,8 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 		game.pickup.changed.connect(_on_pickup_changed)
 		game.held_changed.connect(_on_held_changed)
 		game.pane_broken.connect(_on_pane_broken)
+		game.prop_shattered.connect(func(at: Vector3, material: int) -> void:
+			_broadcast(PlaygroundEvents.Kind.SHATTER, PlaygroundEvents.write_shatter(at, material)))
 		game.addon_message.connect(func(addon: String, body: Dictionary) -> void:
 			_broadcast(PlaygroundEvents.Kind.ADDON, PlaygroundEvents.write_addon(addon, body)))
 		# To the one who hit, and nobody else: a confirmation is about what YOU did.
@@ -1908,6 +1910,10 @@ func _on_event(message: DotNetMessage) -> void:
 			var pane := PlaygroundEvents.read_pane(reader)
 			if bool(pane["ok"]):
 				game.break_pane(int(pane["index"]))
+		PlaygroundEvents.Kind.SHATTER:
+			var burst := PlaygroundEvents.read_shatter(reader)
+			if bool(burst["ok"]):
+				game.prop_shattered.emit(burst["at"], int(burst["material"]))
 		PlaygroundEvents.Kind.HELD:
 			var holding := PlaygroundEvents.read_held(reader)
 			if bool(holding["ok"]):

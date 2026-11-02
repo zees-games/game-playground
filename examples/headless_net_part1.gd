@@ -527,6 +527,10 @@ func _test_event_wire_4() -> void:
 		and absf(float(landed["amount"]) - 17.5) < 0.1 and bool(landed["killed"]) and bool(landed["headshot"])
 		and (landed["point"] as Vector3).distance_to(Vector3(1.0, 1.4, -6.0)) < 0.01,
 		"HIT keeps the victim's kind, the amount, the point and both flags", str(landed))
+	var shattered := PlaygroundEvents.read_shatter(DotNetReader.new(PlaygroundEvents.write_shatter(Vector3(4.0, 1.0, -9.0), 2)))
+	_check(bool(shattered["ok"]) and int(shattered["material"]) == 2
+		and (shattered["at"] as Vector3).distance_to(Vector3(4.0, 1.0, -9.0)) < 0.05,
+		"SHATTER keeps where a prop broke and what it was made of", str(shattered))
 	_check(PlaygroundRequest.fits(), "every request kind fits the request's kind field",
 		"%d kinds in %d bits" % [PlaygroundEvents.Ask.size(), PlaygroundRequest.KIND_BITS])
 	_check(PlaygroundEvents.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
