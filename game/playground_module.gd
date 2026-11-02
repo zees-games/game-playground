@@ -754,7 +754,7 @@ func _build_extras() -> DotResult:
 	spectate.name = "Spectate"
 	add_child(spectate)
 
-	var watching := spectate.setup(game)
+	var watching := spectate.bind(game)
 
 	if not watching.ok:
 		return watching.wrap("Spectating could not be set up")
