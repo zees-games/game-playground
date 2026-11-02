@@ -16,7 +16,7 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ## [/codeblock]
 
 const SECTIONS := 4
-const CHECKS := 27
+const CHECKS := 28
 
 var _entered := 0
 var _completed := 0
@@ -150,6 +150,7 @@ func _test_throw_and_pickup() -> void:
 	layer.drops.tick(1.0)
 	layer.tick(0.0)
 	_check(layer.drops.count() == 0 and ada.zee_rig != null, "then the unarmed player in reach arms with it")
+	_check(layer.rules.auto_pickup, "the sandbox walks over a gun to take it (auto_pickup on)")
 	_check(ada.zee_rig.arsenal.get_ammo_state().get("magazine", -1) == 3 if ada.zee_rig.arsenal.has_method(&"get_ammo_state") else true,
 		"with the ammunition it had")
 	var _bea_unused := bea

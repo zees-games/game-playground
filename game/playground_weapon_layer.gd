@@ -14,7 +14,7 @@ signal picked(player_id: StringName, state: Dictionary)
 const REACH := 0.6
 
 ## The server owner's cvars; they outlive a map change, so the game owns them, not the layer.
-var rules: DotWeaponDropRules = DotWeaponDropRules.new()
+var rules: DotWeaponDropRules = _walk_over_rules()
 var drops: DotWeaponDrops = null
 var game: Node = null
 ## `(player_id) -> bool`; the arena points it at its health, so the dead throw and take nothing.
@@ -139,3 +139,10 @@ class _Defs extends RefCounted:
 	func get_def(id: StringName) -> Variant:
 		var def: Variant = PlaygroundZee.catalogue().get_def(id)
 		return def if def != null else PlaygroundZee.pack_def(id)
+
+
+## Walk-over pickup is the sandbox's behaviour; dot-weapon's default is the use key only.
+static func _walk_over_rules() -> DotWeaponDropRules:
+	var r := DotWeaponDropRules.new()
+	r.auto_pickup = true
+	return r
