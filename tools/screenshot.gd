@@ -452,6 +452,17 @@ var _seq := DotShotSeq.new()
 var _seq_active := false
 
 
+func _splatter_blood() -> void:
+	if OS.get_cmdline_user_args().has("--nogore"):
+		_blood_from.settings.set_value(&"gore", false)
+	var npc := DotEntity.make_id(DotEntity.KIND_NPC, 1)
+	for i in 6:
+		var at := Vector3(-2.5 + i * 1.0, 1.2 + (i % 3) * 0.5, -1.0)
+		var _s := _blood_from.on_body_hit(npc, at, Vector3(at.x * 0.3, 1.7, 8.0), 8.0)
+	print("blood: %d splatters" % _blood_from.decals.blood_count())
+	_blood_from = null
+
+
 func _process(_delta: float) -> bool:
 	# The toys build in the tree, which the root's children are not during `_initialize`.
 	if _toy_box != null and _toy_box.count() == 0 and not _toy_placements.is_empty():
@@ -462,14 +473,7 @@ func _process(_delta: float) -> bool:
 	if _blood_from != null:
 		_blood_delay -= 1
 		if _blood_delay <= 0:
-			if OS.get_cmdline_user_args().has("--nogore"):
-				_blood_from.settings.set_value(&"gore", false)
-			var npc := DotEntity.make_id(DotEntity.KIND_NPC, 1)
-			for i in 6:
-				var at := Vector3(-2.5 + i * 1.0, 1.2 + (i % 3) * 0.5, -1.0)
-				var _s := _blood_from.on_body_hit(npc, at, Vector3(at.x * 0.3, 1.7, 8.0), 8.0)
-			print("blood: %d splatters" % _blood_from.decals.blood_count())
-			_blood_from = null
+			_splatter_blood()
 
 	if _fx_pending:
 		_fx_pending = false
@@ -513,10 +517,7 @@ func _process(_delta: float) -> bool:
 		_armed = true
 		if shot.has("arm"):
 			(shot["arm"] as Callable).call()
-		# Three frames before grabbing. The viewport's texture is the last COMPLETED
-		# frame, so grabbing in the same frame the camera moved saves the previous shot
-		# under the new shot's name — which looks exactly like a camera that did not
-		# move.
+		# Three frames before grabbing: the viewport's texture is the last COMPLETED frame.
 		_wait = int(shot.get("wait", 3))
 		return false
 

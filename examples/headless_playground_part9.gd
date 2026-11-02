@@ -300,7 +300,6 @@ func _test_aw_grenades() -> void:
 		await get_tree().physics_frame
 	_check(st != null and st.grenade != null and st.grenade.stuck, "a sticky grenade sticks where it lands")
 	layer.clear()
-
 	var zones := layer.effects
 	var smoke := layer.launch(_aw_spawn(&"aw_smoke", Vector3(40, 1.0, 40), Vector3.ZERO, 2), &"bot")
 	var fire := layer.launch(_aw_spawn(&"aw_incendiary", Vector3(44, 1.0, 44), Vector3.ZERO, 2), &"bot")
@@ -350,6 +349,12 @@ func _test_aw_grenades() -> void:
 		if spawned != null:
 			var _gone := playground.props.remove(spawned.instance_id)
 
+	_check_aw_wire_format()
+	layer.clear()
+	_done()
+
+
+func _check_aw_wire_format() -> void:
 	var wire_fire := PlaygroundEvents.write_detonate(3, Vector3(1, 2, 3), 4.0, 2, 7.5)
 	var wr := DotNetReader.new(wire_fire)
 	var _sub := wr.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
@@ -370,8 +375,6 @@ func _test_aw_grenades() -> void:
 	var _sub4 := full.read_uint(PlaygroundEvents.PROJECTILE_SUB_BITS)
 	_check(absf(float(sr["strength"]) - 0.4) < 0.04 and absf(float(PlaygroundEvents.read_blind(full)["strength"]) - 1.0) < 0.001,
 		"a blind tell carries the flash strength, full by default")
-	layer.clear()
-	_done()
 
 
 func _aw_spawn(id: StringName, at: Vector3, velocity: Vector3, fuse: int) -> DotWeaponSpawn:

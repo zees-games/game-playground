@@ -24,28 +24,14 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 ## godot --headless --path . res://examples/dedicated.tscn
 ## [/codeblock]
 ##
-## [b]This is the seam the family's own notes say is never run.[/b] The playground's
-## other suite exercises the joins between the gameplay addons; this one exercises the
-## join between the game and the server — the console, the module lifecycle, the
-## permission flags, and the tick rate travelling from `sv_tickrate` all the way to a
-## record's `tick_rate` field.
-##
-## Nothing here opens a socket. A dedicated server that never accepts a client is
-## still a dedicated server as far as its console, its cvars and its modules are
-## concerned, and those are what this is about.
+## The join between the game and the server: the console, the module lifecycle, the permission
+## flags, and `sv_tickrate` all the way to a record's `tick_rate`. Nothing here opens a socket.
 
 ## Sections that ran to their last line, and the checks they ran between them.
 ##
-## [b]Both, because either alone reports a healthy run with checks missing.[/b] A runtime
-## error inside a section aborts that function and not the run, so the checks after it
-## never happen and the "0 failed" at the bottom says nothing about them. The section
-## counter catches a section that stopped; the total catches the one shape it cannot — a
-## section that aborted AFTER announcing itself, which is how dot-settings reported "8
-## sections, 63 passed, 0 failed" with eight checks missing. See docs/testing.md.
-##
-## This suite had neither until 2026-09-24. Each section calls [method _section_done] as
-## its last line; an early `return` after a failed check skips it deliberately, because a
-## section that stopped early did not do what it says.
+## Both, because either alone reports a healthy run with checks missing: a runtime error aborts
+## a section and not the run. Each section calls [method _section_done] as its last line; an
+## early `return` after a failed check skips it deliberately. See docs/testing.md.
 var _stats_errors: PackedStringArray = []
 
 const SECTIONS := 32
@@ -59,11 +45,8 @@ const TIMER_CHECKS := 24
 
 ## Everything this run writes, and it is deleted on the way in and on the way out.
 ##
-## [b]A suite that writes to `user://` is a suite whose result depends on the last run.[/b]
-## This one wrote the real punishment store, the server's ban and admin files, its audit log
-## and an identity directory at their defaults, so every run appended to them: 352
-## punishments in the store a real server enforces, and a gag against `uid-pg-test` every
-## time. The achievements half of this already failed once on an unchanged tree.
+## A suite that writes to `user://` has a result that depends on the last run: this one used to
+## append to the real punishment store, ban and admin files and audit log.
 const SERVER_DIR := "user://pg_dedicated"
 
 var _sections_done := 0
@@ -81,13 +64,9 @@ const APP_URL := "playground"
 
 ## The loaded module, looked up rather than kept.
 ##
-## [b]Looked up every time, because `_test_module_unloads_cleanly` unloads it.[/b] A field
-## holding it would be a freed object the moment that section ran, and every section after
-## it would be testing a use-after-free rather than the thing it names.
-##
-## Typed as [DotModule] rather than as its own class, because `playground_module.gd` has
-## **no `class_name`** — it is loaded by path, which is the shape a module delivered in a
-## dot-cloud pack must have. Its fields come back through `get()` for the same reason.
+## Looked up every time, because `_test_module_unloads_cleanly` unloads it. Typed as [DotModule]:
+## `playground_module.gd` has no `class_name` (a pack-delivered module is loaded by path), so its
+## fields come back through `get()`.
 func _module() -> DotModule:
 	return server.modules.get_module("playground")
 
@@ -304,12 +283,9 @@ func _test_stats_report() -> void:
 
 ## Runs a console command as the local console and returns what it replied.
 ##
-## [b]Through a reply sink captured in an [Array], not by reading the template's own
-## output.[/b] Two reasons, and both are traps the family's notes already name:
-## [method DotConsole.execute] builds a FRESH context from the template and copies
-## only the sink, so the template's `output` stays empty; and a GDScript lambda
-## captures by value, so a [PackedStringArray] appended to inside one is unchanged
-## outside it. An [Array] is a reference and is not.
+## Through a reply sink captured in an [Array]: [method DotConsole.execute] builds a FRESH
+## context and copies only the sink, and a lambda captures by value, so a
+## [PackedStringArray] appended to inside one is unchanged outside it.
 func _forget_learned_heat() -> void:
 	var dir := "user://npc_heat"
 
@@ -345,25 +321,14 @@ func _said(lines: PackedStringArray, text: String) -> bool:
 func _boot() -> void:
 	print("booting a dedicated server")
 
-	# The tick rate is set the way an operator actually sets it: a line in a config
-	# file the server execs at boot.
+	# The tick rate is set the way an operator sets it: a line in a config file the server execs
+	# at boot, not by assigning `config.tickrate` (a `server.cfg` beats anything set in code).
 	#
-	# [b]Not by assigning `config.tickrate`, and that is the point of doing it this
-	# way.[/b] A `server.cfg` beats anything set in code, which is correct and is
-	# also exactly the trap this family has hit before: dot-server's own self-test
-	# once asserted a cvar value that the addon's shipped `server.cfg` had already
-	# overridden. Testing the file path tests what an operator will experience.
+	# `startup_config`, not `autoexec_config`: `sv_tickrate` is FLAG_STARTUP_ONLY, and dot-server
+	# execs `server.cfg` BEFORE the listener while `autoexec.cfg` runs after and is refused.
 	#
-	# [b]`startup_config`, not `autoexec_config`.[/b] `sv_tickrate` is
-	# FLAG_STARTUP_ONLY — a live server cannot re-negotiate its tick rate — and
-	# dot-server execs `server.cfg` BEFORE the listener for exactly that reason,
-	# while `autoexec.cfg` runs after and would have it refused. Putting the tick
-	# rate in the wrong one of the two is the mistake this test would otherwise be
-	# making silently.
-	#
-	# 100, deliberately not the project's own default of 128: the whole point of the
-	# chain below is that the SERVER decides, so a test using the same number on both
-	# sides would pass with the chain disconnected.
+	# 100, not the project's default of 128: the SERVER decides, so the same number on both sides
+	# would pass with the chain disconnected.
 	var cfg_path := "%s/server.cfg" % SERVER_DIR
 	var cfg := FileAccess.open(cfg_path, FileAccess.WRITE)
 
@@ -477,10 +442,8 @@ func _boot() -> void:
 
 	# Into this run's own directory. See [constant SERVER_DIR].
 	#
-	# Through the script, loaded here, rather than a `preload` at the top of this file: a
-	# preload would load the module when this scene loads, long before the host does, and
-	# the order scripts load in is what decides whether Godot 4.7.2 leaks them at exit. See
-	# [method _run_exit_probe]. This is the order a deployed server has.
+	# Loaded here, not preloaded at the top: a preload would load the module long before the host
+	# does, and script load order decides whether Godot 4.7.2 leaks them at exit.
 	(load("res://game/playground_module.gd") as GDScript).set(
 		"punishments_path", "%s/punishments.json" % SERVER_DIR
 	)
@@ -520,12 +483,8 @@ func _boot() -> void:
 func _test_tickrate_reaches_the_timer() -> void:
 	print("sv_tickrate reaches the record")
 
-	# The chain, end to end and in one test, because every link in it is silent when
-	# it breaks: an operator writes `sv_tickrate 100`; dot-server writes
-	# `Engine.physics_ticks_per_second`; the playground reads it; the timer manager
-	# adopts it; and it lands on the record. A timer counting 128 a second on a
-	# server stepping 100 reports every run 28% long, and nothing about the run
-	# looks unusual.
+	# The chain, end to end in one test, because every link is silent when it breaks: sv_tickrate,
+	# `Engine.physics_ticks_per_second`, the playground, the timer manager, the record.
 	_check(
 		server.console.get_int("sv_tickrate") == 100,
 		"server.cfg set sv_tickrate to 100",
@@ -771,16 +730,8 @@ func _test_permissions() -> void:
 
 ## A disconnect actually reaches the module.
 ##
-## [b]This is an ARITY check dressed as a behaviour check, and it is the only kind that
-## could have caught what it caught.[/b] `DotServer.client_disconnected` emits
-## `(session, reason)` and the handler took only the session, so Godot refused every call
-## — "Method expected 1 argument(s), but called with 2" — and the handler never ran. No
-## player was removed, no peer released, and the server kept building snapshots for
-## clients that had gone, three engine errors a tick, for ever.
-##
-## Nothing here had ever disconnected: every other test in this file adds its players
-## directly and the module is torn down at the end. So the bug needed a real browser
-## client to show, and this is the check that means it will not need one again.
+## An ARITY check: `DotServer.client_disconnected` emits `(session, reason)`, and a handler
+## taking only the session was refused by Godot on every call, so no player was ever removed.
 ## Chat, voice, and the one join between them that has to work.
 func _test_services() -> void:
 	print("")
@@ -1387,9 +1338,7 @@ func _test_progress() -> void:
 	)
 	_check(progress.link != null, "and a link from the stats to the achievements")
 
-	# [b]Every stat an achievement watches has to be one the game declares.[/b] An
-	# achievement watching a stat nothing reports never unlocks, nothing errors, and the
-	# only symptom is a player who did the thing and was not told.
+	# Every stat an achievement watches must be declared, or it never unlocks and nothing errors.
 	var schema := PlaygroundProgress.stats_schema()
 	var missing := PackedStringArray()
 
@@ -1406,16 +1355,8 @@ func _test_progress() -> void:
 	var problems := progress.achievements.catalogue.validate()
 	_check(problems.ok, "the catalogue validates", str(problems.error))
 
-	# [b]Wipe this player's stored progress first.[/b] `DotAchievementStoreFile` writes to
-	# `user://`, so every run of this suite ADDED sixty spawns to whatever the last one
-	# left — and after about nine runs the "and not the second" check below crossed 500
-	# and started failing for ever, on a tree with no changes in it. A suite that carries
-	# state between runs is a suite whose result depends on how many times it has been
-	# run, which is the one thing a check must not depend on.
-	#
-	# Matched by substring rather than by a filename this test would have to know: the
-	# store's naming is the store's business, and a second copy of it here is the
-	# family's most repeated bug in miniature.
+	# Wipe stored progress first: the file store writes to `user://`, so each run would add sixty
+	# spawns to the last and the "not the second" check would eventually fail on its own.
 	_forget_stored_progress(progress, "pg-test")
 
 	progress.begin("pg-test")
@@ -1432,9 +1373,7 @@ func _test_progress() -> void:
 		"and not the second"
 	)
 
-	# A LOWEST merge, which is the other end of dot-stats' four kinds — and the reason
-	# `DotAchievementRule.Merge` is deliberately the same table: the two would otherwise
-	# disagree about what a new reading does to an old one.
+	# A LOWEST merge, the other end of dot-stats' four kinds.
 	progress.achievements.record("pg-test", &"fastest_run", 40.0)
 	progress.achievements.record("pg-test", &"fastest_run", 18.0)
 	progress.achievements.record("pg-test", &"fastest_run", 55.0)

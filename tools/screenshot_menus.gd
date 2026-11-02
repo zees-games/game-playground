@@ -54,6 +54,35 @@ func _real_pack_rows() -> Array:
 	return found.describe_items()
 
 
+func _sample_board() -> Dictionary:
+	return {
+		"server": {"name": "Playground  |  build anything", "map": "pg_flatgrass", "players": 4, "max": 24},
+		"you": "2",
+		"stat_columns": [{"key": "props", "title": "Props", "column": "number"}, {"key": "kills", "title": "Kills", "column": "number"}],
+		"players": [
+			{"id": "1", "name": "gamemann", "score": 42, "seconds": 1840, "ping": 23, "st_props": "12", "lt_props": "340", "st_kills": "3", "lt_kills": "88"},
+			{"id": "2", "name": "builder_bo", "score": 17, "seconds": 610, "ping": 48, "st_props": "30", "lt_props": "51", "st_kills": "0", "lt_kills": "2"},
+			{"id": "3", "name": "a_very_long_display_name", "score": 9, "seconds": 95, "ping": 112},
+			{"id": "4", "name": "newcomer", "score": 0, "seconds": 12, "ping": -1},
+		],
+	}
+
+
+func _follow_zee_pack(menu: PlaygroundSpawnMenu) -> void:
+	# A subscribed weapon pack, as the solo client wires it: the real zee provides.json in a
+	# DotContentIndex, followed by the workshop adapter, so the tab is the one a player sees.
+	var zee_dir := ProjectSettings.globalize_path("res://").path_join("../zee-dot-weapons").simplify_path()
+	var zee_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string(zee_dir.path_join("provides.json")))
+	var index := DotContentIndex.new()
+	var _zee := index.add_pack({
+		"content_id": "gamemann/zee-dot-weapons", "version": "1.0.0", "prefix": zee_dir,
+		"session": "solo", "source": "subscription", "provides": zee_provides,
+	})
+	_workshop = PlaygroundWorkshop.new()
+	_workshop.follow(index, menu.catalogue, menu.weapons)
+	menu.set_pack_rows(_workshop.rows())
+
+
 func _initialize() -> void:
 	# Scratch settings, so a render never touches a player's file.
 	var _scratch := PlaygroundPresentation.use_scratch_settings("screenshot_menus")
@@ -86,18 +115,7 @@ func _initialize() -> void:
 	_stack.register(menu)
 	_menu = menu
 
-	# A subscribed weapon pack, as the solo client wires it: the real zee provides.json in a
-	# DotContentIndex, followed by the workshop adapter, so the tab is the one a player sees.
-	var zee_dir := ProjectSettings.globalize_path("res://").path_join("../zee-dot-weapons").simplify_path()
-	var zee_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string(zee_dir.path_join("provides.json")))
-	var index := DotContentIndex.new()
-	var _zee := index.add_pack({
-		"content_id": "gamemann/zee-dot-weapons", "version": "1.0.0", "prefix": zee_dir,
-		"session": "solo", "source": "subscription", "provides": zee_provides,
-	})
-	_workshop = PlaygroundWorkshop.new()
-	_workshop.follow(index, menu.catalogue, menu.weapons)
-	menu.set_pack_rows(_workshop.rows())
+	_follow_zee_pack(menu)
 
 	# The Escape menu the client builds (dot-menu's), over this game's own settings document,
 	# and its Tab board with a roster shaped like the one dot-server sends.
@@ -123,18 +141,7 @@ func _initialize() -> void:
 	# Its load cover would be in every frame; this render is of the menus, not of a join.
 	_platform = platform
 	var _store := platform.add_store_panel(_game_menu, func() -> String: return "")
-	_game_menu.scoreboard.source = func() -> Dictionary:
-		return {
-			"server": {"name": "Playground  |  build anything", "map": "pg_flatgrass", "players": 4, "max": 24},
-			"you": "2",
-			"stat_columns": [{"key": "props", "title": "Props", "column": "number"}, {"key": "kills", "title": "Kills", "column": "number"}],
-			"players": [
-				{"id": "1", "name": "gamemann", "score": 42, "seconds": 1840, "ping": 23, "st_props": "12", "lt_props": "340", "st_kills": "3", "lt_kills": "88"},
-				{"id": "2", "name": "builder_bo", "score": 17, "seconds": 610, "ping": 48, "st_props": "30", "lt_props": "51", "st_kills": "0", "lt_kills": "2"},
-				{"id": "3", "name": "a_very_long_display_name", "score": 9, "seconds": 95, "ping": 112},
-				{"id": "4", "name": "newcomer", "score": 0, "seconds": 12, "ping": -1},
-			],
-		}
+	_game_menu.scoreboard.source = _sample_board
 
 	_shots = [
 		{"id": &"spawn_menu", "file": "menu_spawn.png"},
@@ -187,6 +194,26 @@ func _initialize() -> void:
 var _platform: DotGameClient = null
 
 
+func _show_menu_tab(shot: Dictionary) -> void:
+	if shot.has("mode"):
+		_menu.tool_mode = shot["mode"]
+	if shot.has("settings"):
+		_menu.set_tool_settings(StringName(shot["mode"]), shot["settings"])
+		_menu.set_edit_target("Crate")
+	if shot.has("addons"):
+		_menu.addon_items = shot["addons"]
+	if shot.has("builds"):
+		_menu.builds = shot["builds"]
+	_menu.show_tab(shot["tab"])
+	_menu.refresh()
+	if shot.has("category"):
+		_menu.set("_category", shot["category"])
+	# The grid too: two frames on one tab do not change tab, and the card picked for
+	# the last frame would stay lit.
+	_menu.call("_rebuild_grid")
+	_menu.call("_rebuild_settings")
+
+
 func _process(_delta: float) -> bool:
 	if _platform != null and _platform.gate != null:
 		for reason in _platform.gate.reasons():
@@ -233,23 +260,7 @@ func _process(_delta: float) -> bool:
 			return false
 
 		if shot.has("tab") and _menu != null:
-			if shot.has("mode"):
-				_menu.tool_mode = shot["mode"]
-			if shot.has("settings"):
-				_menu.set_tool_settings(StringName(shot["mode"]), shot["settings"])
-				_menu.set_edit_target("Crate")
-			if shot.has("addons"):
-				_menu.addon_items = shot["addons"]
-			if shot.has("builds"):
-				_menu.builds = shot["builds"]
-			_menu.show_tab(shot["tab"])
-			_menu.refresh()
-			if shot.has("category"):
-				_menu.set("_category", shot["category"])
-			# The grid too: two frames on one tab do not change tab, and the card picked for
-			# the last frame would stay lit.
-			_menu.call("_rebuild_grid")
-			_menu.call("_rebuild_settings")
+			_show_menu_tab(shot)
 
 	if _wait == 1 and bool(shot.get("scroll_end", false)):
 		for found in _game_menu.find_children("*", "ScrollContainer", true, false):

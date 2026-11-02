@@ -22,8 +22,7 @@ const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
 
 ## Boots a playable playground: one local player, a camera, a HUD, a spawn menu and the keys.
 ##
-## Separate from [Playground] on purpose: the playground is the simulation and runs headless;
-## this is everything a person needs on top of it, and a dedicated server never loads it.
+## Separate from [Playground], the simulation: a dedicated server never loads this.
 ##
 ## The bindings are the sandbox ones, so the game can be picked up without a manual:
 ##
@@ -54,12 +53,8 @@ const TOOLGUN := &"toolgun"
 ## The tool gun mode that edits a selected prop (`game/toolgun/tool_edit.gd`).
 const EDIT_MODE := &"edit"
 
-## How long Q may be held before releasing it closes the menu.
-##
-## [b]A tap pins, a hold does not.[/b] Both are wanted and they are the same key in
-## in those sandboxes: holding it is how you glance at the menu without losing your place,
-## and tapping it is how you leave it up while you build. A quarter of a second is
-## comfortably longer than a click and comfortably shorter than a look.
+## How long Q may be held before releasing it closes the menu: a tap pins it open, a hold is a
+## glance. A quarter of a second is longer than a click and shorter than a look.
 const MENU_TAP_SECONDS := 0.25
 
 ## Where a spawned prop appears, in metres in front of the eye.
@@ -76,11 +71,8 @@ var last_undo_cue: Dictionary = {}
 
 ## Configuration handed to the [Playground] this builds, or null for the defaults.
 ##
-## [b]Forwarded rather than set afterwards.[/b] `Playground._ready` layers the config
-## and loads `initial_map` from it, and both happen inside `add_child` — so anything
-## assigned after that is assigned to a game that has already booted on the old
-## values. It is also the only way a test can boot a real client without it writing
-## records into the user's data directory.
+## Forwarded, not set afterwards: `Playground._ready` layers it and loads `initial_map` inside
+## `add_child`. It also lets a test boot a real client without writing the user's data directory.
 @export var config: PlaygroundConfig = null
 
 ## A JSON file to layer over [member config]. Passed straight through.
@@ -88,10 +80,9 @@ var last_undo_cue: Dictionary = {}
 
 ## The dedicated server's client link, when this client is on a server.
 ##
-## [b]Set before this node enters the tree, and it is what decides which client this
-## is.[/b] With it, the playground is a mirror: it is not authoritative, it adds no
-## player of its own, and every action goes to the server as intent. Without it, this
-## is the local sandbox it has always been, which is what `headless_playground` drives.
+## Set before this node enters the tree; it decides which client this is. With it the playground
+## is a mirror (not authoritative, no player of its own, every action sent as intent); without it,
+## the local sandbox `headless_playground` drives.
 @export var link: Node = null
 
 var playground: Playground = null
@@ -126,10 +117,8 @@ var platform: DotGameClient = null
 
 ## The player asked to leave from the pause menu.
 ##
-## Announced rather than acted on: what "leave" means belongs to whatever loaded this
-## client -- a shell goes back to its own menu, an embedded page closes the frame, a
-## development scene quits. A client that called `get_tree().quit()` itself would be one
-## that cannot be embedded in anything.
+## Announced, not acted on: what "leave" means belongs to whatever loaded this client (a shell, an
+## embedded page, a development scene).
 signal leave_requested()
 
 var screens: DotScreenStack = null
@@ -176,9 +165,8 @@ var tool: StringName = TOOL_PHYS
 
 ## The weapon in hand, when [member tool] is neither of the two built-in guns.
 ##
-## [b]Instantiated per equip, not held as a pool.[/b] A weapon is a script with state —
-## a charge, a cooldown, what it is holding — and a shared instance would carry one
-## player's cooldown into another's hands the moment this becomes a server.
+## Instantiated per equip, not pooled: a weapon has state (charge, cooldown) that a shared
+## instance would carry from one player's hands into another's.
 var weapon: PlaygroundWeapon = null
 
 ## The hands and the gun, under the first-person camera, while a zee weapon is in them.
@@ -235,37 +223,26 @@ func _ready() -> void:
 	playground = Playground.new()
 	playground.name = "Playground"
 
-	# [b]A networked client is not authoritative, and this is where that is decided.[/b]
-	# Set afterwards it would be assigned to a game that had already booted:
-	# `Playground._ready` layers the config and loads the first map inside `add_child`,
-	# so a game told at that point that it is a mirror has already spent a map load
-	# believing it owned the world.
+	# A networked client is not authoritative, and this is where that is decided: set afterwards,
+	# `Playground._ready` would already have spent a map load believing it owned the world.
 	if config == null:
 		config = PlaygroundConfig.new()
 
 	# zee-dot-weapons' art is this game's copy of it, wherever this game is mounted.
 	PlaygroundZee.use_this_games_art()
 
-	# [b]Looked up when nobody handed it over, because in a delivered game nobody does.[/b]
-	# The shell sets [member link] on a BUILT-IN client scene, and this game has been a
-	# pack since 2026-09-23 — and `DotClientLink._on_load_game` instantiates a pack's
-	# client scene itself and sets nothing on it. So every connected client booted as the
-	# local sandbox: authoritative, a player of its own, connected to a server it never
-	# spoke to, and every person on the server alone in a private copy of the map. Every
-	# other game in the family reads the registry; this one only had the export. The
-	# export still wins, so two shells in one process keep their own links.
+	# Looked up when nobody handed it over: a pack's client scene is instantiated by
+	# `DotClientLink._on_load_game`, which sets nothing on it. The export still wins, so two shells
+	# in one process keep their own links.
 	if link == null and not platform.offline:
 		link = platform.link as Node
 
 	if link != null:
 		config.authoritative = false
 
-	# [b]Before the playground, and the ordering is what makes the generated map work.[/b]
-	# `Playground._ready` loads its first map inside `add_child`, and a generated map asks
-	# `DotRegistry` for a seed source at that moment. A randomness manager registered
-	# afterwards is one the map did not use -- and nothing would error, because falling
-	# back to a fixed seed is a legitimate configuration and therefore indistinguishable
-	# from the bug.
+	# Before the playground: `Playground._ready` loads its first map inside `add_child`, and a
+	# generated map asks `DotRegistry` for a seed source then. One registered afterwards is silently
+	# ignored (a fixed seed is a legitimate fallback).
 	presentation = PlaygroundPresentation.new()
 	presentation.name = "Presentation"
 	presentation.client = self
@@ -384,13 +361,10 @@ func _build_gate() -> void:
 	platform.name = "Platform"
 	platform.force_offline = link == null and OS.get_cmdline_user_args().has("--offline")
 	platform.link = link
-	# Not built by the platform: the settings document is PlaygroundPresentation's manager with
-	# a DotMenu built round it (the Servers action, the loadout and map menus), handed over by
-	# `adopt_menu`, and the console must follow that menu, so `add_console` comes later (see
-	# _build_pause). The pointer is the platform's: the first Escape frees it, the second opens
-	# the menu, and a click or the menu closing takes it back -- except while the Q menu or the
-	# server browser, screens on this client's own stack, are up. Tab is the roster's, not the
-	# platform's board.
+	# Not built by the platform: the settings document is PlaygroundPresentation's, handed over by
+	# `adopt_menu`, and the console must follow that menu (`add_console` comes later, see
+	# _build_pause). The pointer is the platform's, except while the Q menu or the server browser
+	# are up. Tab is the roster's, not the platform's board.
 	platform.use_settings = false
 	platform.use_console = false
 	platform.escape_releases_pointer = true
@@ -628,11 +602,8 @@ func _on_hello(id: int) -> void:
 	_adopt()
 
 
-## [b]HELLO names you and JOIN creates you, in that order.[/b] Looking the player up on
-## HELLO alone gets null and never tries again — which is how g2gfast shipped a browser
-## client that connected, drew, showed a live HUD and walked around with a dead mouse
-## and a dead keyboard, because everything below the `player == null` guard in its input
-## handler never ran.
+## [b]HELLO names you and JOIN creates you, in that order.[/b] Looking the player up on HELLO
+## alone gets null and never tries again, which leaves a client with a dead mouse and keyboard.
 func _on_roster_changed(_id: int) -> void:
 	_adopt()
 
@@ -680,13 +651,10 @@ func _net_physics(delta: float) -> void:
 	if sampler == null or _covered():
 		return
 
-	# [b]Each pass is its own tick.[/b] `advance` has already moved the clock by all of
-	# them, so `input_tick()` is the LAST one on every pass: a frame worth two ticks sent
-	# the second twice and the first never, the server repeated a stale command for the
-	# one it never got, and the predictor's replay stopped at the hole and drew the player
-	# short of where they were -- after every hitch, and on every frame the display and
-	# the tick rate do not line up. Arithmetic here rather than a new dot-net call,
-	# because a pack has to run on whatever client shell the player already has.
+	# Each pass is its own tick: `advance` has already moved the clock by all of them, so
+	# `input_tick()` is the LAST one on every pass, and a frame worth two ticks sent the second
+	# twice and the first never. Arithmetic here, not a new dot-net call, so a pack runs on any
+	# client shell.
 	for i in range(ticks):
 		if net.clock.is_synced():
 			var tick := net.clock.input_tick() - (ticks - 1 - i)
@@ -779,11 +747,8 @@ func _build_view() -> void:
 
 ## Builds the third-person controller and the switch, on the local player only.
 ##
-## [b]Here rather than in `Playground.add_player`, and the ordering is the whole
-## reason.[/b] `samples_input` is set by this client AFTER the player is made — the
-## comment above says why — so a switch built inside `add_player` would look at a player
-## who is not yet local, decide there was no camera to serve, and build nothing. The
-## symptom would be F5 doing nothing, on the one player it is supposed to work for.
+## Here, not in `Playground.add_player`: `samples_input` is set by this client after the player is
+## made, so a switch built there would see a non-local player and build nothing (F5 does nothing).
 func _build_view_switch() -> void:
 	if player == null:
 		return
@@ -841,15 +806,9 @@ func _build_client_services() -> void:
 
 ## Joins the chat box to the three things it needs.
 ##
-## [b]The sampler is the half that is easy to forget.[/b] `swallows_input` keeps typed keys
-## out of `_unhandled_input`, but movement here is POLLED — `DotFpsSampler.sample` reads
-## the device every physics frame and does not care what consumed an event. Without
-## `suspended`, typing "sw" walks the player backwards through whatever they were building.
-##
-## [b]dot-server's `chat_received` is connected here for its state and the server's own
-## lines.[/b] This game routes every PLAYER's line through its own wire on purpose —
-## connecting both would draw one line twice — but the state payload and the server's system
-## and admin lines come down dot-server's side and there is nowhere else to hear them.
+## The sampler too: movement is POLLED, so without `suspended` typing "sw" walks the player back.
+## dot-server's `chat_received` feeds only the server's own lines; a PLAYER's line goes through
+## this game's wire, so connecting both would draw one twice.
 func _wire_chat_window() -> void:
 	var window: DotChatWindow = presentation.chat_window if presentation != null else null
 
@@ -866,12 +825,11 @@ func _wire_chat_window() -> void:
 		client_link.connect("chat_received", _on_server_chat_state)
 
 
-## dot-server's chat payload: what is carrying the conversation, and the server's own lines.
+## dot-server's chat payload: what carries the conversation, and the server's own lines.
 ##
-## [b]A player's line is never drawn from here[/b]: this game routes those over its own wire,
-## and drawing them here as well is the same line twice. [b]The server's own lines are[/b] (a
-## vote between games, "Ada joined the game.", an admin's `say`): they come only this way,
-## and ignoring them with the players' lines is how this game never showed one.
+## A player's line is never drawn from here (this game routes those over its own wire); the
+## server's own lines (a vote between games, "Ada joined the game.", an admin's `say`) come only
+## this way.
 func _on_server_chat_state(payload: Dictionary) -> void:
 	if str(payload.get("kind", "")) != "state":
 		var window: DotChatWindow = presentation.chat_window if presentation != null else null
@@ -906,9 +864,7 @@ func _on_chat_wire(wire: Dictionary) -> void:
 
 ## A line [DotChatClient] accepted: in sequence, not a duplicate, on a known channel.
 ##
-## [b]The channel decides how it is drawn, and the channel is a document.[/b] Its prefix
-## and colour come off the [DotChatChannel] both ends share, so adding a channel is adding
-## a definition rather than a branch somebody has to remember to extend.
+## The channel, a [DotChatChannel] both ends share, decides the prefix and colour.
 func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 	if hud == null:
 		return
@@ -919,13 +875,9 @@ func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 	var window: DotChatWindow = presentation.chat_window if presentation != null else null
 	var colour := chan.colour if chan != null else Color(0.88, 0.90, 0.94)
 
-	# [b]In the chat box, and on the notice line only when there is no box.[/b] Both drew
-	# every line: a map vote's ballot was printed at the notice line in the middle left and
-	# again in the box bottom left, beside the drawn ballot panel. The notice line keeps what
-	# is the game's (budget reached, a tool's refusal), which never comes through chat.
-	# A join or leave notice is a name and no text (dot-chat's `_presence`): drawn by its
-	# text it was an empty line in the box, and by name and text a bare "Guest 435:".
-	# `describe()` words it ("Guest 435 joined"); every other kind is drawn by its text.
+	# In the chat box, and on the notice line only when there is no box: the notice line keeps what
+	# is the game's (budget reached, a tool's refusal), never chat. A join or leave notice is a name
+	# and no text, so `describe()` words it ("Guest 435 joined"); other kinds are drawn by their text.
 	var text := message.describe() \
 		if message.kind in [DotChatMessage.Kind.JOIN, DotChatMessage.Kind.LEAVE] \
 		else message.text
@@ -1055,12 +1007,8 @@ func rise(id: StringName) -> void:
 		who.character.body().visible = true
 
 
-## The match clock.
-##
-## [b]Taken from the wire rather than from a local [DotMatch].[/b] Nothing ticks a
-## mirroring client's, so `seconds_remaining()` is derived from a tick that is still zero —
-## not a stale value, a value nothing had ever written. game-arena shipped a client that
-## showed `IDLE` for ever while the server was playing a round.
+## The match clock, taken from the wire: nothing ticks a mirroring client's [DotMatch], so
+## `seconds_remaining()` would derive from a tick still zero.
 func _on_match(state: Dictionary) -> void:
 	match_label = str(state["label"])
 	match_seconds = float(state["seconds_left"])
@@ -1068,10 +1016,8 @@ func _on_match(state: Dictionary) -> void:
 
 ## Somebody picked a server in the browser.
 ##
-## [b]Connecting is the host application's, not this scene's.[/b] A client scene that
-## reached into its own link and reconnected would be a scene that decides where a person
-## plays — and the same scene is instantiated by a shell that already knows. So this
-## announces, and a launcher acts; offline it says so rather than pretending.
+## Announced, not acted on: connecting is the host application's, since a shell instantiating this
+## scene already knows where a person plays. Offline it says so.
 func _on_server_chosen(address: String) -> void:
 	server_chosen.emit(address)
 
@@ -1179,21 +1125,15 @@ func _suspend_input(blocked: bool) -> void:
 		sampler.suspended = blocked
 
 
-## The escape menu.
+## The escape menu: dot-menu's, with this game's settings on its pages and the server list as a
+## sidebar action. The spawn menu (Q) and the server browser stay on this client's screen stack.
 ##
-## [b]dot-menu's since 2026-10-09.[/b] It was dot-ui's pause screen (Resume, Settings,
-## Servers, Leave) over a generated settings form; it is the same menu every game here has
-## now, with this game's settings on its pages and the server list as a sidebar action.
-## The spawn menu (Q) and the server browser stay on this client's screen stack.
-##
-## [b]Escape keeps its two steps here[/b]: the first releases the pointer, the second opens
-## the menu (see KEY_ESCAPE in `_unhandled_input`), so the menu is told not to open on
-## Escape itself. It still closes on Escape.
+## Escape keeps its two steps (the first releases the pointer, the second opens the menu; see
+## KEY_ESCAPE in `_unhandled_input`), so the menu is told not to open on Escape but still closes on it.
 func _build_pause() -> void:
 	var settings: DotSettingsManager = presentation.settings if presentation != null else null
 
-	# The keys on the InputMap before anything reads them: the menu's help key, the sampler's
-	# movement and this client's own all come from the table now.
+	# Keys on the InputMap before anything reads them: help key, movement and this client's own.
 	keys = PlaygroundBindings.make()
 	if settings != null:
 		keys.apply_all(settings)
@@ -1208,15 +1148,12 @@ func _build_pause() -> void:
 	game_menu.config = config
 	game_menu.open_on_escape = false
 	game_menu.manage_pointer = false
-	# Leave is dot-menu's: off the server when connected (the shell takes the player back to
-	# its own menu), a quit solo on a desktop. `leave_requested` is still emitted for an
-	# embedder; until 2026-10-11 it was all Leave did, and nothing listened.
+	# Leave is dot-menu's: off the server when connected, a quit solo on a desktop.
 	game_menu.leave_on_its_own = true
 	add_child(game_menu)
 	var _set := game_menu.setup()
-	# The platform takes the menu (the input block, the pointer, `menu_state_changed`), then
-	# builds the console after it, so DotConsoleKit registers it as one of the menu's
-	# overlays: opening it then stops the player through `overlays_changed` below.
+	# The platform takes the menu, then builds the console after it so DotConsoleKit registers
+	# it as one of the menu's overlays.
 	platform.board_snapshot_fn = board_snapshot
 	platform.board_prepare_fn = _prepare_board
 	platform.adopt_menu(game_menu)
@@ -1244,19 +1181,15 @@ func _build_pause() -> void:
 	game_menu.screen.restyle(game_menu.kit)
 	_sync_profiles_entry()
 
-	# M: the maps (dot-menu's map menu, on the table's MAP row). Solo a choice changes the map
-	# here at once; connected the server decides, by the owner's `sv_map_menu_flag`, and
-	# anybody without it gets a vote instead (dot-vote's map menu, over this game's map vote).
-	# By name, so a client shell older than the map menu still runs the game without it.
+	# M: the maps. Solo a choice changes the map at once; connected the server decides by
+	# `sv_map_menu_flag`, and anybody without it gets a vote. By name, so an older shell still runs.
 	if game_menu.has_method(&"use_maps"):
 		var _maps: Variant = game_menu.call(&"use_maps", map_menu_rows, change_from_menu)
 	_use_loadout_menu()
 	_use_mods_menu()
 	game_menu.action_requested.connect(_on_menu_action_chosen)
 	game_menu.overlays_changed.connect(func(_open: bool) -> void:
-		# At once, not at the platform's next poll: the keys are given back or taken the
-		# instant the console or menu opens or closes. The pointer follows through the
-		# platform's own menu-state handler.
+		# At once, not at the platform's next poll.
 		platform.refresh_blocked())
 
 	if settings != null:
@@ -1480,10 +1413,8 @@ func _process(_delta: float) -> void:
 ## body turned the way they are looking. Returns how many bodies are shown. Static so the net
 ## suite drives exactly this.
 ##
-## Once a frame, not once a tick: asked only at a tick boundary the interpolator is useless and
-## remote players step at the snapshot rate. The bodies come after it because it moves the nodes
-## they hang off. [param alpha] is how far through the tick the frame is (-1 asks the engine);
-## [param own] is this client's own player.
+## Per frame, not per tick, or remote players step at the snapshot rate. [param alpha] is how far
+## through the tick the frame is (-1 asks the engine); [param own] is this client's own player.
 static func present_frame(
 	p_net: DotNetManager, p_game: Playground, alpha: float = -1.0, own: PlaygroundPlayer = null
 ) -> int:
@@ -1492,12 +1423,9 @@ static func present_frame(
 	if networked:
 		p_net.interpolate_frame(alpha)
 
-	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the
-	# clock stretches and shrinks its ticks while it settles on the server, so a physics frame
-	# now and then runs no tick or two, and drawn at the engine's fraction the eye stood still
-	# on one frame and moved double on the next. `DotFpsController.render_state` reads it from
-	# `render_clock` (dot-player-controller); by name both ways, so a shell older than either
-	# draws as before. Null offline, where every physics frame is one tick.
+	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the clock
+	# stretches its ticks while it settles on the server, so at the engine's fraction the eye stood
+	# still then moved double. By name both ways, so an older shell draws as before; null offline.
 	if own != null and is_instance_valid(own) and own.controller != null:
 		own.controller.set(&"render_clock", p_net.clock if networked else null)
 
@@ -1522,10 +1450,8 @@ static func present_frame(
 
 ## Draws every beaconed player's marker for one frame, and plays each ripple's ping.
 ##
-## Every player in the world, this client's own included: somebody who has been beaconed
-## should see the ring at their feet and hear it too. Here rather than in the game's tick,
-## because the game is the SIMULATION and runs on a server that draws nothing — a marker is
-## presentation, and a dedicated server that built one would be building meshes for nobody.
+## Every player, this client's own included. Here, not in the game's tick: a marker is
+## presentation and a dedicated server would build meshes for nobody.
 func _present_beacons(delta: float) -> void:
 	if playground == null:
 		return
@@ -1563,10 +1489,7 @@ func _menu_is_open() -> bool:
 
 ## The sampler the next simulated tick will actually read.
 ##
-## A networked client builds its command from `_sampler` in [method _net_physics] (the command
-## is stamped for a tick); a local player samples through `player.sampler`. Mouse events must
-## feed this one: a networked player has no sampler of its own, so feeding `player.sampler`
-## dropped every event and left the mouse dead.
+## A networked player has no sampler of its own, so mouse events must feed this one.
 ## server. Left null in play, where the real mouse mode is the only honest answer.
 var mouse_capture_override: Variant = null
 
@@ -1581,16 +1504,9 @@ func mouse_drives_view() -> bool:
 	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
-## Points the applier's look settings (`sensitivity`, at dot-menu's degrees per count) at
-## the tunables every sampler this client turns the view with reads, and applies them now.
-##
-## [b]The slider moved nothing until 2026-10-11.[/b] `sensitivity` was declared, shown on
-## dot-menu's page and saved, and nothing ever called `bind_look`, so the view turned at
-## `DotFpsTunables`' default whatever the player chose. Called once the applier exists (the
-## offline player's sampler is built before it) and again in [method _adopt], because the
-## connected sampler is handed the player's tunables there: a new object, at the default.
-## Only look fields are written, and `DotFpsTunables.fingerprint` leaves those out, so a
-## client writing them cannot disagree with its server.
+## Points the applier's look settings (`sensitivity`) at the tunables every sampler reads, and
+## applies them now. Called again in [method _adopt]. Only look fields are written, which
+## `DotFpsTunables.fingerprint` leaves out, so a client cannot disagree with its server.
 func _bind_look() -> void:
 	if applier == null:
 		return
@@ -1625,13 +1541,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# [b]A click on the world with the pointer released takes it back, and does nothing
-	# else.[/b] The platform captures it (its `_unhandled_input` runs before this one, so
-	# `mouse_drives_view` is already true); `_was_driving` is last frame's answer, which is
-	# what says this click was the one that took the pointer. Spent on capturing rather than
-	# also firing: the player was pointing, not aiming. Before the `player == null` guard
-	# for g2gfast's reason too -- a click while the world is still loading must not be
-	# swallowed, or the cursor is never captured at all.
+	# A click on the world with the pointer released takes it back and does nothing else: the
+	# platform captures it first, and `_was_driving` (last frame's answer) says this click took the
+	# pointer. Before the `player == null` guard, so a click while the world loads is not swallowed.
 	if (
 		event is InputEventMouseButton and (event as InputEventMouseButton).pressed
 		and not _menu_is_open() and not _was_driving
@@ -1645,12 +1557,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_mouse_motion(event as InputEventMouseMotion)
 		return
 
-	# Everything below moves the world. A menu is up, the mouse is a cursor, and a
-	# click on a prop button must not also punt whatever is behind it.
-	#
-	# Checked here rather than relying on the screen consuming the event: the stack
-	# blocks what reaches the GUI, and a click that lands on the menu's own
-	# background is unhandled by design and would arrive here.
+	# Everything below moves the world. A menu is up, the mouse is a cursor, and a click on the
+	# menu's own background is unhandled by design and would arrive here.
 	if _menu_is_open() and not _is_menu_key(event):
 		return
 
@@ -1749,24 +1657,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		if hud != null:
 			hud.notice(LOADOUT_ARENA_ONLY)
 	elif key.is_action(PlaygroundBindings.VIEW):
-		# The key every third-person toggle in this genre is on, and the one
-		# game-g2gfast already uses for its own. This one hands the player to a
-		# different CONTROLLER rather than flipping a camera, which is why the
-		# handover carrying position, velocity and look matters: pressing it
-		# mid-jump must not stop you dead in the air.
+		# The usual third-person toggle. It hands the player to a different CONTROLLER, so the
+		# handover carries position, velocity and look: pressing it mid-jump must not stop you dead.
 		_toggle_view()
 
 	match key.physical_keycode:
 		KEY_ESCAPE:
-			# Only when no screen is up. The stack's own back handling pops the menu,
-			# and a second handler here would pop it and open the pause menu in one
-			# press.
-			#
-			# [b]Release, THEN open, and never capture.[/b] The release is the platform's
-			# (`escape_releases_pointer`: it frees a captured pointer on the first Escape and
-			# consumes it, so that press never gets here); this is the second press. Capturing
-			# is a click's job, because a browser refuses pointer lock from a key for about a
-			# second after Escape.
+			# Only when no screen is up: the stack's own back handling pops the menu, and a second
+			# handler would also open the pause menu in one press. Release, THEN open, never capture:
+			# the platform frees a captured pointer on the first Escape, this is the second press, and
+			# a browser refuses pointer lock from a key just after Escape.
 			if not _menu_is_open() and game_menu != null:
 				game_menu.open()
 
@@ -1886,10 +1786,7 @@ func _cycle_tools(direction: int) -> void:
 
 ## Q down opens the menu; Q up closes it unless the press was a tap.
 ##
-## [b]One key, two behaviours, and they are not a toggle.[/b] Holding shows the menu
-## for as long as you hold it — a glance, with your place kept. Tapping leaves it up,
-## which is what you want while building; tapping again puts it away. A plain toggle
-## loses the glance, and a plain hold means you cannot let go of the mouse.
+## Not a toggle: holding is a glance with your place kept, tapping leaves it up while building.
 func _on_menu_key(key: InputEventKey) -> void:
 	if screens == null or menu == null or key.is_echo():
 		return
@@ -2079,14 +1976,9 @@ func _set_tool(id: StringName) -> void:
 
 	tool = id
 
-	# The server holds its own copy, because the server is what actuates a tool against
-	# somebody else's prop. A client saying which tool it holds is a request, not a fact.
-	#
-	# [b]A weapon is asked for too, and for a second reason.[/b] `pg_shop` prices every
-	# weapon, and `_give_weapon` is the only thing that charges for one — so a client
-	# that armed itself and told nobody got every weapon in the catalogue free, and
-	# nobody else was told what it was holding either. The request goes for a tool AND
-	# for a weapon; only the id differs.
+	# The server holds its own copy: it actuates a tool against somebody else's prop, so a client
+	# saying which tool it holds is a request, not a fact. A weapon is asked for too: `pg_shop`
+	# prices every weapon and `_give_weapon` is the only thing that charges for one.
 	if bridge != null:
 		if id == TOOL_PHYS or id == TOOL_GRAV:
 			bridge.ask_tool(id)
@@ -2154,10 +2046,7 @@ func _tool_name() -> String:
 
 ## Steps through the weapons this server offers, and back to the physics gun.
 ##
-## [b]Round-trips through the physics gun rather than cycling weapons only.[/b] The
-## physics gun is the tool a sandbox is actually played with; a cycle that could not
-## reach it would leave a player who pressed 3 twice holding a remover with no
-## obvious way back.
+## Round-trips through the physics gun: a cycle that could not reach it would strand a player.
 ## The tool gun mode in hand, by its own name. Read off the menu's copy of the modes, which
 ## exists on a connected client where no tool gun runs.
 func _tool_mode_name() -> String:
@@ -2274,10 +2163,8 @@ func _secondary_up() -> void:
 
 ## Puts a refusal on the HUD, and says nothing about a success.
 ##
-## An empty message is a refusal the player has already been told about through
-## another route — `DotPropSpawner.refused`, which the HUD is listening to — and
-## printing it again would put the same line on screen twice.
-## Instance id -> whether it was in a liquid last frame, for players and props on this end.
+## An empty message is a refusal already told through `DotPropSpawner.refused`; printing it again
+## would show the line twice.
 var _wet: Dictionary = {}
 
 
@@ -2352,13 +2239,10 @@ func _adopt_selection(node: Node3D, prop_name: String, settings: Dictionary, ref
 		hud.notice("Nothing selected.")
 
 
-## An outline round the selected prop, so a player can tell which of twenty identical crates
-## the sliders are moving.
+## An outline round the selected prop, so a player can tell which of twenty identical crates the
+## sliders are moving.
 ##
-## [b]An outline, not a see-through box over it.[/b] The first version was a translucent fill
-## drawn over the prop, and its render showed a crate painted red reading as pink — in the one
-## mode whose sliders include the colour. Here only the back faces of a slightly larger box are
-## drawn, so the rim shows round the silhouette and the prop's own faces are left alone.
+## Only the back faces of a slightly larger box: a translucent fill made a red crate read as pink.
 static func selection_box() -> MeshInstance3D:
 	var box := MeshInstance3D.new()
 	box.name = "EditSelection"
@@ -2455,9 +2339,7 @@ func _punt() -> void:
 
 ## The physics gun's beam to the prop it holds, once a frame, from the drawn camera.
 ##
-## [b]Offline only, like the grab and punt sounds.[/b] On a server the gun is the
-## server's (`PlaygroundNetBridge._drive_tools`) and `_holding` is never set here, so a
-## connected client draws no beam: nothing replicates what a player holds yet.
+## Offline only: on a server the gun is the server's and `_holding` is never set here.
 ## Connected, the server holds every prop and says who holds what (`Kind.HELD`): a beam for
 ## each, [param mine]'s from in front of the camera at [param eye], everybody else's from their
 ## own eye. Static so `tools/screenshot_net.gd` draws exactly this. Returns how many.
@@ -2577,15 +2459,9 @@ func _on_prop_chosen(prop_id: StringName) -> void:
 
 ## What the server says we are holding, which is the only answer that counts.
 ##
-## [b]A refused purchase has to take the weapon back.[/b] `_set_tool` arms locally so a
-## weapon switch is not a round trip, which is prediction — and prediction that is never
-## corrected is just a client disagreeing with the server. `pg_shop` refuses a weapon a
-## player cannot afford, and without this the player kept it: the notice said no and the
-## thing was in their hands.
-##
-## Somebody else's weapon is not applied here. This client draws no first-person weapon
-## for a remote player, so there is nothing to apply it to yet — but the id now arrives,
-## which is what a third-person model would need.
+## A refused purchase has to take the weapon back: `_set_tool` arms locally (prediction), and
+## `pg_shop` may refuse it. Somebody else's weapon is not applied: no first-person weapon is drawn
+## for a remote player yet.
 func _on_weapon_changed(pid: int, weapon_id: StringName) -> void:
 	if bridge == null or pid != bridge.local_player_id:
 		return
@@ -2820,11 +2696,8 @@ func _cycle_style() -> void:
 
 ## First person to third and back, through the controller switch.
 ##
-## [b]A different motor, not a moved camera[/b] — which is the distinction that decides
-## where this feature belongs. game-g2gfast has a third-person view and keeps one motor
-## under it on purpose: a run set in third person has to be comparable with one set in
-## first. A sandbox ranks nothing, so it can afford the better third-person movement —
-## camera-relative input, an orbit rig on a spring arm, coyote time and a jump buffer.
+## A different motor, not a moved camera: a sandbox ranks nothing, so it can afford the better
+## third-person movement (camera-relative input, orbit rig on a spring arm, coyote time, jump buffer).
 func _toggle_view() -> void:
 	if player == null or player.controller_switch == null:
 		return
@@ -2959,9 +2832,8 @@ var arena_on: bool = false
 
 
 ## B: the arena's loadout, which weapon an arena spawn puts in your hands. Connected the server
-## answers (dot-loadout's `/loadout`); the menu is enabled only while the arena is on, and
-## outside it B says "Loadouts are in the arena" (the lead's call, 2026-10-12). Guarded on the
-## host's dot-menu and dot-loadout levels.
+## answers (dot-loadout's `/loadout`); enabled only while the arena is on. Guarded on the host's
+## dot-menu and dot-loadout levels.
 ## Escape's Mods action: the player's own override of the console's look, solo or listen host only
 ## (the platform turns the user tier on). By name, so an older client shell just has no action.
 func _use_mods_menu() -> void:
@@ -3057,10 +2929,8 @@ func _zee_rig() -> ZeeWeaponRig:
 
 ## Builds the hands under the camera and a rig to drive them.
 ##
-## [b]The rig has the authority only offline.[/b] Connected, the server holds the rig that
-## decides (`PlaygroundNetBridge._give_weapon`) and this one is the gun that moves: a
-## player whose weapon never deploys, kicks or reloads cannot tell one that is ready from
-## one that is not.
+## The rig has the authority only offline; connected, the server holds the deciding rig
+## (`PlaygroundNetBridge._give_weapon`) and this one is the gun that moves.
 func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 	if player == null or camera == null:
 		return false

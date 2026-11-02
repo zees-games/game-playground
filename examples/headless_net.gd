@@ -1,4 +1,4 @@
-extends "res://examples/headless_net_part6.gd"
+extends "res://examples/headless_net_part7.gd"
 
 const CHECKS := 410
 
@@ -35,23 +35,18 @@ func _run() -> void:
 		await _test_vehicle_over_the_wire()
 		await _test_timer()
 		await _test_lossy()
-		# Last of the tests that need a connected player: both halves share one physics space, so
-		# a test that advances the world moves every later reading. This one spawns no body.
-		# Run before the vehicle test it made that test flake.
+		# Both halves share one physics space, so a test that advances the world moves every later
+		# reading. This one spawns no body; before the vehicle test it made that flake.
 		await _test_weapon_request()
-		# After the weapon request for the same reason it is after everything else: this
-		# adds a second body to the shared physics space. It takes the body back out again.
+		# Adds a second body to the shared physics space, and takes it back out.
 		await _test_blind_and_beacon()
-		# After the blind and beacon, for the reason that one gives: it adds a body to the
-		# shared world and takes it back out.
+		# Adds a body to the shared world and takes it back out.
 		await _test_somebody_else_is_drawn()
 		_test_clock_wire()
 		# Adds no body and moves nothing; it builds the services and takes them down again.
 		await _test_chat_end_to_end()
-		# The inventory last among the connected-player sections, for the reason every
-		# section above gives: the rejoin below takes the player's body out of the shared
-		# physics world and puts it back.
-		# Before the inventory sections, whose bag it must not find a barrel in.
+		# Before the inventory sections, whose bag it must not find a barrel in; the inventory
+		# runs last of them because the rejoin takes the player's body out and back.
 		await _test_refused_spawn_is_free()
 		await _test_inventory_predicted()
 		await _test_inventory_refused()
@@ -63,8 +58,7 @@ func _run() -> void:
 		await _test_inventory_rejoin()
 		await _test_zee_over_the_wire()
 		await _test_toys_over_the_wire()
-		# Last but the leave: it resizes the crate and spawns an NPC, and every section above
-		# reads a world this would have changed. See its own note.
+		# Last but the leave: it resizes the crate and spawns an NPC.
 		await _test_tool_look_and_armed_npcs()
 		# Adds no body: a grenade is a ray swept each tick, not a physics object.
 		await _test_grenade_over_the_wire()
