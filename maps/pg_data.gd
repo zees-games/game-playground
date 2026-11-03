@@ -43,6 +43,11 @@ const PlaygroundMaterials := preload("../game/playground_materials.gd")
 ## box may not be turned, because a volume is asked about as an axis-aligned box. Foliage is
 ## not solid either, and not a liquid: drawn, walked through, hidden in, recorded nowhere.
 ##
+## A box with a `brush` (optional) is a [DotMapBrush] instead: `"brush": "stairs"` (wedge, ramp,
+## arch, cylinder, cone, spike, quarter_pipe, slab_holes), `size` is the brush's bounding box,
+## `params` its [code]{steps, segments, thickness, holes}[/code], and `at`, `turn`, `colour` and
+## `material` read as for a box. Convex pieces collide; the survey (boxes only) does not see them.
+##
 ## `props` and `wires` are optional (2026-10-07), so every older document still reads. A prop
 ## is a catalogue id, put down by the SERVER when the map loads ([method map_props]) and owned
 ## by nobody in particular (`Playground.MAP_OWNER`): a door with a button beside it, a stack
@@ -197,6 +202,13 @@ static func validate(d: Dictionary) -> DotResult:
 			return DotResult.fail(DotError.CODE_INVALID, "Map %s: box %d is out of the world." % [id, i])
 		if b.has("turn") and not (b["turn"] is Array and (b["turn"] as Array).size() == 4):
 			return DotResult.fail(DotError.CODE_INVALID, "Map %s: box %d's turn is [axis x, y, z, degrees]." % [id, i])
+		if b.has("brush"):
+			var spec := {"kind": str(b["brush"]), "size": b["size"], "params": b.get("params", {})}
+			var ok := DotMapBrush.validate(spec)
+			if not ok.ok:
+				return DotResult.fail(DotError.CODE_INVALID, "Map %s: box %d's brush: %s" % [id, i, ok.error.message])
+			if PlaygroundMaterials.is_volume(str(b.get("material", ""))):
+				return DotResult.fail(DotError.CODE_INVALID, "Map %s: box %d is a brush and a liquid; a brush is solid." % [id, i])
 		if b.has("material"):
 			var material := str(b["material"])
 			if not PlaygroundMaterials.is_known(material):
@@ -260,7 +272,14 @@ static func build_into(parent: Node3D, d: Dictionary) -> Array:
 			var axis := Vector3(float(t[0]), float(t[1]), float(t[2]))
 			if axis.length() > 0.0:
 				basis = Basis(axis.normalized(), deg_to_rad(float(t[3])))
-		var body := PlaygroundGeometry.box(parent, at, size, colour, basis)
+		var body: StaticBody3D
+		if b.has("brush"):
+			body = DotMapBrush.build_body({"kind": str(b["brush"]), "size": b["size"],
+				"params": b.get("params", {})}, PlaygroundGeometry._material(colour))
+			body.transform = Transform3D(basis, at)
+			parent.add_child(body)
+		else:
+			body = PlaygroundGeometry.box(parent, at, size, colour, basis)
 		body.set_meta(&"pg_box", i)
 		if material != "":
 			PlaygroundMaterials.apply(body, material)

@@ -48,6 +48,10 @@ func _initialize() -> void:
 	# A custom map (game-playground-maps, linked as maps/custom) is a document the shared
 	# data-map scene builds.
 	var custom := "res://maps/custom/%s.json" % id
+	var doc_at := args.find("--doc")
+	if doc_at >= 0 and doc_at + 1 < args.size():
+		custom = args[doc_at + 1]
+		id = custom.get_file().get_basename()
 
 	if not MAPS.has(id) and not FileAccess.file_exists(custom):
 		push_error("no such map: %s. Known: %s and maps/custom/*.json" % [id, str(MAPS.keys())])
@@ -186,6 +190,11 @@ func _imported_shots(id: String) -> Array[Dictionary]:
 func _shots_for(id: String) -> Array[Dictionary]:
 	if id in IMPORTED:
 		return _imported_shots(id)
+	if id == "pg_brushes":
+		return [
+			{"name": "pg_brushes", "from": Vector3(-12.0, 7.0, 16.0), "at": Vector3(0.0, 1.5, -1.0)},
+			{"name": "pg_brushes_stairs", "from": Vector3(-4.0, 3.0, 4.0), "at": Vector3(-4.0, 1.5, -4.0)},
+		]
 	if id == "pgc_plots":
 		return [
 			{"name": "pgc_plots", "from": Vector3(0.0, 70.0, 95.0), "at": Vector3(0.0, 0.0, -5.0)},

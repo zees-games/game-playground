@@ -1,0 +1,8 @@
+{"format": 1, "kind": "playground_map", "id": "pg_brushes", "name": "Brushes", "map_kind": "sandbox", "tier": 1,
+ "spawn": [-8, 1, 8], "spawn_yaw": 0,
+ "boxes": [
+  {"at": [0, -0.5, 0], "size": [40, 1, 40], "colour": "floor"},
+  {"at": [-4, 1.5, -4], "size": [6, 3, 4], "brush": "stairs", "params": {"steps": 6}, "material": "concrete"},
+  {"at": [4, 1, -4], "size": [6, 2, 4], "brush": "wedge", "material": "wood", "colour": "#c08040"},
+  {"at": [0, 2, 6], "size": [8, 4, 3], "brush": "arch", "params": {"thickness": 1.2, "segments": 10}, "material": "rock"}
+ ]}

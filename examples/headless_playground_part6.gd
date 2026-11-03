@@ -705,7 +705,46 @@ func _test_the_maps_are_surveyed_2() -> void:
 		_check((found["trapped"] as Array).is_empty(), "%s: and no place with no way out" % id,
 			"; ".join(found["trapped"]))
 
+	_brush_documents()
 	_done()
+
+
+## A document with brushes saved and read back: it validates, builds a mesh and convex collision
+## per brush, and a bad brush kind or a liquid brush is refused whole.
+func _brush_documents() -> void:
+	var text := FileAccess.get_file_as_string("res://examples/fixtures/maps/pg_brushes.json")
+	var doc: Variant = JSON.parse_string(text)
+	var path := "user://pg_brushes_roundtrip.json"
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(doc))
+	f.close()
+	var map: Node3D = _tmas_data_script.new()
+	var configured: DotResult = map.configure_doc(path)
+	_check(configured.ok, "brushes: a saved and re-read document loads", str(configured.error) if not configured.ok else "")
+	var kinds: Array[String] = []
+	var convex := 0
+	var meshes := 0
+	for n in map.get_children():
+		if n is StaticBody3D and n.has_meta(DotMapBrush.META_KIND):
+			kinds.append(str(n.get_meta(DotMapBrush.META_KIND)))
+			for c in n.get_children():
+				if c is CollisionShape3D and (c as CollisionShape3D).shape is ConvexPolygonShape3D:
+					convex += 1
+				if c is MeshInstance3D and (c as MeshInstance3D).mesh != null:
+					meshes += 1
+			_check(PlaygroundMaterials.material_of(n) != &"" and n.has_meta(&"pg_box"),
+				"brushes: %s carries its material and box index" % kinds[-1])
+	kinds.sort()
+	_check(kinds == ["arch", "stairs", "wedge"], "brushes: stairs, wedge and arch are built", str(kinds))
+	_check(convex >= 3 and meshes == 3, "brushes: each has convex collision and a mesh", "%d convex, %d meshes" % [convex, meshes])
+	map.free()
+	var bad: Dictionary = (doc as Dictionary).duplicate(true)
+	bad["boxes"][1]["brush"] = "teapot"
+	_check(not _tmas_data_script.call("validate", bad).ok, "brushes: an unknown brush kind refuses the document")
+	bad = (doc as Dictionary).duplicate(true)
+	bad["boxes"][1]["material"] = "water"
+	_check(not _tmas_data_script.call("validate", bad).ok, "brushes: a liquid brush refuses the document")
+	DirAccess.remove_absolute(path)
 
 
 # The collision audit
