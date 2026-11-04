@@ -153,10 +153,9 @@ func _boot() -> void:
 	# nothing, so the half being exercised here was the half that already worked.
 	config.query_enabled = true
 
-	# A port nothing else on a developer's machine is likely to be holding, and a boot
-	# that failed on a busy 27015 would look like the module being broken.
-	config.port = 28765
-	config.query_port = 28766
+	# Probed free, so two suites never collide.
+	config.port = PgTestPorts.free_port(2)
+	config.query_port = config.port + 1
 	config.admins_path = "%s/admins.json" % SERVER_DIR
 	config.bans_path = "%s/bans.json" % SERVER_DIR
 	config.audit_log_path = "%s/audit.jsonl" % SERVER_DIR
