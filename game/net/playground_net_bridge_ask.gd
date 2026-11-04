@@ -9,12 +9,9 @@ func _connect_projectiles() -> void:
 	game.projectiles.effects.blinded.connect(_on_flash_blinded)
 
 
-## Spawns in front of the player who asked, which is what the menu means by "spawn".
-##
-## The budget, the cooldown and the undo stack are the SPAWNER's, not this bridge's: a
-## refusal comes back through `refused` and is forwarded to that player alone. A bridge
-## that checked them itself would be a second copy of a rule, which is the bug this
-## family has now shipped three times.
+## Spawns in front of the player who asked. The budget, cooldown and undo stack are the SPAWNER's:
+## a refusal comes back through `refused` and goes to that player alone. A bridge checking them
+## itself would be a second copy of a rule.
 func _spawn_for(id: StringName, prop_id: StringName) -> void:
 	var player: PlaygroundPlayer = game.players.get(id)
 	if player == null or game.props.catalogue == null:
@@ -26,11 +23,9 @@ func _spawn_for(id: StringName, prop_id: StringName) -> void:
 			PlaygroundEvents.write_notice(session_of(id), "No such prop: %s" % prop_id))
 		return
 
-	# [b]Carried first.[/b] Something in the bag was paid for when it went in, so spawning
-	# it costs nothing and takes it out — which is what the bag is FOR: without this a
-	# purchase into it bought a grid cell and nothing else, and every spawn was charged
-	# again. Taken only once the spawner has said yes, so a spawn the prop budget refuses
-	# leaves the bag as it was.
+		# Carried first: something in the bag was paid for when it went in, so spawning it costs
+		# nothing and takes it out (else every spawn was charged again). Taken only once the spawner
+		# has said yes, so a spawn the prop budget refuses leaves the bag as it was.
 	var bag := inventory_net.bag_key(session_of(id)) if inventory_net != null else &""
 	if bag != &"" and game.inventory.carries(bag, def.id) > 0:
 		var at_bag := player.eye_position() + player.aim_direction() * 3.0
@@ -188,12 +183,9 @@ func _on_flash_blinded(player_id: StringName, seconds: float, strength: float) -
 	_tell(peer_for_player(session_of(player_id)), PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_blind(seconds, strength))
 
 
-## One chat line to one peer. Server side, and what [member DotChatRouter.send_fn] points
-## at.
-##
-## [b]Peer by peer, never a broadcast, and that is the router's decision rather than this
-## one's.[/b] It has already worked out exactly who may hear a line — everybody, a radius,
-## two people in a whisper — and handing the result to a broadcast would throw that away.
+## One chat line to one peer. Server side, and what [member DotChatRouter.send_fn] points at.
+## Peer by peer, never a broadcast: the router has already worked out who may hear a line
+## (everybody, a radius, a whisper) and a broadcast would throw that away.
 func send_chat(peer_id: int, wire: Dictionary) -> void:
 	_tell(peer_id, PlaygroundEvents.Kind.CHAT, PlaygroundEvents.write_chat(wire))
 
@@ -209,12 +201,9 @@ func broadcast_combat(
 	)
 
 
-## The match clock. Server side.
-##
-## [b]Sent rather than derived, because a mirroring client's [DotMatch] never runs.[/b]
-## Nothing ticks it, so `seconds_remaining()` is computed from a tick that is still zero —
-## not a stale value, a value nothing had ever written. game-arena shipped a client that
-## showed `IDLE` for ever while the server was playing a round.
+## The match clock. Server side. Sent rather than derived, because a mirroring client's [DotMatch]
+## never runs: `seconds_remaining()` would be computed from a tick nothing ever wrote, and the
+## client showed `IDLE` for ever while the server played a round.
 func broadcast_match(
 	state: int, seconds_left: float, round_number: int, label: String
 ) -> void:
@@ -271,11 +260,9 @@ func publish_loadout(pairs: Array) -> void:
 	_ask(PlaygroundEvents.Ask.LOADOUT, PlaygroundEvents.write_loadout(pairs))
 
 
-## Everybody who has said they can receive. Server side.
-##
-## [b]The set chat and voice are addressed against, and deliberately not
-## [method DotServer.sessions].[/b] A session exists from the moment a socket connects; a
-## ready peer is one that has built its scene and can be sent to.
+## Everybody who has said they can receive. Server side. The set chat and voice are addressed
+## against, not [method DotServer.sessions]: a session exists from the moment a socket connects,
+## a ready peer has built its scene and can be sent to.
 func ready_peers() -> PackedInt32Array:
 	var out := PackedInt32Array()
 

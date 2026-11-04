@@ -130,3 +130,7 @@ M is dot-menu's map menu (`PlaygroundBindings.MAP` is `dot_menu_maps`, still sto
 ## Blood
 
 `PlaygroundPresentation.blood` (dot-fx's `DotFxBlood`, a child of the presentation, no autoload; `decals` is its pool) draws a splatter on the first surface behind a player or NPC the local shooter hit: `PlaygroundClient._on_hit` calls `on_body_hit(victim, point, camera)`, which casts from the hit point away from the camera. The `gore` setting (video, default on) and `fx_quality` feed `DotFxDecalConfig`. Only the shooter sees it: the HIT event carries a point and no normal, and other clients are not told. `tools/screenshot.sh pg_flatgrass --fx --blood` renders it.
+
+## The default keys
+
+The sandbox bindings, so the game can be picked up without a manual. Q (hold) opens the spawn menu, release closes it, a tap pins it open. Mouse 1 is the tool's primary (grab and hold, or punt), mouse 2 its secondary (freeze what is held, or pull and carry). The wheel sets how far out the physics gun holds a prop, shift plus mouse turns it. E spawns the prop the menu last armed, again; R unfreezes everything you have frozen; Z undoes your last spawn. 1, 2, 3 select the physics gun, the gravity gun, and cycle the weapons you have. T switches track and C, V, X, G are the practice checkpoints (save, go to, cycle, forget), both only with a run timer (the server added dot-timer). N cycles the style and M goes to the next map.

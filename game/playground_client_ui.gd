@@ -33,10 +33,8 @@ func _on_menu_action_chosen(id: StringName) -> void:
 			leave_requested.emit()
 
 
-## Tells the HUD what is in the player's hands.
-##
-## Pushed rather than polled: the HUD is bound to the simulation and a spectator or a
-## replay has no client holding anything, so it cannot go and look.
+## Tells the HUD what is in the player's hands. Pushed, not polled: the HUD is bound to the
+## simulation, and a spectator or replay has no client holding anything to look at.
 func _sync_hud() -> void:
 	if hud != null:
 		hud.set_tool(_tool_name(), selected_prop)
@@ -124,8 +122,6 @@ func _on_menu_key(key: InputEventKey) -> void:
 
 	_menu_pinned = true
 
-
-# --- The profile workbench -------------------------------------------------
 
 ## Offline this process is the server, so it is an admin; connected, the server decides and
 ## the answer to [method _probe_profile_admin] is remembered for the connection.
@@ -216,8 +212,6 @@ func _now() -> float:
 	return float(Time.get_ticks_msec()) / 1000.0
 
 
-# --- The tools -------------------------------------------------------------
-
 func _space() -> PhysicsDirectSpaceState3D:
 	return player.get_world_3d().direct_space_state
 
@@ -244,11 +238,9 @@ func _tool_name() -> String:
 	return PlaygroundSpawnMenu.name_of_tool(tool)
 
 
-## Steps through the weapons this server offers, and back to the physics gun.
-##
-## Round-trips through the physics gun: a cycle that could not reach it would strand a player.
-## The tool gun mode in hand, by its own name. Read off the menu's copy of the modes, which
-## exists on a connected client where no tool gun runs.
+## Steps through the weapons this server offers, and back to the physics gun (a cycle that could
+## not reach it would strand a player). Also the tool gun mode in hand, read off the menu's copy
+## of the modes, which exists on a connected client where no tool gun runs.
 func _tool_mode_name() -> String:
 	if menu != null:
 		for mode in menu.call("_tools"):
@@ -353,9 +345,7 @@ func _adopt_selection(node: Node3D, prop_name: String, settings: Dictionary, ref
 
 
 ## An outline round the selected prop, so a player can tell which of twenty identical crates the
-## sliders are moving.
-##
-## Only the back faces of a slightly larger box: a translucent fill made a red crate read as pink.
+## sliders are moving. Back faces of a slightly larger box only: a translucent fill read as pink.
 static func selection_box() -> MeshInstance3D:
 	var box := MeshInstance3D.new()
 	box.name = "EditSelection"
@@ -450,12 +440,9 @@ func _punt() -> void:
 		presentation.on_tool_punt(body.global_position, true)
 
 
-## The physics gun's beam to the prop it holds, once a frame, from the drawn camera.
-##
-## Offline only: on a server the gun is the server's and `_holding` is never set here.
-## Connected, the server holds every prop and says who holds what (`Kind.HELD`): a beam for
-## each, [param mine]'s from in front of the camera at [param eye], everybody else's from their
-## own eye. Static so `tools/screenshot_net.gd` draws exactly this. Returns how many.
+## The physics gun's beam to the prop it holds, once a frame, from the drawn camera. Offline the
+## gun is local; connected the server holds every prop (`Kind.HELD`) and a beam is drawn per holder.
+## Static so `tools/screenshot_net.gd` draws exactly this. Returns how many.
 static func present_beams(p_bridge: PlaygroundNetBridge, p_presentation: PlaygroundPresentation,
 		mine: Node, eye: Vector3, forward: Vector3) -> int:
 	var drawn := 0
@@ -633,7 +620,6 @@ func _unfreeze_all() -> void:
 		hud.notice("Unfroze %d prop%s." % [thawed, "" if thawed == 1 else "s"])
 
 
-# --- A run timer's keys ------------------------------------------------------
 #
 # The track and the practice checkpoints are a run timer's, and none ships: the keys are
 # handed to `addons/pg_timer` when a server added dot-timer, and say so when it did not.
@@ -644,8 +630,6 @@ func _timer_key(action: StringName) -> void:
 	elif hud != null:
 		hud.notice("No run timer on this server.")
 
-
-# --- Styles, tracks and maps -----------------------------------------------
 
 func _cycle_style() -> void:
 	var styles := playground.style_order
@@ -667,10 +651,9 @@ func _cycle_style() -> void:
 		hud.notice("Style: %s" % chosen.display_name)
 
 
-## First person to third and back, through the controller switch.
-##
-## A different motor, not a moved camera: a sandbox ranks nothing, so it can afford the better
-## third-person movement (camera-relative input, orbit rig on a spring arm, coyote time, jump buffer).
+## First person to third and back, through the controller switch. A different motor, not a moved
+## camera: a sandbox ranks nothing, so it can afford the better third-person movement (camera-
+## relative input, spring-arm orbit rig, coyote time, jump buffer).
 func _toggle_view() -> void:
 	if player == null or player.controller_switch == null:
 		return
@@ -778,4 +761,3 @@ func change_from_menu(id: StringName) -> DotResult:
 	return await playground.change_map(id)
 
 
-# --- The loadout menu (B) -----------------------------------------------------

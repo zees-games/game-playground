@@ -40,8 +40,6 @@ func _build_client_services() -> void:
 	platform.build_look_mute()
 
 
-# --- Chat ------------------------------------------------------------------
-
 func _build_screens() -> void:
 	screens = DotScreenStack.new()
 	screens.name = "Screens"
@@ -114,10 +112,8 @@ func _build_screens() -> void:
 
 
 ## The escape menu: dot-menu's, with this game's settings on its pages and the server list as a
-## sidebar action. The spawn menu (Q) and the server browser stay on this client's screen stack.
-##
-## Escape keeps its two steps (the first releases the pointer, the second opens the menu; see
-## KEY_ESCAPE in `_unhandled_input`), so the menu is told not to open on Escape but still closes on it.
+## sidebar action. Escape keeps its two steps (first releases the pointer, second opens the menu;
+## see KEY_ESCAPE in `_unhandled_input`), so the menu does not open on Escape but still closes on it.
 func _build_pause() -> void:
 	var settings: DotSettingsManager = presentation.settings if presentation != null else null
 
@@ -190,7 +186,6 @@ func _build_pause() -> void:
 		_bind_look()
 
 
-
 func _process(_delta: float) -> void:
 	var driving := mouse_drives_view()
 	if _was_driving and not driving:
@@ -258,10 +253,9 @@ func _process(_delta: float) -> void:
 		hud.follow_hands(hands)
 
 
-## Sway, bob and the hands hidden in third person, once a frame. Returns the camera's half
-## of the recoil (degrees, x pitch y yaw), which the camera write adds: presentation only, the
-## command's angles and so the shot are untouched. It went to a `DotFpsView` that nothing ran
-## until 2026-10-11, so no zee gun ever kicked the view here.
+## Sway, bob and the hands hidden in third person, once a frame. Returns the camera's half of the
+## recoil (degrees, x pitch y yaw), which the camera write adds: presentation only, the command's
+## angles and so the shot are untouched.
 func _present_zee() -> Vector2:
 	if toy_view != null and is_instance_valid(toy_view):
 		toy_view.visible = view_id() == &"fp"

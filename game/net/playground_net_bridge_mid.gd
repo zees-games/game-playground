@@ -69,11 +69,9 @@ func add_player(
 	return DotResult.success(player)
 
 
-## A player the game made itself — a bot, a test — gets an entity exactly like one a
-## peer asked for. Its peer id is zero, and that is not the broadcast address by
-## accident: [method _tell] refuses zero, because `net.send(msg, 0)` IS a broadcast and
-## game-hungario once sent every player's private message to everybody through exactly
-## this hole.
+## A player the game made itself (a bot, a test) gets an entity like one a peer asked for. Its peer
+## id is zero, which is not the broadcast address by accident: [method _tell] refuses zero, because
+## `net.send(msg, 0)` IS a broadcast and once sent every player's private message to everybody.
 func _on_player_added(id: StringName) -> void:
 	if net == null or not net.is_server:
 		return
@@ -114,13 +112,9 @@ func _on_player_removed(id: StringName) -> void:
 		roster_changed.emit(session_id)
 
 
-## Every prop the spawner creates becomes a replicated entity.
-##
-## [b]Announced reliably AND replicated by snapshot, and it needs both.[/b] The snapshot
-## moves it; the event says what it is, because a client cannot build a barrel from a
-## position. A spawner factory would have to name a script, and this game's props are
-## named by PATH in the catalogue precisely so a dot-cloud pack can deliver them — a
-## mounted pack's `class_name` globals are not registered in the host.
+## Every prop the spawner creates becomes a replicated entity, announced reliably AND replicated by
+## snapshot: the snapshot moves it, the event says what it is. Props are named by PATH in the
+## catalogue so a dot-cloud pack can deliver them (a mounted pack's `class_name`s are not registered).
 func _on_prop_spawned(prop: DotPropInstance) -> void:
 	if net == null or not net.is_server or prop == null or prop.node == null:
 		return
@@ -129,10 +123,9 @@ func _on_prop_spawned(prop: DotPropInstance) -> void:
 	if body == null:
 		return
 
-	# A vehicle replicates through DotVehicleNetSync — its wheels' angle and which seats
-	# are full cannot be derived from a position — so which behaviour a body gets is
-	# decided by the catalogue, once, here. The table below is the same on both ends and
-	# `_apply_prop` reads it the same way.
+		# A vehicle replicates through DotVehicleNetSync (wheel angle and full seats cannot be derived
+		# from a position), so the catalogue decides the behaviour once, here. The table below is the
+		# same on both ends and `_apply_prop` reads it the same way.
 	var behaviour := _behaviour_for(prop.def)
 	behaviour.name = "Net"
 	behaviour.prop = body
@@ -170,16 +163,9 @@ func _on_prop_spawned(prop: DotPropInstance) -> void:
 	))
 
 
-# --- Server: wave NPCs ------------------------------------------------------
-
-## Replicates everything [param spawner] spawns, as props are: a PROP event says what it is
-## and a [PlaygroundPropNet] moves it. Called by the module once the waves exist.
-##
-## [b]Through the prop path, not a second one.[/b] A wave NPC was never replicated at all —
-## a connected client saw the waves' effects (stress, the director's pacing, players going
-## down) and not one NPC. What a client needs is a body where the server's is, which is
-## exactly what the prop path already does for any body; its definition is found in
-## [member npc_catalogue] when the prop catalogue does not have it.
+## Replicates everything [param spawner] spawns, as props are: a PROP event says what it is and a
+## [PlaygroundPropNet] moves it. Called by the module once the waves exist. Through the prop path,
+## not a second one; the definition is found in [member npc_catalogue] when the prop catalogue lacks it.
 func watch_npc_spawner(spawner: DotNpcSpawner, catalogue: DotNpcCatalogue) -> void:
 	npc_catalogue = catalogue
 
@@ -266,8 +252,7 @@ func _on_prop_refused(player_id: StringName, prop_id: StringName, reason: String
 
 
 ## Somebody's physics gun took hold of a prop or let go of one: everybody is told, so every
-## client can draw the beam. Until 2026-10-07 `write_held`/`read_held` existed and nothing
-## sent or read them, so a connected player saw nobody else's beam and not their own either.
+## client can draw the beam.
 func _on_held_changed(id: StringName, prop: DotPropInstance, held: bool) -> void:
 	if net == null or not net.is_server:
 		return
@@ -288,12 +273,8 @@ func _on_pane_broken(index: int, _at: Vector3, _material: StringName) -> void:
 	_broadcast(PlaygroundEvents.Kind.PANE, PlaygroundEvents.write_pane(index))
 
 
-## Tells everybody that somebody got in or out.
-##
-## [b]Everybody, not just the rider.[/b] The other clients are the ones who have to stop
-## drawing a player walking and start drawing them sitting in a car, and it is the same
-## reasoning the occupancy mask already carries: a "get in" prompt over a full seat is a
-## prompt that lies.
+## Tells everybody that somebody got in or out, not just the rider: the other clients must stop
+## drawing a walking player and draw one sitting in a car, and a "get in" prompt over a full seat lies.
 func announce_seat(
 	vehicle: DotVehicleInstance, rider_id: StringName, seat: DotVehicleSeat, seated: bool
 ) -> void:
@@ -311,8 +292,6 @@ func announce_seat(
 		session_of(rider_id), net_id_of_node(vehicle.node), index, seated
 	))
 
-
-# --- Server: the tick ------------------------------------------------------
 
 func _admit(peer_id: int) -> void:
 	if peer_id <= 0:
@@ -414,8 +393,6 @@ func _on_map_ready(map: DotMapDef) -> void:
 		_broadcast(PlaygroundEvents.Kind.JOIN, _join_body(int(session_id)))
 
 
-# --- Both ends: the map's toys ---------------------------------------------------
-
 ## Server: an entity for each of the map's toys, and TOYS naming them.
 func _register_toys() -> void:
 	if net == null or not net.is_server or game == null:
@@ -494,8 +471,6 @@ func _select_tool(session_id: int, id: StringName, tool_id: StringName) -> void:
 	_tool_of[session_id] = tool_id
 	_broadcast(PlaygroundEvents.Kind.WEAPON, PlaygroundEvents.write_weapon(session_id, tool_id))
 
-
-# --- Client: applying ------------------------------------------------------
 
 func _apply_weapon(reader: DotNetReader) -> void:
 	var held := PlaygroundEvents.read_weapon(reader)
@@ -602,10 +577,8 @@ func _apply_hello(reader: DotNetReader) -> void:
 
 
 ## Puts the whole client (game, timers, netcode clock and the ENGINE) on the server's tick rate.
-##
-## Four places hold the tick rate and must move together: `game.tick_rate`; `net.config.tick_rate` (read by [method DotNetInput.sanitise] and the interpolator);
-## `net.clock.tick_rate`, built at `setup()` and not updated by writing the config; and `Engine.physics_ticks_per_second`, which decides whether it LOOKS right.
-## A server never calls this: its rate is `sv_tickrate`.
+## Four places hold it and must move together: `game.tick_rate`; `net.config.tick_rate`;
+## `net.clock.tick_rate` (built at `setup()`); `Engine.physics_ticks_per_second`. A server never calls this.
 func _adopt_tick_rate(rate: int) -> void:
 	if net == null or net.is_server or game == null or rate <= 0 or rate == game.tick_rate:
 		return
@@ -617,10 +590,9 @@ func _adopt_tick_rate(rate: int) -> void:
 
 	net.config.tick_rate = game.tick_rate
 	net.clock.tick_rate = game.tick_rate
-	# dot-net API 7 has DotNetClock.adopt_tick_rate(), which also raises the engine's step cap
-	# to a quarter second of ticks (8 steps are 62.5 ms at 128 Hz, so a client under 16 fps ran
-	# fewer ticks than the server). A shell built before it gets the same rule here, as
-	# game-g2gfast does; remove this branch when the oldest shell is API 7.
+		# dot-net API 7 has DotNetClock.adopt_tick_rate(), which also raises the engine's step cap to a
+		# quarter second of ticks (8 steps are 62.5 ms at 128 Hz). A shell built before it gets the same
+		# rule here; remove this branch when the oldest shell is API 7.
 	if DotAddonApi.build_level("dot_net") >= 7:
 		DotNetClock.adopt_tick_rate(game.tick_rate)
 	else:
@@ -632,10 +604,9 @@ func _adopt_tick_rate(rate: int) -> void:
 	})
 
 
-## Who owns a mirrored player on this client: this client for its own player, 0 otherwise.
-##
-## Matched by session id, not sent on the wire: the id HELLO already carries is the whole answer and `is_owner` (owner == local peer) cannot disagree.
-## Never the local peer for anybody else, or this client would predict somebody whose keys it never had; a local peer of 0 claims nothing (0 is the server's owner id).
+## Who owns a mirrored player on this client: this client for its own player, 0 otherwise. Matched by
+## session id, not sent on the wire. Never the local peer for anybody else (it would predict somebody
+## whose keys it never had); a local peer of 0 claims nothing (0 is the server's owner id).
 func _mirror_owner(session_id: int) -> int:
 	if net == null or net.local_peer_id <= 0:
 		return 0
@@ -646,13 +617,9 @@ func _mirror_owner(session_id: int) -> int:
 	return 0
 
 
-## The local player's mirror, claimed if it arrived before HELLO said whose it was.
-##
-## Not the order `_admit` sends in, which is why this is belt and braces rather than a path
-## this game takes: a JOIN broadcast that reached this peer before its HELLO would otherwise
-## leave the local player unpredicted for the rest of the session, with every other check
-## still passing — which is the bug [method _apply_join] documents. A vehicle is never
-## claimed: it is not a player mirror, and a rigid body is not predicted (family decision).
+## The local player's mirror, claimed if it arrived before HELLO said whose it was. Belt and braces:
+## a JOIN reaching this peer before its HELLO would leave the local player unpredicted for the rest
+## of the session (see [method _apply_join]). A vehicle is never claimed: a rigid body is not predicted.
 func _claim_local_player() -> void:
 	var mine: PlaygroundPlayerNet = _behaviours.get(local_player_id)
 
@@ -694,14 +661,9 @@ func _on_ride_exited(
 	announce_seat(vehicle, rider_id, seat, false)
 
 
-## A client's copy of "that player is in a car".
-##
-## [b]The client does not run the ride at all.[/b] It has no vehicle spawner, no exit
-## sweep and no seats — the server owns every one of those — so what arrives is the
-## answer rather than the question. What the client does with it is stop predicting a
-## player who is no longer walking, which is the one thing it would otherwise get wrong
-## on its own screen: a predicted controller simulating a passenger fights the position
-## the snapshots are putting them at, every tick, at a metre a time.
+## A client's copy of "that player is in a car". The client does not run the ride (no vehicle
+## spawner, exit sweep or seats), so it only stops predicting a player who is no longer walking: a
+## predicted controller simulating a passenger fights the snapshots' position every tick.
 func _apply_seat(reader: DotNetReader) -> void:
 	var info := PlaygroundEvents.read_seat(reader)
 
@@ -754,12 +716,9 @@ func _apply_prop_gone(reader: DotNetReader) -> void:
 	props_changed.emit()
 
 
-# --- Sending ---------------------------------------------------------------
-
-## To every READY peer, one at a time, and never to peer 0.
-##
-## Not `net.send(msg, 0)`, an `rpc()` to every socket: a peer connects before its client builds
-## `Server/Playground`, so the early JOIN hit a missing node. [method _admit] tells it everything on READY.
+## To every READY peer, one at a time, and never to peer 0 (`net.send(msg, 0)` is an `rpc()` to every
+## socket, and a peer connects before its client builds `Server/Playground`, so an early JOIN hit a
+## missing node). [method _admit] tells it everything on READY.
 func _broadcast(kind: int, body: PackedByteArray) -> void:
 	if net == null or not net.is_server or body.is_empty():
 		return
@@ -767,12 +726,8 @@ func _broadcast(kind: int, body: PackedByteArray) -> void:
 		net.send(PlaygroundEvent.new(kind, body), int(peer_id))
 
 
-## To one peer, and never to peer 0.
-##
-## [b]Zero is the broadcast address.[/b] game-hungario gave a bot peer id 0, and every
-## private per-player message sent to that bot went to every client on the server. A
-## player with no peer — a bot, a test — simply is not told, which is correct: there is
-## nobody there to tell.
+## To one peer, and never to peer 0, the broadcast address: a bot given peer id 0 once got every
+## private per-player message sent to every client. A player with no peer is simply not told.
 func _tell(peer_id: int, kind: int, body: PackedByteArray) -> void:
 	if net == null or not net.is_server or peer_id <= 0 or body.is_empty():
 		return

@@ -22,37 +22,16 @@ const PlaygroundWeapons := preload("../playground_weapons.gd")
 const PlaygroundZee := preload("../playground_zee.gd")
 const PlaygroundWaves := preload("../playground_waves.gd")
 
-## Joins a [Playground] to a [DotNetManager]. The netcode seam, and the only file in
-## this project that names both.
-## The ordering is the whole file: dot-net drives simulation per entity, but this game's tick is
-## whole-game (every NPC moves, then every player, then every timer is fed). [method ensure_game_ticked]
-## reconciles the two: the first behaviour through on a tick runs the whole game.
-##
-## [codeblock]
-## # server
-## bridge.attach(game, net, server)      # `server` is the node the link mirrors
-## bridge.add_player(peer_id, session_id, "Ada")
-## bridge.server_tick(tick)              # instead of the game's own loop
-##
-## # client
-## bridge.attach(game, net, client_link)
-## bridge.ask_ready()
-## bridge.client_tick(tick, command)
-## [/codeblock]
-##
-## A player's own movement is predicted; props, NPCs and everything the physics gun touches are
-## server-authoritative, as rigid-body solving is not reproducible across machines
-## (see [PlaygroundPropNet]). So the spawn menu emits and the tools send intent.
+## Joins a [Playground] to a [DotNetManager]; the only file here that names both. dot-net drives
+## simulation per entity but this game's tick is whole-game, so [method ensure_game_ticked] makes
+## the first behaviour through run it. Movement is predicted; props and NPCs are server-authoritative.
 
 const CHANNEL := "pg.net"
 const ACK_BYTES := 4
 
-## Commands in every input packet: this tick's and the four before it, so a lost packet
-## costs the server no tick unless the next four are lost too. Over WebSocket nothing is
-## ever lost; over ENet (the desktop client, since servers went dual-stack) one command a
-## packet was a tick the server ran on the previous command for every packet dropped.
-## game-arena measured it first: 80% of ticks with the right command at 20% loss with one
-## copy, 99-100% with three, and five closed the rest (2026-10-09).
+## Commands in every input packet: this tick's and the four before it, so a lost packet costs the
+## server no tick unless the next four are lost too. Matters over ENet (the desktop client); over
+## WebSocket nothing is lost. Measured at 20% loss: 80% of ticks right with one copy, 99-100% with three.
 const INPUT_COPIES := 5
 
 ## The client has been told who it is. [param player_id] is the session id.
@@ -61,28 +40,22 @@ signal roster_changed(player_id: int)
 ## A prop or entity appeared or went away, on a client. For the HUD's counter.
 signal props_changed()
 
-## A mirrored prop arrived, on a client: where, and whose session spawned it. For the
-## presentation layer, which [signal props_changed] cannot serve because it carries
-## neither. A joining client is sent the whole world's props through the same event, so
-## this fires for those too — a listener that makes a noise has to decide which it wants.
+## A mirrored prop arrived, on a client: where, and whose session spawned it. For the presentation
+## layer, which [signal props_changed] cannot serve. A joining client is sent every prop through
+## the same event, so a listener that makes a noise has to decide which it wants.
 signal prop_arrived(at: Vector3, owner_session: int)
 signal notice_received(player_id: int, text: String)
 
 ## A player got into or out of a vehicle. Client side; the HUD and the camera read it.
 signal seat_changed(player_id: int, seated: bool)
 
-## What the SERVER says a player is holding — the tool or the weapon, by id.
-##
-## [b]The server decides this, not the client that asked.[/b] A weapon is a purchase:
-## `_give_weapon` charges for it and only broadcasts once it is paid for, so a client
-## that armed itself the moment the button was pressed would be holding something it
-## had been refused. This is the answer, and the client corrects itself to it.
+## What the SERVER says a player is holding, the tool or weapon by id. Not what the client asked
+## for: a weapon is a purchase, `_give_weapon` only broadcasts once paid, and the client corrects
+## itself to this answer.
 signal weapon_changed(player_id: int, weapon_id: StringName)
 
-## Somebody pressed Enter. Server side, and the only thing this bridge does with chat.
-##
-## [b]The bridge carries chat and decides nothing about it.[/b] Who may say what, on which
-## channel, how often and who hears it are [DotChatRouter]'s.
+## Somebody pressed Enter. Server side, and the only thing this bridge does with chat: who may say
+## what, on which channel, how often and who hears it are [DotChatRouter]'s.
 signal say_requested(peer_id: int, channel_id: StringName, text: String)
 
 ## Somebody typed a vote command, or published a loadout. Server side.
@@ -106,12 +79,9 @@ signal hit_received(victim: int, amount: float, point: Vector3, killed: bool, he
 ## [method DotVoiceRouter.relay] is what stamps the speaker.
 signal voice_requested(peer_id: int, payload: PackedByteArray)
 
-## A peer said READY for the first time and has been told the world. Server side.
-##
-## [b]The one moment anything else may be sent to it.[/b] dot-server's `client_spawn` comes
-## BEFORE this on every real join (the client says READY only once its scene is up), so
-## anything a module gates on [method peer_is_ready] at spawn finds the peer not ready and
-## has to be sent from here instead.
+## A peer said READY for the first time and has been told the world. Server side. The one moment
+## anything else may be sent to it: dot-server's `client_spawn` comes BEFORE this on every real
+## join, so anything gated on [method peer_is_ready] at spawn must be sent from here instead.
 signal peer_admitted(peer_id: int)
 
 ## Client side.
@@ -142,20 +112,14 @@ var link: PlaygroundNetLink = null
 ## Which session this process is. Zero on a server.
 var local_player_id: int = 0
 
-## Where the clock learns how long the link is, in milliseconds. dot-net never touches a
-## transport and cannot measure it; dot-server's heartbeat already does
-## ([method DotClientLink.ping_ms]), and a client that feeds nothing has a clock that
-## assumes an instant connection and stamps every command for a tick the server has
-## already simulated. Read on every snapshot.
-##
-## Nothing in dot-net writes a sample. It was shipped without one in two games before
-## anybody noticed the clock was reading a median of an empty set.
+## Where the clock learns the link's length in milliseconds. dot-net cannot measure it;
+## dot-server's heartbeat does ([method DotClientLink.ping_ms]). A client that feeds nothing
+## assumes an instant link and stamps commands for a tick the server already simulated.
 var rtt_source: Callable = Callable()
 
-## [code]func() -> Dictionary[/code], in [method DotVoteClockView.state_of]'s shape. What a
-## joining peer is told about the map's time left. Server side; empty sends nothing, and
-## the client then shows its own map session's clock — which on a server with no vote is
-## the one that ends the map.
+## [code]func() -> Dictionary[/code], in [method DotVoteClockView.state_of]'s shape: what a joining
+## peer is told about the map's time left. Server side; empty sends nothing, and the client then
+## shows its own map session's clock.
 var clock_fn: Callable = Callable()
 
 ## The map's time left as the server last described it. Client side; what the HUD draws.
@@ -166,10 +130,9 @@ var clock_view: DotVoteClockView = DotVoteClockView.new()
 ## no inventory.
 var inventory_net: PlaygroundInventoryNet = null
 
-## [code](session_id: int) -> String[/code]: who a session IS, for a bag that should outlast
-## the connection. Server side. Empty or unset means the bag is the session's and goes with
-## it — which is right on a LAN, where nothing identifies anybody twice. The module sets it
-## to the same key the statistics are filed under.
+## [code](session_id: int) -> String[/code]: who a session IS, for a bag that should outlast the
+## connection. Server side. Unset means the bag is the session's and goes with it, which is right
+## on a LAN. The module sets it to the key the statistics are filed under.
 var inventory_key_fn: Callable = Callable():
 	set(value):
 		inventory_key_fn = value
@@ -190,10 +153,9 @@ var weapon_net := PlaygroundWeaponNet.new()
 ## same, as the server last said. What a joiner is told and what a client draws beams from.
 var held_props: Dictionary = {}
 
-## session_id -> the buttons that player's previous command carried, so a press can be
-## told from a hold. A physics gun grabs on the press and holds every tick after it;
-## grabbing every tick instead would re-target continuously and drag whatever the
-## crosshair crossed.
+## session_id -> the buttons that player's previous command carried, so a press can be told from a
+## hold. A physics gun grabs on the press and holds after; grabbing every tick would re-target
+## continuously and drag whatever the crosshair crossed.
 var _prev_buttons: Dictionary = {}
 
 ## Session id -> the toy (launcher, remover, impulse gun) the server runs for that player,
@@ -214,10 +176,9 @@ var _tool_settings_of: Dictionary = {}
 var _player_of_peer: Dictionary = {}
 var _peer_of_player: Dictionary = {}
 var _ready_peers: Dictionary = {}
-## Server: peers whose READY came before their seat ([method add_player]). A client sends READY
-## when its link says PLAYING, which the link decides itself after sending `loaded` on another
-## channel; over ENet with loss the READY can overtake `loaded`, and a READY dropped here left
-## that client waiting for a world for ever. Admitted when seated.
+## Server: peers whose READY came before their seat ([method add_player]). Over ENet with loss the
+## READY can overtake `loaded`, and a READY dropped here left that client waiting for a world for
+## ever. Admitted when seated.
 var _ready_unseated: Dictionary = {}
 var _tick: int = 0
 var _game_ticked_for: int = -1
@@ -228,15 +189,9 @@ var _client_ticked_for: int = -1
 var _style_ids: Array[StringName] = []
 
 
-# --- Wiring ----------------------------------------------------------------
-
-## How every dot-net message reaches a peer.
-##
-## [b]Routed by DELIVERY, not by kind.[/b] Snapshots are unreliable and go on the
-## snapshot call; everything else is reliable, and which reliable call it is depends on
-## which end is sending — the server has events, the client has requests. Sending them
-## all as events works on a server and silently drops every client request, which is a
-## client that connects, draws, and can never ask for anything.
+## How every dot-net message reaches a peer. Routed by DELIVERY, not by kind: snapshots are
+## unreliable, everything else reliable, and the server has events where the client has requests.
+## Sending all as events silently drops every client request.
 func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
 	if link == null:
 		return
@@ -247,8 +202,6 @@ func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
 	else:
 		link.send_request(payload)
 
-
-# --- Identity helpers ------------------------------------------------------
 
 static func _player_key(session_id: int) -> StringName:
 	return StringName("u%d" % session_id)
@@ -276,8 +229,6 @@ func _style_id(index: int) -> StringName:
 		return &"normal"
 	return _style_ids[index]
 
-
-# --- Server: players -------------------------------------------------------
 
 ## What a session wears, as [face, top, legs] kit skins (see `playground_avatars.gd`), or an
 ## empty array for the stock look. Set by the module from dot-platform; asked as a player is
@@ -317,8 +268,6 @@ func _release_entity(session_id: int) -> void:
 	net.registry.unregister(behaviour.identity.net_id)
 
 
-# --- Server: props ---------------------------------------------------------
-
 ## The fall [method Playground.decide_npc_death] left on a killed body, or null.
 static func _death_of(node: Object, reason: StringName) -> DotPlayerDeath:
 	if reason != DotNpcSpawner.REASON_KILLED or node == null or not is_instance_valid(node):
@@ -341,7 +290,7 @@ static func _behaviour_for(def: DotPropDef) -> PlaygroundPropNet:
 	return PlaygroundPropNet.new()
 
 
-## The body a client draws for [param net_id], or null. What a rope's far end is found by.
+## The body a client draws for [param net_id], or null..
 func _mirror_node(net_id: int) -> Node3D:
 	var behaviour: PlaygroundPropNet = _prop_nets.get(net_id)
 	return behaviour.prop if behaviour != null else null
@@ -414,8 +363,6 @@ func client_tick(tick: int, command: DotFpsCommand) -> void:
 		game.tick_timers_only(tick)
 
 
-# --- Receiving -------------------------------------------------------------
-
 func receive_snapshot(payload: PackedByteArray) -> DotResult:
 	if net == null or net.is_server:
 		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only a client receives these.")
@@ -462,13 +409,9 @@ func receive_input(peer_id: int, payload: PackedByteArray) -> DotResult:
 	return pushed
 
 
-## A voice frame off [method PlaygroundNetLink.send_voice], in whichever direction.
-##
-## [b]Not a [PlaygroundEvent].[/b] Voice is fifty packets a second and every event here is
-## reliable, so a talk spurt would put a hundred retransmittable messages in front of a
-## prop spawn. It also does not go through [DotNetManager]: the registry seals a message
-## set and hashes it, and adding a fifty-hertz opaque blob buys nothing — the packet has
-## its own header, sequence and validation in [DotVoicePacket].
+## A voice frame off [method PlaygroundNetLink.send_voice], either direction. Not a
+## [PlaygroundEvent]: voice is fifty packets a second and events are reliable, so a talk spurt
+## would queue behind prop spawns. Nor through [DotNetManager]: the packet has its own header in [DotVoicePacket].
 func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 	if payload.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "An empty voice frame.")
@@ -500,8 +443,6 @@ func receive_request(peer_id: int, payload: PackedByteArray) -> DotResult:
 		return DotResult.fail(DotError.CODE_STATE, "No manager.")
 	return net.receive(payload, peer_id)
 
-
-# --- Server: what a joining peer is told -----------------------------------
 
 func _join_body(session_id: int) -> PackedByteArray:
 	var behaviour: PlaygroundPlayerNet = _behaviours.get(session_id)
@@ -587,12 +528,9 @@ func _release_toys() -> void:
 	_toy_nets.clear()
 
 
-## Client, on TOYS: a mirror for every id at once, under the holder, whether this end's toys
-## for that map exist yet or not. [b]A client must know every entity a snapshot carries[/b]:
-## dot-net stops reading a snapshot at the first one it does not know (a body cannot be skipped
-## without its declarations), so a toy mirror missing while the client loads the map, or ever,
-## on a client left on another map, was every player after it frozen. Paired with its toy
-## by index as soon as both are here.
+## Client, on TOYS: a mirror for every id at once, under the holder, whether this end's toys exist
+## yet or not. A client must know every entity a snapshot carries: dot-net stops reading at the
+## first unknown one, so a missing mirror froze every player after it. Paired with its toy by index.
 func _apply_toys(told: Dictionary) -> void:
 	if net == null or net.is_server:
 		return
@@ -635,8 +573,6 @@ func toy_count() -> int:
 			n += 1
 	return n
 
-
-# --- Client: asking --------------------------------------------------------
 
 func ask_ready() -> void:
 	_ask(PlaygroundEvents.Ask.READY, PackedByteArray())
@@ -708,31 +644,19 @@ func _ask(kind: int, body: PackedByteArray) -> void:
 		net.send(PlaygroundRequest.new(kind, body), 1)
 
 
-# --- Server: answering -----------------------------------------------------
-
-## Asked before anything is spawned or given, and charged for if it is allowed.
-##
-## [code](player_id: StringName, thing_id: StringName) -> DotResult[/code]
-##
-## A callable rather than a shop reference: the bridge knows nothing about prices. Unset means everything is free.
+## Asked before anything is spawned or given, and charged for if allowed:
+## [code](player_id: StringName, thing_id: StringName) -> DotResult[/code]. A callable rather than
+## a shop reference: the bridge knows nothing about prices. Unset means everything is free.
 var charge_fn: Callable = Callable()
 
-## Asked before something is spawned, and charges nothing. The shop's `may_have`.
-##
-## [code](player_id: StringName, thing_id: StringName) -> DotResult[/code]
-##
-## What lets a spawn be paid for AFTER it happened without spawning things nobody can
-## afford — see [method _spawn_for]. Unset answers yes, and the charge after the spawn is
-## then the only check.
+## Asked before something is spawned, and charges nothing (the shop's `may_have`):
+## [code](player_id: StringName, thing_id: StringName) -> DotResult[/code]. Lets a spawn be paid
+## for AFTER it happened (see [method _spawn_for]). Unset answers yes.
 var may_charge_fn: Callable = Callable()
 
-## Handed every shot a zee weapon fires on this server, once the props it hit are shoved.
-##
-## [code](player_id: StringName, shot: DotShot) -> void[/code]
-##
-## The arena's dot-combat, set by the module while `pg_arena` is on. A callable for the
-## shop's reason: health is the arena layer's, which is the module's, and the bridge must
-## not know whether there is a fight. Unset, a shot moves props and hurts nobody.
+## Handed every shot a zee weapon fires on this server, once the props it hit are shoved:
+## [code](player_id: StringName, shot: DotShot) -> void[/code]. The arena's dot-combat sets it
+## while `pg_arena` is on; unset, a shot moves props and hurts nobody.
 var shot_fn: Callable = Callable()
 
 

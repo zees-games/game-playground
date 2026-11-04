@@ -11,20 +11,9 @@ const PlaygroundWeapons := preload("playground_weapons.gd")
 const PlaygroundZee := preload("playground_zee.gd")
 const SwepToolgun := preload("weapons/swep_toolgun.gd")
 
-## The spawn menu: hold Q, pick something, click it.
-##
-## Holding the key opens it, releasing closes it, a quick tap pins it open. Clicking a prop
-## spawns it directly, so building is one click per prop and the menu stays open.
-##
-## Three tabs, two systems: props and entities are one [DotPropCatalogue] split by
-## [method PlaygroundSpawnables.kind_of]; weapons are their own registry, because a weapon is
-## never spawned and the catalogue requires a scene path.
-##
-## dot-props ships no menu on purpose; this is this game's own. Its `categories()`,
-## `in_category()` and `search()` read [DotPropDef] fields without loading a scene, and the
-## icons are drawn from the same fields (see [PlaygroundIcons]), so opening loads nothing.
-##
-## The menu never spawns anything itself: it emits, and [PlaygroundClient] asks the server.
+## The spawn menu: hold Q, pick something, click it; a quick tap pins it open. It never spawns
+## anything itself: it emits, and [PlaygroundClient] asks the server. Props and entities are one
+## [DotPropCatalogue] split by [method PlaygroundSpawnables.kind_of]; weapons are their own registry.
 
 # No CHANNEL: a screen, and nothing it draws is an operator's to act on. What a player picks is
 # logged where it is acted on — by the spawner, or by the server the bridge asks.
@@ -35,12 +24,9 @@ const ALL := &"__all"
 ## Card size. Wide enough for "Large crate" on one line at the default font.
 const CARD := Vector2(146.0, 92.0)
 
-## The key that puts the caret in the search box.
-##
-## [b]Not "any letter", and not focused on open.[/b] Focusing the search box by default
-## sends W, A, S and D into it — the player stands still typing "wasd" while the menu
-## looks exactly as it should — and this is a menu you can walk around with. A slash is
-## the convention every search-in-a-list uses and it is not a movement key.
+## The key that puts the caret in the search box. Not "any letter" and not focused on open: that
+## sends W, A, S and D into the box while the player walks. A slash is the search-in-a-list
+## convention and is not a movement key.
 const SEARCH_KEY := KEY_SLASH
 
 ## The provider kinds that have a tab of their own ([enum Tab]); other kinds stay on Addons.
@@ -164,8 +150,6 @@ var _first_card: Button = null
 func _screen_id() -> StringName:
 	return &"spawn_menu"
 
-
-# --- Building ---------------------------------------------------------------
 
 func _build_sidebar() -> Control:
 	var side := VBoxContainer.new()
@@ -305,8 +289,6 @@ func _build_npc_weapon_row() -> Control:
 	return row
 
 
-# --- Lifecycle --------------------------------------------------------------
-
 func _on_pop() -> void:
 	# The search does not survive being put away. Coming back to a menu still filtered
 	# to "boul" from a minute ago reads as a menu with one prop in it.
@@ -333,8 +315,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	# focused, and so the client's own key handling never sees it.
 	get_viewport().set_input_as_handled()
 
-
-# --- Looks ------------------------------------------------------------------
 
 ## A rounded box from the palette. A helper because five widgets want one and each wants a
 ## different fill, border and padding; the StyleBoxFlat defaults are square and borderless.
@@ -390,8 +370,6 @@ func _style_tabs(bar: TabBar) -> void:
 	bar.add_theme_color_override("font_hovered_color", _palette.text)
 	bar.add_theme_constant_override("h_separation", 6)
 
-
-# --- Tabs and categories ----------------------------------------------------
 
 func _sync_pack_tabs() -> void:
 	var titles := PackedStringArray()
@@ -502,24 +480,18 @@ func _categories_for_tab() -> PackedStringArray:
 	return out
 
 
-## One card. A [Button] rather than a container, deliberately.
-##
-## [b]A Button is focusable and a VBoxContainer is not.[/b] Godot's own focus
-## neighbours then make the whole grid navigable with a gamepad or the arrow keys for
-## free — and a menu that cannot be used without a mouse is the failure dot-ui's
-## `initial_focus` exists to prevent. Icon above text is `vertical_icon_alignment`,
-## which is exactly what that property is for.
+## One card. A [Button] rather than a container because a Button is focusable, so Godot's focus
+## neighbours make the grid navigable by gamepad or arrow keys; a VBoxContainer is not.
+## Icon above text is `vertical_icon_alignment`.
 func _card(icon: Texture2D, text: String, tip: String) -> Button:
 	var button := Button.new()
 	button.icon = icon
 	button.text = text
 	button.tooltip_text = tip
 	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-	# [b]And the icon's own horizontal alignment too.[/b] It defaults to LEFT, and
-	# `vertical_icon_alignment` alone puts the icon in the top-LEFT corner and still
-	# reserves its width beside the text, so the label is centred in what is left and
-	# drawn off-centre under nothing. Every property above reads right; only a
-	# rendered frame shows it.
+	# The icon's horizontal alignment too: it defaults to LEFT, so `vertical_icon_alignment` alone puts
+	# the icon top-left and still reserves its width, leaving the label off-centre. Only a rendered
+	# frame shows it.
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = CARD
@@ -574,8 +546,6 @@ func _set_setting(key: String, value: Variant) -> void:
 	tool_settings[tool_mode] = values
 	tool_mode_chosen.emit(tool_mode, values.duplicate())
 
-
-# --- What is on screen ------------------------------------------------------
 
 ## Everything on the current tab, before the category and the search are applied.
 func _all_in_tab() -> Array:
@@ -722,13 +692,9 @@ func _tool_for(id: StringName) -> Object:
 	return null
 
 
-## The entries the grid should show: the search if there is one, else the category.
-##
-## [b]The search reaches across the whole tab, not the selected category.[/b] A player
-## typing "barrel" wants the barrel, and telling them it does not exist because they
-## last clicked "Toys" is the wrong answer to the question they asked. It does not
-## reach across tabs, because the tabs are three different kinds of thing and a weapon
-## turning up in a prop search is not a result, it is a surprise.
+## The entries the grid should show: the search if there is one, else the category. The search
+## spans the whole tab, not the selected category (a player typing "barrel" wants the barrel), but
+## not other tabs: a weapon in a prop search is a surprise.
 func _visible() -> Array:
 	var pool := _all_in_tab()
 

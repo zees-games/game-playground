@@ -254,8 +254,6 @@ func _on_vote_change_due(map_id: StringName) -> void:
 	game.change_map(map_id)
 
 
-# --- Loadouts, combat and progress ----------------------------------------
-
 func _on_loadout_requested(peer_id: int, pairs: Array) -> void:
 	var session_id := bridge.player_for_peer(peer_id)
 
@@ -373,8 +371,6 @@ func _session_of(player_id: StringName) -> int:
 	return text.substr(1).to_int() if text.begins_with("u") else 0
 
 
-# --- The netcode -----------------------------------------------------------
-
 ## The id the game files records under: the session's own scoped id, not a site account, so
 ## operators cannot correlate players across servers.
 func _player_id(session: DotClientSession) -> StringName:
@@ -403,8 +399,6 @@ func _caller(ctx: DotCmdContext) -> PlaygroundPlayer:
 	var found: Variant = game.players.get(id)
 	return found if found is PlaygroundPlayer else null
 
-
-# --- Spawn and style -------------------------------------------------------
 
 func _cmd_restart(ctx: DotCmdContext) -> void:
 	var id := _target(ctx)
@@ -502,10 +496,9 @@ func _cmd_nextmap(ctx: DotCmdContext) -> void:
 	])
 
 
-## The game's own map and vote commands (`pg_map`, `pg_nextmap`, `pg_rtv`, `pg_extend`,
-## `pg_vote`), each registered under every name maps.yml's `commands: names:` gives its role,
-## the role's own name with no file. Takes the registrar as a Callable so a check can bind them
-## on a console of its own: the live one already holds the defaults.
+## The game's own map and vote commands (`pg_map`, `pg_nextmap`, `pg_rtv`, `pg_extend`, `pg_vote`),
+## each registered under every name maps.yml's `commands: names:` gives its role. Takes the
+## registrar as a Callable so a check can bind them on a console of its own.
 func bind_map_commands(register: Callable) -> void:
 	var table := [
 		["pg_map", _cmd_map, "Change map, or list what there is", DotAdminFlags.CHANGEMAP],
@@ -582,8 +575,6 @@ func _cmd_extend(ctx: DotCmdContext) -> void:
 	ctx.reply("Extended. %s left." % game.maps.time_limit.formatted_remaining())
 
 
-# --- Prop commands ---------------------------------------------------------
-
 func _cmd_prop(ctx: DotCmdContext) -> void:
 	var player := _caller(ctx)
 
@@ -619,11 +610,9 @@ func _cmd_prop(ctx: DotCmdContext) -> void:
 		ctx.reply("Spawned %s." % found[0].name_or_id())
 
 
-# --- Saved builds -------------------------------------------------------------
-#
-# Relative to the player both ways: a build is saved around where its builder stands and the
-# way they face, and put down around whoever loads it, the way they face. Kept under the
-# player's statistics key, so a build outlives a reconnect wherever there are accounts.
+# Relative to the player both ways: a build is saved around where its builder stands and faces,
+# and put down around whoever loads it. Kept under the player's statistics key, so it outlives a
+# reconnect wherever there are accounts.
 
 ## Where saved builds are kept. The suites point it somewhere of their own.
 var builds := PlaygroundBuilds.new()
@@ -736,10 +725,6 @@ func _cmd_props_clear(ctx: DotCmdContext) -> void:
 	)
 	ctx.reply("Removed %d of %s's props." % [count, ctx.args[0]])
 
-
-# --- Status ----------------------------------------------------------------
-
-# --- Limits ------------------------------------------------------------------
 
 const LOADOUT_COMMAND_SCRIPT := "res://addons/dot_loadout/integrations/dot_loadout_command.gd"
 

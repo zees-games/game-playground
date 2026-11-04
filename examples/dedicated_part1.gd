@@ -46,11 +46,9 @@ func _test_identity() -> void:
 		"until they hold it"
 	)
 
-	# [b]The key a statistic is filed under, and the reason dot-platform is here at
-	# all.[/b] dot-stats refuses an account id as a player key before it leaves the
-	# server, and a board is exactly the same kind of record — so the one function that
-	# decides has to give a scoped id when there is an identity stack and something
-	# honest when there is not.
+		# The key a statistic is filed under, and the reason dot-platform is here: dot-stats refuses an
+		# account id as a player key before it leaves the server, so the one function that decides gives
+		# a scoped id with an identity stack and something honest without.
 	var key := PlaygroundPlatform.key_for_session(server, null)
 	_check(key == "", "no session is no key rather than a guessed one")
 
@@ -61,12 +59,9 @@ func _test_identity() -> void:
 	_section_done()
 
 
-## An administrator's blind and beacon, typed at the console of a real server.
-##
-## What is asserted is the flag on the player and on the entity the netcode sends, because
-## that is the whole of what the server decides; whether the owner's client — and only the
-## owner's — receives it is `headless_net`'s, and what it looks like is
-## `tools/screenshot_views.sh`'s.
+## An administrator's blind and beacon, typed at the console of a real server. Asserted is the flag
+## on the player and on the entity the netcode sends; that only the owner's client receives it is
+## `headless_net`'s, and how it looks is `tools/screenshot_views.sh`'s.
 func _test_blind_and_beacon() -> void:
 	print("")
 	print("[blind and beacon]")
@@ -288,12 +283,9 @@ func _test_saved_builds() -> void:
 	_check(summaries.size() == 1 and summaries[0]["name"] == "tower" and int(summaries[0]["props"]) == 2,
 		"the Builds tab is sent what pg_builds lists", str(summaries))
 	game.props.clear_player(&"u81")
-	# The click is answered over the wire with a NOTICE to the clicker. 8101 is a session
-	# this suite adopted with no socket behind it, so sent for real that NOTICE was an
-	# `rpc_id` to a peer the multiplayer API has never heard of, and every green run printed
-	# "Attempt to call RPC with unknown peer ID: 8101". Caught on the link's loopback for the
-	# one call instead: the reply becomes a check, and a real unknown-peer line in this
-	# suite's stderr is a real one.
+		# The click is answered over the wire with a NOTICE to the clicker. 8101 has no socket behind it,
+		# so sent for real that NOTICE was an `rpc_id` to an unknown peer and every run printed "Attempt
+		# to call RPC with unknown peer ID: 8101". Caught on the link's loopback instead; the reply is a check.
 	var link: Variant = module.get("bridge").get("link")
 	var replies: Array = []
 	if link != null:
@@ -376,13 +368,9 @@ func _test_inventory_commands() -> void:
 	_section_done()
 
 
-## A joiner is welcomed when it says READY, which on every real join is AFTER `client_spawn`.
-##
-## [b]The module's own half of `[pg-rpc-before-scene]`.[/b] `_welcome` (the chat backlog and
-## the join line) ran from `client_spawn` and returned unless the bridge had the peer READY,
-## which it never does at spawn, because the client says READY only once its scene is up. So
-## no connected player had ever been sent either. This drives the real order: a session,
-## `client_spawn`, then READY through the bridge, recording what goes to that one peer.
+## A joiner is welcomed when it says READY, which on every real join is AFTER `client_spawn`. The
+## module's half of `[pg-rpc-before-scene]`: `_welcome` ran from `client_spawn` and returned unless
+## the bridge had the peer READY, which it never does then. Drives the real order, recording what goes to that peer.
 func _test_welcome_waits_for_ready() -> void:
 	print("a joiner is welcomed when it says READY, and not before")
 
@@ -438,9 +426,8 @@ func _test_welcome_waits_for_ready() -> void:
 	bridge.net.send_fn = old_send
 	server.client_disconnected.emit(session, "closed")
 	_check(not game.players.has(&"u79"), "and they leave cleanly")
-	# The module takes them off the ready set BEFORE the bridge removes the player, and
-	# the bridge used to ask that same set whether to tell dot-net: every peer that ever
-	# disconnected stayed in `net.peers()`, built a snapshot for every tick.
+	# The module takes them off the ready set BEFORE the bridge removes the player; asking that
+	# same set whether to tell dot-net left every disconnected peer in `net.peers()`.
 	_check(
 		not bridge.net.peers().has(peer),
 		"and dot-net stops replicating to them",
@@ -449,10 +436,8 @@ func _test_welcome_waits_for_ready() -> void:
 	_section_done()
 
 
-## A disconnect actually reaches the module.
-##
-## An ARITY check: `DotServer.client_disconnected` emits `(session, reason)`, and a handler
-## taking only the session was refused by Godot on every call, so no player was ever removed.
+## A disconnect actually reaches the module. An ARITY check: `DotServer.client_disconnected` emits
+## `(session, reason)`, and a handler taking only the session was refused by Godot on every call.
 func _test_disconnect_is_handled() -> void:
 	print("a client disconnecting reaches the module")
 
@@ -518,9 +503,8 @@ func _test_module_unloads_cleanly() -> void:
 
 
 ## A module reload must leave ONE link under the server, still named for the client's route.
-## Two used to be left, the live one renamed `@Node@n`, and every RPC to a real client was lost
-## without an error. The proof is a real client over the socket: the server's snapshots and
-## events must reach a link of the client's own.
+## Two links left the live one renamed `@Node@n` and lost every RPC to a real client without an
+## error. The proof is a real client over the socket: snapshots and events must reach its own link.
 func _test_a_module_reload() -> void:
 	print("")
 	print("a module reload leaves one live link")
@@ -653,26 +637,9 @@ func _exit_probe_seconds() -> int:
 	return EXIT_PROBE_SECONDS
 
 
-## Runs this same suite in a fresh process: `[exit code, its stdout, its stderr, whether it
-## had to be killed, the seconds it was allowed]`.
-##
-## A leak ("N ObjectDB instances were leaked at exit") is printed after `quit()`, so only another process
-## can check a run's exit. Run first, before this run opens a port, so it is the second run on the same `user://`.
-##
-## Not `OS.execute`: a hanging copy would hold this run, and an outer `timeout` would orphan it holding the
-## port. So the copy is polled against a deadline and killed at it, with two deadlines:
-##
-## - coreutils `timeout` wraps the copy where it exists. It is an exec wrapper, not a shell,
-##   and it outlives this process, so a copy orphaned by the outer `timeout` still dies on
-##   time. Its exit status 124 is how its expiry is recognised.
-## - this loop's own deadline, a little later, for a platform without it.
-##
-## `execute_with_pipe` rather than `create_process`, because the latter captures nothing and
-## the whole point is reading what the copy printed. Non-blocking, and drained on every pass
-## rather than once at the end: a pipe holds 64 KiB, and a copy that fills it blocks on its
-## next print — a hang this probe would then report as the suite's own. The copy's stdin is
-## the other end of a pipe this process holds open, which is why every suite turns the
-## server's stdin console off: a reader blocked on it never lets the copy exit.
+## Runs this same suite in a fresh process: `[exit code, stdout, stderr, whether it was killed,
+## the seconds allowed]`. Another process is the only way to see a leak report (printed after
+## `quit()`). Polled against a deadline, not `OS.execute`: a hang would hold this run.
 func _run_exit_probe() -> Array:
 	var seconds := _exit_probe_seconds()
 	print("(running this suite once more in a fresh process, to read what it leaves at exit — %d s allowed)" % seconds)
@@ -736,10 +703,8 @@ func _test_exits_clean(probe: Array) -> void:
 	var stderr: String = probe[2]
 	var hung: bool = probe[3]
 	var seconds: int = probe[4]
-	# Every leak line is the engine's, and the engine writes them to stderr; both are
-	# searched so that stays a fact about the engine rather than an assumption here. Shown
-	# apart, because a pipe each is two streams whose interleaving is lost, and where a hung
-	# copy had got to is the end of its stdout.
+		# Every leak line is the engine's, written to stderr; both streams are searched, and shown apart
+		# because their interleaving is lost and where a hung copy got to is the end of its stdout.
 	var text := stdout + "\n" + stderr
 	var tail := "its last lines:\n%s\nand the last on stderr:\n%s" % [
 		_last_lines(stdout, 15), _last_lines(stderr, 10)

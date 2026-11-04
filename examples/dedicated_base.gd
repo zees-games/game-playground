@@ -20,11 +20,9 @@ const PlaygroundVote := preload("../game/playground_vote.gd")
 const PlaygroundWaves := preload("../game/playground_waves.gd")
 
 
-## Sections that ran to their last line, and the checks they ran between them.
-##
-## Both, because either alone reports a healthy run with checks missing: a runtime error aborts
-## a section and not the run. Each section calls [method _section_done] as its last line; an
-## early `return` after a failed check skips it deliberately. See docs/testing.md.
+## Sections that ran to their last line, and the checks they ran between them. Both, because either
+## alone reports a healthy run with checks missing: a runtime error aborts a section, not the run.
+## Each section calls [method _section_done] last; an early `return` after a failed check skips it.
 var _stats_errors: PackedStringArray = []
 
 const SECTIONS := 32
@@ -47,18 +45,14 @@ var server: DotServer = null
 var game: Playground = null
 var platform: PlaygroundPlatform = null
 
-## The app's URL segment on the website, which is this game's code name.
-##
-## Display only — a listing prints it to say which game this is, and nothing treats it as
-## proof.
+## The app's URL segment on the website, this game's code name. Display only: a listing prints it
+## and nothing treats it as proof.
 const APP_URL := "playground"
 
 
-## The loaded module, looked up rather than kept.
-##
-## Looked up every time, because `_test_module_unloads_cleanly` unloads it. Typed as [DotModule]:
-## `playground_module.gd` has no `class_name` (a pack-delivered module is loaded by path), so its
-## fields come back through `get()`.
+## The loaded module, looked up every time because `_test_module_unloads_cleanly` unloads it. Typed
+## as [DotModule]: `playground_module.gd` has no `class_name` (a pack-delivered module is loaded by
+## path), so its fields come back through `get()`.
 func _module() -> DotModule:
 	return server.modules.get_module("playground")
 
@@ -73,12 +67,9 @@ func _section_done() -> void:
 	_sections_done += 1
 
 
-## The server half of this game's own server browser.
-##
-## [b]`PlaygroundBrowser` has existed for as long as this client has, and nothing in this
-## repository could answer it.[/b] The interesting part of a sandbox's listing row is not
-## the map: it is which of `pg_arena`, `pg_waves` and `pg_shop` are on, because each turns
-## this into a different server and all three default to off.
+## The server half of this game's own server browser. What matters in a sandbox's listing row is
+## not the map but which of `pg_arena`, `pg_waves` and `pg_shop` are on: each turns this into a
+## different server and all three default to off.
 func _test_query() -> void:
 	print("")
 	print("[a server browser's half]")
@@ -168,11 +159,9 @@ func _test_stats_report() -> void:
 	_section_done()
 
 
-## Runs a console command as the local console and returns what it replied.
-##
-## Through a reply sink captured in an [Array]: [method DotConsole.execute] builds a FRESH
-## context and copies only the sink, and a lambda captures by value, so a
-## [PackedStringArray] appended to inside one is unchanged outside it.
+## Runs a console command as the local console and returns what it replied. The reply sink is
+## captured in an [Array]: [method DotConsole.execute] copies only the sink into a FRESH context,
+## and a lambda captures by value, so a [PackedStringArray] appended to inside one is unchanged.
 func _forget_learned_heat() -> void:
 	var dir := "user://npc_heat"
 
@@ -652,13 +641,9 @@ func _test_progress() -> void:
 	_section_done()
 
 
-## `pg_status`'s "time left" is the vote's clock, and an extend moves it.
-##
-## [b]It read the map session's clock after the vote had taken the map's end over[/b], so
-## an operator asking how long was left was shown a limit an extend had already moved —
-## the same bug the HUD had, one screen over. Through the console, which is how an
-## operator reads it, and asserting the session's clock did NOT move while the line did:
-## the line moving with the session held still is the line reading the vote.
+## `pg_status`'s "time left" is the vote's clock, and an extend moves it. It once read the map
+## session's clock after the vote took the map's end over. Through the console, asserting the
+## session's clock did NOT move while the line did: that is the line reading the vote.
 func _test_status_clock(vote: PlaygroundVote) -> void:
 	var rules := vote.director.rules
 	var clock := vote.director.clock
@@ -726,11 +711,8 @@ func _status_seconds(lines: PackedStringArray) -> int:
 	return int(parts[0]) * 60 + int(parts[1])
 
 
-## Deletes any file the achievement store has written for [param player].
-##
-## The store is a directory of files under `user://` and it is not part of what this
-## suite is testing; what matters is that a run starts from nothing. Failing to open the
-## directory is not an error — the first run on a machine has no directory yet.
+## Deletes any file the achievement store has written for [param player], so a run starts from
+## nothing. A missing directory is not an error: the first run on a machine has none.
 func _forget_stored_progress(progress: PlaygroundProgress, player: String) -> void:
 	var dir := DirAccess.open(progress.progress_dir)
 
@@ -749,11 +731,9 @@ const EXIT_PROBE_FLAG := "--exit-probe"
 const EXIT_PROBE_CHECKS := 3
 
 
-## How long the copy may run before it is killed and this probe fails. A copy that is still
-## running this long after it started is hung, and the likeliest reason is the one that says
-## nothing at all: a scene whose script failed to parse never reaches `quit()` and prints
-## nothing. `-- --exit-probe-seconds N` lowers it, which is how the deadline itself is armed —
-## any N shorter than the suite takes is a copy that is still running when it expires.
+## How long the copy may run before it is killed and this probe fails. A copy still running this
+## long is hung, likeliest a scene whose script failed to parse (it never reaches `quit()` and
+## prints nothing). `-- --exit-probe-seconds N` lowers it, which is how the deadline is armed.
 const EXIT_PROBE_SECONDS := 300
 
 

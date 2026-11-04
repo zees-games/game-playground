@@ -21,26 +21,9 @@ const PlaygroundWeapons := preload("playground_weapons.gd")
 const PlaygroundZee := preload("playground_zee.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
 
-## Boots a playable playground: one local player, a camera, a HUD, a spawn menu and the keys.
-##
-## Separate from [Playground], the simulation: a dedicated server never loads this.
-##
-## The bindings are the sandbox ones, so the game can be picked up without a manual:
-##
-## [codeblock]
-## Q (hold)     the spawn menu. Release to close; tap to pin it open
-## Mouse 1      the tool's primary: grab and hold, or punt
-## Mouse 2      the tool's secondary: freeze what is held, or pull and carry
-## Wheel        how far out the physics gun holds a prop
-## Shift+mouse  turn the prop the physics gun is holding
-## E            spawn the prop the menu last armed, again
-## R            unfreeze everything you have frozen
-## Z            undo your last spawn
-## 1 / 2 / 3    physics gun / gravity gun / cycle the weapons you have
-## T            switch track (with a run timer: the server added dot-timer)
-## N            cycle style      M   next map
-## C V X G      practice checkpoints, with a run timer: save, go to, cycle, forget
-## [/codeblock]
+## Boots a playable playground: one local player, a camera, a HUD, a spawn menu and the keys
+## (listed in docs/client.md). Separate from [Playground], the simulation: a dedicated server
+## never loads this.
 
 const CHANNEL := "playground.client"
 
@@ -70,20 +53,16 @@ const FALLBACK_MAP := &"pg_flatgrass"
 var last_undo_cue: Dictionary = {}
 @export var display_name: String = "Player"
 
-## Configuration handed to the [Playground] this builds, or null for the defaults.
-##
-## Forwarded, not set afterwards: `Playground._ready` layers it and loads `initial_map` inside
-## `add_child`. It also lets a test boot a real client without writing the user's data directory.
+## Configuration handed to the [Playground] this builds, or null for the defaults. Forwarded, not
+## set afterwards: `Playground._ready` layers it and loads `initial_map` inside `add_child`.
 @export var config: PlaygroundConfig = null
 
 ## A JSON file to layer over [member config]. Passed straight through.
 @export var config_file: String = ""
 
-## The dedicated server's client link, when this client is on a server.
-##
-## Set before this node enters the tree; it decides which client this is. With it the playground
-## is a mirror (not authoritative, no player of its own, every action sent as intent); without it,
-## the local sandbox `headless_playground` drives.
+## The dedicated server's client link, when this client is on a server. Set before this node enters
+## the tree; with it the playground is a mirror (not authoritative, no player of its own, every
+## action sent as intent), without it the local sandbox `headless_playground` drives.
 @export var link: Node = null
 
 var playground: Playground = null
@@ -118,10 +97,8 @@ var platform: DotGameClient = null
 ## Whether an offline client fetches the world's art slices and the locked pack; a suite sets it false so it needs no network.
 var fetch_content: bool = true
 
-## The player asked to leave from the pause menu.
-##
-## Announced, not acted on: what "leave" means belongs to whatever loaded this client (a shell, an
-## embedded page, a development scene).
+## The player asked to leave from the pause menu. Announced, not acted on: what "leave" means
+## belongs to whatever loaded this client (a shell, an embedded page, a development scene).
 signal leave_requested()
 
 var screens: DotScreenStack = null
@@ -166,10 +143,8 @@ var _selection_box: MeshInstance3D = null
 ## Which tool is in hand: [constant TOOL_PHYS], [constant TOOL_GRAV], or a weapon id.
 var tool: StringName = TOOL_PHYS
 
-## The weapon in hand, when [member tool] is neither of the two built-in guns.
-##
-## Instantiated per equip, not pooled: a weapon has state (charge, cooldown) that a shared
-## instance would carry from one player's hands into another's.
+## The weapon in hand, when [member tool] is neither built-in gun. Instantiated per equip, not
+## pooled: a weapon has state (charge, cooldown) a shared instance would carry between hands.
 var weapon: PlaygroundWeapon = null
 
 ## The hands and the gun, under the first-person camera, while a zee weapon is in them.
@@ -213,10 +188,9 @@ var _menu_pinned: bool = false
 ## the command has to be stamped for a tick and kept for reconciliation.
 var _sampler: DotFpsSampler = null
 
-## The tool triggers, as command buttons. Held rather than edge-triggered: the server
-## decides what a press and a hold each mean (see PlaygroundNetBridge._drive_tools), and
-## a client that sent only the edges would drop one to packet loss and leave a player
-## holding a crate they have let go of.
+## The tool triggers, as command buttons. Held rather than edge-triggered: the server decides what
+## a press and a hold each mean (PlaygroundNetBridge._drive_tools), and a client sending only
+## edges would drop one to packet loss and leave a player holding a crate they let go of.
 var _net_buttons: int = 0
 
 
@@ -295,11 +269,9 @@ func _build_view_arms() -> void:
 	view_arms.call("build")
 
 
-## Joins the chat box to the three things it needs.
-##
-## The sampler too: movement is POLLED, so without `suspended` typing "sw" walks the player back.
-## dot-server's `chat_received` feeds only the server's own lines; a PLAYER's line goes through
-## this game's wire, so connecting both would draw one twice.
+## Joins the chat box to the three things it needs, the sampler too: movement is POLLED, so
+## without `suspended` typing "sw" walks the player back. dot-server's `chat_received` feeds only
+## the server's own lines; a PLAYER's line goes through this game's wire, so both would draw twice.
 func _wire_chat_window() -> void:
 	var window: DotChatWindow = presentation.chat_window if presentation != null else null
 
@@ -316,11 +288,9 @@ func _wire_chat_window() -> void:
 		client_link.connect("chat_received", _on_server_chat_state)
 
 
-## dot-server's chat payload: what carries the conversation, and the server's own lines.
-##
-## A player's line is never drawn from here (this game routes those over its own wire); the
-## server's own lines (a vote between games, "Ada joined the game.", an admin's `say`) come only
-## this way.
+## dot-server's chat payload: the server's own lines (a vote between games, "Ada joined the game.",
+## an admin's `say`) come only this way. A player's line is never drawn from here; this game
+## routes those over its own wire.
 func _on_server_chat_state(payload: Dictionary) -> void:
 	if str(payload.get("kind", "")) != "state":
 		var window: DotChatWindow = presentation.chat_window if presentation != null else null
@@ -331,10 +301,8 @@ func _on_server_chat_state(payload: Dictionary) -> void:
 		presentation.set_chat_relayed(bool(payload.get("relay", false)))
 
 
-## What a player typed, on its way to the server.
-##
-## Nothing is filtered here: the server decides what a line may contain and its answer is
-## the only one that counts.
+## What a player typed, on its way to the server. Nothing is filtered here: the server decides
+## what a line may contain and its answer is the only one that counts.
 func _on_chat_submitted(text: String, channel: StringName) -> void:
 	if bridge != null:
 		bridge.say(channel, text)
@@ -387,10 +355,9 @@ func _on_chat_message(message: DotChatMessage, channel_id: StringName) -> void:
 		hud.notice("%s%s: %s" % [prefix, message.sender_name, message.text])
 
 
-## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a
-## body the client's presentation ray never meets (a target hit through the server's hitboxes). The rig's effects skip a second drawing
-## of a hit the ray already drew. Through `has_method`: an older shell's zee has no
-## `play_body_hit`.
+## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a body
+## the presentation ray never meets (a target hit through the server's hitboxes). The rig skips a
+## second drawing of a hit the ray drew. Via `has_method`: an older shell's zee has no `play_body_hit`.
 func _draw_body_hit(rig: Object, point: Vector3) -> void:
 	if rig == null or not is_instance_valid(rig) or not rig.has_method(&"shot_fx"):
 		return
@@ -425,8 +392,6 @@ func _on_combat(state: Dictionary) -> void:
 	if bool(state["died"]) and hud != null:
 		hud.notice("You were killed.")
 
-
-# --- Dead bodies -------------------------------------------------------------
 
 ## Where the dead lie: dot-player-char's ragdolls under the server's rules. Connected only:
 ## a solo sandbox has no arena and nobody dies.
@@ -495,10 +460,8 @@ func _on_match(state: Dictionary) -> void:
 	match_seconds = float(state["seconds_left"])
 
 
-## Somebody picked a server in the browser.
-##
-## Announced, not acted on: connecting is the host application's, since a shell instantiating this
-## scene already knows where a person plays. Offline it says so.
+## Somebody picked a server in the browser. Announced, not acted on: connecting is the host
+## application's, since a shell instantiating this scene already knows where a person plays.
 func _on_server_chosen(address: String) -> void:
 	server_chosen.emit(address)
 
@@ -659,12 +622,9 @@ func board_snapshot() -> Dictionary:
 var _started_msec: int = Time.get_ticks_msec()
 
 
-## What a frame draws that a tick does not: the netcode's interpolation, then every player's
-## body turned the way they are looking. Returns how many bodies are shown. Static so the net
-## suite drives exactly this.
-##
-## Per frame, not per tick, or remote players step at the snapshot rate. [param alpha] is how far
-## through the tick the frame is (-1 asks the engine); [param own] is this client's own player.
+## What a frame draws that a tick does not: the netcode's interpolation, then every player's body
+## turned the way they look. Per frame, not per tick, or remote players step at the snapshot rate.
+## [param alpha] is how far through the tick the frame is (-1 asks the engine). Returns the body count.
 static func present_frame(
 	p_net: DotNetManager, p_game: Playground, alpha: float = -1.0, own: PlaygroundPlayer = null
 ) -> int:
@@ -698,10 +658,8 @@ static func present_frame(
 	return shown
 
 
-## Draws every beaconed player's marker for one frame, and plays each ripple's ping.
-##
-## Every player, this client's own included. Here, not in the game's tick: a marker is
-## presentation and a dedicated server would build meshes for nobody.
+## Draws every beaconed player's marker for one frame, and plays each ripple's ping, this client's
+## own included. Here, not in the game's tick: a dedicated server would build meshes for nobody.
 func _present_beacons(delta: float) -> void:
 	if playground == null:
 		return
@@ -726,12 +684,8 @@ func _menu_is_open() -> bool:
 	return (screens != null and screens.any_open()) or (game_menu != null and game_menu.any_open())
 
 
-# --- Input -----------------------------------------------------------------
-
-## The sampler the next simulated tick will actually read.
-##
-## A networked player has no sampler of its own, so mouse events must feed this one.
-## server. Left null in play, where the real mouse mode is the only honest answer.
+## The sampler the next simulated tick will actually read. A networked player has no sampler of its
+## own, so mouse events must feed this one. Left null in play, where the real mouse mode is the answer.
 var mouse_capture_override: Variant = null
 
 
@@ -770,10 +724,8 @@ func key_for(action: StringName) -> String:
 	return str(PlaygroundBindings.make().row_for_action(action).get("default", action))
 
 
-## Puts a refusal on the HUD, and says nothing about a success.
-##
-## An empty message is a refusal already told through `DotPropSpawner.refused`; printing it again
-## would show the line twice.
+## Puts a refusal on the HUD, and says nothing about a success. An empty message is a refusal
+## already told through `DotPropSpawner.refused`; printing it again would show the line twice.
 var _wet: Dictionary = {}
 
 

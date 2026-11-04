@@ -2,11 +2,9 @@ extends "res://game/playground_module_base.gd"
 ## The rest of the console commands: limits, arena, waves, shop, vote and punishments.
 
 
-## `pg_max_<group>` per kind, `pg_limit_roles` for who gets more, and `pg_limits` to see
-## anybody's. A role is a dot-server admin group by name, plus `admin` (any admin flag)
-## and `root` (the root flag) — so an operator who already has an admin file has roles.
-## One slot count: the server's `sv_maxplayers` is what it accepts and advertises (A2S clamps its
-## own byte), so the roster follows it; a non-default `pg_max_players` is the operator's and wins.
+## `pg_max_<group>` per kind, `pg_limit_roles` for who gets more, and `pg_limits` to see anybody's.
+## A role is a dot-server admin group by name, plus `admin` and `root`. Slot count follows the
+## server's `sv_maxplayers`; a non-default `pg_max_players` is the operator's and wins.
 func _bind_slots() -> void:
 	var slots: DotConVar = server.console.find_cvar("sv_maxplayers") if server != null else null
 	var roster: DotPlayerRoster = game.player_stack.roster if game.player_stack != null else null
@@ -228,8 +226,6 @@ func set_arena(on: bool) -> void:
 	if _arena_on != null and _arena_on.get_bool() != on:
 		_arena_on.force_set("1" if on else "0")
 
-
-# --- The loadout (B) ----------------------------------------------------------
 
 func _build_loadout_command() -> void:
 	_arena_on = add_cvar("pg_arena_on", "1" if arena.enabled else "0",

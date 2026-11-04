@@ -98,11 +98,8 @@ func _adopt() -> void:
 	_sync_hud()
 
 
-## The client's tick, driven by the netcode clock rather than by the engine's frame.
-##
-## The clock is asked how many ticks this frame is worth, because the engine's rate and
-## the server's need not agree — though the bridge adopts the server's on HELLO, which
-## is the only reason the two ever do.
+## The client's tick, driven by the netcode clock rather than the engine's frame: the engine's
+## rate and the server's need not agree (the bridge adopts the server's on HELLO).
 func _net_physics(delta: float) -> void:
 	if net == null or bridge == null or not net.is_running():
 		return
@@ -162,11 +159,9 @@ func _build_view() -> void:
 		presentation.bind_camera_motion(player)
 
 
-
-## Builds the third-person controller and the switch, on the local player only.
-##
-## Here, not in `Playground.add_player`: `samples_input` is set by this client after the player is
-## made, so a switch built there would see a non-local player and build nothing (F5 does nothing).
+## Builds the third-person controller and the switch, on the local player only. Not in
+## `Playground.add_player`: `samples_input` is set by this client after the player is made, so a
+## switch built there would see a non-local player and build nothing (F5 does nothing).
 func _build_view_switch() -> void:
 	if player == null:
 		return
@@ -277,10 +272,9 @@ func _set_tool(id: StringName) -> void:
 				hud.notice("Ammunition refilled.")
 		return
 
-	# Everything is let go of on the way out. A gravity gun that kept carrying a
-	# crate after the player switched to the physics gun would have two tools
-	# holding one prop, which `DotPropInstance.held_by` refuses — so the physics gun
-	# would simply do nothing and there would be nothing on screen to say why.
+	# Everything is let go of on the way out: a gravity gun still carrying a crate after the switch
+	# to the physics gun would mean two tools holding one prop, which `DotPropInstance.held_by`
+	# refuses, so the physics gun would do nothing with nothing on screen to say why.
 	_primary_up()
 	_secondary_up()
 
@@ -423,10 +417,9 @@ func _secondary_down() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# On a server the tools are actuated by the SERVER from the buttons this client
-	# sends — see PlaygroundNetBridge._drive_tools. Running them here as well would be a
-	# second, disagreeing simulation of somebody else's rigid body, on a copy that is
-	# frozen and drawn from snapshots and could not move anyway.
+	# On a server the SERVER actuates the tools from this client's buttons (PlaygroundNetBridge.
+	# _drive_tools). Running them here too would be a second, disagreeing simulation of a rigid body
+	# that is frozen and drawn from snapshots here.
 	if link != null:
 		_net_physics(delta)
 		return
@@ -434,10 +427,9 @@ func _physics_process(delta: float) -> void:
 	if player == null or _covered():
 		return
 
-	# Held from the physics loop, because the spring writes a velocity the solver
-	# consumes on this step. Doing it in _process writes a velocity that a variable
-	# number of physics steps then apply, and the prop jitters at exactly the rate
-	# the frame time varies.
+	# Held from the physics loop, because the spring writes a velocity the solver consumes on this
+	# step. In _process a variable number of physics steps apply it, and the prop jitters at the
+	# rate the frame time varies.
 	if _holding:
 		player.phys_gun.hold(
 			player.eye_position(), player.aim_direction(), _view_basis(), delta
@@ -471,13 +463,9 @@ func _physics_process(delta: float) -> void:
 		playground.player_shots_fired(player_id, outcome)
 
 
-# --- Props -----------------------------------------------------------------
-
-## What the server says we are holding, which is the only answer that counts.
-##
-## A refused purchase has to take the weapon back: `_set_tool` arms locally (prediction), and
-## `pg_shop` may refuse it. Somebody else's weapon is not applied: no first-person weapon is drawn
-## for a remote player yet.
+## What the server says we are holding, the only answer that counts. A refused purchase has to
+## take the weapon back (`_set_tool` arms locally as prediction, `pg_shop` may refuse). Another
+## player's weapon is not applied: no first-person weapon is drawn for a remote player.
 func _on_weapon_changed(pid: int, weapon_id: StringName) -> void:
 	if bridge == null or pid != bridge.local_player_id:
 		return
@@ -576,10 +564,8 @@ func map_menu_rows() -> Array:
 
 
 ## B: the arena's loadout, which weapon an arena spawn puts in your hands. Connected the server
-## answers (dot-loadout's `/loadout`); enabled only while the arena is on. Guarded on the host's
-## dot-menu and dot-loadout levels.
-## Escape's Mods action: the player's own override of the console's look, solo or listen host only
-## (the platform turns the user tier on). By name, so an older client shell just has no action.
+## answers (dot-loadout's `/loadout`); enabled only while the arena is on, and guarded on the
+## host's dot-menu and dot-loadout levels. Escape's Mods action: the player's own look override.
 func _use_mods_menu() -> void:
 	if platform == null or not platform.user_tier_on or game_menu == null or not game_menu.has_method(&"use_mods"):
 		return
@@ -659,8 +645,6 @@ func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary
 	return out
 
 
-# --- zee-dot-weapons --------------------------------------------------------
-
 ## The rig in this client's own player's hands, or null.
 func _zee_rig() -> ZeeWeaponRig:
 	if player == null or not is_instance_valid(player):
@@ -671,10 +655,9 @@ func _zee_rig() -> ZeeWeaponRig:
 	return null
 
 
-## Builds the hands under the camera and a rig to drive them.
-##
-## The rig has the authority only offline; connected, the server holds the deciding rig
-## (`PlaygroundNetBridge._give_weapon`) and this one is the gun that moves.
+## Builds the hands under the camera and a rig to drive them. The rig has the authority only
+## offline; connected, the server holds the deciding rig (`PlaygroundNetBridge._give_weapon`)
+## and this one is the gun that moves.
 func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 	if player == null or camera == null:
 		return false
