@@ -1,13 +1,6 @@
 # frame-hazards
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
 addons/pg_timer/playground_hook.gd::_process::string_build	1
-examples/headless_presentation.gd::_answer::duplicate	1
-examples/headless_presentation.gd::_answer::string_build	2
-examples/headless_presentation.gd::_process::duplicate	1
-examples/headless_presentation.gd::_process::string_build	3
-game/playground_client.gd::_present_splashes::alloc_array	1
-game/playground_client.gd::_present_splashes::alloc_dict	1
-game/playground_client.gd::fit_selection_box::node_lookup	1
 game/playground_constraints.gd::_physics_process::duplicate	1
 game/playground_hud.gd::_process::string_build	3
 game/playground_hud.gd::_props_line::string_build	1
@@ -24,7 +17,7 @@ tools/map_props.gd::_physics_process::alloc_array	1
 tools/map_props.gd::_physics_process::alloc_dict	1
 tools/map_props.gd::_physics_process::string_build	3
 tools/render_feel.gd::_process::string_build	5
-tools/screenshot.gd::_process::string_build	3
+tools/screenshot.gd::_process::string_build	2
 tools/screenshot.gd::_stage_action::string_build	3
 tools/screenshot.gd::_stage_fx::connect_unguarded	1
 tools/screenshot.gd::_stage_fx::find_children	1

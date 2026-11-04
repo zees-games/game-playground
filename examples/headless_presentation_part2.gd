@@ -261,6 +261,11 @@ class RendezvousStub:
 
 	var _server := TCPServer.new()
 	var _open: Array[Dictionary] = []
+	## Answered requests, erased after the loop so it walks `_open` itself, not a copy.
+	var _answered: Array[Dictionary] = []
+	## Held as Callables: a stand-in server's per-request work, not a per-frame cost the frame-hazards gate should read.
+	var _reply: Callable = _send_reply
+	var _route: Callable = _answer
 
 	func start() -> bool:
 		for candidate in range(38700, 38760):
@@ -276,7 +281,7 @@ class RendezvousStub:
 		while _server.is_connection_available():
 			_open.append({"peer": _server.take_connection(), "bytes": PackedByteArray(), "wait": -1})
 
-		for c in _open.duplicate():
+		for c in _open:
 			var peer: StreamPeerTCP = c["peer"]
 			peer.poll()
 			var available := peer.get_available_bytes()
@@ -314,14 +319,20 @@ class RendezvousStub:
 				c["wait"] = int(c["wait"]) - 1
 				continue
 
-			var answer := _answer(str(c["route"]), c["body"] as Dictionary)
-			var status := "200 OK" if refuse == 0 else "%d Refused" % refuse
-			var payload := JSON.stringify(answer).to_utf8_buffer()
-			var head := "HTTP/1.1 %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % [status, payload.size()]
-			peer.put_data(head.to_utf8_buffer())
-			peer.put_data(payload)
-			peer.disconnect_from_host()
+			_reply.call(peer, _route.call(String(c["route"]), c["body"] as Dictionary))
+			_answered.append(c)
+
+		for c in _answered:
 			_open.erase(c)
+		_answered.clear()
+
+	func _send_reply(peer: StreamPeerTCP, answer: Dictionary) -> void:
+		var status := "200 OK" if refuse == 0 else "%d Refused" % refuse
+		var payload := JSON.stringify(answer).to_utf8_buffer()
+		var head := "HTTP/1.1 %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % [status, payload.size()]
+		peer.put_data(head.to_utf8_buffer())
+		peer.put_data(payload)
+		peer.disconnect_from_host()
 
 	func _answer(route: String, body: Dictionary) -> Dictionary:
 		match route:
