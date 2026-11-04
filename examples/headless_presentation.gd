@@ -27,7 +27,8 @@ const PlaygroundZee := preload("../game/playground_zee.gd")
 ##
 ## Exits non-zero on any failure.
 
-const CHECKS := 157
+const CHECKS := 156
+const SECTIONS := 18
 
 var _entered := 0
 var _completed := 0
@@ -87,12 +88,7 @@ func _run() -> void:
 		"the player's own settings files were not touched",
 		PlaygroundPresentation.PLAYER_SETTINGS
 	)
-	_check(
-		_completed == _entered,
-		"every section ran to its last line (%d of %d)" % [_completed, _entered],
-		"a section that aborted stops adding checks and the total cannot show it"
-	)
-	_report(CHECKS)
+	_report_sections(_entered, _completed, SECTIONS, CHECKS)
 
 
 ## Every file in the player's own settings directory, as name, modification time and MD5,

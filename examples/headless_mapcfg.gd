@@ -9,6 +9,7 @@ const PlaygroundMapConfig := preload("../game/playground_map_config.gd")
 ## [/codeblock]
 
 const CHECKS := 7
+const SECTIONS := 1
 
 
 func _ready() -> void:
@@ -18,6 +19,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	print("game-playground: per-map cvars")
+	var entered := 1
 	var file := "res://cfg/game/game-playground/dot_map/map/pgt_mapcfg.yml"
 	var out := FileAccess.open(file, FileAccess.WRITE)
 	if out != null:
@@ -42,4 +44,4 @@ func _run() -> void:
 	_check(cfg.applied().is_empty(), "a map with no file applies nothing")
 
 	DirAccess.remove_absolute(file)
-	_report(CHECKS)
+	_report_sections(entered, 1, SECTIONS, CHECKS)

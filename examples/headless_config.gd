@@ -11,6 +11,10 @@ const PlaygroundAmbience := preload("../game/playground_ambience.gd")
 const ROOT := "user://pg_cfgtest"
 const GAME := "game-playground"
 const CHECKS := 29
+const SECTIONS := 4
+
+var _entered := 0
+var _finished := 0
 
 
 func _ready() -> void:
@@ -23,6 +27,7 @@ func _run() -> void:
 		_probe()
 		return
 	print("game-playground: config binder")
+	_entered += 1
 	var config := PlaygroundConfig.new()
 	var binder := PlaygroundConfig.make_binder(config)
 	binder.strict = true
@@ -52,9 +57,13 @@ func _run() -> void:
 	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
 	DirAccess.remove_absolute("user://pg_config_bad.json")
 
+	_entered += 2
 	_layers()
+	_finished += 1
 	_templates(binder)
+	_finished += 1
 
+	_entered += 1
 	var wb := DotGameWorkbench.new()
 	wb.panel_mode = 1
 	wb.config = {"enabled": false}
@@ -88,16 +97,8 @@ func _run() -> void:
 
 	wb.free()
 	console.free()
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
-
+	_finished += 2
+	_report_sections(_entered, _finished, SECTIONS, CHECKS)
 
 
 ## Child process: loads the layers strictly over the test root and prints what the live config holds.
