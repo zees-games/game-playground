@@ -3,9 +3,8 @@
 addons/pg_natural_disasters/playground_hook.gd::long_block	1
 addons/pg_timer/playground_hook.gd::banner	6
 addons/pg_timer/playground_hook.gd::long_block	2
-examples/dedicated.gd::banner	6
-examples/dedicated.gd::history	5
-examples/dedicated.gd::long_block	29
+examples/dedicated.gd::history	3
+examples/dedicated.gd::long_block	13
 examples/headless_config.gd::long_block	1
 examples/headless_mapcfg.gd::long_block	1
 examples/headless_net.gd::long_block	1
@@ -43,9 +42,9 @@ game/net/playground_events.gd::banner	19
 game/net/playground_events.gd::long_block	9
 game/net/playground_inventory_net.gd::banner	4
 game/net/playground_inventory_net.gd::long_block	10
-game/net/playground_net_bridge.gd::banner	14
-game/net/playground_net_bridge.gd::history	4
-game/net/playground_net_bridge.gd::long_block	40
+game/net/playground_net_bridge.gd::banner	1
+game/net/playground_net_bridge.gd::history	1
+game/net/playground_net_bridge.gd::long_block	6
 game/net/playground_net_command.gd::long_block	1
 game/net/playground_net_link.gd::banner	2
 game/net/playground_net_link.gd::history	1
@@ -67,9 +66,7 @@ game/playground_bindings.gd::long_block	1
 game/playground_builds.gd::banner	4
 game/playground_builds.gd::long_block	1
 game/playground_character.gd::long_block	9
-game/playground_client.gd::banner	10
-game/playground_client.gd::history	1
-game/playground_client.gd::long_block	34
+game/playground_client.gd::long_block	2
 game/playground_config.gd::long_block	14
 game/playground_constraints.gd::banner	4
 game/playground_constraints.gd::long_block	2
@@ -91,8 +88,8 @@ game/playground_map_survey.gd::history	1
 game/playground_map_survey.gd::long_block	4
 game/playground_materials.gd::long_block	1
 game/playground_mod_tools.gd::long_block	1
-game/playground_module.gd::banner	14
-game/playground_module.gd::long_block	9
+game/playground_module.gd::banner	6
+game/playground_module.gd::long_block	6
 game/playground_npc_world.gd::long_block	1
 game/playground_party.gd::long_block	2
 game/playground_paths.gd::long_block	4
@@ -121,8 +118,8 @@ game/playground_services.gd::banner	2
 game/playground_services.gd::history	1
 game/playground_services.gd::long_block	12
 game/playground_shop.gd::long_block	6
-game/playground_spawn_menu.gd::banner	7
-game/playground_spawn_menu.gd::long_block	13
+game/playground_spawn_menu.gd::banner	2
+game/playground_spawn_menu.gd::long_block	8
 game/playground_spawnables.gd::banner	1
 game/playground_spawnables.gd::long_block	12
 game/playground_spectate.gd::long_block	2
