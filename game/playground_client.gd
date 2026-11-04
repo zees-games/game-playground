@@ -479,6 +479,12 @@ func _build_netcode() -> DotResult:
 	net_config.enable_lag_compensation = false
 	net_config.max_entities_per_snapshot = 0
 	net_config.world_extent = 512.0
+	# Both default off; without them every snapshot rewinds and replays the whole input lead. By name:
+	# a pack runs on whatever dot-net its shell carries.
+	if &"reconcile_once_per_frame" in net_config:
+		net_config.set(&"reconcile_once_per_frame", true)
+	if &"skip_matching_replays" in net_config:
+		net_config.set(&"skip_matching_replays", true)
 	net.config = net_config
 	add_child(net)
 
