@@ -111,12 +111,8 @@ enum Ask {
 	RTV,
 	## Put me on this style (index into the server's ordered table).
 	STYLE,
-	## Get me into whatever I am standing next to, or out of what I am in.
-	##
-	## [b]One ask for both, because the player pressed one key.[/b] Two asks would put a
-	## client in charge of deciding which it is, and a client that guesses wrong asks to
-	## get into the car it is already sitting in — which the server then refuses, so the
-	## symptom is a use key that stops working once you are in something.
+	## Get me into whatever I am standing next to, or out of what I am in. One ask for both, because the
+	## player pressed one key: a client guessing which would ask to enter the car it is already in.
 	USE_VEHICLE,
 	## I typed a line. The server decides what channel it lands on and who hears it.
 	SAY,
@@ -130,9 +126,7 @@ enum Ask {
 	INVENTORY,
 	## Load this prop into the toy in my hand: what the launcher throws.
 	##
-	## [b]The sixteenth kind, and the last one four bits hold.[/b] Anything after this
-	## goes in as a sub-kind of an existing one, the way [constant INVENTORY] does. An
-	## older server refuses it as an unknown kind and nothing else happens.
+	## The sixteenth kind, the last four bits hold: later ones go in as a sub-kind, as [constant INVENTORY] does.
 	ARM_PROP,
 }
 
@@ -331,12 +325,8 @@ static func read_weapon(r: DotNetReader) -> Dictionary:
 	return {"player_id": player_id, "weapon_id": StringName(weapon_id), "ok": r.ok()}
 
 
-## Who is in what, and where. Sent to everybody, because a client draws other people
-## sitting in cars and has to stop drawing them walking.
-##
-## [param seat_index] is the index into the vehicle definition's own seat list rather
-## than the seat's id: the client has the same catalogue and a byte is a byte, where an
-## id is up to sixty-four of them per player per journey.
+## Who is in what, and where. Sent to everybody, because a client draws others sitting in cars.
+## [param seat_index] indexes the vehicle definition's seat list, not the seat id: a byte, not sixty-four.
 static func write_seat(
 	player_id: int, vehicle_net_id: int, seat_index: int, seated: bool
 ) -> PackedByteArray:
@@ -402,12 +392,8 @@ static func read_id(r: DotNetReader) -> StringName:
 	return StringName(r.read_string(ID_BYTES))
 
 
-# --- ARM_PROP and its sub-kinds ---------------------------------------------------
-#
-# The Ask enum is four bits and full, so the tool gun's settings, the NPC weapon choice and
-# spawning a weapon into the world ride on ARM_PROP as sub-kinds after its id — the way
-# INVENTORY carries its own. A body with nothing after the id is the original ARM_PROP,
-# which is what an older client sends and an older server reads.
+# The Ask enum is four bits and full, so tool gun settings, the NPC weapon choice and weapon spawns ride on
+# ARM_PROP as sub-kinds after its id. A body with nothing after the id is the original ARM_PROP.
 
 const ARM_PROP_SUB := 0
 ## The tool gun: id is the mode, payload its settings as JSON.
@@ -595,10 +581,7 @@ const MATCH_LABEL_BYTES := 48
 
 ## The match clock, once a second and on every transition.
 ##
-## [b]Sent rather than derived, because a mirroring client's [DotMatch] never runs.[/b]
-## Nothing ticks it, so `seconds_remaining()` is computed from a `_current_tick` that is
-## still zero — not a stale value, a value nothing had ever written. game-arena shipped a
-## client showing `IDLE` for ever while the server was playing a round.
+## Sent rather than derived: a mirroring client's [DotMatch] never ticks, so its clock never advances.
 static func write_match(
 	state: int, seconds_left: float, round_number: int, label: String
 ) -> PackedByteArray:
@@ -662,9 +645,7 @@ const LOADOUT_COUNT_BITS := 4
 
 ## What a client asks the vote for: `rtv`, `nominate <id>`, `vote <n>`, `extend`.
 ##
-## A token rather than an enum, because the thing voted for is an id and what an id means
-## is a [DotVoteSource]'s business — which is what lets one engine drive dot-server's games
-## and dot-map's maps without this file naming either.
+## A token rather than an enum: what an id means is a [DotVoteSource]'s business.
 static func write_vote(token: String) -> PackedByteArray:
 	var writer := DotNetWriter.new()
 	writer.write_string(token, VOTE_TOKEN_BYTES)
@@ -896,8 +877,7 @@ static func read_inv_ack(r: DotNetReader) -> Dictionary:
 
 ## The whole bag, as the JSON [method DotInvDoc.to_dictionary] was written to survive.
 ##
-## JSON on purpose: it is the format a saved bag is in, so every join round-trips it for real.
-## Refused, not truncated, when too big ([method DotNetWriter.write_string] truncates, leaving
+## JSON on purpose: it is the saved format. Refused, not truncated, when too big (truncating leaves
 ## JSON the client cannot parse); an empty result is one [method PlaygroundNetBridge._tell] refuses.
 static func write_inv_doc(through_seq: int, doc: Dictionary) -> PackedByteArray:
 	var text := JSON.stringify(doc)

@@ -589,10 +589,8 @@ func _test_grenade_over_the_wire() -> void:
 	_done()
 
 
-## The thrower's own grenade flies the frame it is thrown, and the server's launch adopts it.
-##
-## Without the prediction the first check fails (nothing flies until the round trip); without the
-## adoption the count after the echo is two.
+## The thrower's own grenade flies the frame it is thrown, and the server's launch adopts it
+## (without the adoption the count after the echo is two).
 func _test_own_grenade_predicted() -> void:
 	_section("the thrower's own grenade is predicted")
 	_server_game.projectiles.clear()

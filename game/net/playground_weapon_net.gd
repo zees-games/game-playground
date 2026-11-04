@@ -1,9 +1,8 @@
 extends RefCounted
 
-## Carries the weapon layer over the link: the drop layer's three signals out as events, a joiner's
-## snapshot, a client's events back into the layer's mirror, and the server's hand-over of a gun
-## (a throw or a death takes the rig off the player, a pickup arms them). Lives beside the bridge
-## because the bridge is over its size gate; it reaches the bridge's send and tool calls by name.
+## Carries the weapon layer over the link: drop events out, a joiner's snapshot, a client's events
+## into the mirror, and the server's hand-over of a gun. Lives beside the bridge to keep it under
+## its size gate; it reaches the bridge's send and tool calls by name.
 
 const PlaygroundEvents := preload("playground_events.gd")
 const PlaygroundZee := preload("../playground_zee.gd")

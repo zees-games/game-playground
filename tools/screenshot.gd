@@ -185,16 +185,8 @@ func _imported_shots(id: String) -> Array[Dictionary]:
 	]
 
 
-## Angles per map, because a 200 m sandbox with a park at one end and a movement corner at
-## the other has nothing useful to say from one camera.
-func _shots_for(id: String) -> Array[Dictionary]:
-	if id in IMPORTED:
-		return _imported_shots(id)
-	if id == "pg_brushes":
-		return [
-			{"name": "pg_brushes", "from": Vector3(-12.0, 7.0, 16.0), "at": Vector3(0.0, 1.5, -1.0)},
-			{"name": "pg_brushes_stairs", "from": Vector3(-4.0, 3.0, 4.0), "at": Vector3(-4.0, 1.5, -4.0)},
-		]
+## Camera views for the course maps (pgc_*); empty for any other id.
+func _course_shots(id: String) -> Array[Dictionary]:
 	if id == "pgc_plots":
 		return [
 			{"name": "pgc_plots", "from": Vector3(0.0, 70.0, 95.0), "at": Vector3(0.0, 0.0, -5.0)},
@@ -243,6 +235,11 @@ func _shots_for(id: String) -> Array[Dictionary]:
 			{"name": "pgc_warehouse_cold", "from": Vector3(22.0, 3.2, -16.0), "at": Vector3(22.0, 1.4, -30.0)},
 			{"name": "pgc_warehouse_office", "from": Vector3(-17.0, 3.2, -9.5), "at": Vector3(-30.0, 2.2, -4.0)},
 		]
+	return _course_shots_more(id)
+
+
+## The second half of the course maps' views.
+func _course_shots_more(id: String) -> Array[Dictionary]:
 	if id == "pgc_canyon":
 		return [
 			{"name": "pgc_canyon", "from": Vector3(-30.0, 60.0, 120.0), "at": Vector3(0.0, 5.0, 0.0)},
@@ -291,6 +288,22 @@ func _shots_for(id: String) -> Array[Dictionary]:
 			{"name": "pgc_slopes_pond", "from": Vector3(-34.0, 5.0, 46.0), "at": Vector3(-50.0, -0.5, 28.0)},
 			{"name": "pgc_slopes_runout", "from": Vector3(22.0, 7.0, -66.0), "at": Vector3(0.0, 0.0, -82.0)},
 		]
+	return []
+
+
+## Angles per map, because a 200 m sandbox with a park at one end and a movement corner at
+## the other has nothing useful to say from one camera.
+func _shots_for(id: String) -> Array[Dictionary]:
+	if id in IMPORTED:
+		return _imported_shots(id)
+	if id == "pg_brushes":
+		return [
+			{"name": "pg_brushes", "from": Vector3(-12.0, 7.0, 16.0), "at": Vector3(0.0, 1.5, -1.0)},
+			{"name": "pg_brushes_stairs", "from": Vector3(-4.0, 3.0, 4.0), "at": Vector3(-4.0, 1.5, -4.0)},
+		]
+	var course := _course_shots(id)
+	if not course.is_empty():
+		return course
 	if id != "pg_flatgrass":
 		return [
 			{"name": "%s_overview" % id, "from": Vector3(-90, 70, 90), "at": Vector3(0, 8, 0)},

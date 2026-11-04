@@ -147,7 +147,12 @@ func _build() -> void:
 	var _store := platform.add_store_panel(_game_menu, func() -> String: return "")
 	_game_menu.scoreboard.source = _sample_board
 
-	_shots = [
+	_shots = _shot_list()
+
+
+## The screens to render, in order.
+func _shot_list() -> Array[Dictionary]:
+	return [
 		{"id": &"spawn_menu", "file": "menu_spawn.png"},
 		{"id": &"spawn_menu", "file": "menu_weapons.png", "tab": PlaygroundSpawnMenu.Tab.WEAPONS},
 		# The model props: a category chip picked, so the thumbnails and their names are on screen.

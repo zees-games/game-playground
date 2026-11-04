@@ -59,11 +59,8 @@ var bridge: PlaygroundNetBridge = null
 ## the people connected rather than about the world.
 var services: PlaygroundServices = null
 
-## Where the services write punishments: [constant PlaygroundServices.PUNISHMENTS_PATH], the real
-## store, unless a host says otherwise before this loads.
-##
-## Static because dot-server constructs the module from a path, so a host has no instance to set
-## a field on first; `examples/dedicated.tscn` points it at a directory of its own.
+## Where the services write punishments, unless a host says otherwise before this loads.
+## Static because dot-server constructs the module from a path, so a host has no instance to set.
 static var punishments_path: String = PlaygroundServices.PUNISHMENTS_PATH
 
 ## Health, weapons that hurt, and a round. Off unless an operator turns it on.
@@ -114,10 +111,8 @@ func _module_version() -> String:
 	return "0.1.0"
 
 
-## The custom maps delivered beside this game: every pack its descriptor names, read for a
-## `maps/` directory where it is mounted. A client builds the map too, so such a pack is a
-## `dependencies` entry every client fetches. Duck-typed, so a dot-server without the field offers
-## the built-in maps.
+## The custom maps delivered beside this game: every pack its descriptor names, read for a `maps/` directory
+## where it is mounted. Duck-typed, so a dot-server without the field offers the built-in maps.
 func _add_delivered_maps() -> void:
 	var games: Object = server.get("games") if server != null else null
 	if games == null:
@@ -177,11 +172,8 @@ func _module_load() -> DotResult:
 		"pg_style", _cmd_style,
 		"List the styles, or switch to one", ""
 	).with_chat()
-	# --- A run timer's, when a server added one -----------------------------
-	#
-	# pg_timer, pg_track, pg_top and the practice checkpoints (pg_cp, pg_tp, pg_cp_clear)
-	# belong to `addons/pg_timer`, which registers them only when dot-timer is present: a
-	# command for a timer the server does not have would answer every player with an error.
+	# The run timer's commands (pg_timer, pg_track, pg_top, pg_cp, pg_tp, pg_cp_clear) belong to
+	# `addons/pg_timer`, which registers them only when dot-timer is present.
 	if game.run_timer != null and game.run_timer.has_method("bind_commands"):
 		game.run_timer.call("bind_commands", add_command, _target)
 
@@ -284,9 +276,7 @@ func _module_load() -> DotResult:
 		"pg_mute", _cmd_mute, "pg_mute <who> <seconds> [reason]", DotAdminFlags.MUTE
 	).with_chat()
 
-	# The tick rate is dot-server's `sv_tickrate` and is deliberately not duplicated
-	# here. A second cvar for the same number is a second number that can disagree
-	# with the first, and a run timer reads the engine's.
+	# The tick rate is dot-server's `sv_tickrate`, not duplicated: a second cvar could disagree with the engine's.
 	add_cvar(
 		"pg_map_seconds",
 		str(int(game.maps.time_limit.duration)),
@@ -311,10 +301,8 @@ func _module_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
-	# dot-player-controller's mp_forceview (first or third person: the player's choice, or one
-	# held) and mp_solidplayers (players block each other, 1 by default). REPLICATED: the
-	# client places its own camera under the first and predicts its own player under the
-	# second.
+	# dot-player-controller's mp_forceview (view mode) and mp_solidplayers (players block each other),
+	# REPLICATED: the client places its camera under the first and predicts its player under the second.
 	var _views := game.view_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
@@ -343,11 +331,8 @@ func _module_load() -> DotResult:
 
 	hook_post("client_spawn", _on_client_spawn)
 
-	# [b]dot-server's own chat is cancelled here rather than listened to.[/b]
-	# [DotChatRouter] has the rules now, and the one thing that must not happen is both
-	# running: two sets of rules to keep in step, and the one that skipped the filter would
-	# be the one that leaked admin chat. A pre-hook is what can cancel;
-	# [method DotChatManager.handle_message] broadcasts the moment the event returns.
+	# dot-server's own chat is cancelled here, not listened to: [DotChatRouter] has the rules, and both
+	# running would leak admin chat. Only a pre-hook can cancel; handle_message broadcasts on return.
 	hook_pre("player_chat", _on_player_chat)
 
 	# dot-chat makes the join and leave notices now, so dot-server's would be a second one
@@ -423,9 +408,8 @@ class PlaygroundQueryProvider extends DotQueryProvider:
 var map_config: DotGameMapConfig = null
 
 
-## Tells dot-server which map is running, so A2S and DQP print it in their map field (and
-## the backbone report does too) rather than this game's content id. On every change
-## through the session's own signal, which every route to a new map ends at.
+## Tells dot-server which map is running, so A2S, DQP and the backbone report print it rather than the
+## game's content id. On every change, through the session's own signal.
 func _report_map(map: DotMapDef, _world: Node = null) -> void:
 	if map_config == null and console != null:
 		map_config = PlaygroundMapConfig.build(console)
@@ -435,17 +419,15 @@ func _report_map(map: DotMapDef, _world: Node = null) -> void:
 		server.games.set_current_map(String(map.id) if map != null else "")
 
 
-## Who is still behind their loading cover, from dot-game's roster used for that alone: this
-## module is not on DotGameModule, so it seats people itself and only borrows the bookkeeping
-## (loading from the spawn event until the client says its cover lifted, again from a map
-## change). The arena asks it by player key (`u<userid>`). A bot is never seated, so never loading.
+## Who is still behind their loading cover, from dot-game's roster used for that alone (this module is
+## not on DotGameModule). Loading runs from the spawn event until the cover lifts, again per map change.
+## The arena asks it by player key (`u<userid>`); a bot is never seated, so never loading.
 var loading: DotGameRoster = null
 var _handles_cover: bool = false
 
 
-## The loading roster and the handler for the client's cover report on dot-server's envelope.
-## A kind on the existing envelope because the RPC set is frozen; a client that predates it is
-## released by the roster's timeout. Duck-typed so an older dot-server still loads this.
+## The loading roster and the handler for the client's cover report, a kind on dot-server's envelope
+## (the RPC set is frozen). An older client is released by the roster's timeout.
 func _build_loading() -> void:
 	loading = DotGameRoster.new()
 	loading.server = server
@@ -476,11 +458,9 @@ var _identity: DotPlatformIdentity = null
 var _loaded_platform := false
 
 
-## Resolves who a session is and what they wear, through dot-platform.
-##
-## This module is not a DotGameModule, so it does what that base does: build
-## `DotPlatformIdentity` with the avatar schema, a stock look and the site translation, then load
-## dot-platform's module (an already-loaded one is used as is).
+## Resolves who a session is and what they wear, through dot-platform. Does what DotGameModule does:
+## build `DotPlatformIdentity` with the avatar schema, a stock look and the site translation, then
+## load dot-platform's module (an already-loaded one is used as is).
 func _build_identity() -> DotResult:
 	if bridge != null:
 		bridge.skin_fn = _skins_for
@@ -599,9 +579,7 @@ func _module_unload() -> void:
 		if game.maps.changed.is_connected(_report_map):
 			game.maps.changed.disconnect(_report_map)
 
-		# Every player this module put in the game comes back out. A module that
-		# unloaded and left them would leave the game holding players whose sessions
-		# no longer exist — and the next record filed would be attributed to a ghost.
+		# Every player this module put in comes back out, or a later record is attributed to a ghost.
 		for id in game.players.keys():
 			game.remove_player(id)
 
@@ -622,11 +600,8 @@ func _wire_arena_hooks() -> void:
 	)
 
 
-## Everything that is not the netcode.
-##
-## Built in this order because each needs the last (the services register a mute source the chat
-## router wants; the progress layer watches the spawner and timer). None of it suspends:
-## [method DotModuleHost.load_module] does not await `_module_load`.
+## Everything that is not the netcode, in the order each needs the last (the services register a mute
+## source the chat router wants). Nothing suspends: load_module does not await `_module_load`.
 func _build_extras() -> DotResult:
 	services = PlaygroundServices.new()
 	services.name = "Services"
@@ -763,9 +738,7 @@ func _build_extras() -> DotResult:
 	# it and everybody dies, which is what a deathmatch is.
 	arena.death_rule_fn = downs.report_zero_health
 
-	# A downed player who bleeds out is a death the scoreboard and the respawn queue
-	# still have to hear about, and the arena's own path was skipped when they went
-	# down. This is the other end of that decision.
+	# A downed player who bleeds out is a death the scoreboard and respawn queue still have to hear about.
 	downs.died.connect(func(player_id: StringName, _reason: StringName) -> void:
 		if arena.enabled and player_id != &"":
 			arena.match_node.report_kill("", String(player_id), &"bleed_out", game.current_tick())
@@ -783,9 +756,7 @@ func _build_extras() -> DotResult:
 			record.revive(clampf(health / game.config.arena_health, 0.05, 1.0))
 	)
 
-	# Being killed by a wave is what being downed is FOR, so the two switch together.
-	# The alternative — a separate cvar — is an operator who turned the waves on and
-	# wonders why nobody is being picked up.
+	# Being killed by a wave is what being downed is for, so the two switch together (no separate cvar).
 	downs.set_enabled(waves.is_enabled())
 
 	progress = PlaygroundProgress.new()
@@ -840,10 +811,8 @@ func _build_extras() -> DotResult:
 
 	vote.change_due.connect(_on_vote_change_due)
 
-	# Both map clocks follow the server's hibernation: they wait while nobody is here and start
-	# again from the top when somebody joins. With it off (`sv_hibernate_when_empty 0`),
-	# dot-vote's `empty_choice` changes the map when the limit runs out on nobody. This module
-	# is not on DotGameModule, which does it itself.
+	# Both map clocks follow the server's hibernation: they wait while nobody is here and restart when
+	# somebody joins. With `sv_hibernate_when_empty 0`, dot-vote's `empty_choice` changes the map instead.
 	if vote.director != null:
 		vote.director.follow_hibernation(server)
 	if game.maps != null:
@@ -878,10 +847,8 @@ func _build_extras() -> DotResult:
 	var commanded := vote.install_commands(self)
 	DotLog.result(CHANNEL, "the vote's commands", commanded)
 
-	# The map menu (M), dot-vote's: a player holding the owner's `sv_map_menu_flag` changes the
-	# map now through the game's own change (props, NPCs and course reset with it, as for the
-	# vote and `pg_map`), anybody else gets a vote. Read by name, because a server on a dot-vote
-	# older than the menu has no `map_menu`.
+	# The map menu (M), dot-vote's: a holder of `sv_map_menu_flag` changes the map now through the game's
+	# own change, anybody else gets a vote. Read by name: an older dot-vote has no `map_menu`.
 	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
 	if menu_half is Object:
 		(menu_half as Object).set(&"change_fn", game.change_map)
@@ -900,10 +867,7 @@ func _build_extras() -> DotResult:
 
 # --- Chat, voice and votes -------------------------------------------------
 
-## Somebody said something through dot-server's own chat path.
-##
-## Taken and cancelled, not watched: this game's rules are [DotChatRouter]'s now, and
-## cancelling is what makes there be exactly one path.
+## Somebody said something through dot-server's own chat path. Cancelled, not watched, so [DotChatRouter]'s rules are the only path.
 func _on_player_chat(event: DotEvent) -> void:
 	event.cancel("routed by the sandbox's chat", _module_name())
 
@@ -935,12 +899,8 @@ func _on_chat_accepted(message: DotChatMessage, _to: PackedInt32Array) -> void:
 		_last_spoke = message.sender_name
 
 
-## An unclaimed `!command` from chat, routed into dot-server's own console with the
-## player's permissions.
-##
-## [b]Not a second command table.[/b] dot-server already decides what a session may run,
-## logs it to the audit log and answers it — and this game's console surface is the largest
-## in the family, so a second table would be the larger half unaudited.
+## An unclaimed `!command` from chat, routed into dot-server's own console with the player's permissions.
+## Not a second command table: dot-server already decides, audits and answers.
 func _on_chat_command(peer_id: int, command: String, args: PackedStringArray) -> void:
 	var session := server.session_of(peer_id)
 
@@ -1071,9 +1031,7 @@ func _on_earned(player_key: String, id: StringName, title: String, points: int) 
 		return
 
 
-## The key a statistic is filed under.
-##
-## The stats key of a world player id: dot-game's stable per-server one, never an account id.
+## The key a statistic is filed under: a world player id's stable per-server stats key, never an account id.
 func _stats_key_for(player_id: StringName) -> String:
 	var text := String(player_id)
 
@@ -1099,10 +1057,8 @@ func _stats_key(session: DotClientSession) -> String:
 	return String(_stats_feed.key_for(session))
 
 
-## Who a session is, for a bag that outlasts the connection, or empty for nobody.
-##
-## The key the statistics use: the userid is sequential and a reconnect is a new one. Without an
-## identity stack the key is `local:<userid>`, answered as empty so the bag goes with the session.
+## Who a session is, for a bag that outlasts the connection, or empty for nobody. The statistics' key
+## (a userid is sequential); without an identity stack it is empty so the bag goes with the session.
 func _bag_key_for(session_id: int) -> String:
 	if server == null:
 		return ""
@@ -1287,11 +1243,8 @@ func _bind_config() -> void:
 	game.config_binder.bind_commands(add_command)
 
 
-## The server's tick, which is the whole game's.
-##
-## Driven from here rather than by the game's own loop, because it has to happen between
-## dot-net applying the inputs that arrived and building the snapshot that goes back out.
-## `Playground.external_tick` is what stands the game's loop down.
+## The server's tick, which is the whole game's. Driven from here, not the game's loop: it has to run between
+## dot-net applying inputs and building the snapshot. `Playground.external_tick` stands the game's loop down.
 func _physics_process(_delta: float) -> void:
 	if not loaded or bridge == null:
 		return
@@ -1343,11 +1296,8 @@ func _physics_process(_delta: float) -> void:
 
 # --- Sessions --------------------------------------------------------------
 
-## A client finished the signon and is in the world.
-##
-## `client_spawn`, not `client_connected`: a connected client has a socket and nothing else.
-## It carries `userid`, NOT `peer_id`: reading `peer_id` gave 0, a null session, a quiet return
-## and nobody ever joined (docs/bugs-found.md).
+## A client finished the signon and is in the world. `client_spawn`, not `client_connected` (a socket and
+## nothing else); it carries `userid`, NOT `peer_id` (which read as 0 and nobody joined).
 func _on_client_spawn(event: DotEvent) -> void:
 	var session := server.session_by_userid(event.get_int("userid"))
 
@@ -1398,9 +1348,7 @@ func _on_client_spawn(event: DotEvent) -> void:
 	log_info("player joined the game", {"player": String(id)})
 
 
-## The bridge has admitted a peer: now they can be told what they missed.
-##
-## `_welcome` must not wait for the peer to be READY, which it never is on a real join, or nobody gets the chat backlog, the join line or the match clock.
+## The bridge has admitted a peer: now they can be told what they missed. `_welcome` must not wait for READY, which a real join never reaches.
 func _on_peer_admitted(peer_id: int) -> void:
 	var session := server.session_of(peer_id) if server != null else null
 	if session == null or not _joined.has(session.userid):
@@ -1410,18 +1358,13 @@ func _on_peer_admitted(peer_id: int) -> void:
 	_welcome(session)
 
 
-## What somebody is told once they are in: the backlog, and the clock.
-##
-## After the admission, never before: anything sent before the client builds its scene lands on a
-## node that does not exist.
+## What somebody is told once they are in: the backlog, and the clock. After the admission only: earlier lands on a node that does not exist.
 func _welcome(session: DotClientSession) -> void:
 	if bridge == null or not bridge.peer_is_ready(session.peer_id):
 		return
 
 	if services != null:
-		# The backlog: what was said before they walked in. dot-chat computes it per peer,
-		# because a channel with `backlog = 0` — the proximity one — must not replay a
-		# line somebody said quietly beside their build to a stranger who was not there.
+		# The backlog is computed per peer: a channel with `backlog = 0` (proximity) must not replay a quiet line.
 		for line in services.chat.backlog_for(session.peer_id):
 			bridge.send_chat(session.peer_id, line)
 
@@ -1459,9 +1402,7 @@ func _build_mod_tools() -> void:
 
 	add_child(mod_tools)
 
-	# A map change clears the return history for everybody: every position in it is a point on a
-	# map that was just freed. A respawn keeps it on purpose. `DotMapSession.changed` is the one
-	# signal every change ends at, whoever asked.
+	# A map change clears everybody's return history (its points are on a freed map); a respawn keeps it.
 	game.maps.changed.connect(_on_map_changed_for_mod_tools)
 
 	mod_commands = DotModToolCommands.install(self, mod_tools, server)
@@ -1531,10 +1472,8 @@ func _player_id(session: DotClientSession) -> StringName:
 	return StringName("u%d" % session.userid)
 
 
-## The key this seat's records and board rows are filed under: the account's uid (a guest's
-## is per device), never the session's userid, which is a server-local counter that restarts
-## at 1. Empty when the session has no identity, and then the seat is known by its userid, a
-## key [method Playground.is_legacy_key] reads as unranked.
+## The key this seat's records and board rows are filed under: the account's uid, never the session's
+## userid (a server-local counter). Without an identity the seat is known by its userid, read as unranked.
 func _record_key_for(session: DotClientSession) -> StringName:
 	var uid := session.uid()
 	if uid == "":
@@ -1707,9 +1646,7 @@ func _cmd_rtv(ctx: DotCmdContext) -> void:
 		return
 
 	if game.maps.time_limit.has_rocked(id):
-		# Said rather than silently ignored: typing it twice is what somebody does
-		# when nothing visible happened, and "nothing happened again" is the worst
-		# possible answer.
+		# Said rather than silently ignored: nothing visible happening twice is the worst answer.
 		ctx.reply("You have already rocked the vote. %d of %d." % [
 			game.maps.time_limit.rtv_votes(),
 			game.maps.time_limit.rtv_needed(game.players.size()),
@@ -1758,10 +1695,7 @@ func _cmd_prop(ctx: DotCmdContext) -> void:
 		return
 
 	if ctx.args.is_empty():
-		# Grouped, because a flat list of fourteen ids in a console window is
-		# unreadable and a delivered catalogue is four hundred. The categories are
-		# the same ones the spawn menu tabs on, so what an admin sees here and what
-		# a player sees in the menu cannot drift apart.
+		# Grouped by the spawn menu's own categories: a delivered catalogue is four hundred ids.
 		for category in game.props.catalogue.categories():
 			var names := PackedStringArray()
 
@@ -2219,9 +2153,7 @@ func _cmd_waves(ctx: DotCmdContext) -> void:
 	match ctx.arg(0):
 		"on":
 			waves.set_enabled(true)
-			# Being killed by a wave is what being downed is for, so the two switch
-			# together. A separate cvar is an operator who turned the waves on and
-			# wonders why nobody is being picked up.
+			# Being killed by a wave is what being downed is for, so the two switch together.
 			downs.set_enabled(true)
 			ctx.reply("Waves are on, and a player at zero health goes down rather than dying.")
 		"off":
@@ -2235,11 +2167,7 @@ func _cmd_waves(ctx: DotCmdContext) -> void:
 			ctx.reply_lines(waves.describe_lines())
 
 
-## `pg_spec` — watch somebody else.
-##
-## A sandbox is the one place where watching is not about being dead: the interesting
-## thing on a server like this is usually what somebody else is making, and the answer to
-## "what is that noise in the corner" is a camera.
+## `pg_spec` — watch somebody else. In a sandbox watching is not about being dead: the interesting thing is what somebody is making.
 func _cmd_spec(ctx: DotCmdContext) -> void:
 	var session := ctx.session
 
@@ -2294,12 +2222,7 @@ func _player_named(text: String) -> StringName:
 	return &""
 
 
-## `pg_shop` — turn the price list on, off, or read it.
-##
-## Off by default, and the cvar is the point: a sandbox where everything is free is a
-## sandbox, and one where a jeep costs four hundred credits is a game. Turning one into
-## the other because an addon was installed is what this family's rule about cvars
-## exists to prevent.
+## `pg_shop` — turn the price list on, off, or read it. Off by default: installing an addon must not turn a sandbox into a game.
 func _cmd_shop(ctx: DotCmdContext) -> void:
 	match ctx.arg(0):
 		"on":
@@ -2450,11 +2373,7 @@ func _cmd_mute(ctx: DotCmdContext) -> void:
 	await _punish(ctx, DotPunishment.Kind.VOICE_MUTE, "muted")
 
 
-## The shared half of gag and mute.
-##
-## One function because the only difference is a kind: dot-moderation already models both
-## as one record with an expiry, a scope and a revocation, and writing them separately
-## would be two chances to forget the duration parsing or the immunity.
+## The shared half of gag and mute: dot-moderation models both as one record, differing only in kind.
 func _punish(ctx: DotCmdContext, kind: DotPunishment.Kind, verb: String) -> void:
 	if ctx.args.size() < 2:
 		ctx.reply("Usage: %s <who> <seconds, 0 for permanent> [reason]" % ctx.command)
@@ -2467,9 +2386,7 @@ func _punish(ctx: DotCmdContext, kind: DotPunishment.Kind, verb: String) -> void
 		return
 
 	if targets.size() > 1:
-		# Refused rather than applied to all of them: `@me` and a name prefix both match
-		# more than one person, and a mute applied to four people by accident is a thing
-		# an operator finds out about from the four people.
+		# Refused rather than applied to all: `@me` and a name prefix can match several people.
 		ctx.reply("'%s' matches %d people. Be more specific." % [
 			ctx.args[0], targets.size()
 		])

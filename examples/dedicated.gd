@@ -328,11 +328,8 @@ func _boot() -> void:
 	# The tick rate is set the way an operator sets it: a line in a config file the server execs
 	# at boot, not by assigning `config.tickrate` (a `server.cfg` beats anything set in code).
 	#
-	# `startup_config`, not `autoexec_config`: `sv_tickrate` is FLAG_STARTUP_ONLY, and dot-server
-	# execs `server.cfg` BEFORE the listener while `autoexec.cfg` runs after and is refused.
-	#
-	# 100, not the project's default of 128: the SERVER decides, so the same number on both sides
-	# would pass with the chain disconnected.
+	# `startup_config`, not `autoexec_config` (`sv_tickrate` is FLAG_STARTUP_ONLY). 100, not the default 128,
+	# so the same number on both sides cannot pass with the chain disconnected.
 	var cfg_path := "%s/server.cfg" % SERVER_DIR
 	var cfg := FileAccess.open(cfg_path, FileAccess.WRITE)
 
@@ -1848,12 +1845,8 @@ func _test_live_tools() -> void:
 	if timed:
 		# A slap is a shove in a direction the slapper knows: speed nobody earned.
 		#
-		# Out of the start zone first. Pat joined at the spawn, which is inside the start, and
-		# standing in the start ends a live run (dot-timer's REASON_RESET): the run begun
-		# here was thrown away on the first tick after the slap and replaced by a clean one,
-		# so the check read a run the slap never touched. Up in the air is in no zone at all.
-		# Then let the timer see the move: leaving the start is what STARTS a run, so a run
-		# begun before that tick is replaced by the timer's own the moment it is processed.
+		# Out of the start zone first: standing in it ends a live run (REASON_RESET). Up in the air is in no zone.
+		# Then let the timer see the move, or a run begun earlier is replaced when it is processed.
 		player.teleport(Vector3(0.0, 400.0, 0.0))
 		for _i in 4:
 			await get_tree().physics_frame
@@ -2701,17 +2694,9 @@ func _forget_stored_progress(progress: PlaygroundProgress, player: String) -> vo
 			dir.remove(file)
 
 
-## [b]The one line that leaked mg-buses-from-hell's whole script graph at exit.[/b]
-##
-## A script that `extends DotNetMessage` and preloads ITSELF, first loaded from a module a
-## running [DotServer] loads — which is how every deployed server loads this game — leaves
-## every loaded script alive at exit on Godot 4.7.2 (measured in mg-buses-from-hell,
-## 8ed866c). This game's event and request both did it, for a typed `of()` factory.
-##
-## [b]Asserted on the source, because the symptom is where no check can reach.[/b] The
-## leak is reported after `quit()`, by the engine, as warnings a CI filter already treats
-## as noise; an assertion here runs before any of it exists. So this checks the cause
-## instead: every message script in `game/`, read as text.
+## A script that `extends DotNetMessage` and preloads ITSELF, first loaded from a module a running
+## [DotServer] loads, leaves every loaded script alive at exit on Godot 4.7.2. The leak is reported after
+## `quit()` where no check reaches, so this reads every message script in `game/` as text.
 func _test_no_message_preloads_itself() -> void:
 	print("exiting clean")
 
@@ -2792,22 +2777,11 @@ func _exit_probe_seconds() -> int:
 ## Runs this same suite in a fresh process: `[exit code, its stdout, its stderr, whether it
 ## had to be killed, the seconds it was allowed]`.
 ##
-## [b]A leak is reported after `quit()`, by the engine, where nothing in the process that
-## leaked can read it.[/b] "N ObjectDB instances were leaked at exit" is printed once the
-## scene tree is gone, so the only process that can check a run's exit is another one. On
-## Godot 4.7.2 a script that names itself, loaded after its base, cuts the engine's exit
-## teardown short and every script loaded before it is reported leaked — hundreds of lines
-## a passing run printed for weeks, which is why this is a check now and not a warning.
+## A leak ("N ObjectDB instances were leaked at exit") is printed after `quit()`, so only another process
+## can check a run's exit. Run first, before this run opens a port, so it is the second run on the same `user://`.
 ##
-## [b]First, before this run opens a port[/b], so the two never contend for a socket — and
-## so this run is always the second one against the same `user://`, which is the other
-## thing no single run can see.
-##
-## [b]Not `OS.execute`.[/b] That blocks until the copy exits, so a copy that hangs held this
-## run for ever; and when the outer `timeout` then killed this run, the copy was left behind
-## holding the suite's directory and port. So the copy is started, polled against a deadline
-## and killed at it. Two deadlines, because Godot dies on SIGTERM without running a line of
-## script — nothing in this process can clean up after it is killed:
+## Not `OS.execute`: a hanging copy would hold this run, and an outer `timeout` would orphan it holding the
+## port. So the copy is polled against a deadline and killed at it, with two deadlines:
 ##
 ## - coreutils `timeout` wraps the copy where it exists. It is an exec wrapper, not a shell,
 ##   and it outlives this process, so a copy orphaned by the outer `timeout` still dies on

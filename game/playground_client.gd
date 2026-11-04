@@ -479,8 +479,7 @@ func _build_netcode() -> DotResult:
 	net_config.enable_lag_compensation = false
 	net_config.max_entities_per_snapshot = 0
 	net_config.world_extent = 512.0
-	# Both default off; without them every snapshot rewinds and replays the whole input lead. By name:
-	# a pack runs on whatever dot-net its shell carries.
+	# Both default off, else every snapshot replays the whole input lead. By name: a pack runs on its shell's dot-net.
 	if &"reconcile_once_per_frame" in net_config:
 		net_config.set(&"reconcile_once_per_frame", true)
 	if &"skip_matching_replays" in net_config:
@@ -521,8 +520,7 @@ func _build_netcode() -> DotResult:
 	bridge.hello_received.connect(_on_hello)
 	bridge.roster_changed.connect(_on_roster_changed)
 	bridge.weapon_changed.connect(_on_weapon_changed)
-	# dot-server's own `chat_received` is deliberately NOT connected: every line is routed
-	# through [DotChatRouter] onto this game's wire, and both would draw a line twice.
+	# dot-server's `chat_received` is NOT connected: [DotChatRouter] routes every line, and both would draw it twice.
 	bridge.chat_received.connect(_on_chat_wire)
 	bridge.builds_received.connect(func(list: Array) -> void:
 		if menu != null:
@@ -544,7 +542,7 @@ func _build_netcode() -> DotResult:
 		var _solid := playground.body_rules.follow_cvars(link)
 		var _ambient := playground.ambient_rules.follow_cvars(link)
 		_follow_arena(link)
-	# The server's pg_ambient* set (when a link tells it) drives the quiet layer; the player's sliders multiply on top.
+	# The server's pg_ambient* set drives the quiet layer; the player's sliders multiply on top.
 	if presentation != null and presentation.ambient != null:
 		presentation.ambient.follow_settings(presentation.settings, playground.ambient_rules)
 	_build_ragdolls()
@@ -579,9 +577,7 @@ func _build_netcode() -> DotResult:
 			presentation.on_vote_cue(StringName(str(info.get("cue", ""))))
 	)
 
-	# Stock tunables until there is a player to ask. The sampler turns the view at the
-	# rate the player's style says, and at this point the server has not told us who we
-	# are — _adopt swaps them in the moment JOIN does.
+	# Stock tunables until there is a player to ask; _adopt swaps them in when JOIN arrives.
 	_sampler = DotFpsSampler.new(DotFpsTunables.new())
 	DotFpsSampler.register_default_actions(_sampler)
 
@@ -594,9 +590,7 @@ func _build_netcode() -> DotResult:
 		link.connect("spawned", bridge.ask_ready, CONNECT_ONE_SHOT)
 		link.connect("spawned", workbench_remote.ask, CONNECT_ONE_SHOT)
 
-	# Nothing in dot-net writes an RTT sample: it never touches a transport. A client
-	# that feeds none has a clock that believes the link is instant, and every command
-	# it stamps arrives after its tick has already been simulated.
+	# Nothing in dot-net writes an RTT sample; without one the clock believes the link is instant.
 	if link.has_method("ping_ms"):
 		bridge.rtt_source = func() -> float:
 			return float(maxi(0, int(link.call("ping_ms"))))
@@ -1535,17 +1529,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _covered():
 		return
 
-	# [b]The console first.[/b] This client reads bare letters -- Q opens the spawn menu,
-	# 1 and 2 switch tools, F gets into a car, E spawns -- so without this, typing
-	# `seed` at the console opens the menu, switches a tool and spawns a crate. It is the
-	# line every game that ships a console forgets.
+	# The console first: this client reads bare letters (Q, 1, 2, F, E), so typing `seed` at the console would act.
 	if presentation != null and presentation.swallows_input():
 		return
 
-	# [b]Voice first, and before the player check.[/b] Somebody with no player yet — mid
-	# signon, or spectating — should still be able to talk, and a release swallowed by an
-	# early return is a microphone left open. `handle_event` sees both edges, which every
-	# branch below this deliberately does not.
+	# Voice first, before the player check: somebody mid-signon or spectating can still talk, and a swallowed
+	# release leaves the microphone open. `handle_event` sees both edges.
 	if voice != null and voice.handle_event(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1566,8 +1555,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_mouse_motion(event as InputEventMouseMotion)
 		return
 
-	# Everything below moves the world. A menu is up, the mouse is a cursor, and a click on the
-	# menu's own background is unhandled by design and would arrive here.
+	# Everything below moves the world; a click on a menu's own background would arrive here.
 	if _menu_is_open() and not _is_menu_key(event):
 		return
 
@@ -1676,10 +1664,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	match key.physical_keycode:
 		KEY_ESCAPE:
-			# Only when no screen is up: the stack's own back handling pops the menu, and a second
-			# handler would also open the pause menu in one press. Release, THEN open, never capture:
-			# the platform frees a captured pointer on the first Escape, this is the second press, and
-			# a browser refuses pointer lock from a key just after Escape.
+			# Only when no screen is up (the stack pops menus itself). Release, THEN open, never capture:
+			# a browser refuses pointer lock just after Escape.
 			if not _menu_is_open() and game_menu != null:
 				game_menu.open()
 

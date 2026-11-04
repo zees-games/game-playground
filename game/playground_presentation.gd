@@ -544,10 +544,8 @@ func _build_audio() -> DotResult:
 	audio.mixer = DotAudioMixer.new()
 	audio.mixer.master = settings.get_float(&"master_volume", 0.8)
 	audio.voices = 24
-	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md) with the local player
-	# driven by tools/loudness_pilot.gd: walking the lobby, spawning crates, barrels and balls
-	# and punting them with the gravity gun. At +6 that read -22.5 LUFS; at +12 two runs read
-	# -17.5. The +6 before came from a stand-in that built nothing (-24.6, the empty room).
+	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md) with tools/loudness_pilot.gd:
+	# +6 read -22.5 LUFS, +12 read -17.5.
 	audio.loudness_trim_db = 12.0
 	# Deterministic: the pitch of a crate landing comes out of the session's own seed, so
 	# two people watching the same sandbox hear the same thing. It costs nothing and it is
@@ -582,10 +580,7 @@ func _build_audio() -> DotResult:
 	else:
 		ambience.set_map_bed(bed_for(&""))
 
-	# Only on a real sink, and only after setup: the manager decides whether there is a
-	# device, and on a headless server there is nothing to bake for. Building the bank
-	# anyway would be arithmetic per dedicated-server startup for streams no process on
-	# that machine can play.
+	# Only on a real sink, after setup: a headless server has nothing to bake for.
 	var godot_sink := audio.sink as DotAudioSinkGodot
 	if godot_sink != null:
 		godot_sink.bank = DotAudioSynth.bank(audio.catalogue, sound_recipes())
@@ -672,10 +667,7 @@ func _build_fx() -> DotResult:
 	if not res.ok:
 		return res.wrap("the playground's effects")
 
-	# [b]Said out loud, because a missing scene is otherwise a DEBUG line.[/b] Until
-	# 2026-09-27 neither scene this catalogue names existed, and every spawn puff was
-	# refused in silence. `headless_presentation` asserts the list is empty; this is for
-	# a build that lost one anyway.
+	# Said out loud, because a missing scene is otherwise a DEBUG line; headless_presentation asserts none is missing.
 	var missing := fx.catalogue.missing_scenes()
 	if not missing.is_empty():
 		DotLog.warn(CHANNEL, "effect scenes missing; those effects will not draw", {
@@ -724,8 +716,7 @@ func _build_chat() -> void:
 
 ## Puts one binding from the settings document onto its action.
 ##
-## Empty is left alone rather than applied: a settings file somebody cleared the field in
-## would otherwise unbind chat with no way to get it back from inside the game.
+## Empty is left alone: applying it would unbind chat with no way back from inside the game.
 func _bind_chat(action: StringName, text: String) -> void:
 	if action == &"" or text.strip_edges() == "":
 		return
@@ -845,9 +836,7 @@ func camera_shake() -> Vector3:
 
 ## Whether something on screen owns the keyboard right now.
 ##
-## [b]The chat box belongs here for the reason the console does.[/b] A client that keeps
-## reading movement while somebody types walks them across the map, and in a sandbox it
-## also fires whatever tool they are holding at whatever they were building.
+## The chat box belongs here as the console does: movement and tool fire must stop while somebody types.
 func swallows_input() -> bool:
 	if console != null and console.is_open():
 		return true

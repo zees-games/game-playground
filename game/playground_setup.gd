@@ -44,9 +44,8 @@ signal map_ready(map: DotMapDef)
 ## already fired before a caller reaches its `await` and the `await` never returns. A signal is not a state.
 signal ready_for_players()
 
-## A player now exists in [member players]. The net bridge answers this by building the
-## entity that replicates them, so a player the GAME made itself — a bot, a test — is
-## replicated exactly like one a peer asked for.
+## A player now exists in [member players]. The net bridge builds the entity that replicates them,
+## so a bot or test player replicates like one a peer asked for.
 signal player_added(id: StringName)
 
 ## A player is about to stop existing. Emitted BEFORE the teardown, so a listener can
@@ -76,9 +75,8 @@ signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vect
 ## server; the client equips it offline.
 signal weapon_picked_up(player_id: StringName, weapon_id: StringName)
 
-## Somebody finished a timed run of [param time] seconds; [param rank] is 0 when not filed and [param reason] says why. Emitted
-## only by a run timer (see [member run_timer]). A time rather than dot-timer's run object, because this file must compile
-## with the timer absent.
+## Somebody finished a timed run of [param time] seconds; [param rank] is 0 when not filed and [param reason] says why.
+## Emitted only by a run timer (see [member run_timer]); a time, not dot-timer's run object, so this compiles without it.
 signal run_filed(player_id: StringName, time: float, rank: int, reason: String)
 
 @export_group("Content")
@@ -92,9 +90,8 @@ signal run_filed(player_id: StringName, time: float, rank: int, reason: String)
 
 @export_group("Role")
 
-## Simulation ticks per second. The engine's rate wins whenever dot-server has set it from `sv_tickrate` (see
-## [method _resolve_tick_rate]); the export is the fallback for a client or test with no server to ask.
-## It stamps every record a run timer files, which is what lets a disputed time be checked.
+## Simulation ticks per second. The engine's rate wins when dot-server has set it from `sv_tickrate`
+## (see [method _resolve_tick_rate]); the export is the fallback. It stamps every filed run.
 @export_range(1, 240, 1) var tick_rate: int = 128
 
 ## Registry scope, so a server game and a client game can share one process (every headless netcode test does). Without it

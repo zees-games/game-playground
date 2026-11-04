@@ -7,13 +7,9 @@ const PlaygroundEvents := preload("../game/net/playground_events.gd")
 const PlaygroundWeaponNet := preload("../game/net/playground_weapon_net.gd")
 const PlaygroundZee := preload("../game/playground_zee.gd")
 
-## Dropped zee guns: the drop key throws the gun in hand, an unarmed player in reach picks it up
-## with the ammunition it had, a kill leaves the dead player's gun, a round or map change clears
-## the floor, the sv_weapon_drop* cvars bite, and a client (and a joiner) sees the same floor.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_weapondrop.tscn
-## [/codeblock]
+## Dropped zee guns: throw, pickup with ammunition, a kill's drop, floor clearing, the
+## sv_weapon_drop* cvars, and the same floor on a client and a joiner.
+## Run: godot --headless --path . res://examples/headless_weapondrop.tscn
 
 const SECTIONS := 4
 const CHECKS := 28

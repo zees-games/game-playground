@@ -310,10 +310,7 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 				PlaygroundEvents.write_hit(victim, amount, point, killed, headshot)))
 		game.weapon_picked_up.connect(_on_weapon_picked_up)
 
-		if game.projectiles != null:
-			game.projectiles.launched.connect(_on_projectile_launched)
-			game.projectiles.detonated.connect(_on_projectile_detonated)
-			game.projectiles.effects.blinded.connect(_on_flash_blinded)
+		_connect_projectiles()
 
 		# A map loaded before the bridge was attached has its toys already.
 		if game.toys != null:
@@ -322,11 +319,16 @@ func attach(p_game: Playground, p_net: DotNetManager, link_parent: Node) -> DotR
 	return DotResult.success(true)
 
 
+func _connect_projectiles() -> void:
+	if game.projectiles == null:
+		return
+	game.projectiles.launched.connect(_on_projectile_launched)
+	game.projectiles.detonated.connect(_on_projectile_detonated)
+	game.projectiles.effects.blinded.connect(_on_flash_blinded)
+
+
 ## Builds the inventory's half of the wire, when the game has an inventory.
-##
-## [b]Through [method _tell] and never [method _broadcast], and the callables are why that
-## cannot drift.[/b] [PlaygroundInventoryNet] is given a way to reach ONE peer and no way to
-## reach everybody, so a bag cannot be broadcast by a later edit that picks the wrong helper.
+## Through [method _tell], never [method _broadcast]: [PlaygroundInventoryNet] can reach ONE peer only.
 func _attach_inventory() -> void:
 	if game.inventory == null:
 		return
@@ -879,17 +881,9 @@ func ensure_game_ticked(tick: int) -> void:
 		inventory_net.flush()
 
 
-## Runs one player's physics gun or gravity gun from the buttons their command carried.
-##
-## [b]The triggers are BUTTONS, not requests.[/b] They are per-tick and continuous —
-## holding a prop is a thing you do every tick, not an event — so they ride in
-## [member DotFpsCommand.buttons] beside jump and crouch. Sending them as reliable
-## requests would put every grab a round trip behind the mouse and would reorder against
-## the movement they are aimed with.
-##
-## [b]And the server actuates them, not the client.[/b] The client's own copy of a prop
-## is frozen and drawn from snapshots; it could not move one if it tried. That is the
-## same decision [PlaygroundPropNet] documents, seen from the input end.
+## Runs one player's physics gun or gravity gun from the buttons their command carried. The triggers are
+## BUTTONS, per-tick and continuous, riding in [member DotFpsCommand.buttons]; reliable requests would lag
+## the mouse. The server actuates them: the client's props are frozen and drawn from snapshots.
 func _drive_tools(session_id: int, behaviour: PlaygroundPlayerNet) -> void:
 	if behaviour == null or behaviour.player == null or behaviour.identity == null:
 		return
@@ -1552,11 +1546,7 @@ func _on_request(message: DotNetMessage) -> void:
 ##
 ## [code](player_id: StringName, thing_id: StringName) -> DotResult[/code]
 ##
-## [b]A callable rather than a reference to the shop.[/b] The bridge is dot-net's half of
-## this game and knows nothing about prices; the shop lives on the module beside the
-## arena and the waves. Unset means everything is free, which is the sandbox this game
-## was before there was a price list — so a caller never has to branch on whether a shop
-## exists, and there is no second code path to keep in step.
+## A callable rather than a shop reference: the bridge knows nothing about prices. Unset means everything is free.
 var charge_fn: Callable = Callable()
 
 ## Asked before something is spawned, and charges nothing. The shop's `may_have`.
@@ -1903,15 +1893,7 @@ func _on_event(message: DotNetMessage) -> void:
 		PlaygroundEvents.Kind.PROP_GONE:
 			_apply_prop_gone(reader)
 		PlaygroundEvents.Kind.WEAPON:
-			var held := PlaygroundEvents.read_weapon(reader)
-			if bool(held["ok"]):
-				PlaygroundZee.show_held(
-					game.players.get(_player_key(int(held["player_id"]))),
-					game.weapon_def(held["weapon_id"] as StringName)
-				)
-				weapon_changed.emit(
-					int(held["player_id"]), held["weapon_id"] as StringName
-				)
+			_apply_weapon(reader)
 		PlaygroundEvents.Kind.PANE:
 			var pane := PlaygroundEvents.read_pane(reader)
 			if bool(pane["ok"]):
@@ -1921,12 +1903,7 @@ func _on_event(message: DotNetMessage) -> void:
 			if bool(burst["ok"]):
 				game.prop_shattered.emit(burst["at"], int(burst["material"]))
 		PlaygroundEvents.Kind.HELD:
-			var holding := PlaygroundEvents.read_held(reader)
-			if bool(holding["ok"]):
-				if int(holding["net_id"]) > 0:
-					held_props[int(holding["player_id"])] = int(holding["net_id"])
-				else:
-					held_props.erase(int(holding["player_id"]))
+			_apply_held(reader)
 		PlaygroundEvents.Kind.NOTICE:
 			var notice := PlaygroundEvents.read_notice(reader)
 			if bool(notice["ok"]):
@@ -1981,12 +1958,29 @@ func _on_event(message: DotNetMessage) -> void:
 			var _weapon := weapon_net.apply(event.kind, reader, game.weapon_layer)
 
 
-# --- Projectiles ---------------------------------------------------------------
+func _apply_weapon(reader: DotNetReader) -> void:
+	var held := PlaygroundEvents.read_weapon(reader)
+	if not bool(held["ok"]):
+		return
+	PlaygroundZee.show_held(
+		game.players.get(_player_key(int(held["player_id"]))),
+		game.weapon_def(held["weapon_id"] as StringName)
+	)
+	weapon_changed.emit(int(held["player_id"]), held["weapon_id"] as StringName)
 
-## Every launch to every client, so each flies a copy and draws the arc. Sent once rather
-## than replicated as an entity: a grenade lives two or three seconds, its path is a pure
-## function of where it left and how fast, and an entity per grenade would be an identity,
-## an interest-grid cell and a snapshot field for something the client can work out.
+
+func _apply_held(reader: DotNetReader) -> void:
+	var holding := PlaygroundEvents.read_held(reader)
+	if not bool(holding["ok"]):
+		return
+	if int(holding["net_id"]) > 0:
+		held_props[int(holding["player_id"])] = int(holding["net_id"])
+	else:
+		held_props.erase(int(holding["player_id"]))
+
+
+## Every launch to every client, so each flies a copy and draws the arc. Sent once, not replicated as an
+## entity: a grenade lives seconds and its path is a pure function of where it left and how fast.
 func _on_projectile_launched(flying: RefCounted) -> void:
 	_broadcast(PlaygroundEvents.Kind.PROJECTILE, PlaygroundEvents.write_launch(
 		int(flying.get("serial")), flying.get("spawn"), flying.get("owner_id"), bool(flying.get("sticks"))
@@ -2057,16 +2051,8 @@ func _apply_hello(reader: DotNetReader) -> void:
 	if inventory_net != null:
 		inventory_net.on_hello(local_player_id)
 
-	# [b]The server's tick rate, before anything is derived from it.[/b] game-g2gfast
-	# shipped with HELLO carrying this and nothing reading it: a browser client counted
-	# at the 60 its export declared against a server on 128, so the correction rate was
-	# 0.96 and every replicated time was out by 128/60. Produced correctly and consumed
-	# by nothing, which is this family's most repeated bug — and invisible to a
-	# one-process suite, because one process has one engine rate and both ends agree no
-	# matter what the wire says.
-	#
-	# Before sync_from_server, because the clock converts its error and its lead
-	# through tick_rate and would otherwise do that arithmetic at the old rate.
+	# The server's tick rate, before anything is derived from it and before sync_from_server, whose clock
+	# converts through tick_rate. A client counting at its export's 60 against a server on 128 has every time wrong.
 	_adopt_tick_rate(int(hello["tick_rate"]))
 
 	var rtt := float(rtt_source.call()) if rtt_source.is_valid() else 0.0
@@ -2263,17 +2249,9 @@ func _apply_prop(reader: DotNetReader) -> void:
 		# A wave NPC's mirror, dressed by the rule the server's own copy was.
 		PlaygroundWaves.dress(body, str(info["kind_id"]))
 
-	# [b]On the layout's layer, not the scene's 1/1.[/b] The server classifies every
-	# spawned body (`Playground._classify_spawned`) and a mirror used to keep whatever the
-	# scene had — layer 1 masking 1, the world's — so a crate was scenery to this client
-	# and a prop to the server. That matters now the client predicts its own player: its
-	# sweeps run against its own copy of the world, and a copy whose props sit on another
-	# layer is a world the server does not move that player through. A client has a
-	# layout even though it applies no physics (see `PlaygroundPlayerStack._build_physics`).
-	#
-	# The PROP event carries no frozen state, so a mirror is classified as the spawn left
-	# it on the server only when that is unfrozen; a prop frozen or held later is
-	# reclassified on the server and not here. See docs/netcode.md on `[prop-mirror-layer-1]`.
+	# On the layout's layer, not the scene's 1/1: the client predicts its own player against its copy of the
+	# world, so a mirror must sit where the server classified it. PROP carries no frozen state; later
+	# reclassification happens on the server only. See docs/netcode.md on `[prop-mirror-layer-1]`.
 	if game.player_stack != null and def != null:
 		var _put := game.player_stack.classify(body, Playground.layer_for(def, false))
 
@@ -2393,13 +2371,8 @@ func _apply_prop_gone(reader: DotNetReader) -> void:
 
 ## To every READY peer, one at a time, and never to peer 0.
 ##
-## [b]Not `net.send(msg, 0)`, which is an `rpc()` to every socket.[/b] A peer is connected
-## — and dot-server fires `client_spawn` for it — as soon as [DotClientLink] has added the
-## game scene, but this game's client builds its `Server/Playground` node only once its
-## first map is up. The JOIN that `client_spawn` produces went out in that gap, and every
-## real join logged "Failed to get path from RPC: Server/Playground" and "Requested node
-## was not found" once. The joining peer loses nothing: [method _admit] tells it every
-## player, itself included, when it says READY. `pg-rpc-before-scene`.
+## Not `net.send(msg, 0)`, an `rpc()` to every socket: a peer connects before its client builds
+## `Server/Playground`, so the early JOIN hit a missing node. [method _admit] tells it everything on READY.
 func _broadcast(kind: int, body: PackedByteArray) -> void:
 	if net == null or not net.is_server or body.is_empty():
 		return
