@@ -43,26 +43,51 @@ func _sync_hud() -> void:
 
 
 ## The phone's buttons over the HUD, on a touch device only. Fire and alt are the click's two buttons; Q is the
-## hold-or-tap spawn-menu key, fed the same press and release.
+## spawn-menu key fed the same press and release, so hold-to-open and tap-to-pin are the keyboard's own; the
+## tool arrows step the weapon wheel's actions, TAB holds the scoreboard and CHAT opens the chat box.
 func _build_touch() -> void:
 	if not DotPlatform.has_touch() or hud == null:
 		return
 	_touch = PlaygroundTouch.new()
-	var _built := _touch.build(hud, active_sampler,
-		func(down: bool) -> void:
+	var _built := _touch.build(hud, active_sampler, {
+		PlaygroundTouch.FIRE: func(down: bool) -> void:
 			if down:
 				call(&"_primary_down")
 			else:
 				_primary_up(),
-		func(down: bool) -> void:
+		PlaygroundTouch.ALT: func(down: bool) -> void:
 			if down:
 				call(&"_secondary_down")
 			else:
 				_secondary_up(),
-		func(down: bool) -> void:
+		PlaygroundTouch.MENU: func(down: bool) -> void:
 			var key := InputEventKey.new()
 			key.pressed = down
-			_on_menu_key(key))
+			_on_menu_key(key),
+		PlaygroundTouch.PREV: func(down: bool) -> void: _touch_step(-1, down),
+		PlaygroundTouch.NEXT: func(down: bool) -> void: _touch_step(1, down),
+		PlaygroundTouch.BOARD: func(down: bool) -> void:
+			if game_menu != null:
+				if down:
+					game_menu.scoreboard.open()
+				else:
+					game_menu.scoreboard.close(),
+		PlaygroundTouch.CHAT: func(down: bool) -> void:
+			var window: DotChatWindow = presentation.chat_window if presentation != null else null
+			if down and window != null and not _menu_is_open():
+				window.open(),
+	})
+
+
+## A tool step through the same wheel the keyboard's previous/next-weapon actions drive.
+func _touch_step(step: int, down: bool) -> void:
+	if not down or _menu_is_open():
+		return
+	var _ignored: Variant = call(&"_wheel_cycle", InputEventKey.new())
+	var ev := InputEventAction.new()
+	ev.action = _wheel.next_action if step > 0 else _wheel.previous_action
+	ev.pressed = true
+	_ignored = call(&"_wheel_cycle", ev)
 
 
 func _touch_ignores(position: Vector2) -> bool:

@@ -40,6 +40,37 @@ func _test_party_does_not_migrate() -> void:
 	_done()
 
 
+func _test_touch_buttons() -> void:
+	_section("A phone's on-screen buttons")
+	var list := PlaygroundTouch.layout()
+	var ids: Array = list.map(func(b: Dictionary) -> Variant: return b["id"])
+	for want: StringName in [PlaygroundTouch.PREV, PlaygroundTouch.NEXT, PlaygroundTouch.BOARD, PlaygroundTouch.CHAT, PlaygroundTouch.MENU]:
+		_check(ids.has(want), "the layout has the %s button" % want)
+	var probe := DotTouchButtons.new()
+	var m := probe.margin
+	probe.free()
+	for size: Vector2 in [Vector2(667, 375), Vector2(844, 390), Vector2(932, 430)]:
+		var clear := true
+		var inside := true
+		for i in list.size():
+			var a: Vector2 = size - Vector2(m, m) - (list[i]["offset"] as Vector2)
+			var ra: float = list[i]["radius"]
+			inside = inside and a.x - ra >= size.x * 0.5 and a.y - ra >= 0.0 and a.x + ra <= size.x and a.y + ra <= size.y
+			for j in range(i + 1, list.size()):
+				var b: Vector2 = size - Vector2(m, m) - (list[j]["offset"] as Vector2)
+				clear = clear and a.distance_to(b) >= ra + float(list[j]["radius"])
+		_check(inside, "every button sits in the right half at %dx%d" % [size.x, size.y])
+		_check(clear, "and no two overlap at %dx%d" % [size.x, size.y])
+	var got: Array = []
+	var handlers := {}
+	for id: StringName in [PlaygroundTouch.PREV, PlaygroundTouch.NEXT, PlaygroundTouch.BOARD, PlaygroundTouch.CHAT]:
+		handlers[id] = func(down: bool) -> void: got.append([id, down])
+	PlaygroundTouch.route(PlaygroundTouch.NEXT, true, Callable(), handlers)
+	PlaygroundTouch.route(PlaygroundTouch.BOARD, false, Callable(), handlers)
+	_check(got == [[PlaygroundTouch.NEXT, true], [PlaygroundTouch.BOARD, false]], "a press and a release reach their handlers", str(got))
+	_done()
+
+
 func _test_chat_box() -> void:
 	_section("A sandbox where you can be talked to and can talk back")
 
