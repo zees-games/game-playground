@@ -16,8 +16,8 @@ extends "res://examples/headless_presentation_part2.gd"
 ## Exits non-zero on any failure.
 
 
-const CHECKS := 156
-const SECTIONS := 18
+const CHECKS := 168
+const SECTIONS := 19
 
 ## The player's own settings directory as it was before this run: every file's name,
 ## modification time and digest. Checked at the end; see
@@ -55,6 +55,7 @@ func _run() -> void:
 	_test_party_does_not_migrate()
 	await _test_party_over_http()
 	await _test_escape_menu()
+	_test_touch_buttons()
 	_test_chat_box()
 	await _test_glance_pieces()
 

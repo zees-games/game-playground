@@ -1,7 +1,8 @@
 class_name PlaygroundTouch
 extends RefCounted
 
-## The on-screen buttons a phone needs: fire, alt-fire, jump, duck and the hold-to-open spawn menu.
+## The on-screen buttons a phone needs: fire, alt-fire, jump, duck, the hold-to-open spawn menu, tool previous/next,
+## the held scoreboard and the chat box.
 ## The look and move halves of the screen are [DotFpsTouchSampler]'s; [member buttons] tells it where a button is.
 
 const CHANNEL := "playground.touch"
@@ -11,6 +12,10 @@ const ALT := &"alt"
 const JUMP := &"jump"
 const DUCK := &"duck"
 const MENU := &"spawn"
+const PREV := &"prev"
+const NEXT := &"next"
+const BOARD := &"board"
+const CHAT := &"chat"
 
 ## Offsets are from the bottom-right corner towards the middle; small enough for a 375 px tall screen.
 static func layout() -> Array[Dictionary]:
@@ -20,40 +25,38 @@ static func layout() -> Array[Dictionary]:
 		{"id": JUMP, "label": "JUMP", "offset": Vector2(80, 172), "radius": 32.0},
 		{"id": DUCK, "label": "DUCK", "offset": Vector2(262, 60), "radius": 28.0},
 		{"id": MENU, "label": "Q", "offset": Vector2(190, 150), "radius": 26.0},
+		{"id": PREV, "label": "<", "offset": Vector2(138, 246), "radius": 22.0},
+		{"id": NEXT, "label": ">", "offset": Vector2(80, 246), "radius": 22.0},
+		{"id": BOARD, "label": "TAB", "offset": Vector2(196, 246), "radius": 22.0},
+		{"id": CHAT, "label": "CHAT", "offset": Vector2(254, 246), "radius": 22.0},
 	]
 
 var buttons: DotTouchButtons = null
 
 
-## Builds the buttons under [param parent] and routes them: bits to [param sampler] (read through the callable, the
-## active one changes on JOIN), the rest to the client's own handlers.
-func build(
-	parent: Control, sampler_fn: Callable, fire_fn: Callable, alt_fn: Callable, menu_fn: Callable
-) -> DotTouchButtons:
+## Builds the buttons under [param parent] and routes them: jump and duck to the sampler (read through the callable,
+## the active one changes on JOIN), the rest to [param handlers], button id to a Callable taking `down: bool`.
+func build(parent: Control, sampler_fn: Callable, handlers: Dictionary) -> DotTouchButtons:
 	buttons = DotTouchButtons.new()
 	buttons.name = "TouchButtons"
 	buttons.set_anchors_preset(Control.PRESET_FULL_RECT)
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	buttons.set_buttons(layout())
 	parent.add_child(buttons)
-	buttons.button_down.connect(func(id: StringName) -> void: _route(id, true, sampler_fn, fire_fn, alt_fn, menu_fn))
-	buttons.button_up.connect(func(id: StringName) -> void: _route(id, false, sampler_fn, fire_fn, alt_fn, menu_fn))
+	buttons.button_down.connect(func(id: StringName) -> void: route(id, true, sampler_fn, handlers))
+	buttons.button_up.connect(func(id: StringName) -> void: route(id, false, sampler_fn, handlers))
 	return buttons
 
 
-func _route(id: StringName, down: bool, sampler_fn: Callable, fire_fn: Callable, alt_fn: Callable, menu_fn: Callable) -> void:
-	match id:
-		FIRE:
-			fire_fn.call(down)
-		ALT:
-			alt_fn.call(down)
-		MENU:
-			menu_fn.call(down)
-		JUMP, DUCK:
-			var sampler: Variant = sampler_fn.call()
-			if sampler != null and sampler.has_method(&"hold"):
-				var bit := DotFpsCommand.BUTTON_JUMP if id == JUMP else DotFpsCommand.BUTTON_CROUCH
-				sampler.call(&"hold", bit, down)
+static func route(id: StringName, down: bool, sampler_fn: Callable, handlers: Dictionary) -> void:
+	if id == JUMP or id == DUCK:
+		var sampler: Variant = sampler_fn.call()
+		if sampler != null and sampler.has_method(&"hold"):
+			var bit := DotFpsCommand.BUTTON_JUMP if id == JUMP else DotFpsCommand.BUTTON_CROUCH
+			sampler.call(&"hold", bit, down)
+		return
+	if handlers.has(id):
+		(handlers[id] as Callable).call(down)
 
 
 ## A touch sampler where a phone is, the keyboard one otherwise; [param tunables] are the player's; [param ignore_fn] is asked with a screen position and keeps a button's finger off the stick.
