@@ -1,0 +1,15 @@
+{
+	"format": 1,
+	"mirrors": [],
+	"origin": "https://dev.dotgames.org/content",
+	"packs": [
+		{
+			"id": "gamemann/game-playground",
+			"into": "",
+			"kind": "pack",
+			"manifest_sha256": "411600fc730683fe6a5ed448c29debd2a877ebc57c7d92ef1e66ee25f9396cd3",
+			"optional": false,
+			"version": "0.1.15"
+		}
+	]
+}
