@@ -42,6 +42,44 @@ func _sync_hud() -> void:
 		hud.set_tool(_tool_name(), selected_prop)
 
 
+## The phone's buttons over the HUD, on a touch device only. Fire and alt are the click's two buttons; Q is the
+## hold-or-tap spawn-menu key, fed the same press and release.
+func _build_touch() -> void:
+	if not DotPlatform.has_touch() or hud == null:
+		return
+	_touch = PlaygroundTouch.new()
+	var _built := _touch.build(hud, active_sampler,
+		func(down: bool) -> void:
+			if down:
+				call(&"_primary_down")
+			else:
+				_primary_up(),
+		func(down: bool) -> void:
+			if down:
+				call(&"_secondary_down")
+			else:
+				_secondary_up(),
+		func(down: bool) -> void:
+			var key := InputEventKey.new()
+			key.pressed = down
+			_on_menu_key(key))
+
+
+func _touch_ignores(position: Vector2) -> bool:
+	return _touch != null and _touch.buttons != null and _touch.buttons.contains_point(position)
+
+
+## A finger on the look or move half goes to the touch sampler; with a menu open it is the menu's.
+func _on_screen_touch(event: InputEvent) -> void:
+	if _menu_is_open():
+		return
+	var sampler := active_sampler()
+	if sampler is DotFpsTouchSampler:
+		(sampler as DotFpsTouchSampler).set_screen_width(get_viewport().get_visible_rect().size.x)
+	if sampler != null:
+		sampler.handle_event(event)
+
+
 ## The spawn-menu key (Q) is the one key that still means something while the menu is open.
 func _is_menu_key(event: InputEvent) -> bool:
 	return event is InputEventKey and (event.is_action(PlaygroundBindings.SPAWN_MENU) \
