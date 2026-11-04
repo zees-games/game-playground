@@ -350,8 +350,7 @@ func _test_sounds_and_effects() -> void:
 
 
 ## [b]Every effect scene the catalogue names exists, and the effects actually spawn.[/b]
-## Until 2026-09-27 `scenes/fx/` did not exist, dot-fx refused both scenes at DEBUG, and
-## no check noticed because none asked whether anything was drawn.
+## `scenes/fx/` once did not exist and dot-fx refused both scenes quietly; nothing asked whether anything drew.
 func _test_breaks_throw_pieces() -> void:
 	_section("Broken props and panes throw splinters and shards")
 

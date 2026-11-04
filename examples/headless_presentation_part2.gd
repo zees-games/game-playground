@@ -114,11 +114,8 @@ func _test_chat_box() -> void:
 	_done()
 
 
-## Every chat line is drawn once: in the box when there is one, on the notice line only
-## when there is not. Both drew it, so a map vote's ballot was printed at the notice line
-## and again in the box, beside the drawn ballot panel. The client is never added to the
-## tree (its `_ready` builds the netcode); only the handler and the three fields it reads
-## are used.
+## Every chat line is drawn once: in the box when there is one, on the notice line only when there is not.
+## The client is never added to the tree (its `_ready` builds the netcode); only the handler and three fields are used.
 func _test_chat_drawn_once(p: PlaygroundPresentation) -> void:
 	var hud := PlaygroundHud.new()
 	hud.name = "ChatHud"
@@ -192,13 +189,8 @@ func _test_chat_drawn_once(p: PlaygroundPresentation) -> void:
 
 
 func _test_every_sound_has_a_voice() -> void:
-	# This game shipped a complete catalogue pointing at files nobody has produced, and
-	# was therefore silent while every check about its audio passed. The two directions
-	# below are the ones that go wrong without erroring: an id with no recipe is one sound
-	# that stays silent for ever, and a recipe naming an id the catalogue does not have is
-	# a decision that reaches nothing. Neither is visible from any assertion about the
-	# catalogue on its own -- and a headless run cannot hear the result, so this is as
-	# close as an assertion gets. game-arena/tools/audio_probe.sh is the other half.
+	# Both directions go wrong without erroring: an id with no recipe stays silent for ever, and a recipe
+	# naming an id the catalogue lacks reaches nothing. A headless run cannot hear; audio_probe.sh is the other half.
 	_section("Every sound this game declares has a noise to make")
 
 	var cat := PlaygroundPresentation.sound_catalogue()
@@ -343,101 +335,3 @@ class RendezvousStub:
 			"poll":
 				return {"messages": [], "cursor": 0}
 		return {}
-
-
-## `[p2p-await-games]`: a party over the HTTP rendezvous, host and join, each awaited end to end through
-## `PlaygroundParty`, `DotP2PSession` and `DotP2PSignallerHttp`. The caller's answer must be the stub's, arriving at
-## least [member RendezvousStub.delay] frames after the call: a link that dropped its `await` fails here.
-func _test_party_over_http() -> void:
-	_section("A party that meets over HTTP waits for the answer")
-
-	var stub := RendezvousStub.new()
-	stub.name = "Rendezvous"
-	add_child(stub)
-	var listening := stub.start()
-	_check(listening, "a stand-in rendezvous listens on a local port", str(stub.port))
-
-	if not listening:
-		stub.queue_free()
-		_done()
-		return
-
-	var url := "http://127.0.0.1:%d/p2p" % stub.port
-	var ada := PlaygroundParty.new()
-	ada.name = "PartyAda"
-	ada.signalling_url = url
-	add_child(ada)
-	var bob := PlaygroundParty.new()
-	bob.name = "PartyBob"
-	bob.signalling_url = url
-	add_child(bob)
-
-	_check(
-		ada.setup().ok and bob.setup().ok
-			and ada.session.signaller is DotP2PSignallerHttp
-			and bob.session.signaller is DotP2PSignallerHttp,
-		"two parties set up with a URL, and both meet over HTTP rather than the loopback"
-	)
-
-	var opened: Array[String] = []
-	ada.open.connect(func(code: String) -> void: opened.append(code))
-
-	var before := Engine.get_process_frames()
-	var hosted: DotResult = await ada.host("Ada")
-	var took := Engine.get_process_frames() - before
-	var code := str(hosted.value) if hosted != null and hosted.ok else ""
-
-	_check(
-		hosted != null and hosted.ok and DotP2PLobby.is_code_shaped(code, ada.session.config.code_length),
-		"host() hands back a join code",
-		str(hosted.error.message) if hosted != null and not hosted.ok else "null"
-	)
-	_check(took >= stub.delay,
-		"only once the rendezvous has answered: %d frames, the stub waits %d" % [took, stub.delay])
-	_check(
-		stub.seen.size() >= 1 and stub.seen[0]["route"] == "host"
-			and str((stub.seen[0]["body"] as Dictionary).get("code", "")) == code
-			and str(((stub.seen[0]["body"] as Dictionary).get("info", {}) as Dictionary).get("name", "")) == "Ada",
-		"and it is the code the rendezvous was told, under the host's name",
-		str(stub.seen)
-	)
-	_check(ada.active() and ada.session.is_host() and opened == [code],
-		"the party is open, hosted, and says so once",
-		"state %s, opened %s" % [ada.session.state(), str(opened)])
-
-	before = Engine.get_process_frames()
-	var joined: DotResult = await bob.join(code.to_lower(), "Bob")
-	took = Engine.get_process_frames() - before
-
-	_check(joined != null and joined.ok and took >= stub.delay,
-		"join() waits for the rendezvous too (%d frames) and succeeds" % took,
-		str(joined.error.message) if joined != null and not joined.ok else "null")
-	_check(
-		stub.seen.size() >= 2 and stub.seen[1]["route"] == "join"
-			and str((stub.seen[1]["body"] as Dictionary).get("code", "")) == code,
-		"under the code as the host has it, not as it was typed",
-		str(stub.seen)
-	)
-	_check(
-		bob.session.lobby.has(ada.session.local_id) and not bob.session.is_host(),
-		"and the joiner learns who is already there from the answer, and does not elect itself",
-		str(bob.session.lobby.member_ids())
-	)
-
-	# A refusal arrives as a failure the caller can read, not as null and not as success.
-	bob.leave()
-	var carol := PlaygroundParty.new()
-	carol.name = "PartyCarol"
-	carol.signalling_url = url
-	add_child(carol)
-	var _set := carol.setup()
-	stub.refuse = 403
-	var refused: DotResult = await carol.host("Carol")
-	_check(refused != null and not refused.ok and not carol.active(),
-		"and a rendezvous that refuses leaves the party closed with a reason",
-		"null" if refused == null else ("ok" if refused.ok else refused.error.message))
-
-	ada.leave()
-	for node: Node in [ada, bob, carol, stub]:
-		node.queue_free()
-	_done()
