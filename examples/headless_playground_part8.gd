@@ -68,6 +68,7 @@ func _test_the_client_boots() -> void:
 
 	_tcb_client = PlaygroundClient.new()
 	_tcb_client.name = "Client"
+	_tcb_client.fetch_content = false
 
 	# Its own config, records in memory. A test must not write into the user's data
 	# directory, and this is the only reason `PlaygroundClient.config` exists.

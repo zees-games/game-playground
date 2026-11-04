@@ -21,6 +21,7 @@ func _test_the_wheel_cycles_tools() -> void:
 
 	var client := PlaygroundClient.new()
 	client.name = "WheelClient"
+	client.fetch_content = false
 	var config := PlaygroundConfig.new()
 	config.records_directory = ""
 	config.record_replays = false
