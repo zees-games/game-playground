@@ -103,8 +103,7 @@ func _ready() -> void:
 		# built here instead. Setting the flag alone would leave a player who is
 		# supposed to be driving and never samples anything, which reads as the input
 		# being broken.
-		player.sampler = DotFpsSampler.new(player.controller.tunables)
-		DotFpsSampler.register_default_actions(player.sampler)
+		player.sampler = PlaygroundTouch.make_sampler(player.controller.tunables, _touch_ignores)
 
 		_build_view()
 		_build_view_switch()
@@ -114,6 +113,7 @@ func _ready() -> void:
 	hud.key_fn = key_for
 	add_child(hud)
 	hud.flash_source = presentation.fx if presentation != null else null
+	_build_touch()
 	_follow_hud()
 	if link == null:
 		hud.bind(playground, player_id)
@@ -254,8 +254,7 @@ func _build_netcode() -> DotResult:
 	)
 
 	# Stock tunables until there is a player to ask; _adopt swaps them in when JOIN arrives.
-	_sampler = DotFpsSampler.new(DotFpsTunables.new())
-	DotFpsSampler.register_default_actions(_sampler)
+	_sampler = PlaygroundTouch.make_sampler(DotFpsTunables.new(), _touch_ignores)
 
 	# Nothing may be sent before the peer says it can receive: dot-server's signon ends before
 	# this scene exists, so earlier sends hit a missing node and the client never joins.
@@ -298,6 +297,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if player == null:
+		return
+
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_on_screen_touch(event)
 		return
 
 	if event is InputEventMouseMotion:

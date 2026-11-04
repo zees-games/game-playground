@@ -128,6 +128,9 @@ func _build_pause() -> void:
 	game_menu.bindings = keys
 	var config := DotMenuConfig.new()
 	config.brand_name = "Playground"
+	# By name: an older dot-menu has no such property, and assigning it would stop this function.
+	if &"menu_button_corner" in config:
+		config.set(&"menu_button_corner", &"top_left")
 	var _layered := config.load_layered()
 	game_menu.config = config
 	game_menu.open_on_escape = false
