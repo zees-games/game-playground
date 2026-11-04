@@ -14,7 +14,6 @@ examples/dedicated.gd::_test_vote	146
 examples/headless_config.gd::_run	83
 examples/headless_net.gd::_run	81
 examples/headless_playground.gd::_run	89
-examples/headless_presentation.gd	1329
 examples/headless_presentation.gd::_test_escape_menu	114
 examples/headless_presentation.gd::_test_glance_pieces	118
 examples/headless_presentation.gd::_test_party_over_http	93
