@@ -1,0 +1,162 @@
+{
+	"format": "dot-stat-defs",
+	"version": 1,
+	"stats": [
+		{
+			"key": "props",
+			"name": "Props",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "undos",
+			"name": "Undos",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "runs",
+			"name": "Runs",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "finishes",
+			"name": "Finishes",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "falls",
+			"name": "Falls",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "kills",
+			"name": "Kills",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "deaths",
+			"name": "Deaths",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "best_speed",
+			"name": "Fastest",
+			"description": "",
+			"kind": "BEST",
+			"unit": "",
+			"format": "",
+			"decimals": 1,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "fastest_run",
+			"name": "Best time",
+			"description": "",
+			"kind": "LOWEST",
+			"unit": "",
+			"format": "",
+			"decimals": 3,
+			"category": "",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "hitzone_hits",
+			"name": "Hits per zone",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "hitzones",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "hitzone_damage",
+			"name": "Damage per zone",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "hitzones",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "hitzone_kills",
+			"name": "Kills per zone",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "hitzones",
+			"column": "OPTIONAL",
+			"better": null
+		},
+		{
+			"key": "hitzone_side_hits",
+			"name": "Hits per side",
+			"description": "",
+			"kind": "COUNTER",
+			"unit": "",
+			"format": "",
+			"decimals": 0,
+			"category": "hitzones",
+			"column": "OPTIONAL",
+			"better": null
+		}
+	]
+}
