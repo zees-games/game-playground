@@ -57,11 +57,8 @@ There are two maps built in, beside the custom maps the map pack adds:
 | **Z** | Undo your last spawn |
 | **WASD** / **Space** / **Ctrl** | Move / jump (hold to keep hopping) / crouch |
 | **F5** | First or third person |
-| **T** | Switch track, on a server with the run timer |
 | **Tab** (hold) | Scoreboard: who is on, their score, time connected and ping |
 | **N** | Change movement style |
-| **C** / **V** | Save a checkpoint / go back to it, on a server with the run timer |
-| **X** / **G** | Pick a checkpoint / forget them all |
 | **Y** / **U** | Chat / chat with nearby players |
 | **M** | Next map |
 | **B** | Loadout: the weapon you spawn with in the arena (a server's mode) |
@@ -132,7 +129,7 @@ pg_limits u3                 // what player u3 is using against their limits
 | `pg_give <player> <prop> [count]`, `pg_inv <player>` | Put things in a player's bag, or read it |
 
 ### Adding the run timer
-The game does not ship a run timer. A server that wants timed courses adds [dot-timer](https://github.com/modcommunity/dot-timer): put its `addons/dot_timer` folder in the project (a link or a copy), run `godot --headless --path . --import` once, and start the server. The playground's own `addons/pg_timer` notices it and turns timing on: zones from a map's zone file, records and leaderboards, `pg_timer`, `pg_track`, `pg_top`, `pg_cp`, `pg_tp` and `pg_cp_clear`, and the T and checkpoint keys. Details in [docs/timer.md](docs/timer.md).
+The game does not ship a run timer. A server that wants timed courses adds [dot-timer](https://github.com/modcommunity/dot-timer): put its `addons/dot_timer` folder in the project (a link or a copy), run `godot --headless --path . --import` once, and start the server. The playground's own `addons/pg_timer` notices it and turns timing on: zones from a map's zone file, records and leaderboards, `pg_timer`, `pg_track`, `pg_top`, `pg_cp`, `pg_tp` and `pg_cp_clear` as commands (the game binds no keys for them). Details in [docs/timer.md](docs/timer.md).
 
 ### Spawn providers
 

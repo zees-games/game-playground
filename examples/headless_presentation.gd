@@ -16,7 +16,7 @@ extends "res://examples/headless_presentation_part2.gd"
 ## Exits non-zero on any failure.
 
 
-const CHECKS := 168
+const CHECKS := 167
 const SECTIONS := 19
 
 ## The player's own settings directory as it was before this run: every file's name,
@@ -185,24 +185,6 @@ func _test_escape_menu() -> void:
 	stack.clear()
 	stack.queue_free()
 	p.queue_free()
-
-	# A document saved when Clear checkpoints was on B: it follows to G, and a key the player
-	# chose stays where they put it.
-	var back := PlaygroundPresentation.new()
-	back.name = "Returning"
-	add_child(back)
-	back.setup()
-	var old_doc := DotSettingsStoreMemory.new()
-	var _saved_old := old_doc.save_document(back.settings.app_namespace, back.settings.profile, {"version": 1, "values": {
-		"bind_checkpoint_clear": "B", "bind_style": "J",
-	}})
-	back.settings.local_store = old_doc
-	var _loaded := back.settings.load_now()
-	back.apply_all()
-	_check(back.settings.get_string(&"bind_checkpoint_clear") == "G",
-		"an old settings file with Clear checkpoints on B: it moves to G", back.settings.get_string(&"bind_checkpoint_clear"))
-	_check(back.settings.get_string(&"bind_style") == "J", "and a key the player chose is kept", back.settings.get_string(&"bind_style"))
-	back.queue_free()
 	_done()
 
 ## The ammo counter, hit marker and damage numbers are dot-ui's glance pieces, fed this game's numbers.

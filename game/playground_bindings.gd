@@ -22,12 +22,11 @@ const UNDO := &"pg_undo"
 const ROTATE := &"pg_rotate"
 const RELOAD := &"pg_reload"
 const VEHICLE := &"pg_vehicle"
-## Throws the zee gun in hand (`sv_weapon_drop_key`). H is help, G clears checkpoints, Q the menu.
+## Throws the zee gun in hand (`sv_weapon_drop_key`). H is help, Q the menu.
 const DROP_WEAPON := &"pg_drop_weapon"
 const PHYS_GUN := &"pg_phys_gun"
 const GRAV_GUN := &"pg_grav_gun"
 const WEAPONS := &"pg_weapons"
-const TRACK := &"pg_track"
 const STYLE := &"pg_style"
 ## Down a zee gun's sights while held (right mouse, the family's Aim row). With a tool or a toy
 ## in hand the right button is still its secondary (freeze, pull, a mode's second button).
@@ -38,10 +37,6 @@ const BASH := &"pg_bash"
 ## vote) online. Kept on `bind_map`, the setting it was stored under, so a key a player moved
 ## stays moved.
 const MAP := &"dot_menu_maps"
-const CHECKPOINT_SAVE := &"pg_checkpoint_save"
-const CHECKPOINT_LOAD := &"pg_checkpoint_load"
-const CHECKPOINT_NEXT := &"pg_checkpoint_next"
-const CHECKPOINT_CLEAR := &"pg_checkpoint_clear"
 const VOICE_GAG := &"voice_gag"
 const VOICE_MUTE := &"voice_mute"
 const VIEW := &"pg_view"
@@ -73,13 +68,7 @@ static func make() -> DotMenuBindings:
 	keys.add(AIM, &"bind_aim", "Aim down a gun's sights (hold)", "Mouse 2", "Tools")
 	keys.add(BASH, &"bind_bash", "A gun's quick melee", "Mouse 3", "Tools")
 
-	keys.add(CHECKPOINT_SAVE, &"bind_checkpoint_save", "Save a checkpoint", "C", "Running")
-	keys.add(CHECKPOINT_LOAD, &"bind_checkpoint_load", "Go to the checkpoint", "V", "Running")
-	keys.add(CHECKPOINT_NEXT, &"bind_checkpoint_next", "Next checkpoint", "X", "Running")
-	# G, not B: B is the family's loadout key (dot-menu's DotMenuLoadout), the arena's loadout.
-	keys.add(CHECKPOINT_CLEAR, &"bind_checkpoint_clear", "Clear checkpoints", "G", "Running")
 	keys.add(STYLE, &"bind_style", "Next movement style", "N", "Running")
-	keys.add(TRACK, &"bind_track", "Next timed track on this map", "T", "Running")
 
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(PROFILES, &"bind_profiles", "Profile workbench (admins): edit NPCs and weapons live", "F6", "General")
@@ -89,15 +78,13 @@ static func make() -> DotMenuBindings:
 	# (declared in `PlaygroundPresentation.schema`, per ACCOUNT, applied there as well).
 	keys.add(CHAT, &"chat_open_key", "Chat", "Y", "General", DotSettingsDef.Scope.ACCOUNT)
 	keys.add(CHAT_NEAR, &"chat_near_key", "Chat with nearby players", "U", "General", DotSettingsDef.Scope.ACCOUNT)
-	# dot-voice's talk action (DotVoiceManager.TALK_ACTION), on K because V is the checkpoint.
+	# dot-voice's talk action (DotVoiceManager.TALK_ACTION).
 	keys.add_voice("General", "K")
-	# Look at a player and press (dot-game's DotGameClient): G clears checkpoints, H is help.
+	# Look at a player and press (dot-game's DotGameClient): H is help.
 	keys.add(VOICE_GAG, &"bind_voice_gag", "Look at a player: stop (or resume) hearing them", "J", "General")
 	keys.add(VOICE_MUTE, &"bind_voice_mute", "Look at a player: mute (or unmute) their voice and chat", "L", "General")
 	keys.add_help("General")
 	# B is the arena's loadout (dot-menu's `dot_menu_loadout`), where the host has it (API 6).
 	if DotAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):
 		var _l: Variant = keys.call(&"add_loadout", "General")
-	# Clear checkpoints' default moved from B under saved documents: a player who never touched
-	# it follows to G, a key they chose stays.
-	return keys.renamed(&"bind_checkpoint_clear", ["B"])
+	return keys

@@ -1,0 +1,4 @@
+[gd_scene load_steps=2 format=3]
+[ext_resource type="Script" path="res://tools/render_look_down.gd" id="1"]
+[node name="RenderLookDown" type="Node"]
+script = ExtResource("1")

@@ -20,7 +20,7 @@ Nothing else is configured: the tick rate comes from `sv_tickrate` as before ([s
 - **Styles**: `PlaygroundPlayer.style_changed` puts the matching timer style on the player's timer.
 - **Vehicles**: getting in stops the run unless the map says the track is driven (`track_is_driven`); getting out of a driven track ends it.
 - **Records** file on the authority, keyed by the account (`Playground.record_key`), onto the `fastest`, `top_speed` and `points` boards the hook defines; the verdict is emitted as `Playground.run_filed` and sent to the client as an addon message.
-- **Commands** `pg_timer`, `pg_track`, `pg_top`, `pg_cp`, `pg_tp`, `pg_cp_clear`, and the keys T (track) and C V X G (checkpoints). Without the timer the commands are not registered and the keys say "No run timer on this server."
+- **Commands** `pg_timer`, `pg_track`, `pg_top`, `pg_cp`, `pg_tp`, `pg_cp_clear`. The game binds no keys for them. Without the timer the commands are not registered.
 - **The HUD block** is dot-timer's `DotTimerHud`, top left, placed by the hook.
 
 ## What did not come back
