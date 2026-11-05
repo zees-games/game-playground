@@ -49,7 +49,7 @@ func _build_touch() -> void:
 	if not DotPlatform.has_touch() or hud == null:
 		return
 	_touch = PlaygroundTouch.new()
-	var _built := _touch.build(hud, active_sampler, {
+	var built := _touch.build(hud, active_sampler, {
 		PlaygroundTouch.FIRE: func(down: bool) -> void:
 			if down:
 				call(&"_primary_down")
@@ -77,6 +77,8 @@ func _build_touch() -> void:
 			if down and window != null and not _menu_is_open():
 				window.open(),
 	})
+	if platform != null:
+		var _scale := platform.fit_touch_buttons(built, PlaygroundTouch.layout())
 
 
 ## A tool step through the same wheel the keyboard's previous/next-weapon actions drive.
