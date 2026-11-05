@@ -76,7 +76,7 @@ func _build_touch() -> void:
 				window.open(),
 	})
 	if platform != null:
-		var _scale := platform.fit_touch_buttons(built, PlaygroundTouch.layout())
+		var _scale := PlaygroundTouch.touch_layout().apply(built, platform)
 
 
 ## A tool step through the same wheel the keyboard's previous/next-weapon actions drive.

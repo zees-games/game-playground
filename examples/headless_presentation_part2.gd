@@ -42,7 +42,7 @@ func _test_party_does_not_migrate() -> void:
 
 func _test_touch_buttons() -> void:
 	_section("A phone's on-screen buttons")
-	var list := PlaygroundTouch.layout()
+	var list := PlaygroundTouch.touch_layout().buttons()
 	var ids: Array = list.map(func(b: Dictionary) -> Variant: return b["id"])
 	for want: StringName in [PlaygroundTouch.PREV, PlaygroundTouch.NEXT, PlaygroundTouch.BOARD, PlaygroundTouch.CHAT, PlaygroundTouch.MENU]:
 		_check(ids.has(want), "the layout has the %s button" % want)
@@ -77,7 +77,7 @@ func _test_touch_buttons() -> void:
 		add_child(host)
 		var touch := PlaygroundTouch.new()
 		var built := touch.build(host, Callable(), {})
-		var k := fit.fit_buttons(built, PlaygroundTouch.layout())
+		var k := fit.fit_buttons(built, PlaygroundTouch.touch_layout().buttons())
 		var stretch := float(fit.plan.get("stretch", 0.0))
 		var smallest := INF
 		for b in list:
