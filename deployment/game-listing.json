@@ -1,0 +1,15 @@
+{
+  "format": "tmc-game-listing",
+  "version": 1,
+  "listing": {
+    "name": "Playground",
+    "description": "A 3D sandbox where players do whatever they want. Hold Q to open a menu and spawn props, NPCs and weapons, then play with them using the physics and gravity guns.",
+    "tags": ["3D", "Multiplayer", "Sandbox"],
+    "platforms": ["PLATFORM_WEB"],
+    "graphicsType": "THREE_D",
+    "tmcKind": "GAME"
+  },
+  "pack": {
+    "id": "gamemann/game-playground"
+  }
+}
