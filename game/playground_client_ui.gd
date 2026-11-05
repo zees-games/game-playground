@@ -685,7 +685,6 @@ func _unfreeze_all() -> void:
 		hud.notice("Unfroze %d prop%s." % [thawed, "" if thawed == 1 else "s"])
 
 
-
 func _cycle_style() -> void:
 	var styles := playground.style_order
 
