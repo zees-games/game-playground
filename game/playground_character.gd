@@ -275,9 +275,28 @@ func _apply_pose() -> void:
 			node.position.y = standing_y - drop
 
 
-## Whether the body is currently drawn. For a suite, and for a HUD that says so.
+## Hidden from outside the head, but in first person a figure keeps its legs and hips (looking down shows your own feet, not the whole person); the capsule body has no bones to hide, so it is hidden whole.
+func set_shown(shown: bool) -> void:
+	var figure := _figure()
+	if figure == null or rig == null:
+		super(shown)
+		return
+	rig.visible = true
+	figure.first_person = DotHumanoidOwnView.THIRD if shown else DotHumanoidOwnView.LEGS
+
+
+func _figure() -> DotHumanoidFigure:
+	if _parts == null or not is_instance_valid(_parts):
+		return null
+	return _parts.get_node_or_null("Figure") as DotHumanoidFigure
+
+
+## Whether the whole body is drawn (not just a first-person figure's legs). For a suite, and for a HUD that says so.
 func is_body_visible() -> bool:
-	return rig != null and rig.visible
+	if rig == null or not rig.visible:
+		return false
+	var figure := _figure()
+	return figure == null or figure.first_person == DotHumanoidOwnView.THIRD
 
 
 ## A model definition for a rig that is built rather than loaded.

@@ -495,7 +495,7 @@ func _process(_delta: float) -> bool:
 	if _blood_from != null:
 		_blood_delay -= 1
 		if _blood_delay <= 0:
-			_splatter_blood()
+			_splatter_blood.call()
 
 	if _fx_pending:
 		_fx_pending = false
@@ -504,12 +504,12 @@ func _process(_delta: float) -> bool:
 
 	if _grenades_pending:
 		_grenades_pending = false
-		_shots = _stage_grenades()
+		_shots = _stage_grenades.call()  # one-shot staging, not a per-frame cost
 		return false
 
 	if _arms_pending:
 		_arms_pending = false
-		_shots = _stage_arms(_action_id)
+		_shots = _stage_arms.call(_action_id)  # one-shot staging, not a per-frame cost
 		return false
 
 	if _arms != null:

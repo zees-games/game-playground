@@ -428,6 +428,15 @@ func _test_effects_draw() -> void:
 		"and a beam past its ceiling is replaced in the same frame, so a hold never flickers"
 	)
 
+	# A beam freed outright (not merely queued) leaves a dead instance in the dictionary.
+	if fresh != null:
+		fresh.free()
+	var after_free := p.on_tool_beam(eye, aim, held)
+	_check(
+		after_free != null and is_instance_valid(after_free),
+		"a beam freed between frames is replaced, not assigned from the dead entry"
+	)
+
 	p.queue_free()
 	_done()
 

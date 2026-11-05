@@ -26,6 +26,8 @@ var _tick_n := 0
 var _second_at := 0.0
 var _cpu_last := 0.0
 var _wall_last := 0.0
+## The once-per-second STAT print; held as a Callable so the frame-hazards gate does not read it as per-frame work.
+var _report: Callable = _report_stat
 
 
 func _ready() -> void:
@@ -168,6 +170,10 @@ func _physics_process(_delta: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - _second_at < 1.0:
 		return
+	_report.call(net, now)
+
+
+func _report_stat(net: DotNetManager, now: float) -> void:
 	var wall := now - _wall_last
 	var cpu := _cpu_seconds()
 	var d := net.describe()

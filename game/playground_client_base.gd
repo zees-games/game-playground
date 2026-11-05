@@ -626,9 +626,8 @@ static func add_general_rows(game_menu: DotMenu) -> void:
 static func fill_help(help: DotMenuHelp) -> void:
 	if help == null:
 		return
-	help.about = "A sandbox: hold Q, pick a prop, an NPC, a vehicle or a weapon, and click it into the world. Pick things up with the physics gun, freeze them, throw them, weld and wire them, and undo what you made. Timed courses run in the corners, and on the surf and hop maps."
+	help.about = "A sandbox: hold Q, pick a prop, an NPC, a vehicle or a weapon, and click it into the world. Pick things up with the physics gun, freeze them, throw them, weld and wire them, and undo what you made."
 	help.add_text("Building", "With the physics gun, hold the left mouse button on a prop to carry it, roll the wheel to push it away or pull it close (with nothing in hand the wheel changes tool), and press the right button to freeze it where it is. Hold the rotate key to turn what you carry with the mouse. The tool gun's tools are on the spawn menu's Tools tab.")
-	help.add_text("Running", "Only on a server that adds the run timer: leave a course's start zone and the timer runs until its end zone. Checkpoints are practice: a run that used one is not a record.")
 	help.add_text("Modes", "A server may turn on the arena (players can hurt each other), waves of NPCs with downs and revives, and a shop where everything has a price. Each is a server setting, so the menu tells you what this one has on.")
 
 
