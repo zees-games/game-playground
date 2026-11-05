@@ -1,0 +1,174 @@
+{
+	"format": "dot-achievement-defs",
+	"version": 1,
+	"achievements": [
+		{
+			"key": "build_50",
+			"name": "Getting started",
+			"description": "Spawn fifty things.",
+			"points": 10,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "builder",
+			"tier": 1,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "props",
+					"op": "at_least",
+					"value": 50.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "build_500",
+			"name": "Builder",
+			"description": "Spawn five hundred things.",
+			"points": 25,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "builder",
+			"tier": 2,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "props",
+					"op": "at_least",
+					"value": 500.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "build_5000",
+			"name": "Architect",
+			"description": "Spawn five thousand things.",
+			"points": 50,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "builder",
+			"tier": 3,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "props",
+					"op": "at_least",
+					"value": 5000.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "first_run",
+			"name": "On the clock",
+			"description": "Finish a run.",
+			"points": 10,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "finishes",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "run_100",
+			"name": "Regular",
+			"description": "Finish a hundred runs.",
+			"points": 30,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "finishes",
+					"op": "at_least",
+					"value": 100.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "speed_30",
+			"name": "Quick",
+			"description": "Reach thirty metres a second.",
+			"points": 30,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "best_speed",
+					"op": "at_least",
+					"value": 30.0,
+					"merge": "highest"
+				}
+			]
+		},
+		{
+			"key": "under_20",
+			"name": "Swift",
+			"description": "Finish a course in under twenty seconds.",
+			"points": 40,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "fastest_run",
+					"op": "at_most",
+					"value": 20.0,
+					"merge": "lowest"
+				}
+			]
+		},
+		{
+			"key": "fell_10",
+			"name": "Gravity works",
+			"description": "Fall off the course ten times.",
+			"points": 15,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": true,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "falls",
+					"op": "at_least",
+					"value": 10.0,
+					"merge": "sum"
+				}
+			]
+		}
+	]
+}
