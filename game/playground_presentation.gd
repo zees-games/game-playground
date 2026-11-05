@@ -883,15 +883,18 @@ func on_tool_beam(eye: Vector3, aim: Vector3, to: Vector3, key: int = 0) -> Node
 
 	var from := facing(eye, aim).translated_local(BEAM_OFFSET).origin
 	var at := beam_between(from, to)
-	var beam: Node3D = _beams.get(key)
+	var held: Variant = _beams.get(key)
 
-	if beam != null and is_instance_valid(beam) and not beam.is_queued_for_deletion():
+	if is_instance_valid(held) and not (held as Node3D).is_queued_for_deletion():
+		var beam := held as Node3D
 		beam.global_transform = at
 		return beam
 
-	beam = fx.spawn(&"tool_beam", at) as Node3D
-	_beams[key] = beam
-	return beam
+	_beams.erase(key)
+
+	var fresh := fx.spawn(&"tool_beam", at) as Node3D
+	_beams[key] = fresh
+	return fresh
 
 
 ## How many splashes this has made. For the suites and `describe`.
