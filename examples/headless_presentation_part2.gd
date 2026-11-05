@@ -68,6 +68,24 @@ func _test_touch_buttons() -> void:
 	PlaygroundTouch.route(PlaygroundTouch.NEXT, true, Callable(), handlers)
 	PlaygroundTouch.route(PlaygroundTouch.BOARD, false, Callable(), handlers)
 	_check(got == [[PlaygroundTouch.NEXT, true], [PlaygroundTouch.BOARD, false]], "a press and a release reach their handlers", str(got))
+	for phone: Vector2 in [Vector2(1170, 540), Vector2(2340, 1080)]:
+		var fit := DotGameScreenFit.new()
+		fit.size_override = phone
+		fit.dpi_override = 160.0
+		fit.attach(get_tree().root)
+		var host := Control.new()
+		add_child(host)
+		var touch := PlaygroundTouch.new()
+		var built := touch.build(host, Callable(), {})
+		var k := fit.fit_buttons(built, PlaygroundTouch.layout())
+		var stretch := float(fit.plan.get("stretch", 0.0))
+		var smallest := INF
+		for b in list:
+			smallest = minf(smallest, built.radius_of(b["id"]) * 2.0 * stretch)
+		_check(built.button_scale == k and fit.describe()["buttons"] == 1, "fit_touch_buttons registered the built buttons at %dx%d" % [phone.x, phone.y])
+		_check(smallest >= 43.99, "every touch button is at least 44 real px across at %dx%d" % [phone.x, phone.y], "smallest %.1f" % smallest)
+		fit.detach()
+		host.free()
 	_done()
 
 
