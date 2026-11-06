@@ -1,7 +1,7 @@
 # size
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
-examples/dedicated.gd	1353
-examples/dedicated.gd::_boot	157
+examples/dedicated.gd	1352
+examples/dedicated.gd::_boot	156
 examples/dedicated.gd::_test_arena	130
 examples/dedicated.gd::_test_live_tools	116
 examples/dedicated.gd::_test_loading_cover	99
@@ -16,7 +16,6 @@ examples/headless_playground.gd::_run	89
 examples/headless_presentation.gd::_test_escape_menu	114
 examples/headless_presentation.gd::_test_glance_pieces	118
 examples/headless_presentation.gd::_test_party_over_http	93
-game/net/playground_events.gd	1139
 game/net/playground_net_bridge.gd::_apply_prop	95
 game/net/playground_net_bridge.gd::_drive_tools	90
 game/net/playground_net_bridge.gd::_on_event	96
@@ -26,16 +25,12 @@ game/playground.gd::add_player	97
 game/playground_client.gd::_build_netcode	132
 game/playground_client.gd::_ready	138
 game/playground_client.gd::_unhandled_input	143
-game/playground_map_survey.gd	925
-game/playground_map_survey.gd::_link_regions	90
-game/playground_map_survey.gd::_rasterise	120
+game/playground_map_survey_base.gd::_link_regions	90
+game/playground_map_survey_base.gd::_rasterise	120
 game/playground_mod_tools.gd::handlers	109
-game/playground_module.gd	1151
-game/playground_module.gd::_build_extras	264
-game/playground_module.gd::_module_load	222
-game/playground_player.gd	974
-game/playground_presentation.gd	1060
-game/playground_presentation.gd::sound_catalogue	173
+game/playground_module.gd::_module_load	216
+game/playground_module_build.gd::_build_extras	264
+game/playground_presentation_base.gd::sound_catalogue	173
 game/playground_spawn_menu.gd::_setting_row	85
 game/playground_spawnables.gd::catalogue	194
 game/playground_vote.gd::setup	90
