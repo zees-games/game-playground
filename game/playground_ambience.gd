@@ -14,6 +14,7 @@ const PREFIX_MOODS := {
 	"surf_": &"snow_wind", "kz_": &"cave_tunnel", "climb_": &"cave_tunnel", "xc_": &"cave_tunnel",
 	"pgc_warehouse": &"industrial", "pgc_site": &"industrial", "pgc_smallbase": &"industrial",
 	"pgc_quarry": &"cave_tunnel", "pgc_canyon": &"snow_wind",
+	"pgc_mountain_resort": &"snow_wind",
 }
 
 
