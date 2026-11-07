@@ -60,6 +60,9 @@ var _seen_fire_seq: int = 0
 ## Retained, not cleared: a player whose packet was lost keeps moving in a straight line
 ## rather than stopping dead. The controller says the same of its own command.
 var last_move: DotFpsCommand = DotFpsCommand.new()
+
+## The aim button of the last command a peer sent (a zee gun's sights up), which the server builds the rig's weapon command from; the motor reads the rig.
+var last_aim: bool = false
 var last_state_tick: int = -1
 
 
@@ -109,6 +112,7 @@ func _net_apply_input(input: DotNetInput, _tick: int) -> void:
 	var command := input as PlaygroundNetCommand
 	if command != null:
 		last_move = command.move
+		last_aim = command.aim
 
 
 ## On the authority the whole game ticks as one — every entity moves, then every player,
@@ -134,7 +138,7 @@ func _net_simulate(tick: int, delta: float) -> void:
 		player.controller.apply_command(last_move.duplicate_command())
 	else:
 		player.controller.apply_command(last_move.duplicate_command())
-		player.controller.simulate_tick(tick, delta)
+		player.step_controller(tick, delta)
 
 	pull()
 

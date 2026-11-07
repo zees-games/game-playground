@@ -2,7 +2,7 @@ extends DotNetInput
 
 const PlaygroundNetCommand := preload("playground_net_command.gd")
 
-## One tick of a player's intent, on the wire: a [DotFpsCommand] and nothing else.
+## One tick of a player's intent, on the wire: a [DotFpsCommand] and the aim bit.
 ##
 ## [b]The only thing a client may send about itself.[/b] Clients send inputs, never
 ## state — a client that could send a position could send any position, and dot-net's
@@ -17,14 +17,20 @@ const PlaygroundNetCommand := preload("playground_net_command.gd")
 
 var move: DotFpsCommand = DotFpsCommand.new()
 
+## The aim button, held: a zee gun's sights are up. One bit after the move, so a batch is bit-packed and a server of a build before this one reads the next
+## input from the wrong bit; client and server are one pack version (the join handshake pins it, see docs/netcode.md "Aim on the wire").
+var aim: bool = false
+
 
 func _write(writer: DotNetWriter) -> void:
 	move.write(writer)
+	writer.write_bool(aim)
 
 
 func _read(reader: DotNetReader) -> void:
 	move = DotFpsCommand.new()
 	move.read(reader)
+	aim = reader.read_bool()
 
 
 ## Not optional. Quantisation bounds each field; it cannot bound the relationship
@@ -35,4 +41,4 @@ func _sanitise() -> void:
 
 func _equals(other: DotNetInput) -> bool:
 	var them := other as PlaygroundNetCommand
-	return them != null and move.equals(them.move)
+	return them != null and aim == them.aim and move.equals(them.move)

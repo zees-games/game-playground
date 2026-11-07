@@ -522,7 +522,7 @@ func _test_swimming_over_the_wire() -> void:
 	_done()
 
 
-func _step(command: DotFpsCommand = null) -> void:
+func _step(command: DotFpsCommand = null, aim: bool = false) -> void:
 	_tick += 1
 	_client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
 	_server_bridge.server_tick(_tick)
@@ -530,15 +530,15 @@ func _step(command: DotFpsCommand = null) -> void:
 	# A real client stamps its command far enough ahead to cover the trip; the lead grows
 	# with the transit delay for the same reason.
 	_client_bridge.client_tick(
-		_tick + INPUT_LEAD + _delay_ticks, command if command != null else DotFpsCommand.new()
+		_tick + INPUT_LEAD + _delay_ticks, command if command != null else DotFpsCommand.new(), aim
 	)
 	_flush()
 	await get_tree().physics_frame
 
 
-func _steps(count: int, command: DotFpsCommand = null) -> void:
+func _steps(count: int, command: DotFpsCommand = null, aim: bool = false) -> void:
 	for _i in range(count):
-		await _step(command)
+		await _step(command, aim)
 
 
 func _forward() -> DotFpsCommand:

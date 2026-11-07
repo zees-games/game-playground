@@ -321,7 +321,7 @@ func net_id_of_node(node: Node) -> int:
 	return 0
 
 
-func client_tick(tick: int, command: DotFpsCommand) -> void:
+func client_tick(tick: int, command: DotFpsCommand, aim: bool = false) -> void:
 	if net == null or net.is_server or game == null:
 		return
 
@@ -331,6 +331,7 @@ func client_tick(tick: int, command: DotFpsCommand) -> void:
 	packet.tick = tick
 	packet.delta = net.clock.tick_duration()
 	packet.move = command if command != null else DotFpsCommand.new()
+	packet.aim = aim
 
 	# Into the local history BEFORE predicting: reconciliation replays it.
 	net.local_inputs().push(packet)
@@ -341,6 +342,7 @@ func client_tick(tick: int, command: DotFpsCommand) -> void:
 	var mine: PlaygroundPlayerNet = _behaviours.get(local_player_id)
 	if mine != null:
 		mine.last_move = packet.move
+		mine.last_aim = aim
 
 	if link != null:
 		var payload := net.encode_ack()

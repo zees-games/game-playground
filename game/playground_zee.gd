@@ -414,8 +414,9 @@ static func trace_outcome(
 	return out
 
 
-static func command_for(buttons: int, yaw: float, pitch: float, slot: int) -> DotWeaponCommand:
+static func command_for(buttons: int, yaw: float, pitch: float, slot: int, aim: bool = false) -> DotWeaponCommand:
 	var command := DotWeaponCommand.new()
+	command.set_button(DotWeaponCommand.BUTTON_AIM, aim)
 	command.set_button(DotWeaponCommand.BUTTON_ATTACK, (buttons & DotFpsCommand.BUTTON_USER_0) != 0)
 	command.set_button(DotWeaponCommand.BUTTON_ALT, (buttons & DotFpsCommand.BUTTON_USER_1) != 0)
 	command.set_button(DotWeaponCommand.BUTTON_RELOAD, (buttons & DotFpsCommand.BUTTON_USER_2) != 0)

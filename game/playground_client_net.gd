@@ -120,14 +120,14 @@ func _net_physics(delta: float) -> void:
 			var tick := net.clock.input_tick() - (ticks - 1 - i)
 			var command := sampler.sample(delta)
 			command.buttons |= _net_buttons
-			bridge.client_tick(tick, command)
+			bridge.client_tick(tick, command, _aim_sent())
 
 			# The hands, from the same command the server will run. No authority: what it
 			# fires is drawn and heard here and decided there.
 			var rig := _zee_rig()
 			if rig != null:
 				var drawn_command := PlaygroundZee.command_for(
-					command.buttons, command.yaw, command.pitch, PlaygroundZee.slot_of(rig)
+					command.buttons, command.yaw, command.pitch, PlaygroundZee.slot_of(rig), _aim_sent()
 				)
 				var drawn := rig.simulate_tick(drawn_command, tick)
 				var _flown := bridge.predict_launches(drawn, player)
@@ -454,7 +454,7 @@ func _physics_process(delta: float) -> void:
 		var state := player.controller.state
 		var outcome := rig.simulate_tick(
 			PlaygroundZee.command_for(
-				_zee_buttons, state.yaw, state.pitch, PlaygroundZee.slot_of(rig)
+				_zee_buttons, state.yaw, state.pitch, PlaygroundZee.slot_of(rig), _aim_sent()
 			),
 			Engine.get_physics_frames()
 		)
@@ -646,6 +646,11 @@ func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary
 
 
 ## The rig in this client's own player's hands, or null.
+## Whether the sights are up in the command. Overridden by the client half that owns the key and the view (`playground_client_fx.gd`).
+func _aim_sent() -> bool:
+	return false
+
+
 func _zee_rig() -> ZeeWeaponRig:
 	if player == null or not is_instance_valid(player):
 		return null

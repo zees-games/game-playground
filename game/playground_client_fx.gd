@@ -259,6 +259,18 @@ func _process(_delta: float) -> void:
 ## Sway, bob and the hands hidden in third person, once a frame. Returns the camera's half of the
 ## recoil (degrees, x pitch y yaw), which the camera write adds: presentation only, the command's
 ## angles and so the shot are untouched.
+## Whether the sights may come up: only first person, with the pointer on the view, no menu up, a zee gun in hand and the player alive.
+func _aim_may() -> bool:
+	return _zee_rig() != null and mouse_drives_view() and not _menu_is_open() and view_id() == &"fp" and player != null and not player.downed
+
+
+## What the command says about the sights: the view model's own state (a toggle in the rules reaches the server's spread and pace as it does the
+## picture), and nothing when the sights may not come up.
+func _aim_sent() -> bool:
+	var hands := zee_view as ZeeViewModel if zee_view != null and is_instance_valid(zee_view) else null
+	return _aim_may() and (hands.is_aim_held() if hands != null else _aiming)
+
+
 func _present_zee() -> Vector2:
 	if toy_view != null and is_instance_valid(toy_view):
 		toy_view.visible = view_id() == &"fp"
@@ -272,7 +284,7 @@ func _present_zee() -> Vector2:
 	# Down the sights: only first person, with the pointer on the view and no menu up.
 	var hands := zee_view as ZeeViewModel
 	if hands != null:
-		hands.aim(_aiming and mouse_drives_view() and not _menu_is_open() and view_id() == &"fp")
+		hands.aim_input(_aiming and _aim_may())
 	var state := player.controller.state
 	rig.drive_view(Vector2.ZERO, player.speed(), state.is_grounded(), state.is_crouched())
 	return rig.view_punch()

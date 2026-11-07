@@ -292,6 +292,35 @@ func _test_command_wire() -> void:
 	_check(absf(got.move.yaw - 42.5) < 1.0, "the yaw arrives", "%.2f" % got.move.yaw)
 	_check(got.move.buttons == 5, "and the buttons", str(got.move.buttons))
 	_check(sent._equals(got) or true, "an input compares against another")
+
+	# The aim bit rides after the move, in a batch with commands that do not carry it.
+	var batch: Array = []
+	for i in range(3):
+		var one := PlaygroundNetCommand.new()
+		one.tick = 40 + i
+		one.delta = 1.0 / 64.0
+		one.aim = i != 1
+		one.move.yaw = 10.0 * float(i)
+		one.move.move = Vector2(0.0, 1.0)
+		one.move.set_button(DotFpsCommand.BUTTON_USER_0, i == 2)
+		batch.append(one)
+	var batch_writer := DotNetWriter.new()
+	DotNetInput.write_batch(batch_writer, batch)
+	var back := DotNetInput.read_batch(batch_writer.to_reader(), func() -> DotNetInput: return PlaygroundNetCommand.new())
+	var round_trip := back.size() == 3
+	for i in range(mini(back.size(), 3)):
+		var one_back := back[i] as PlaygroundNetCommand
+		round_trip = round_trip and one_back != null and one_back.aim == (i != 1) \
+			and one_back.move.is_pressed(DotFpsCommand.BUTTON_USER_0) == (i == 2) and absf(one_back.move.yaw - 10.0 * float(i)) < 1.0
+	_check(round_trip, "a batch of commands keeps each one's aim bit and buttons", "%d back" % back.size())
+	var plain := PlaygroundNetCommand.new()
+	var bits_plain := DotNetWriter.new()
+	plain._write(bits_plain)
+	plain.aim = true
+	var bits_aim := DotNetWriter.new()
+	plain._write(bits_aim)
+	_check(bits_plain.to_bytes().size() == bits_aim.to_bytes().size() and plain._equals(plain) and not plain._equals(PlaygroundNetCommand.new()),
+		"the bit costs no byte, and a command with it is not equal to one without", "%d bytes" % bits_aim.to_bytes().size())
 	_done()
 
 

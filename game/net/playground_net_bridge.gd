@@ -227,7 +227,7 @@ func _drive_tools(session_id: int, behaviour: PlaygroundPlayerNet) -> void:
 	if rig != null and is_instance_valid(rig):
 		var command := PlaygroundZee.command_for(
 			buttons, behaviour.last_move.yaw, behaviour.last_move.pitch,
-			PlaygroundZee.slot_of(rig)
+			PlaygroundZee.slot_of(rig), behaviour.last_aim
 		)
 		var outcome := rig.simulate_tick(command, game.current_tick())
 		var _moved := PlaygroundZee.shove_props(player, outcome, may_touch)

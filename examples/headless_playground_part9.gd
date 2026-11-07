@@ -658,3 +658,91 @@ func _test_view_cycle() -> void:
 	rules.force_view = DotPlayerViewRules.FIRST_ONLY
 	_check(rules.next_mode(&"fp") == &"fp", "a forced view does not cycle")
 	_done()
+
+
+## The aim button, as the game reads it: the aim bit of the weapon command (`PlaygroundZee.command_for`) slows the motor to the rules' pace
+## (`PlaygroundPlayer.step_controller`) and closes the spread. Armed: with `command_for` not setting BUTTON_AIM, every check but the first
+## fails; with `step_controller` calling the motor unscaled, the second.
+func _test_zee_aim() -> void:
+	_section("the aim bit slows a player's pace and closes the spread")
+
+	var bot: PlaygroundPlayer = playground.players[&"bot"]
+	bot.teleport(Vector3(-60.0, 1.0, -60.0), 90.0)
+	await get_tree().physics_frame
+	var rig := PlaygroundZee.arm(
+		bot, playground.weapon_def(&"zee_pistol"), ZeeWeaponRig.Role.SERVER, true,
+		playground.tick_rate, playground.current_tick(), null, playground.ads_rules
+	)
+	var armed := rig != null and rig.current_def() != null
+	_check(armed, "a rig on the player")
+	if not armed:
+		_done()
+		return
+
+	var held := rig.current_def()
+	var rules := playground.ads_rules
+	var paced := rules.move_speed_for(held.id)
+	var dt := 1.0 / float(maxi(playground.tick_rate, 1))
+	var start := bot.global_position
+	var tick := 200000
+
+	var step := func(direction: Vector2, aim: bool) -> void:
+		var command := DotFpsCommand.new()
+		command.move = direction
+		bot.controller.apply_command(command)
+		tick += 1
+		var _o := rig.simulate_tick(PlaygroundZee.command_for(0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim), tick)
+		bot.simulate(tick, dt)
+		await get_tree().physics_frame
+	var walk := func(direction: Vector2, aim: bool) -> float:
+		bot.teleport(start, 90.0)
+		for _i in range(playground.tick_rate / 4):
+			await step.call(Vector2.ZERO, aim)
+		var from := bot.controller.state.position
+		for _i in range(playground.tick_rate):
+			await step.call(direction, aim)
+		return bot.controller.state.position.distance_to(from)
+	var best := Vector2.ZERO
+	var hip := 0.0
+	for direction: Vector2 in [Vector2(0.0, 1.0), Vector2(1.0, 0.0), Vector2(-1.0, 0.0), Vector2(0.0, -1.0)]:
+		var reach: float = await walk.call(direction, false)
+		if reach > hip:
+			hip = reach
+			best = direction
+	var hip_scale := rig.ads_move_scale()
+	var aimed: float = await walk.call(best, true)
+	var aimed_scale := rig.ads_move_scale()
+	_check(hip > 1.0 and hip_scale == 1.0 and absf(aimed_scale - paced) < 0.001,
+		"aimed, the rig is at the rules' pace and unaimed it is not", "hip %.2f aimed %.2f of %.2f" % [hip_scale, aimed_scale, paced])
+	_check(absf(aimed / maxf(hip, 0.001) - paced) < 0.1,
+		"and the player walks at that pace", "hip %.2f m aimed %.2f m, ratio %.2f of %.2f" % [hip, aimed, aimed / maxf(hip, 0.001), paced])
+	var up := PlaygroundZee.command_for(0, 0.0, 0.0, 1, true)
+	var down := PlaygroundZee.command_for(0, 0.0, 0.0, 1)
+	_check(up.is_pressed(DotWeaponCommand.BUTTON_AIM) and not down.is_pressed(DotWeaponCommand.BUTTON_AIM),
+		"the aim argument is the weapon command's aim button")
+
+	# The spread: first shots of a held trigger with the sights down, then up for longer than they take to rise.
+	var spreads := func(aim: bool) -> float:
+		var command := PlaygroundZee.command_for(0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim)
+		var at := 300000
+		for i in range(playground.tick_rate * 2):
+			at += 1
+			var _o := rig.simulate_tick(command, at)
+		var total := 0.0
+		var shots := 0
+		for i in range(playground.tick_rate):
+			at += 1
+			rig.arsenal.current().magazine = held.magazine
+			var fire := PlaygroundZee.command_for(DotFpsCommand.BUTTON_USER_0 if i % 2 == 0 else 0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim)
+			var outcome := rig.simulate_tick(fire, at)
+			for shot in outcome.shots:
+				total += shot.spread
+				shots += 1
+		return total / float(maxi(shots, 1))
+	var hip_spread: float = spreads.call(false)
+	var aimed_spread: float = spreads.call(true)
+	_check(hip_spread > 0.0 and aimed_spread < hip_spread * 0.9,
+		"and the sights close the spread", "hip %.3f, aimed %.3f degrees, rule %.2f" % [hip_spread, aimed_spread, rules.spread_for(held.id)])
+	PlaygroundZee.disarm(bot)
+	bot.teleport(start, 90.0)
+	_done()

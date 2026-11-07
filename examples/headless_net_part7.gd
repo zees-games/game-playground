@@ -186,3 +186,67 @@ func _test_leave() -> void:
 	_check(int(_server_bridge.describe()["players"]) == 0, "and their entity")
 	_check(_client_player() == null, "and the client is told")
 	_done()
+
+
+## The claim: the aim bit a client sends is the server rig's BUTTON_AIM and the pace of the motor on both ends.
+## Armed: with `last_aim` not reaching `PlaygroundZee.command_for` in the bridge, the aimed checks fail.
+func _test_the_aim_bit_crosses() -> void:
+	_section("the aim bit crosses the wire, slows the player and the prediction agrees")
+
+	var theirs := _server_player()
+	var mirror := _client_player()
+	_client_bridge.ask_weapon(&"zee_smg")
+	_exchange()
+	await _steps(4)
+	_exchange()
+	await _steps(4)
+	var rig: ZeeWeaponRig = theirs.zee_rig as ZeeWeaponRig if theirs != null else null
+	# The client's drawn gun, as PlaygroundClient._arm_zee builds it, driven with the aim as `_net_physics` does.
+	var drawn: ZeeWeaponRig = PlaygroundZee.arm(mirror, _client_game.weapon_def(&"zee_smg"),
+		ZeeWeaponRig.Role.LOCAL, false, _client_game.tick_rate, _tick, null, _client_game.ads_rules) if mirror != null else null
+	var armed := rig != null and rig.current_def() != null and drawn != null
+	_check(armed, "a gun on the server and one drawn on the client")
+	if not armed:
+		_done()
+		return
+
+	var paced := _server_game.ads_rules.move_speed_for(rig.current_def().id)
+	var start := theirs.global_position
+	var walk_step := func(command: DotFpsCommand, aim: bool) -> void:
+		var _o := drawn.simulate_tick(PlaygroundZee.command_for(0, 0.0, 0.0, PlaygroundZee.slot_of(drawn), aim), _tick)
+		await _step(command, aim)
+
+	var run := func(direction: Vector2, aim: bool) -> float:
+		var walk := DotFpsCommand.new()
+		walk.move = direction
+		theirs.teleport(start, 0.0)
+		for _i in range(INPUT_LEAD + 8):
+			await walk_step.call(null, false)
+		var from := theirs.controller.state.position
+		for _i in range(_server_game.tick_rate / 2):
+			await walk_step.call(walk, aim)
+		return theirs.controller.state.position.distance_to(from)
+	var best := Vector2.ZERO
+	var hip_run := 0.0
+	for direction: Vector2 in [Vector2(0.0, 1.0), Vector2(1.0, 0.0), Vector2(-1.0, 0.0), Vector2(0.0, -1.0)]:
+		var reach: float = await run.call(direction, false)
+		if reach > hip_run:
+			hip_run = reach
+			best = direction
+	_check(rig.ads_move_scale() == 1.0, "unaimed, the server's rig does not slow the player")
+
+	var aimed_run: float = await run.call(best, true)
+	_check(absf(rig.ads_move_scale() - paced) < 0.001,
+		"aimed, the server's rig is at the rules' pace", "scale %.2f of %.2f" % [rig.ads_move_scale(), paced])
+	_check(hip_run > 0.5 and absf(aimed_run / hip_run - paced) < 0.1,
+		"and the server's body walks at that pace", "hip %.2f m aimed %.2f m, ratio %.2f of %.2f" % [hip_run, aimed_run, aimed_run / maxf(hip_run, 0.001), paced])
+	var apart := mirror.controller.state.position.distance_to(theirs.controller.state.position)
+	_check(apart < 0.3, "the prediction, slowed alike, agrees with the server", "%.3f m" % apart)
+
+	for _i in range(INPUT_LEAD + 8):
+		await walk_step.call(null, false)
+	_check(rig.ads_move_scale() == 1.0, "let go, the pace comes back")
+	theirs.teleport(start, 0.0)
+	await _steps(INPUT_LEAD + 8)
+	PlaygroundZee.disarm(mirror)
+	_done()
