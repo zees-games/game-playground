@@ -193,6 +193,12 @@ func submit(voter: StringName, token: String) -> DotResult:
 	return DotResult.fail(DotError.CODE_INVALID, "That is not something to vote.")
 
 
+## The world is on [param map_id] now (a vote, an operator, or the boot): the clock starts over and the history gains an entry.
+func note_playing(map_id: StringName) -> void:
+	if director != null:
+		director.begin(map_id)
+
+
 func next_in_rotation() -> StringName:
 	return director.next_in_rotation() if director != null else &""
 
