@@ -80,6 +80,14 @@ check_addons() {
     done < <(sed -n 's|^/addons/\([^/]*\)/\{0,1\}$|\1|p' .gitignore 2>/dev/null)
     [ -z "$missing" ] || die "Missing addons:$missing
 Run dot-bootstrap first: https://github.com/modcommunity/dot-bootstrap" 2
+    # Content links (maps, world): without them the suites run on an empty level set. A git
+    # worktree gets them from tools/link_worktree.sh.
+    local path src gone=""
+    while IFS=$'\t' read -r path src; do
+        [ -n "$path" ] && [ ! -e "${path#/}" ] && gone="$gone ${path#/} (from $src)"
+    done < <(awk '/^# bootstrap-link: /{src=$3; next} src!="" && /^\//{print $0 "\t" src} {src=""}' .gitignore 2>/dev/null)
+    [ -z "$gone" ] || die "Content not linked:$gone
+Run dot-bootstrap, or in a git worktree: tools/link_worktree.sh <main checkout>" 2
 }
 
 deploy_dir() {
