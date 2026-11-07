@@ -73,6 +73,7 @@ func _register_net_vars() -> void:
 		if spec["property"] == &"net_crouch":
 			declaration.range_of(0.0, 1.0)
 
+	# The four below are server-driven: only pull() writes them, so a change is not a misprediction.
 	# [b]Per-player state rather than an event, and that is what makes both of these
 	# survive what an event does not.[/b] A client that joins after the admin typed
 	# `beacon`, a snapshot lost on the way, a map change: each is a baseline the next
@@ -87,9 +88,9 @@ func _register_net_vars() -> void:
 	# one reaches every client however far away they are with nothing added — and a beacon
 	# that switched relevance off when it was lifted would cut every player it had ever
 	# marked out of everybody else's world.
-	replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only()
-	replicate(&"net_beacon", DotNetVar.Type.BOOL)
-	replicate(&"net_creative", DotNetVar.Type.BOOL)
+	replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only().server_driven()
+	replicate(&"net_beacon", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_creative", DotNetVar.Type.BOOL).server_driven()
 
 	for spec in ZeeWeaponNet.all_specs():
 		var weapon := replicate(spec["property"], DotNetVar.Type[spec["type"]])
@@ -101,7 +102,7 @@ func _register_net_vars() -> void:
 			var _owner := weapon.to_owner_only()
 
 	# Last, so the fields before it keep their places in the schema.
-	replicate(&"net_downed", DotNetVar.Type.BOOL)
+	replicate(&"net_downed", DotNetVar.Type.BOOL).server_driven()
 
 
 func _net_apply_input(input: DotNetInput, _tick: int) -> void:
