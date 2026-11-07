@@ -424,6 +424,11 @@ func _module_unload() -> void:
 			game.run_filed.disconnect(_on_run_filed)
 		if game.maps.changed.is_connected(_on_map_changed_for_mod_tools):
 			game.maps.changed.disconnect(_on_map_changed_for_mod_tools)
+		if game.maps.changed.is_connected(_on_map_changed_for_map_edit):
+			game.maps.changed.disconnect(_on_map_changed_for_map_edit)
+		if game.map_edit == map_edit:
+			game.map_edit = null
+			game.map_edit_allowed_fn = Callable()
 		if game.maps.changed.is_connected(_report_map):
 			game.maps.changed.disconnect(_report_map)
 
@@ -502,6 +507,7 @@ func _build_extras() -> DotResult:
 	_build_loadout_command()
 
 	_build_mod_tools()
+	_build_map_edit()
 
 	waves = PlaygroundWaves.new()
 	waves.name = "Waves"
@@ -1062,6 +1068,26 @@ func _build_mod_tools() -> void:
 	mod_commands.alive_fn = func(id: StringName) -> bool:
 		var health := arena.health_of(PlaygroundModTools.key_of(id)) if arena != null else null
 		return health == null or health.alive
+
+
+## Installs the map-edit commands behind the `config` flag and lets the same sessions use the spawn-point tool.
+func _build_map_edit() -> void:
+	map_edit = PlaygroundMapEdit.make(game) as DotGameMapEdit
+
+	if map_edit == null:
+		return
+
+	map_edit.server = server
+	DotLog.result(CHANNEL, "binding the map-edit commands", map_edit.bind(self))
+	game.map_edit = map_edit
+	game.map_edit_allowed_fn = _session_may_edit_map
+	game.maps.changed.connect(_on_map_changed_for_map_edit)
+	PlaygroundMapEdit.reload_saved(map_edit)
+
+
+## The working points belong to the map that was running; the new map's saved ones replace them.
+func _on_map_changed_for_map_edit(_map: DotMapDef, _world: Node = null) -> void:
+	PlaygroundMapEdit.reload_saved(map_edit)
 
 
 func _on_map_changed_for_mod_tools(_map: DotMapDef, _world: Node) -> void:

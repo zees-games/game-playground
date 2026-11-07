@@ -14,6 +14,7 @@ const PlaygroundProfiles := preload("playground_profiles.gd")
 const PlaygroundArena := preload("playground_arena.gd")
 const PlaygroundDowns := preload("playground_downs.gd")
 const PlaygroundModTools := preload("playground_mod_tools.gd")
+const PlaygroundMapEdit := preload("playground_map_edit.gd")
 const PlaygroundLimits := preload("playground_limits.gd")
 const PlaygroundPickup := preload("playground_pickup.gd")
 const PlaygroundBuilds := preload("playground_builds.gd")
@@ -64,6 +65,8 @@ var arena: PlaygroundArena = null
 ## the arena layer, which is the module's.
 var mod_tools: DotModTools = null
 var mod_commands: DotModToolCommands = null
+## The admin map-edit commands (`spawn_add`, `nav_link_add`, `mapdata_save` ...), which the spawn-point tool also drives. Null without dot-spawn.
+var map_edit: DotGameMapEdit = null
 
 ## NPCs the server releases, paced by a director. Also off by default.
 var waves: PlaygroundWaves = null
@@ -363,6 +366,12 @@ func _session_may_noclip(player_id: StringName) -> bool:
 	var flag := game.config.noclip_flag if game.config != null else DotAdminFlags.NOCLIP
 	return session.has_permission(flag) or session.has_permission(DotAdminFlags.CHEATS) \
 		or session.has_permission(DotAdminFlags.ROOT)
+
+
+## Whether this player's admin session holds the map-edit flag (`config`) or root.
+func _session_may_edit_map(player_id: StringName) -> bool:
+	var session := server.session_by_userid(_session_of(player_id)) if server != null else null
+	return PlaygroundMapEdit.session_may_edit(session, map_edit.map_edit_flag if map_edit != null else DotAdminFlags.CONFIG)
 
 
 ## A world player id back to a dot-server session id, or zero.

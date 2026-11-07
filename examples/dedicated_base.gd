@@ -26,7 +26,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 var _stats_errors: PackedStringArray = []
 
 const SECTIONS := 32
-const CHECKS := 297
+const CHECKS := 300
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -316,6 +316,12 @@ func _test_permissions() -> void:
 		clear_cmd != null and clear_cmd.permission == DotAdminFlags.GENERIC,
 		"and clearing everybody's props is an admin action"
 	)
+
+	var edit_cmd: DotConCommand = server.console.find_command("spawn_add")
+	_check(edit_cmd != null and edit_cmd.permission == DotAdminFlags.CONFIG, "the map-edit commands are installed behind the config flag")
+	var shared: Object = _module().get("game")
+	_check(shared.get("map_edit") != null and shared.get("map_edit") == _module().get("map_edit"), "the spawn-point tool is handed the same editor")
+	_check(not bool((shared.get("map_edit_allowed_fn") as Callable).call(&"u4040")), "and a player with no admin session may not use it")
 	_section_done()
 
 

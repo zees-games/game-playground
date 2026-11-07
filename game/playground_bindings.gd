@@ -42,6 +42,9 @@ const VOICE_MUTE := &"voice_mute"
 const VIEW := &"pg_view"
 ## The admin workbench (live NPC and weapon profile edits); only an admin is let in.
 const PROFILES := &"pg_profiles"
+## Staff: shows the map's spawn points and links, and the second key opens the one you look at.
+const MAP_EDIT := &"pg_map_edit"
+const MAP_EDIT_PICK := &"pg_map_edit_pick"
 const SCOREBOARD := &"pg_scoreboard"
 ## The chat box's own actions (`PlaygroundPresentation`'s `DotChatWindow`).
 const CHAT := &"playground_chat"
@@ -72,6 +75,8 @@ static func make() -> DotMenuBindings:
 
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(PROFILES, &"bind_profiles", "Profile workbench (admins): edit NPCs and weapons live", "F6", "General")
+	keys.add(MAP_EDIT, &"bind_map_edit", "Spawn points and links (staff): show or hide them", "F7", "General")
+	keys.add(MAP_EDIT_PICK, &"bind_map_edit_pick", "Spawn points (staff): edit the one you look at", "F8", "General")
 	keys.add(MAP, &"bind_map", "Change map", "M", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# The chat keys keep the settings they were stored under before this table existed

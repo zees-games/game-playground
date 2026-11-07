@@ -371,6 +371,13 @@ const MAP_OWNER := &"map"
 var waypoints: Array = []
 
 
+## dot-game's `DotGameMapEdit` (duck-typed) once the server module installs it; the spawn tool sends it the shared commands.
+var map_edit: Object = null
+
+## `func(who: StringName) -> bool`: whether `who` may edit the map's data. Unset, nobody may.
+var map_edit_allowed_fn: Callable = Callable()
+
+
 ## `func(victim: StringName, amount: float) -> bool`: hurts a player standing in a hazard (lava) and says whether it did. The module sets it to
 ## the arena's `hurt` while the arena is on; unset or false, a hazard sends the player back to the spawn, so a sandbox where nobody can be hurt still says "not in there".
 var hazard_hurt: Callable = Callable()
