@@ -159,6 +159,7 @@ static func zee_id(def: PlaygroundWeaponDef) -> StringName:
 ## [param role] is the rig's: SERVER draws nothing, LOCAL draws into [param view_model].
 ## [param authority] is false only on a connected client, whose rig animates the hands and
 ## decides nothing — the server's rig is the one whose shots land.
+## [param ads_rules] is the game's `zee_ads_rules` (null keeps the art's own); no command here carries the aim bit yet.
 static func arm(
 	player: Node3D,
 	def: PlaygroundWeaponDef,
@@ -166,7 +167,8 @@ static func arm(
 	authority: bool,
 	tick_rate: int,
 	tick: int,
-	view_model: Node3D = null
+	view_model: Node3D = null,
+	ads_rules: ZeeAdsRules = null
 ) -> ZeeWeaponRig:
 	disarm(player)
 
@@ -180,6 +182,7 @@ static func arm(
 	rig.wall_extra_mask = ctl.tunables.collision_mask if ctl != null else 0
 	rig.catalogue = catalogue_for(def)
 	rig.player_ref = DotNodeRef.of_path(player.get_path())
+	rig.ads_rules = ads_rules
 
 	if view_model != null:
 		rig.view_model_ref = DotNodeRef.of_path(view_model.get_path())

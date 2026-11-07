@@ -1,0 +1,9 @@
+# Aiming down sights (ZeeAdsRules). Override on a server in cfg/server/addons/zee_weapons/ads.yml.
+# view_scale and view_shift_* are 1.0 and 0 here so a gun is drawn at its art's own hip size and place;
+# the aim bit is not in this game's command yet, so only the view numbers and the replicated cvar are live.
+ads:
+  default:
+    view_scale: 1.0
+    view_shift_x: 0.0
+    view_shift_y: 0.0
+    view_shift_z: 0.0

@@ -230,9 +230,11 @@ func _test_zee_weapons() -> void:
 
 	var rig := PlaygroundZee.arm(
 		_zw_player, playground.weapon_def(&"zee_pistol"), ZeeWeaponRig.Role.SERVER, true,
-		playground.tick_rate, playground.current_tick()
+		playground.tick_rate, playground.current_tick(), null, playground.ads_rules
 	)
 	_check(rig != null and _zw_player.zee_rig == rig, "a server's rig goes on the player")
+	_check(rig != null and rig.ads_rules == playground.ads_rules and rig.ads_move_scale() == 1.0,
+		"and takes the game's zee_ads_rules without slowing an unaimed player")
 	_check(_zw_player.component(&"DotFpsController") == _zw_player.controller,
 		"and the player answers dot-weapon's controller lookup")
 

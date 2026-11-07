@@ -283,6 +283,10 @@ var toys: DotPropToyBox = null
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
+
+## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults, handed to every Zee rig.
+## Bound by the module and followed by a client. No command carries the aim bit yet.
+var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 ## `sv_grenade_*`, kept across maps so a cvar bound once survives the projectile layer's rebuild.
 var grenade_rules := AwGrenadeRules.new()
 

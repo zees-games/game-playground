@@ -102,7 +102,7 @@ func _give_weapon(session_id: int, id: StringName, weapon_id: StringName) -> voi
 		game.phys_gun_release(player)
 		player.grav_gun.drop()
 		if PlaygroundZee.arm(
-			player, def, ZeeWeaponRig.Role.SERVER, true, game.tick_rate, game.current_tick()
+			player, def, ZeeWeaponRig.Role.SERVER, true, game.tick_rate, game.current_tick(), null, game.ads_rules
 		) != null:
 			_tool_of[session_id] = weapon_id
 	else:

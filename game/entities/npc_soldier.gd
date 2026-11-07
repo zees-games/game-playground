@@ -96,7 +96,7 @@ func arm_with(id: StringName) -> DotResult:
 	if def == null or not PlaygroundZee.npc_can_use(def):
 		return DotResult.fail(DotError.CODE_INVALID, "An NPC cannot use that.", String(id))
 
-	var rig := PlaygroundZee.arm(self, def, ZeeWeaponRig.Role.SERVER, true, game.tick_rate, game.current_tick())
+	var rig := PlaygroundZee.arm(self, def, ZeeWeaponRig.Role.SERVER, true, game.tick_rate, game.current_tick(), null, game.ads_rules)
 
 	if rig == null:
 		return DotResult.fail(DotError.CODE_STATE, "That weapon could not be armed.")

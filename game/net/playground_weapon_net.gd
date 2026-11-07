@@ -95,7 +95,7 @@ func _on_picked(player_id: StringName, state: Dictionary) -> void:
 	_bridge._drop_toy(session)
 	game.phys_gun_release(player)
 	player.grav_gun.drop()
-	var rig: Variant = PlaygroundZee.arm(player, def, ZeeWeaponRig.Role.SERVER, true, game.tick_rate, game.current_tick())
+	var rig: Variant = PlaygroundZee.arm(player, def, ZeeWeaponRig.Role.SERVER, true, game.tick_rate, game.current_tick(), null, game.ads_rules)
 	if rig == null:
 		return
 	rig.arsenal.apply_dropped(state)

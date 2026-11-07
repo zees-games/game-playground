@@ -212,6 +212,7 @@ func _build_netcode() -> DotResult:
 		var _bodies := playground.ragdoll_rules.follow_cvars(link)
 		var _drops = playground.weapon_layer.rules.follow_cvars(link)
 		var _toy_rules := playground.toy_rules.follow_cvars(link)
+		var _ads := playground.ads_rules.follow_cvars(link)
 		# The server's mp_forceview and mp_solidplayers: this end places its own camera and
 		# predicts its own player.
 		var _view := playground.view_rules.follow_cvars(link)

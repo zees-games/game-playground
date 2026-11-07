@@ -676,7 +676,7 @@ func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 
 	var rig := PlaygroundZee.arm(
 		player, def, ZeeWeaponRig.Role.LOCAL, bridge == null,
-		playground.tick_rate, Engine.get_physics_frames(), zee_view
+		playground.tick_rate, Engine.get_physics_frames(), zee_view, playground.ads_rules
 	)
 
 	if rig == null:
