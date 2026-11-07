@@ -80,6 +80,8 @@ enum Kind {
 	WEAPON_GONE,
 	## A prop broke: where and what it was made of, to everybody, for the splinters.
 	SHATTER,
+	## The server's move_speed, jump_height and move_gravity changed. After SHATTER, last. A joiner has them in HELLO.
+	MOVEMENT,
 }
 
 ## What a [constant Kind.PROJECTILE] event says.
@@ -164,14 +166,40 @@ static func _w() -> DotNetWriter:
 ## The tick rate is in here: a client that counted at its export's 60 against a server running
 ## 128 had every replicated time wrong by 128/60.
 static func write_hello(
-	player_id: int, tick_rate: int, server_tick: int, map_id: StringName
+	player_id: int, tick_rate: int, server_tick: int, map_id: StringName,
+	movement: Vector3 = Vector3(7.0, 1.15, 20.0)
 ) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
 	w.write_uint(tick_rate, 9)
 	w.write_varint(server_tick)
 	w.write_string(String(map_id), ID_BYTES)
+	_write_movement(w, movement)
 	return w.to_bytes()
+
+
+## The movement numbers as (speed, jump height, gravity), appended to HELLO and the whole of a MOVEMENT event.
+static func write_movement(movement: Vector3) -> PackedByteArray:
+	var w := _w()
+	_write_movement(w, movement)
+	return w.to_bytes()
+
+
+static func _write_movement(w: DotNetWriter, movement: Vector3) -> void:
+	w.write_float32(movement.x)
+	w.write_float32(movement.y)
+	w.write_float32(movement.z)
+
+
+## "movement" is Vector3.ZERO when the message carried none (a server older than this field): the client keeps what it has.
+static func read_movement(r: DotNetReader) -> Vector3:
+	if r.bits_remaining() < 96:
+		return Vector3.ZERO
+	var movement := Vector3(r.read_float32(), r.read_float32(), r.read_float32())
+	# A corrupt or hostile value must not freeze or launch the player.
+	if not (movement.x >= 1.0 and movement.x <= 30.0 and movement.y >= 0.2 and movement.y <= 5.0 and movement.z >= 2.0 and movement.z <= 60.0):
+		return Vector3.ZERO
+	return movement
 
 
 static func read_hello(r: DotNetReader) -> Dictionary:
@@ -179,12 +207,15 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	var tick_rate := r.read_uint(9)
 	var server_tick := r.read_varint()
 	var map_id := r.read_string(ID_BYTES)
+	var ok := r.ok()
+	var movement := read_movement(r)
 	return {
+		"movement": movement,
 		"player_id": player_id,
 		"tick_rate": tick_rate,
 		"server_tick": server_tick,
 		"map_id": StringName(map_id),
-		"ok": r.ok(),
+		"ok": ok,
 	}
 
 

@@ -299,6 +299,30 @@ func _release_record_key(id: StringName) -> void:
 		_match_ids.erase(key)
 
 
+## Pushes `config`'s move_speed / jump_height / move_gravity onto every player and the map's toys, and emits [signal movement_changed]. Called on the authority when the config changes; a client calls [method set_movement] with the server's values instead.
+func apply_movement() -> void:
+	for id in players:
+		_apply_movement_to(players[id])
+	if toys != null and config != null:
+		toys.gravity = config.move_gravity
+	movement_changed.emit()
+
+
+## Adopts the server's numbers on a client (its own config object carries them from then on).
+func set_movement(speed: float, jump: float, gravity: float) -> void:
+	if config == null:
+		return
+	config.move_speed = speed
+	config.jump_height = jump
+	config.move_gravity = gravity
+	apply_movement()
+
+
+func _apply_movement_to(player: PlaygroundPlayer) -> void:
+	if config != null:
+		player.apply_movement(config.move_speed, config.jump_height, config.move_gravity)
+
+
 ## Adds a player and puts them on the current map's spawn. [param p_record_key] is the
 ## account uid the player's records are filed under; see [method record_key].
 func add_player(id: StringName, display_name: String, p_record_key: StringName = &"") -> PlaygroundPlayer:
@@ -366,6 +390,7 @@ func add_player(id: StringName, display_name: String, p_record_key: StringName =
 
 	players[id] = player
 	player.set_water(water_boxes())
+	_apply_movement_to(player)
 
 	# Given a timer before the first spawn, which asks it which track the player is on.
 	if run_timer != null:

@@ -311,6 +311,14 @@ func _test_event_wire() -> void:
 	_check(int(hello["server_tick"]) == 4242, "hello: the server tick")
 	_check(hello["map_id"] == &"pg_flatgrass", "hello: the map")
 	_check(bool(hello["ok"]), "hello: the reader was not exhausted")
+	_check(hello["movement"] == Vector3(7.0, 1.15, 20.0), "hello: the default movement numbers", str(hello["movement"]))
+	var odd := PlaygroundEvents.read_hello(DotNetReader.new(PlaygroundEvents.write_hello(9, 128, 1, &"x", Vector3(4.5, 2.0, 12.0))))
+	_check(odd["movement"] == Vector3(4.5, 2.0, 12.0), "hello: the movement numbers round-trip")
+	var old := PackedByteArray(PlaygroundEvents.write_hello(9, 128, 1, &"x"))
+	old.resize(old.size() - 12)
+	var older := PlaygroundEvents.read_hello(DotNetReader.new(old))
+	_check(bool(older["ok"]) and older["movement"] == Vector3.ZERO, "hello: a server without the movement numbers still reads")
+	_check(PlaygroundEvents.read_movement(DotNetReader.new(PlaygroundEvents.write_movement(Vector3(9999.0, 1.0, 20.0)))) == Vector3.ZERO, "movement: an absurd value is refused")
 
 	var join := PlaygroundEvents.read_join(
 		DotNetReader.new(PlaygroundEvents.write_join(9, 31, "Ada", 2))

@@ -22,3 +22,19 @@
 # wave_kill_reward: 60
 # Credits for an arena kill. [0..10000]
 # arena_kill_reward: 100
+
+# --- Npcs
+# Multiplies the health of every built-in soldier, elite and rebel (`npc_soldier.gd`). Read when the catalogu... [0.1..20.0]
+# soldier_health_scale: 1.0
+# Multiplies the speed of both built-in hunters (`npc_hunter.gd`). Same timing and exception as soldier_healt... [0.1..5.0]
+# hunter_speed_scale: 1.0
+# Multiplies the speed of the wave director's runners, walkers and brutes. Read when the wave catalogue is bu... [0.1..5.0]
+# wave_speed_scale: 1.0
+
+# --- Movement
+# Ground speed, m/s (`DotFpsTunables.max_speed`). Sent to every client in HELLO and again when it changes, so... [1.0..30.0]
+# move_speed: 7.0
+# Jump height, metres (`DotFpsTunables.jump_height`). Replicated like move_speed. [0.2..5.0]
+# jump_height: 1.15
+# Gravity, m/s² (`DotFpsTunables.gravity`, and the map toys'). Replicated like move_speed. [2.0..60.0]
+# move_gravity: 20.0

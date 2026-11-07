@@ -724,3 +724,38 @@ func _corrections_and_snaps() -> int:
 func _exchange_steps(count: int) -> void:
 	_exchange()
 	await _steps(count)
+
+
+## A changed move_speed on the server is the speed the client predicts with, live (a MOVEMENT event) and
+## for a joiner (HELLO, round-tripped in _test_event_wire). Without it the client runs at 7 m/s against a
+## server at 3.5 and reconciliation drags it back every packet.
+func _test_movement_over_the_wire() -> void:
+	_section("the server's movement numbers are the client's prediction")
+
+	_check(_client_player().controller.tunables.max_speed == 7.0, "the client starts at the default speed")
+	_server_game.config.move_speed = 3.5
+	_server_game.apply_movement()
+	await _exchange_steps(4)
+	await _steps(4)
+	_check(is_equal_approx(_client_player().controller.tunables.max_speed, 3.5), "the client adopts the server's move_speed",
+		str(_client_player().controller.tunables.max_speed))
+	_check(is_equal_approx(_server_player().controller.tunables.max_speed, 3.5), "and the server applies it to its player")
+
+	var corrections := _corrections_and_snaps()
+	var before := _client_player().controller.state.position
+	await _steps(48, _forward())
+	var client_at := _client_player().controller.state.position
+	var server_at := _server_player().controller.state.position
+	_check(client_at.distance_to(server_at) < 0.5, "the client ends within 0.5 m of the server",
+		"%.3f m apart" % client_at.distance_to(server_at))
+	var travelled := Vector2(client_at.x - before.x, client_at.z - before.z).length()
+	_check(travelled < 3.5 * float(48) / float(maxi(_client_game.tick_rate, 1)) + 0.5, "and it moved at the slower speed",
+		"%.2f m" % travelled)
+	_check(_corrections_and_snaps() - corrections <= 2, "with no run of corrections", str(_corrections_and_snaps() - corrections))
+
+	_server_game.config.move_speed = 7.0
+	_server_game.apply_movement()
+	await _exchange_steps(4)
+	await _steps(4)
+	_check(is_equal_approx(_client_player().controller.tunables.max_speed, 7.0), "and the change back arrives too")
+	_done()

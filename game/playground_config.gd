@@ -197,6 +197,28 @@ extends DotConfig
 ## Credits for an arena kill.
 @export_range(0, 10000, 1) var arena_kill_reward: int = 100
 
+@export_group("Npcs")
+
+## Multiplies the health of every built-in soldier, elite and rebel (`npc_soldier.gd`). Read when the catalogue is built, so a change applies to the next map load; an NPC already standing keeps what it spawned with. A catalogue from [member props_path] is the operator's own and is left alone.
+@export_range(0.1, 20.0, 0.05) var soldier_health_scale: float = 1.0
+
+## Multiplies the speed of both built-in hunters (`npc_hunter.gd`). Same timing and exception as [member soldier_health_scale].
+@export_range(0.1, 5.0, 0.05) var hunter_speed_scale: float = 1.0
+
+## Multiplies the speed of the wave director's runners, walkers and brutes. Read when the wave catalogue is built (a restart).
+@export_range(0.1, 5.0, 0.05) var wave_speed_scale: float = 1.0
+
+@export_group("Movement")
+
+## Ground speed, m/s (`DotFpsTunables.max_speed`). Sent to every client in HELLO and again when it changes, so a client predicts with the number the server simulates. Map layouts stay sized against `PlaygroundMap.MOVE_SPEED` (7.0).
+@export_range(1.0, 30.0, 0.1) var move_speed: float = 7.0
+
+## Jump height, metres (`DotFpsTunables.jump_height`). Replicated like [member move_speed].
+@export_range(0.2, 5.0, 0.05) var jump_height: float = 1.15
+
+## Gravity, m/s² (`DotFpsTunables.gravity`, and the map toys'). Replicated like [member move_speed].
+@export_range(2.0, 60.0, 0.5) var move_gravity: float = 20.0
+
 @export_group("Server")
 
 ## Player slots. Read when the roster is built, so a change takes a restart.
@@ -207,7 +229,7 @@ extends DotConfig
 const CFG_FILES := {
 	"Content": "server", "Rules": "server", "Undo": "props", "Records": "server", "Server": "server",
 	"Props": "props",
-	"Arena": "arena", "Economy": "arena",
+	"Arena": "arena", "Economy": "arena", "Npcs": "arena", "Movement": "arena",
 }
 
 
