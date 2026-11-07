@@ -11,6 +11,7 @@
 #   ./game.sh server -- ARGS       ARGS go to dot-server-deploy's ./server (e.g. -- --port 7000)
 #   ./game.sh test                 parse every script, then run every test suite
 #   ./game.sh test NAME...         run only these suites (e.g. ./game.sh test headless_net)
+#   ./game.sh soak [MAP] [MIN]     bot soak on tools/soak.tscn (report in .godot/test-logs/soak-MAP.json)
 #   ./game.sh suites               list the test suites
 #   ./game.sh shot [ARGS]          save a screenshot to screenshots/ (tools/shot.sh or tools/screenshot.sh)
 #
@@ -48,7 +49,7 @@ CR=$'\r\033[K'
 [ -t 1 ] || { RED=""; GRN=""; YLW=""; OFF=""; CR=""; }
 
 die() { printf '%s%s%s\n' "$RED" "$1" "$OFF" >&2; exit "${2:-1}"; }
-usage() { sed -n '3,24p' "$ROOT/$(basename "${BASH_SOURCE[0]}")" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,25p' "$ROOT/$(basename "${BASH_SOURCE[0]}")" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -262,6 +263,17 @@ case "$cmd" in
         ;;
     test)
         do_test "$@"
+        ;;
+    soak)
+        [ -f tools/soak.tscn ] || die "$GAME_NAME has no bot soak (tools/soak.tscn)." 2
+        check_addons
+        soak_args=()
+        [ -n "${1:-}" ] && { soak_args+=(--map "$1"); shift; }
+        [ -n "${1:-}" ] && { soak_args+=(--minutes "$1"); shift; }
+        mkdir -p .godot/test-logs
+        timeout "$TIMEOUT" "$GODOT" --headless --path . res://tools/soak.tscn -- "${soak_args[@]}" "$@" \
+            2>&1 | tee .godot/test-logs/soak.log | grep -E '^SOAK|^soak|SCRIPT ERROR|Parse Error|ERROR|FAIL'
+        exit "${PIPESTATUS[0]}"
         ;;
     suites)
         printf '%s\n' $SUITES
