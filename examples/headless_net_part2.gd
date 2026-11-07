@@ -28,9 +28,10 @@ func _test_clock_wire() -> void:
 	# or register anything; the module is what would.
 	_cw_vote = PlaygroundVote.new()
 	_cw_vote.name = "ClockVote"
+	_cw_vote.game = _server_game
 	_cw_vote.config_path = ""
 	add_child(_cw_vote)
-	var built := _cw_vote.setup(_server_game)
+	var built := _cw_vote.setup()
 	_check(built.ok, "a vote is built on the server's game", str(built.error) if not built.ok else "")
 	if not built.ok:
 		remove_child(_cw_vote)

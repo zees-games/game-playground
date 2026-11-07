@@ -253,7 +253,7 @@ func _on_vote_announced(line: String) -> void:
 
 
 ## The vote picked a map. The game is what changes to it.
-func _on_vote_change_due(map_id: StringName) -> void:
+func _on_vote_change_due(map_id: StringName, _choice: DotVoteChoice) -> void:
 	game.change_map(map_id)
 
 

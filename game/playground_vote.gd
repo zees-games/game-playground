@@ -1,4 +1,4 @@
-extends Node
+extends DotVoteTimedGame
 
 const Playground := preload("playground.gd")
 
@@ -60,55 +60,40 @@ const COMMAND_NAMES := {"vote": "vote"}
 
 
 ## The vote picked something. The game is what changes to it.
-signal change_due(map_id: StringName)
 
-## Something a player should be told: the ballot, the tally, a warning.
 signal announced(line: String)
 
-## Something for every client to hear or count: a [code]cue_*[/code] id, or a second of
-## the countdown before a ballot. One of the two is empty or zero. The module puts it on
-## the wire as [constant PlaygroundEvents.Kind].VOTE.
-signal cue_due(cue: StringName, seconds_left: int, runoff: bool)
-
-## The map's time left changed in a way a client counting it down would not have guessed:
-## an extend, a new map, a clock stopped for a ballot or started again. [param state] is
-## [method DotVoteClockView.state_of]'s. The module puts it on the wire as
-## [constant PlaygroundEvents.Kind].CLOCK.
-signal clock_due(state: Dictionary)
-
-
-var director: DotVoteDirector = null
-var commands: DotVoteCommands = null
-
-## `() -> Dictionary`: maps.yml's `commands:` block, so an operator renames the vote's commands
-## without this game naming any. The module points it at the game's rotation file.
-var commands_spec_fn: Callable = Callable()
+## The game whose map session the vote runs over; set before [method setup].
 var game: Playground = null
 
-## How many people are playing. Every threshold in a vote needs it.
-var player_count_fn: Callable = Callable()
-var is_admin_fn: Callable = Callable()
 
-## [code]func(state: Dictionary)[/code]: the ballot as a client draws it, sent whenever it
-## changes. The host points it at the client shell (a dot-server notice), which draws a
-## menu a player picks from with a number key or a click. Unset sends nothing.
-var ballot_fn: Callable = Callable()
+func _init() -> void:
+	channel = CHANNEL
+	metadata_key = METADATA_KEY
+	command_names = COMMAND_NAMES
+	noun = "map"
+	config_path = CONFIG_PATH
+	director_name = "Vote"
+	# The module applies the change itself (through the map session it already drives, so clients are told).
+	auto_apply = false
+	# Voters are session ids of the form `u<n>`, dot-vote's own spelling.
+	bare_voter_ids = false
+	announce_fn = func(line: String) -> void: announced.emit(line)
 
-## [code]func(voter: StringName) -> Dictionary[/code]: a voter's name and avatar URL.
-var people_fn: Callable = Callable()
 
-## What [member ballot_fn] is fed from. Polled once per [method advance].
-var feed: DotVoteBallotFeed = null
+## dot-map's own source, over the session this game already drives. Nothing here loads a map: `DotVoteMapSource.apply` calls
+## `DotMapSession.change_to`, which is the path that already works, including the cloud fetch for a delivered map.
+func _make_source() -> DotVoteSource:
+	return DotVoteMapSource.from_session(game.maps)
 
-## What every client was last told about the clock, counted down the way they count it.
-## See [method advance].
-var clock_view: DotVoteClockView = DotVoteClockView.new()
 
-## Simulated seconds, for [member clock_view]. Never compared with a client's clock.
-var _clock_time: float = 0.0
+func _rules() -> DotVoteRules:
+	return vote_rules()
 
-## The file [method setup] layers over the defaults. A test sets it empty.
-var config_path: String = CONFIG_PATH
+
+func _configure_director(d: DotVoteDirector) -> void:
+	# This game counts heads (player_count_fn), it has no voter list.
+	d.voters_fn = Callable()
 
 
 ## The vote's policy. Fifty-five settings, and these are the ones a sandbox changes.
@@ -168,144 +153,6 @@ static func vote_rules() -> DotVoteRules:
 	return rules
 
 
-func setup(p_game: Playground) -> DotResult:
-	game = p_game
-
-	var rules := vote_rules()
-	var problem := rules.validate()
-
-	if not problem.ok:
-		return problem.wrap("The vote rules are not usable")
-
-	# The owner's layers over the defaults that just validated. A layered result that
-	# does not validate is refused whole and the defaults stand — loud, not fatal,
-	# because a server that would not start over its vote file is one nobody can fix
-	# from a chat window.
-	var layered := rules.layer_over_defaults(
-		config_path, DotVoteGameSource.running_game_metadata(METADATA_KEY)
-	)
-
-	if not layered.ok:
-		DotLog.error(CHANNEL, "the map vote configuration is not usable; using the defaults", {
-			"path": config_path,
-			"why": layered.error.message,
-			"detail": layered.error.detail,
-		})
-
-	# Nothing in this game reports a round end or a leading score to the vote, so a
-	# `trigger: round_end` or a score limit in an operator's file would validate and then
-	# wait for ever — and with the map's own clock handed to the vote, the map never ends.
-	var unfed := rules.drop_unfed(false, false)
-	if not unfed.is_empty():
-		DotLog.error(CHANNEL, "the map vote configuration asks for what this game cannot drive; ignored", {
-			"path": config_path, "ignored": ", ".join(unfed),
-		})
-
-	director = DotVoteDirector.new()
-	director.name = "Vote"
-	director.rules = rules
-	# [b]dot-map's own source, over the session this game already drives.[/b] Nothing here
-	# loads a map: `DotVoteMapSource.apply` calls `DotMapSession.change_to`, which is the
-	# path that already works — including the cloud fetch for a delivered map.
-	director.source = DotVoteMapSource.from_session(game.maps)
-	director.auto_apply = false
-	# [b]Off, and this is dot-vote's fifth bug.[/b] With it on the director announces the
-	# change it just made *and* the host announces the same change through its own map
-	# signal — which fires for an operator typing `pg_map` too, and is therefore the one
-	# that has to be connected. Both firing is two entries in the play history for one
-	# play, and a "played in the last N" cooldown that is quietly half what it says.
-	director.begin_on_apply = false
-	# [b]Off: the module advances it, once per server tick.[/b] It was on, AND the module
-	# called `advance(step)` every tick, so every clock in the vote ran at twice the speed
-	# it said — a thirty-minute limit was fifteen, a thirty-second ballot fifteen, and the
-	# three-minute rock-the-vote delay ninety seconds. Nothing errored: every number was
-	# consistent with itself, and only a clock on the wall disagrees.
-	director.self_advance = false
-	director.register_service = false
-	director.player_count_fn = _player_count
-	director.is_admin_fn = _is_admin
-	director.announce_fn = func(line: String) -> void: announced.emit(line)
-	add_child(director)
-
-	director.change_due.connect(func(id: StringName, _choice: DotVoteChoice) -> void:
-		change_due.emit(id)
-	)
-
-	# Two signals, two messages: dot-vote emits a countdown second and that second's cue
-	# separately, and merging them here would be this file deciding which is which.
-	director.cue.connect(func(id: StringName) -> void: cue_due.emit(id, 0, false))
-	director.countdown_tick.connect(func(seconds_left: int, runoff: bool) -> void:
-		cue_due.emit(&"", seconds_left, runoff)
-	)
-
-	feed = DotVoteBallotFeed.of(director, func(state: Dictionary) -> void:
-		if ballot_fn.is_valid():
-			ballot_fn.call(state)
-	)
-	feed.title = "Vote for the next map"
-	feed.people_fn = func(voter: StringName) -> Dictionary:
-		return people_fn.call(voter) if people_fn.is_valid() else {}
-
-	return DotResult.success(null)
-
-
-## dot-vote's commands, on [param host] — the module, so they go when it does.
-##
-## [b]The only vote commands, and the one rock-the-vote.[/b] `pg_rtv` went to the map
-## session's own `DotMapTimeLimit` while the wire's `rtv` went to this director — two
-## votes under one name — and none of dot-vote's commands existed here: no `nominate`
-## from chat, no `timeleft`, and none of the operator's `setnextmap`, `nominate_addmap`,
-## `forcertv`, `votereload`. A chat `!` line goes to the console in this game, so
-## registering them is all it takes. Voters are `u<userid>`, dot-vote's default and the
-## id [method submit] is handed off the wire.
-func install_commands(host: Object) -> DotResult:
-	if director == null:
-		return DotResult.fail(DotError.CODE_STATE, "There is no vote to command.")
-
-	commands = DotVoteCommands.new()
-	commands.director = director
-	commands.names = COMMAND_NAMES
-	commands.spec_fn = commands_spec_fn
-
-	var bound := commands.bind(host)
-
-	if feed != null:
-		feed.command = commands.command_name("vote")
-
-	return bound
-
-
-## Somebody is playing something. The vote is told, once, from the one signal that fires
-## for every change however it happened.
-func note_playing(map_id: StringName) -> void:
-	if director != null:
-		director.begin(map_id)
-
-
-func advance(delta: float) -> void:
-	if director != null:
-		director.advance(delta)
-
-	if feed != null:
-		feed.poll()
-
-	_clock_time += delta
-
-	# [b]Sent when a client's own count would be wrong, not every second.[/b] Both ends
-	# count with `DotVoteClockView`, so the server knows exactly what every client is
-	# showing and only an extend, a new map or a stopped clock is worth a message.
-	if clock_view.is_stale(director, _clock_time):
-		clock_view.adopt(clock_state(), _clock_time)
-		clock_due.emit(clock_view.to_state())
-
-
-## The map's time left as a client should show it: the VOTE's clock, which is the one that
-## ends a map here, and no clock at all when the vote has none — which is the deployed
-## `trigger: rtv_only` with `duration_sec: 0`.
-func clock_state() -> Dictionary:
-	return DotVoteClockView.state_of(director)
-
-
 ## Rock the vote, nominate, or cast one. The token comes off the wire.
 func submit(voter: StringName, token: String) -> DotResult:
 	if director == null:
@@ -350,13 +197,5 @@ func next_in_rotation() -> StringName:
 	return director.next_in_rotation() if director != null else &""
 
 
-func _player_count() -> int:
-	return int(player_count_fn.call()) if player_count_fn.is_valid() else 0
-
-
 func _is_admin(voter: StringName) -> bool:
 	return bool(is_admin_fn.call(voter)) if is_admin_fn.is_valid() else false
-
-
-func describe_lines() -> PackedStringArray:
-	return director.describe_lines() if director != null else PackedStringArray()

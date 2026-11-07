@@ -402,7 +402,8 @@ func _build_extras() -> DotResult:
 
 	add_child(vote)
 
-	var voted := vote.setup(game)
+	vote.game = game
+	var voted := vote.setup()
 
 	if not voted.ok:
 		return voted.wrap("The vote could not be set up")
