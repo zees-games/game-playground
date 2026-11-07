@@ -197,6 +197,17 @@ extends DotConfig
 ## Credits for an arena kill.
 @export_range(0, 10000, 1) var arena_kill_reward: int = 100
 
+@export_group("Npcs")
+
+## Multiplies the health of every built-in soldier, elite and rebel (`npc_soldier.gd`). Read when the catalogue is built, so a change applies to the next map load; an NPC already standing keeps what it spawned with. A catalogue from [member props_path] is the operator's own and is left alone.
+@export_range(0.1, 20.0, 0.05) var soldier_health_scale: float = 1.0
+
+## Multiplies the speed of both built-in hunters (`npc_hunter.gd`). Same timing and exception as [member soldier_health_scale].
+@export_range(0.1, 5.0, 0.05) var hunter_speed_scale: float = 1.0
+
+## Multiplies the speed of the wave director's runners, walkers and brutes. Read when the wave catalogue is built (a restart).
+@export_range(0.1, 5.0, 0.05) var wave_speed_scale: float = 1.0
+
 @export_group("Server")
 
 ## Player slots. Read when the roster is built, so a change takes a restart.
@@ -207,7 +218,7 @@ extends DotConfig
 const CFG_FILES := {
 	"Content": "server", "Rules": "server", "Undo": "props", "Records": "server", "Server": "server",
 	"Props": "props",
-	"Arena": "arena", "Economy": "arena",
+	"Arena": "arena", "Economy": "arena", "Npcs": "arena",
 }
 
 

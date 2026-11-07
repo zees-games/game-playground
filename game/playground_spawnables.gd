@@ -492,6 +492,28 @@ static func _pickup(weapon: Object) -> DotPropDef:
 	return def
 
 
+## Scales the built-in NPCs' tuning from the config: soldiers' `health`, hunters' `speed`. Reads the base from the def's `meta` once and stores it under `base_*`, so scaling twice from the same catalogue does not compound.
+static func apply_npc_scales(catalogue: DotPropCatalogue, soldier_health: float, hunter_speed: float) -> void:
+	for def in catalogue.props:
+		var meta: Dictionary = def.meta
+		var script := String(meta.get("script", "")).get_file().get_basename()
+		var key := ""
+		var scale := 1.0
+		if script == "npc_soldier":
+			key = "health"
+			scale = soldier_health
+		elif script == "npc_hunter":
+			key = "speed"
+			scale = hunter_speed
+		else:
+			continue
+		var base_key := "base_" + key
+		if not meta.has(base_key):
+			meta[base_key] = float(meta.get(key, 100.0 if key == "health" else 5.0))
+		meta[key] = float(meta[base_key]) * scale
+		def.meta = meta
+
+
 static func _merged(a: Dictionary, b: Dictionary) -> Dictionary:
 	var out := a.duplicate(true)
 

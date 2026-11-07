@@ -76,12 +76,14 @@ var _tick: int = 0
 
 
 ## Three kinds, and each is a different problem.
-static func catalogue() -> DotNpcCatalogue:
+##
+## [param speed_scale] is [member PlaygroundConfig.wave_speed_scale]: it multiplies each kind's speed.
+static func catalogue(speed_scale := 1.0) -> DotNpcCatalogue:
 	var out := DotNpcCatalogue.new()
 
-	_add(out, &"runner", "Runner", 60.0, 6.4, 30.0, 1)
-	_add(out, &"walker", "Walker", 140.0, 3.6, 40.0, 2)
-	_add(out, &"brute", "Brute", 500.0, 2.4, 26.0, 6)
+	_add(out, &"runner", "Runner", 60.0, 6.4 * speed_scale, 30.0, 1)
+	_add(out, &"walker", "Walker", 140.0, 3.6 * speed_scale, 40.0, 2)
+	_add(out, &"brute", "Brute", 500.0, 2.4 * speed_scale, 26.0, 6)
 
 	return out
 
@@ -160,7 +162,8 @@ func setup(p_game: Playground) -> DotResult:
 
 	spawner = DotNpcSpawner.new()
 	spawner.name = "Spawner"
-	spawner.catalogue = shared_catalogue()
+	var wave_scale: float = game.config.wave_speed_scale if game != null and game.config != null else 1.0
+	spawner.catalogue = shared_catalogue() if is_equal_approx(wave_scale, 1.0) else catalogue(wave_scale)
 	spawner.limits = limits
 	spawner.authoritative = true
 	# Each wave NPC's own seed (`npc.seed`) comes from the session's seed and its spawn count,

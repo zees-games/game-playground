@@ -866,9 +866,31 @@ func _bind_noblock() -> DotResult:
 func _bind_config() -> void:
 	# pg_creative and pg_prop_surf are the hand-written cvars of these two fields.
 	var hand := PackedStringArray(["pg_allow_creative", "pg_prop_surfing"])
+	_mirror_hand_cvars()
 	game.config_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(name: String) -> bool:
 		return hand.has(name) or console.has_name(name))
 	game.config_binder.bind_commands(add_command)
+
+
+## Config field -> the hand-written cvar that carries it. The binder skips these (its own `pg_<field>` name is
+## either taken or reserved), so a workbench edit reached the field and never the cvar, and a handler with
+## a side effect (`pg_creative` ending everybody's creative mode) never ran.
+const HAND_CVARS := {
+	"allow_creative": "pg_creative",
+	"prop_surfing": "pg_prop_surf",
+	"destruction": "pg_destruction",
+	"breakable_glass": "pg_breakable_glass",
+}
+
+
+## Pushes a workbench edit of a [constant HAND_CVARS] field into its cvar, whose change handler writes the field and does the rest.
+func _mirror_hand_cvars() -> void:
+	game.config_binder.field_changed.connect(func(key: String, value: Variant, source: String) -> void:
+		if source != "workbench" or not HAND_CVARS.has(key):
+			return
+		var c: DotConVar = console.find_cvar(HAND_CVARS[key]) if console != null else null
+		if c != null:
+			c.force_set("1" if value else "0"))
 
 
 ## The server's tick, which is the whole game's. Driven from here, not the game's loop: it has to run between

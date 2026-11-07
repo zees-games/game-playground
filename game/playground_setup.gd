@@ -768,7 +768,10 @@ func _prop_catalogue() -> DotPropCatalogue:
 			"path": config.props_path, "why": loaded.error.message
 		})
 
-	return PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), config.props_dir if config != null else "user://props")
+	var built := PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), config.props_dir if config != null else "user://props")
+	if config != null:
+		PlaygroundSpawnables.apply_npc_scales(built, config.soldier_health_scale, config.hunter_speed_scale)
+	return built
 
 
 func _clock_seconds() -> float:

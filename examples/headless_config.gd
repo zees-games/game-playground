@@ -8,9 +8,11 @@ extends DotGameCheckSuite
 
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundAmbience := preload("../game/playground_ambience.gd")
+const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
+const PlaygroundWaves := preload("../game/playground_waves.gd")
 const ROOT := "user://pg_cfgtest"
 const GAME := "game-playground"
-const CHECKS := 29
+const CHECKS := 37
 const SECTIONS := 4
 
 var _entered := 0
@@ -36,7 +38,7 @@ func _run() -> void:
 	var keys := PackedStringArray()
 	for e: Dictionary in binder.schema():
 		keys.append(e["key"])
-	for k in ["arena_round_sec", "arena_score_limit", "arena_health", "arena_respawn_sec", "arena_friendly_fire", "wave_kill_reward", "arena_kill_reward", "max_players", "prop_budget", "map_seconds"]:
+	for k in ["arena_round_sec", "arena_score_limit", "arena_health", "arena_respawn_sec", "arena_friendly_fire", "wave_kill_reward", "arena_kill_reward", "max_players", "prop_budget", "map_seconds", "soldier_health_scale", "hunter_speed_scale", "wave_speed_scale"]:
 		_check(keys.has(k), "%s is exposed" % k)
 
 	var console := DotConsole.new()
@@ -45,6 +47,7 @@ func _run() -> void:
 	console.set_cvar("pg_arena_score_limit", "7")
 	_check(config.arena_score_limit == 7 and binder.source_of("arena_score_limit") == "cvar", "a cvar writes the field")
 	_check(binder.diff_yaml().contains("arena_score_limit: 7"), "the diff names the edit")
+	_npc_scales()
 	var schema_path := "user://pg_config_schema.json"
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
@@ -159,3 +162,20 @@ func _templates(binder: DotGameConfigBinder) -> void:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
 			stale.append(path)
 	_check(stale.is_empty(), "the shipped files match the config (run addons/dot_game/qa/dot_game_cfg_templates.gd)", ",".join(stale))
+
+
+func _npc_scales() -> void:
+	var cat := PlaygroundSpawnables.catalogue()
+	var soldier := float(cat.get_prop(&"npc_soldier").meta["health"])
+	var elite := float(cat.get_prop(&"npc_soldier_elite").meta["health"])
+	var hunter := float(cat.get_prop(&"npc_hunter").meta["speed"])
+	PlaygroundSpawnables.apply_npc_scales(cat, 2.0, 1.5)
+	PlaygroundSpawnables.apply_npc_scales(cat, 2.0, 1.5)
+	_check(is_equal_approx(float(cat.get_prop(&"npc_soldier").meta["health"]), soldier * 2.0), "soldier_health_scale doubles a soldier, once")
+	_check(is_equal_approx(float(cat.get_prop(&"npc_soldier_elite").meta["health"]), elite * 2.0), "and the elite")
+	_check(is_equal_approx(float(cat.get_prop(&"npc_hunter").meta["speed"]), hunter * 1.5), "hunter_speed_scale scales a hunter, once")
+	PlaygroundSpawnables.apply_npc_scales(cat, 1.0, 1.0)
+	_check(is_equal_approx(float(cat.get_prop(&"npc_soldier").meta["health"]), soldier), "scale 1.0 restores the catalogue")
+	var base := PlaygroundWaves.catalogue()
+	var fast := PlaygroundWaves.catalogue(2.0)
+	_check(is_equal_approx(float(fast.get_npc(&"runner").meta["speed"]), float(base.get_npc(&"runner").meta["speed"]) * 2.0), "wave_speed_scale scales the wave kinds")
