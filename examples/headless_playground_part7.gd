@@ -457,7 +457,7 @@ func _test_glass() -> void:
 	var pane_at := func(centre: Vector3) -> int:
 		for index: int in playground.panes.keys():
 			var node := (playground.panes[index] as Dictionary)["node"] as Node3D
-			if Playground._pane_bounds(node).get_center().distance_to(centre) < 1.0:
+			if DotPropPanes.bounds_of(node).get_center().distance_to(centre) < 1.0:
 				return index
 		return -1
 	var glass_panes := playground.panes.values().filter(func(p: Dictionary) -> bool: return p["material"] == &"glass")

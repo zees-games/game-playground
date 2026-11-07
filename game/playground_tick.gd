@@ -318,69 +318,31 @@ func _liquid_tick(step: float) -> void:
 			var _gone := props.remove(instance_id, DotPropSpawner.REASON_CLEANUP)
 
 
-## Buoyancy and drag on every loose prop in a liquid, on the authority (props are not predicted). Lighter than the liquid for its
-## volume floats, heavier sinks, slowed. Density is the catalogue's `density` when given (rock, concrete: the catalogue's masses
-## are tuned for a physics gun and a 900 kg boulder works out lighter than water), else mass over volume.
+## Buoyancy and drag on every loose prop in a liquid, on the authority (props are not predicted), by [DotPropBuoyancy]. Density is
+## the catalogue's `density` when given (rock, concrete: the catalogue's masses are tuned for a physics gun and a 900 kg boulder
+## works out lighter than water), else mass over volume.
 func _float_props(step: float) -> void:
+	if liquids.is_empty():
+		return
 	var gravity := float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
+	var surface := func(material: Variant) -> Variant: return PlaygroundMaterials.surface(String(material))
 	for prop: DotPropInstance in props.all_props():
 		var body := prop.node as RigidBody3D
 		if body == null or body.freeze or not body.is_inside_tree() or prop.held_by != &"":
 			continue
-		var at := body.global_position
-		for liquid: Dictionary in liquids:
-			var box: AABB = liquid["box"]
-			if not box.grow(2.0).has_point(at):
-				continue
-			var s := PlaygroundMaterials.surface(String(liquid["material"]))
-			if s == null:
-				continue
-			var volume := _volume_of(prop)
-			var half := _half_height_of(prop)
-			var submerged := clampf((box.end.y - (at.y - half)) / maxf(half * 2.0, 0.01), 0.0, 1.0)
-			if submerged <= 0.0 or at.x < box.position.x or at.x > box.end.x or at.z < box.position.z or at.z > box.end.z:
-				continue
-			var density := float(prop.def.meta.get("density", body.mass / maxf(volume, 0.001))) if prop.def != null else body.mass / maxf(volume, 0.001)
-			# Up by the liquid's weight displaced; the engine already pulls down by the body's.
-			var lift := s.density * volume * submerged * gravity
-			# A dense body is heavier than its mass says: pull the difference down too, so a
-			# boulder whose catalogue mass makes it a balloon still sinks like rock.
-			var extra := maxf(density * volume - body.mass, 0.0) * gravity * submerged
-			# Drag, never more than the velocity it is taking off.
-			var drag := clampf(s.dampening * submerged * step, 0.0, 1.0)
-						# And the bob damped critically. Buoyancy is a spring whose stiffness is the liquid's density over the body's: a crate fifty
-						# times lighter than water is a very stiff one and shot out of the pond and bounced for ever. Damping at 2 sqrt(k) settles it.
-			var ratio := clampf(s.density / maxf(density, 1.0), 0.0, 60.0)
-			var critical := 2.0 * sqrt(gravity * ratio / maxf(half * 2.0, 0.1))
-			# Whenever it touches, not scaled by how deep: a body that floats rides almost
-			# entirely out of the liquid, and damping scaled by that depth let a crate bounce on
-			# lava half a metre high indefinitely.
-			var settle := clampf(critical * step, 0.0, 1.0)
-						# Vertical velocity is worked out once and set with one impulse: as separate impulses the damping read the velocity BEFORE
-						# the lift landed, so a held beach ball gained a sixty-g lift every tick and left the surface at tens of metres a second.
-						# Under water a body rises at most at [constant RISE_SPEED]: drag sets a terminal speed in a real liquid, and this is that.
-			var vy := body.linear_velocity.y
-			var rise := (lift - extra) * step / maxf(body.mass, 0.001)
-			var vy_after := minf(vy * (1.0 - drag) * (1.0 - settle) + rise, maxf(vy, RISE_SPEED))
-			body.apply_central_impulse(Vector3.UP * (vy_after - vy) * body.mass)
-			var flat := Vector3(body.linear_velocity.x, 0.0, body.linear_velocity.z)
-			body.apply_central_impulse(-flat * body.mass * drag)
-			body.angular_velocity *= 1.0 - drag
-			break
+		if not DotPropBuoyancy.near_liquid(body.global_position, liquids):
+			continue
+		var volume := _volume_of(prop)
+		var density := float(prop.def.meta.get("density", body.mass / maxf(volume, 0.001))) if prop.def != null else body.mass / maxf(volume, 0.001)
+		var _acted := DotPropBuoyancy.apply(body, volume, _half_height_of(prop), density, liquids, surface, step, gravity)
 
 
 static func _volume_of(prop: DotPropInstance) -> float:
 	if prop.def == null:
 		return 1.0
-	var e := PlaygroundProp.extent_of(prop.def)
 	var scale := float(prop.node.get("size_scale")) if prop.node != null and prop.node.get("size_scale") != null else 1.0
-	var box := e.x * e.y * e.z * pow(scale, 3.0)
-	match PlaygroundProp.shape_of(prop.def):
-		PlaygroundProp.Shape.SPHERE:
-			return box * PI / 6.0
-		PlaygroundProp.Shape.CYLINDER:
-			return box * PI / 4.0
-	return box
+	var shape: String = ["box", "sphere", "cylinder"][PlaygroundProp.shape_of(prop.def)]
+	return DotPropBuoyancy.volume_of(PlaygroundProp.extent_of(prop.def), scale, shape)
 
 
 static func _half_height_of(prop: DotPropInstance) -> float:
