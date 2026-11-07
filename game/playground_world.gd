@@ -574,7 +574,7 @@ func _build_toys(loaded: Node) -> void:
 	toys.name = "Toys"
 	toys.authoritative = authoritative
 	toys.rules = toy_rules
-	toys.gravity = PlaygroundMap.MOVE_GRAVITY
+	toys.gravity = config.move_gravity if config != null else PlaygroundMap.MOVE_GRAVITY
 	toys.kill_y = -60.0
 	if layout != null:
 		toys.loose_layer = layout.layer_mask(&"toy")

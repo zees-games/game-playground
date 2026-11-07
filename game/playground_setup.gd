@@ -63,6 +63,9 @@ signal held_changed(id: StringName, prop: DotPropInstance, held: bool)
 ## what it was made of. Emitted on every end that removes it, so a client plays the sound.
 signal pane_broken(index: int, at: Vector3, material: StringName)
 
+## The movement numbers changed (config edit on the authority, or the server's values arriving on a client). A server bridge replicates it.
+signal movement_changed()
+
 ## A prop broke: where and what it was made of (an index into playground_break_fx.gd MATERIALS). Every end that draws it.
 signal prop_shattered(at: Vector3, material: int)
 

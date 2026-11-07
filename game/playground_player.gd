@@ -501,6 +501,15 @@ func _tunables() -> DotFpsTunables:
 	return movement_tunables()
 
 
+## Puts the three configurable movement numbers on this player (`PlaygroundConfig` Movement group). Also on the class base, so a later class scale starts from them.
+func apply_movement(speed: float, jump: float, gravity: float) -> void:
+	for t: DotFpsTunables in [controller.tunables if controller != null else null, _class_base]:
+		if t != null:
+			t.max_speed = speed
+			t.jump_height = jump
+			t.gravity = gravity
+
+
 ## A fresh copy of the movement every player here is built with. See [method _tunables].
 static func movement_tunables() -> DotFpsTunables:
 	var t := DotFpsTunables.with_profile("legacy")

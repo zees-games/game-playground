@@ -309,7 +309,8 @@ func _admit(peer_id: int) -> void:
 
 	_tell(peer_id, PlaygroundEvents.Kind.HELLO, PlaygroundEvents.write_hello(
 		session_id, game.tick_rate, net.clock.tick,
-		game.maps.current.id if game.maps.current != null else &""
+		game.maps.current.id if game.maps.current != null else &"",
+		_movement_of_game()
 	))
 
 	for other in _behaviours.keys():
@@ -549,6 +550,16 @@ func _apply_projectile(reader: DotNetReader) -> void:
 				game.projectiles.blind_remote(float(blind["seconds"]), float(blind["strength"]))
 
 
+func _movement_of_game() -> Vector3:
+	var c := game.config
+	return Vector3(c.move_speed, c.jump_height, c.move_gravity) if c != null else Vector3(7.0, 1.15, 20.0)
+
+
+func _adopt_movement(movement: Vector3) -> void:
+	if movement != Vector3.ZERO:
+		game.set_movement(movement.x, movement.y, movement.z)
+
+
 func _apply_hello(reader: DotNetReader) -> void:
 	var hello := PlaygroundEvents.read_hello(reader)
 	if not bool(hello["ok"]):
@@ -563,6 +574,7 @@ func _apply_hello(reader: DotNetReader) -> void:
 	# The server's tick rate, before anything is derived from it and before sync_from_server, whose clock
 	# converts through tick_rate. A client counting at its export's 60 against a server on 128 has every time wrong.
 	_adopt_tick_rate(int(hello["tick_rate"]))
+	_adopt_movement(hello["movement"])
 
 	var rtt := float(rtt_source.call()) if rtt_source.is_valid() else 0.0
 	net.clock.sync_from_server(int(hello["server_tick"]), maxf(0.0, rtt))

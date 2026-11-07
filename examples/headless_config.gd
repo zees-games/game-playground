@@ -12,7 +12,7 @@ const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundWaves := preload("../game/playground_waves.gd")
 const ROOT := "user://pg_cfgtest"
 const GAME := "game-playground"
-const CHECKS := 37
+const CHECKS := 41
 const SECTIONS := 4
 
 var _entered := 0
@@ -38,7 +38,7 @@ func _run() -> void:
 	var keys := PackedStringArray()
 	for e: Dictionary in binder.schema():
 		keys.append(e["key"])
-	for k in ["arena_round_sec", "arena_score_limit", "arena_health", "arena_respawn_sec", "arena_friendly_fire", "wave_kill_reward", "arena_kill_reward", "max_players", "prop_budget", "map_seconds", "soldier_health_scale", "hunter_speed_scale", "wave_speed_scale"]:
+	for k in ["arena_round_sec", "arena_score_limit", "arena_health", "arena_respawn_sec", "arena_friendly_fire", "wave_kill_reward", "arena_kill_reward", "max_players", "prop_budget", "map_seconds", "soldier_health_scale", "hunter_speed_scale", "wave_speed_scale", "move_speed", "jump_height", "move_gravity"]:
 		_check(keys.has(k), "%s is exposed" % k)
 
 	var console := DotConsole.new()
@@ -48,6 +48,7 @@ func _run() -> void:
 	_check(config.arena_score_limit == 7 and binder.source_of("arena_score_limit") == "cvar", "a cvar writes the field")
 	_check(binder.diff_yaml().contains("arena_score_limit: 7"), "the diff names the edit")
 	_npc_scales()
+	_check(config.move_speed == 7.0 and config.jump_height == 1.15 and config.move_gravity == 20.0, "the movement defaults are the map layout constants")
 	var schema_path := "user://pg_config_schema.json"
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)

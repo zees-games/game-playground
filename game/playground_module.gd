@@ -867,6 +867,9 @@ func _bind_config() -> void:
 	# pg_creative and pg_prop_surf are the hand-written cvars of these two fields.
 	var hand := PackedStringArray(["pg_allow_creative", "pg_prop_surfing"])
 	_mirror_hand_cvars()
+	game.config_binder.field_changed.connect(func(key: String, _value: Variant, _source: String) -> void:
+		if key in ["move_speed", "jump_height", "move_gravity"]:
+			game.apply_movement())
 	game.config_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(name: String) -> bool:
 		return hand.has(name) or console.has_name(name))
 	game.config_binder.bind_commands(add_command)
