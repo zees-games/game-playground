@@ -150,6 +150,36 @@ func _open_profiles() -> void:
 	var _pushed := screens.push(&"profiles")
 
 
+## F7: the spawn point markers, for staff. Offline this process is the server; on a server the client has neither the points nor the right.
+func _toggle_map_edit() -> void:
+	if map_edit_view == null:
+		map_edit_view = PlaygroundMapEditView.new(self, playground)
+
+	if map_edit_view.active():
+		map_edit_view.hide()
+		return
+
+	var why := map_edit_view.prepare(bridge == null)
+
+	if why != "":
+		if hud != null:
+			hud.notice(why)
+		return
+
+	map_edit_view.show()
+
+
+## F8: opens the form of the spawn point the crosshair is on.
+func _pick_map_edit() -> void:
+	if map_edit_view == null or not map_edit_view.active():
+		return
+
+	_primary_up()
+	_secondary_up()
+	_rotating = false
+	var _picked := map_edit_view.pick()
+
+
 ## The server answers a harmless request by who asked: an unknown profile for an admin, "needs
 ## cvar" for anybody else. There is no "am I an admin" message, and this is the cheapest honest one.
 func _probe_profile_admin() -> void:

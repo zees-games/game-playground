@@ -14,6 +14,7 @@ const PlaygroundIcons := preload("playground_icons.gd")
 const PlaygroundViewGrip := preload("playground_view_grip.gd")
 const PlaygroundServices := preload("playground_services.gd")
 const PlaygroundProfileScreen := preload("playground_profile_screen.gd")
+const PlaygroundMapEditView := preload("playground_map_edit_view.gd")
 const PlaygroundSpawnMenu := preload("playground_spawn_menu.gd")
 const PlaygroundVoice := preload("client/playground_voice.gd")
 const PlaygroundWeapon := preload("weapons/playground_weapon.gd")
@@ -119,6 +120,8 @@ var browser: PlaygroundBrowser = null
 
 ## The admin workbench (F6): live NPC and weapon profile edits. Only an admin is let in.
 var profile_screen: PlaygroundProfileScreen = null
+## Staff's spawn point markers and form; null until first used.
+var map_edit_view: PlaygroundMapEditView = null
 var _profile_admin := false
 var _profile_probing := false
 
@@ -681,7 +684,8 @@ func _present_beacons(delta: float) -> void:
 
 ## Whether a menu is up, in which case the mouse belongs to it.
 func _menu_is_open() -> bool:
-	return (screens != null and screens.any_open()) or (game_menu != null and game_menu.any_open())
+	return (screens != null and screens.any_open()) or (game_menu != null and game_menu.any_open()) \
+		or (map_edit_view != null and map_edit_view.panel_open())
 
 
 ## The sampler the next simulated tick will actually read. A networked player has no sampler of its

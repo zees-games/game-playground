@@ -56,8 +56,12 @@ func primary(gun: Object, hit: Dictionary) -> DotResult:
 	if str(setting("action")) == "link":
 		var marking := pending.is_empty()
 		ctx.args = PackedStringArray() if marking else PackedStringArray([str(setting("link"))])
-		pending = {"marked": true} if marking else {}
-		return _run(edit, "nav_link_mark" if marking else "nav_link_add", ctx)
+		var done := _run(edit, "nav_link_mark" if marking else "nav_link_add", ctx)
+
+		if done.ok:
+			pending = {"marked": true} if marking else {}
+
+		return done
 
 	ctx.args = PackedStringArray([str(setting("kind"))])
 	return _run(edit, "spawn_add", ctx)
@@ -145,7 +149,12 @@ func _ctx(gun: Object, hit: Dictionary) -> Ctx:
 
 
 func _run(edit: Object, role: String, ctx: Ctx) -> DotResult:
-	# Not awaited: the editing commands finish in the call, and a save that waits on its store
-	# answers through the console like any other.
-	edit.call("run", role, ctx)
+	# Not awaited: a command that finishes in the call returns its outcome here, and one waiting on
+	# its store (a save) answers through the console like any other.
+	var outcome: Variant = edit.call("run", role, ctx)
+
+	if outcome is DotResult:
+		var done := outcome as DotResult
+		return DotResult.success(ctx.said) if done.ok else done
+
 	return DotResult.success(ctx.said if ctx.said != "" else "Sent.")

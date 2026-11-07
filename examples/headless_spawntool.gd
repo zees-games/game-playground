@@ -2,13 +2,14 @@ extends DotGameCheckSuite
 
 const Playground := preload("../game/playground.gd")
 const PlaygroundConfig := preload("../game/playground_config.gd")
+const PlaygroundMapEdit := preload("../game/playground_map_edit.gd")
 const PlaygroundWeapons := preload("../game/playground_weapons.gd")
 
 ## The spawn-point tool gun mode: it sends dot-game's map-edit commands and decides nothing itself.
 ## Run: godot --headless --path . res://examples/headless_spawntool.tscn
 
-const SECTIONS := 3
-const CHECKS := 15
+const SECTIONS := 4
+const CHECKS := 21
 
 var _entered := 0
 var _completed := 0
@@ -39,6 +40,7 @@ func _run() -> void:
 	await _test_refusals(gun)
 	await _test_spawns(gun)
 	await _test_links(gun)
+	await _test_real_editor(gun)
 	_report_sections(_entered, _completed, SECTIONS, CHECKS)
 
 
@@ -125,5 +127,28 @@ func _test_links(gun: Object) -> void:
 	var again: DotResult = await _at_ground(gun, 22.0, 20.0, &"primary")
 	_check(again.ok and nav.links.size() == 1, "and the next click starts a new link")
 	var save: DotResult = await _at_ground(gun, 0.0, 0.0, &"reload")
-	_check(save.ok, "reload sends the save, which says why it cannot here", str(save.value))
+	_check(not save.ok and save.error.message.contains("no map data store"), "reload sends the save, and a refusal is a failure with its reason",
+		save.error.message if not save.ok else "")
+	_completed += 1
+
+
+func _test_real_editor(gun: Object) -> void:
+	_entered += 1
+	var edit: DotGameMapEdit = PlaygroundMapEdit.make(_game, DotMapDataMemory.new())
+	_check(edit != null and edit.points != null and edit.store != null, "the game builds its editor over a point set and a store")
+	_game.map_edit = edit
+	gun.call("set_mode", &"spawnpoint", {"action": "spawn", "kind": "player"})
+	var placed: DotResult = await _at_ground(gun, 12.0, 8.0, &"primary")
+	_check(placed.ok and edit.points.points.size() == 1, "a point is placed through it", placed.error.message if not placed.ok else "")
+	var saved: DotResult = await _at_ground(gun, 0.0, 0.0, &"reload")
+	_check(saved.ok and not edit.dirty, "and saved to the store", saved.error.message if not saved.ok else str(saved.value))
+	edit.points.points.clear()
+	await PlaygroundMapEdit.reload_saved(edit)
+	_check(edit.points.points.size() == 1, "a map change reloads the saved points")
+	gun.call("set_mode", &"spawnpoint", {"action": "link"})
+	var marked: DotResult = await _at_ground(gun, 12.0, 8.0, &"primary")
+	_check(marked.ok, "a link start is marked even where there is no navigation", str(marked.value))
+	var refused: DotResult = await _at_ground(gun, 14.0, 8.0, &"primary")
+	_check(not refused.ok and refused.error.code == DotError.CODE_UNSUPPORTED, "a command that refuses is a failure to the player",
+		refused.error.message if not refused.ok else "")
 	_completed += 1

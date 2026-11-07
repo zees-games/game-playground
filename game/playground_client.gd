@@ -338,6 +338,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_profiles()
 		return
 
+	if key.is_action(PlaygroundBindings.MAP_EDIT):
+		if key.pressed and not key.is_echo():
+			_toggle_map_edit()
+		return
+
+	if key.is_action(PlaygroundBindings.MAP_EDIT_PICK):
+		if key.pressed and not key.is_echo():
+			_pick_map_edit()
+		return
+
 	# The Tab board, held: shown while the key is down, released when it comes up.
 	if key.is_action(PlaygroundBindings.SCOREBOARD) and not key.is_echo():
 		if game_menu != null:
