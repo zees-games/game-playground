@@ -1,4 +1,4 @@
-extends Node
+extends DotGameNetIo
 
 
 const Playground := preload("../playground.gd")
@@ -106,16 +106,9 @@ signal clock_received(state: Dictionary)
 signal inventory_refused(reason: String)
 
 var game: Playground = null
-var net: DotNetManager = null
-var link: PlaygroundNetLink = null
 
 ## Which session this process is. Zero on a server.
 var local_player_id: int = 0
-
-## Where the clock learns the link's length in milliseconds. dot-net cannot measure it;
-## dot-server's heartbeat does ([method DotClientLink.ping_ms]). A client that feeds nothing
-## assumes an instant link and stamps commands for a tick the server already simulated.
-var rtt_source: Callable = Callable()
 
 ## [code]func() -> Dictionary[/code], in [method DotVoteClockView.state_of]'s shape: what a joining
 ## peer is told about the map's time left. Server side; empty sends nothing, and the client then
@@ -187,20 +180,6 @@ var _client_ticked_for: int = -1
 ## A style index -> id table both ends build identically, so a style travels as one
 ## byte rather than as a string on every join.
 var _style_ids: Array[StringName] = []
-
-
-## How every dot-net message reaches a peer. Routed by DELIVERY, not by kind: snapshots are
-## unreliable, everything else reliable, and the server has events where the client has requests.
-## Sending all as events silently drops every client request.
-func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
-	if link == null:
-		return
-	if delivery == DotNetMessage.Delivery.UNRELIABLE:
-		link.send_snapshot(peer_id, payload)
-	elif net.is_server:
-		link.send_event(peer_id, payload)
-	else:
-		link.send_request(payload)
 
 
 static func _player_key(session_id: int) -> StringName:
@@ -363,14 +342,6 @@ func client_tick(tick: int, command: DotFpsCommand) -> void:
 		game.tick_timers_only(tick)
 
 
-func receive_snapshot(payload: PackedByteArray) -> DotResult:
-	if net == null or net.is_server:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only a client receives these.")
-	if rtt_source.is_valid():
-		net.stats.note_rtt(float(rtt_source.call()))
-	return net.receive_snapshot(payload)
-
-
 ## [param packet] and the commands before it from the local replay history, oldest first,
 ## for one input packet. See [constant INPUT_COPIES].
 func _input_copies(packet: DotNetInput) -> Array:
@@ -430,18 +401,6 @@ func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 
 	voice_arrived.emit(payload)
 	return DotResult.success(null)
-
-
-func receive_event(payload: PackedByteArray) -> DotResult:
-	if net == null:
-		return DotResult.fail(DotError.CODE_STATE, "No manager.")
-	return net.receive(payload, 1)
-
-
-func receive_request(peer_id: int, payload: PackedByteArray) -> DotResult:
-	if net == null:
-		return DotResult.fail(DotError.CODE_STATE, "No manager.")
-	return net.receive(payload, peer_id)
 
 
 func _join_body(session_id: int) -> PackedByteArray:
