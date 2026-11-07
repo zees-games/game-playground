@@ -354,21 +354,9 @@ var broken_panes: Array[int] = []
 ## `destruction`, which is about props: glass in a map is there to be broken.
 var panes_break: bool = true
 
-## Speed above which a prop or a player going into a pane breaks it, in m/s.
-const PANE_IMPACT_SPEED := 6.0
-
-## How many shards a broken pane throws, per square metre, and the most it ever throws.
-const SHARDS_PER_M2 := 0.6
-const SHARDS_MAX := 10
-
 ## Speeds as the last tick left them, by player id and prop instance id: what a body was
 ## doing BEFORE the contact that stopped it, which is the speed it hit the pane at.
 var _last_speed: Dictionary = {}
-
-
-## The fastest a prop rises through a liquid under its own buoyancy, m/s. See
-## [method _float_props].
-const RISE_SPEED := 2.0
 
 
 ## Who a map's own props belong to. Not a player id (one is `u<n>`), so no player's limits,

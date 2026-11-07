@@ -74,21 +74,13 @@ func water_boxes() -> Array[AABB]:
 
 
 func _index_panes(map: Node) -> void:
-	panes.clear()
 	broken_panes.clear()
 	_last_speed.clear()
-	if map == null:
-		return
-	var stack: Array[Node] = [map]
-	while not stack.is_empty():
-		var n: Node = stack.pop_back()
-		stack.append_array(n.get_children())
-		if not (n is StaticBody3D) or not n.has_meta(&"pg_box"):
-			continue
-		var material := PlaygroundMaterials.material_of(n)
-		var s := PlaygroundMaterials.surface(String(material)) if material != &"" else null
-		if s != null and s.break_health > 0.0:
-			panes[int(n.get_meta(&"pg_box"))] = {"node": n, "health": s.break_health, "material": material}
+	panes = DotPropPanes.index_map(map, &"pg_box",
+		func(n: Node) -> StringName: return PlaygroundMaterials.material_of(n),
+		func(material: StringName) -> float:
+			var s := PlaygroundMaterials.surface(String(material))
+			return s.break_health if s != null else 0.0)
 
 
 ## Puts down a map document's props and wires them (`maps/pg_data.gd`). An id this server's
