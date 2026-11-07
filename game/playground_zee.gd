@@ -207,7 +207,9 @@ static func arm(
 	var weapon := rig.arsenal.catalogue.get_def(id)
 
 	if weapon != null:
-		var _selected := rig.arsenal.select(weapon.slot, tick)
+		# equip, not select: select refuses while the arsenal is disabled (a spawn freeze).
+		if not rig.arsenal.equip(weapon.slot):
+			var _selected := rig.arsenal.select(weapon.slot, tick)
 
 	player.set("zee_rig", rig)
 	return rig
