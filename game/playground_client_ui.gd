@@ -620,16 +620,7 @@ func _unfreeze_all() -> void:
 		hud.notice("Unfroze %d prop%s." % [thawed, "" if thawed == 1 else "s"])
 
 
-#
-# The track and the practice checkpoints are a run timer's, and none ships: the keys are
-# handed to `addons/pg_timer` when a server added dot-timer, and say so when it did not.
-
-func _timer_key(action: StringName) -> void:
-	if playground.run_timer != null and playground.run_timer.has_method("on_key"):
-		playground.run_timer.call("on_key", action, player_id, hud)
-	elif hud != null:
-		hud.notice("No run timer on this server.")
-
+# --- Styles, tracks and maps -----------------------------------------------
 
 func _cycle_style() -> void:
 	var styles := playground.style_order
