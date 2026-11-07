@@ -386,7 +386,7 @@ func _test_inventory_predicted() -> void:
 	)
 
 	var ball := _uid_at(mine, _cell_of(mine, &"beach_ball"))
-	var requests := _client_bridge.link.requests_sent
+	var requests: int = _client_bridge.link.requests_sent
 	var moved := mine.apply(DotInvOp.move(BACKPACK, ball, BACKPACK, Vector2i(6, 3)))
 	_check(moved.ok, "the client moves the ball")
 	_check(
