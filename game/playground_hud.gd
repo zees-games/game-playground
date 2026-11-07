@@ -58,6 +58,9 @@ var weapon_icon: DotWeaponIconPlate = null
 
 ## Every hit the server confirmed ([method confirm_hit]): a mark round the crosshair, and
 ## the number on the body. Never the local prediction.
+## The marker and numbers layer ([DotHitFeedback]); [member hit_marker] and
+## [member damage_numbers] are its two pieces.
+var hit_fx: DotHitFeedback = null
 var hit_marker: DotHitMarker = null
 ## The key an action is on, as bound (`PlaygroundClient.key_for`), for the lines that name one.
 var key_fn: Callable = Callable()
@@ -193,15 +196,9 @@ func _ready() -> void:
 	add_child(weapon_icon)
 
 	# Full rect, centred on the crosshair; both draw only what the server confirmed.
-	damage_numbers = DotDamageNumbers.new()
-	damage_numbers.name = "DamageNumbers"
-	damage_numbers.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(damage_numbers)
-
-	hit_marker = DotHitMarker.new()
-	hit_marker.name = "HitMarker"
-	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(hit_marker)
+	hit_fx = DotHitFeedback.mount(self)
+	hit_marker = hit_fx.marker
+	damage_numbers = hit_fx.numbers
 
 	set_process(true)
 
@@ -264,10 +261,8 @@ func set_tool(p_tool: String, p_prop: StringName) -> void:
 ## A hit of this player's that the server confirmed (or, offline, this world): the marker
 ## flashes and the number goes up on [param point]. [param victim] groups hits on one body.
 func confirm_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
-	if hit_marker == null:
-		return
-	hit_marker.flash(killed, headshot)
-	damage_numbers.add(victim, amount, point, headshot)
+	if hit_fx != null:
+		hit_fx.confirm_hit(victim, amount, point, killed, headshot)
 
 
 func notice(text: String) -> void:
