@@ -40,6 +40,71 @@ func _sync_hud() -> void:
 		hud.set_tool(_tool_name(), selected_prop)
 
 
+## The phone's buttons over the HUD, on a touch device only. Fire and alt are the click's two buttons; Q is the
+## spawn-menu key fed the same press and release, so hold-to-open and tap-to-pin are the keyboard's own; the
+## tool arrows step the weapon wheel's actions, TAB holds the scoreboard and CHAT opens the chat box.
+func _build_touch() -> void:
+	if not DotPlatform.has_touch() or hud == null:
+		return
+	_touch = PlaygroundTouch.new()
+	var built := _touch.build(hud, active_sampler, {
+		PlaygroundTouch.FIRE: func(down: bool) -> void:
+			if down:
+				call(&"_primary_down")
+			else:
+				_primary_up(),
+		PlaygroundTouch.ALT: func(down: bool) -> void:
+			if down:
+				call(&"_secondary_down")
+			else:
+				_secondary_up(),
+		PlaygroundTouch.MENU: func(down: bool) -> void:
+			var key := InputEventKey.new()
+			key.pressed = down
+			_on_menu_key(key),
+		PlaygroundTouch.PREV: func(down: bool) -> void: _touch_step(-1, down),
+		PlaygroundTouch.NEXT: func(down: bool) -> void: _touch_step(1, down),
+		PlaygroundTouch.BOARD: func(down: bool) -> void:
+			if game_menu != null:
+				if down:
+					game_menu.scoreboard.open()
+				else:
+					game_menu.scoreboard.close(),
+		PlaygroundTouch.CHAT: func(down: bool) -> void:
+			var window: DotChatWindow = presentation.chat_window if presentation != null else null
+			if down and window != null and not _menu_is_open():
+				window.open(),
+	})
+	if platform != null:
+		var _scale := PlaygroundTouch.touch_layout().apply(built, platform)
+
+
+## A tool step through the same wheel the keyboard's previous/next-weapon actions drive.
+func _touch_step(step: int, down: bool) -> void:
+	if not down or _menu_is_open():
+		return
+	var _ignored: Variant = call(&"_wheel_cycle", InputEventKey.new())
+	var ev := InputEventAction.new()
+	ev.action = _wheel.next_action if step > 0 else _wheel.previous_action
+	ev.pressed = true
+	_ignored = call(&"_wheel_cycle", ev)
+
+
+func _touch_ignores(position: Vector2) -> bool:
+	return _touch != null and _touch.buttons != null and _touch.buttons.contains_point(position)
+
+
+## A finger on the look or move half goes to the touch sampler; with a menu open it is the menu's.
+func _on_screen_touch(event: InputEvent) -> void:
+	if _menu_is_open():
+		return
+	var sampler := active_sampler()
+	if sampler is DotFpsTouchSampler:
+		(sampler as DotFpsTouchSampler).set_screen_width(get_viewport().get_visible_rect().size.x)
+	if sampler != null:
+		sampler.handle_event(event)
+
+
 ## The spawn-menu key (Q) is the one key that still means something while the menu is open.
 func _is_menu_key(event: InputEvent) -> bool:
 	return event is InputEventKey and (event.is_action(PlaygroundBindings.SPAWN_MENU) \

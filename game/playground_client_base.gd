@@ -188,6 +188,9 @@ var _menu_pinned: bool = false
 ## the command has to be stamped for a tick and kept for reconciliation.
 var _sampler: DotFpsSampler = null
 
+## The phone's on-screen buttons; null off a touch device.
+var _touch: PlaygroundTouch = null
+
 ## The tool triggers, as command buttons. Held rather than edge-triggered: the server decides what
 ## a press and a hold each mean (PlaygroundNetBridge._drive_tools), and a client sending only
 ## edges would drop one to packet loss and leave a player holding a crate they let go of.
