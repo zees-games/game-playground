@@ -9,6 +9,7 @@ func _physics_process(_delta: float) -> void:
 	_tick += 1
 	if loading != null:
 		loading.poll_loading()
+	_follow_npc_lod(waves.spawner if waves != null else null, _delta)
 	var _t_bridge_server_tick := DotFrameCost.now()
 	bridge.server_tick(_tick)
 	DotFrameCost.add(&"mod.bridge_server_tick", _t_bridge_server_tick)
@@ -298,3 +299,18 @@ func _resolve_shot(player_id: StringName, shot: DotShot) -> void:
 	shot.attacker = arena.entity_id_of(player_id)
 	shot.tick = game.current_tick()
 	var _resolved := arena.combat.resolve_shot(shot)
+
+
+## The NPC level of detail and sense workers follow the `npc_lod*` cvars (dot-game's DotGameNpcLod; all off by default). This module is a DotModule, so it holds the attachment itself.
+var _npc_lod: DotGameNpcLod = null
+
+
+func _follow_npc_lod(spawner: Object, delta: float) -> void:
+	if spawner == null or (server.console if server != null else null) == null:
+		return
+	if _npc_lod == null or _npc_lod.spawner != spawner:
+		if _npc_lod != null:
+			_npc_lod.release()
+		_npc_lod = DotGameNpcLod.attach(self, (server.console if server != null else null), spawner, server.config if server != null else null)
+	if _npc_lod != null:
+		_npc_lod.follow(delta)
