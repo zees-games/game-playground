@@ -59,7 +59,6 @@ There are two maps built in, beside the custom maps the map pack adds:
 | **WASD** / **Space** / **Ctrl** | Move / jump (hold to keep hopping) / crouch |
 | **F5** | First or third person |
 | **Tab** (hold) | Scoreboard: who is on, their score, time connected and ping |
-| **N** | Change movement style |
 | **Y** / **U** | Chat / chat with nearby players |
 | **M** | Next map |
 | **B** | Loadout: the weapon you spawn with in the arena (a server's mode) |

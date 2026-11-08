@@ -15,11 +15,16 @@ const LOCAL_ACTOR := &"__local"
 ## Profile keys written to an entry's `meta`, where the entity scripts read them with `tune`.
 const TUNED: PackedStringArray = ["health", "speed", "sight", "sight_angle", "hearing", "faction"]
 
+## A weapon pack's profiles joined [member weapons] (its provider was scanned): the Workbench lists the pack from then on.
+signal weapon_pack_added(pack: String)
+
 var roots := PackedStringArray()
 var npcs: DotProfileSet = null
 ## Every pack's weapon profiles as the one `weapon` kind; its runtime layer is what the packs rebuild from.
 var weapons: DotWeaponProfileGroup = null
 var runtime: DotProfileRuntime = null
+## The weapon packs whose provider was scanned, in order: what is loaded, for the Workbench's per-pack headings.
+var weapon_packs := PackedStringArray()
 
 var _snap: Dictionary = {}
 var _clones: PackedStringArray = PackedStringArray()
@@ -158,6 +163,9 @@ func _apply_npc(catalogue: DotPropCatalogue, id: String, p: DotProfile, entry: D
 ## no profile stays as it was. Returns the rows, not the same Array.
 func refine_weapon_entries(pack: String, entries: Array) -> Array:
 	var set := weapons.add_pack(pack)
+	if not weapon_packs.has(pack):
+		weapon_packs.append(pack)
+		weapon_pack_added.emit(pack)
 	if set.list_ids().is_empty():
 		return entries
 	var menu := {}

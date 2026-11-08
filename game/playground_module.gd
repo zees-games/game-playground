@@ -221,6 +221,8 @@ func _module_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
 	)
+	# The Workbench started with the netcode, before these addon cvars existed: list their sets now.
+	var _addon_sets := PlaygroundWorkbenchSets.add_cvar_sets(workbench, console, game.profiles.runtime)
 
 	_bind_limits()
 	_bind_slots()
