@@ -1,5 +1,7 @@
 extends "res://game/playground_module_handlers.gd"
 
+const PlaygroundWorkbenchSets := preload("playground_workbench_sets.gd")
+
 ## What a server browser is told about this sandbox: the GAME part of a DQP/A2S query.
 ##
 ## `pg_arena`, `pg_waves` and `pg_shop` each make a different server and default to off (an

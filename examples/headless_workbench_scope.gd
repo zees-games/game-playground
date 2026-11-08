@@ -9,6 +9,7 @@ extends DotGameCheckSuite
 
 const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundProfiles := preload("../game/playground_profiles.gd")
+const PlaygroundWorkbenchSets := preload("../game/playground_workbench_sets.gd")
 const ROOT := "user://pg_wbscope"
 const PACK := "pg_scope_pack"
 const EMPTY_PACK := "pg_scope_empty"

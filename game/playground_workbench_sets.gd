@@ -1,4 +1,3 @@
-class_name PlaygroundWorkbenchSets
 extends RefCounted
 
 ## What the playground's Workbench lists, and under which heading. One call for the three hosts: the offline client,
