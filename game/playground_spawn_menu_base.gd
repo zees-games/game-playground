@@ -447,7 +447,8 @@ func _sync_tab_icons() -> void:
 
 ## Eases one property to a value, replacing a move already under way on the same node.
 func _ease(node: Control, property: String, to: Variant, seconds: float, delay: float = 0.0) -> void:
-	var key := &"ease_" + StringName(property)
+	# A property path such as "modulate:a" is not a valid meta name, so ":" becomes "_".
+	var key := &"ease_" + StringName(property.replace(":", "_"))
 	if node.has_meta(key):
 		(node.get_meta(key) as Tween).kill()
 	var tween := node.create_tween()
