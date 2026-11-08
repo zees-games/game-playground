@@ -283,7 +283,7 @@ func _build_grid() -> Control:
 	_settings_card = PanelContainer.new()
 	_settings_card.name = "ToolSettingsCard"
 	_settings_card.visible = false
-	_settings_card.add_theme_stylebox_override("panel", Style.box(Style.SURFACE, 14.0, Style.LINE, 1, Vector2(16, 12)))
+	_settings_card.add_theme_stylebox_override("panel", Style.box(Style.SURFACE, Style.RADIUS, Style.LINE, 1, Vector2(16, 12)))
 	_settings_card.add_child(_settings_box)
 	holder.add_child(_settings_card)
 
@@ -355,13 +355,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 ## card (the prop the spawn key repeats, the tool mode in use) wears the accent fill.
 func _style_card(button: Button, armed: bool = false) -> void:
 	var pad := Vector2(8, 10)
-	var plate := Style.box(Style.ACCENT * Color(1, 1, 1, 0.16), 16.0, Style.ACCENT, 2, pad) if armed \
-		else Style.box(Style.SURFACE, 16.0, Style.LINE, 1, pad)
+	var plate := Style.box(Style.ACCENT * Color(1, 1, 1, 0.16), Style.CARD_RADIUS - 2.0, Style.ACCENT, 2, pad) if armed \
+		else Style.box(Style.SURFACE, Style.CARD_RADIUS - 2.0, Style.LINE, 1, pad)
 	button.add_theme_stylebox_override("normal", plate)
-	button.add_theme_stylebox_override("hover", Style.box(Style.SURFACE_HOVER, 16.0, Style.ACCENT * Color(1, 1, 1, 0.65), 1, pad))
-	button.add_theme_stylebox_override("pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.22), 16.0, Style.ACCENT, 2, pad))
-	button.add_theme_stylebox_override("hover_pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.28), 16.0, Style.ACCENT, 2, pad))
-	button.add_theme_stylebox_override("focus", Style.box(Color(0, 0, 0, 0), 16.0, Style.ACCENT, 2, pad))
+	button.add_theme_stylebox_override("hover", Style.box(Style.SURFACE_HOVER, Style.CARD_RADIUS - 2.0, Style.ACCENT * Color(1, 1, 1, 0.65), 1, pad))
+	button.add_theme_stylebox_override("pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.22), Style.CARD_RADIUS - 2.0, Style.ACCENT, 2, pad))
+	button.add_theme_stylebox_override("hover_pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.28), Style.CARD_RADIUS - 2.0, Style.ACCENT, 2, pad))
+	button.add_theme_stylebox_override("focus", Style.box(Color(0, 0, 0, 0), Style.CARD_RADIUS - 2.0, Style.ACCENT, 2, pad))
 	button.add_theme_constant_override("icon_max_width", 60)
 	button.add_theme_constant_override("h_separation", 0)
 	button.add_theme_constant_override("outline_size", 0)

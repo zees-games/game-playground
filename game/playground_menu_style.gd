@@ -4,12 +4,15 @@ extends RefCounted
 ## rounded boxes, a bold face and a key cap. A menu asks this instead of mixing its own
 ## colours, so a changed accent changes every widget. Nothing here touches a node tree.
 
-const ACCENT := Color(0.38, 0.62, 1.0)
-const PANEL := Color(0.055, 0.065, 0.095, 0.97)
-const TEXT := Color(0.93, 0.95, 0.98)
-const DIM := Color(0.60, 0.66, 0.76)
-const FAINT := Color(0.42, 0.47, 0.57)
-const DANGER := Color(1.0, 0.42, 0.45)
+## Colours and radii come from the Workbench menu's DotWorkbenchStyle so the two overlays read as one product.
+const ACCENT := DotWorkbenchStyle.ACCENT
+const PANEL := Color(DotWorkbenchStyle.BG, 0.97)
+const TEXT := DotWorkbenchStyle.TEXT
+const DIM := DotWorkbenchStyle.TEXT_DIM
+const FAINT := DotWorkbenchStyle.TEXT_FAINT
+const DANGER := DotWorkbenchStyle.DANGER
+const RADIUS := DotWorkbenchStyle.RADIUS
+const CARD_RADIUS := DotWorkbenchStyle.CARD_RADIUS
 const LINE := Color(1, 1, 1, 0.07)
 const SURFACE := Color(1, 1, 1, 0.045)
 const SURFACE_HOVER := Color(1, 1, 1, 0.095)
@@ -107,7 +110,7 @@ static func box(
 
 ## The panel itself: dark glass, a hairline, a long soft shadow.
 static func panel() -> StyleBoxFlat:
-	var made := box(PANEL, 22.0, Color(1, 1, 1, 0.09), 1, Vector2.ZERO)
+	var made := box(PANEL, CARD_RADIUS + 4.0, Color(1, 1, 1, 0.09), 1, Vector2.ZERO)
 	made.shadow_color = Color(0, 0, 0, 0.55)
 	made.shadow_size = 44
 	made.shadow_offset = Vector2(0, 14)
