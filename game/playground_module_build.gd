@@ -489,6 +489,10 @@ func _build_netcode() -> DotResult:
 	if not ready_result.ok:
 		return ready_result.wrap("The netcode could not start")
 
+	# net_skip_idle and net_visibility, the switches dot-game's own games get from DotGameNetcode (dot-game 52; by name, so an older host still parses this).
+	if DotAddonApi.build_level("dot_game") >= 52:
+		load("res://addons/dot_game/net/dot_game_relevance.gd").call(&"bind_toggles", console, net)
+
 	bridge = PlaygroundNetBridge.new()
 	bridge.name = "Bridge"
 	add_child(bridge)
