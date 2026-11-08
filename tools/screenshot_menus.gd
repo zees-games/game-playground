@@ -109,6 +109,7 @@ func _build() -> void:
 	# The real catalogues, because a picture of a hand-built list is a picture of a list.
 	var menu := PlaygroundSpawnMenu.new()
 	menu.name = "SpawnMenu"
+	menu.animated = false
 	menu.catalogue = PlaygroundSpawnables.with_models(PlaygroundSpawnables.catalogue(), "")
 	# The fixture profiles, so the Entities tab shows a regrouped, re-iconed, hidden entry.
 	var profiles := PlaygroundProfiles.new()
@@ -148,6 +149,15 @@ func _build() -> void:
 	_game_menu.scoreboard.source = _sample_board
 
 	_shots = _shot_list()
+	# SHOTS=a,b renders only the files whose name contains one of the words (a quick look at one tab).
+	var only := OS.get_environment("SHOTS")
+	if only != "":
+		var words := only.split(",")
+		_shots = _shots.filter(func(s: Dictionary) -> bool:
+			for w in words:
+				if str(s["file"]).contains(w):
+					return true
+			return false)
 
 
 ## The screens to render, in order.

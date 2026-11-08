@@ -6,6 +6,7 @@ const PlaygroundBindings := preload("playground_bindings.gd")
 const PlaygroundWeaponIcons := preload("playground_weapon_icons.gd")
 const PlaygroundIcons := preload("playground_icons.gd")
 const PlaygroundSpawnables := preload("playground_spawnables.gd")
+const Style := preload("playground_menu_style.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
 const PlaygroundWeapons := preload("playground_weapons.gd")
 const PlaygroundZee := preload("playground_zee.gd")
@@ -22,7 +23,7 @@ const SwepToolgun := preload("weapons/swep_toolgun.gd")
 const ALL := &"__all"
 
 ## Card size. Wide enough for "Large crate" on one line at the default font.
-const CARD := Vector2(146.0, 92.0)
+const CARD := Vector2(150.0, 112.0)
 
 ## The key that puts the caret in the search box. Not "any letter" and not focused on open: that
 ## sends W, A, S and D into the box while the player walks. A slash is the search-in-a-list
@@ -142,9 +143,17 @@ var _tabs: TabBar = null
 var _categories: VBoxContainer = null
 var _grid: GridContainer = null
 var _search_box: LineEdit = null
-var _footer: Label = null
+var _footer: HBoxContainer = null
 var _empty: Label = null
 var _first_card: Button = null
+var _subtitle: Label = null
+var _panel: PanelContainer = null
+var _settings_card: PanelContainer = null
+var _hand_buttons: Dictionary = {}
+
+## Whether the menu moves: it fades in, cards appear in a quick cascade and ease on hover. Off
+## for a still render and for suites, where nothing draws a frame to finish a tween.
+var animated: bool = true
 
 
 func _screen_id() -> StringName:
@@ -154,65 +163,77 @@ func _screen_id() -> StringName:
 func _build_sidebar() -> Control:
 	var side := VBoxContainer.new()
 	side.name = "Sidebar"
-	side.custom_minimum_size = Vector2(184.0, 0.0)
-	side.add_theme_constant_override("separation", 4)
+	side.custom_minimum_size = Vector2(212.0, 0.0)
+	side.add_theme_constant_override("separation", 6)
+
+	side.add_child(Style.section("Categories"))
+
+	var scroll := ScrollContainer.new()
+	scroll.name = "CategoryScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	side.add_child(scroll)
 
 	_categories = VBoxContainer.new()
 	_categories.name = "Categories"
-	_categories.add_theme_constant_override("separation", 4)
-	side.add_child(_categories)
+	_categories.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_categories.add_theme_constant_override("separation", 2)
+	scroll.add_child(_categories)
 
 	side.add_child(_build_npc_weapon_row())
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	side.add_child(spacer)
-
-	var heading := Label.new()
-	heading.text = "In hand"
-	side.add_child(heading)
+	side.add_child(Style.section("In hand"))
 
 	# Ids rather than indices, because the client matches on them and a reordering
 	# here would otherwise silently swap two tools.
-	side.add_child(_flat_button(
-		"Physics gun",
-		"Hold to carry, scroll for distance, right click to freeze",
-		func() -> void: tool_chosen.emit(&"phys")
+	var hand := HBoxContainer.new()
+	hand.add_theme_constant_override("separation", 6)
+	hand.add_child(_hand_button(
+		&"phys", "Physics", "magnet", "Physics gun\nHold to carry, scroll for distance, right click to freeze"
 	))
-	side.add_child(_flat_button(
-		"Gravity gun",
-		"Left click punts, right click pulls and carries",
-		func() -> void: tool_chosen.emit(&"grav")
+	hand.add_child(_hand_button(
+		&"grav", "Gravity", "orbit", "Gravity gun\nLeft click punts, right click pulls and carries"
 	))
+	side.add_child(hand)
 
-	side.add_child(HSeparator.new())
-
-	side.add_child(_flat_button(
-		"Undo last",
-		"Removes the last prop you spawned",
-		func() -> void: action_requested.emit(&"undo")
-	))
-	side.add_child(_flat_button(
-		"Unfreeze mine",
-		"Thaws every prop you have frozen",
-		func() -> void: action_requested.emit(&"unfreeze")
-	))
-	side.add_child(_flat_button(
-		"Remove mine",
-		"Removes every prop you own",
-		func() -> void: action_requested.emit(&"clear")
-	))
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 6)
+	actions.add_child(_action_button("undo", "Undo last\nRemoves the last prop you spawned", &"undo", false))
+	actions.add_child(_action_button("snow", "Unfreeze mine\nThaws every prop you have frozen", &"unfreeze", false))
+	actions.add_child(_action_button("trash", "Remove mine\nRemoves every prop you own", &"clear", true))
+	side.add_child(actions)
 
 	return side
 
 
-func _flat_button(text: String, tip: String, on_press: Callable) -> Button:
+## A tool the player can take in hand; lit while it is the one held.
+func _hand_button(id: StringName, text: String, glyph: String, tip: String) -> Button:
 	var button := Button.new()
 	button.text = text
+	button.icon = Style.icon(glyph, 16, Style.DIM)
 	button.tooltip_text = tip
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.pressed.connect(on_press)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(func() -> void: tool_chosen.emit(id))
+	_hand_buttons[id] = button
+	_style_ghost(button, false, false)
 	return button
+
+
+## A square icon button for an action; the destructive one reddens when hovered.
+func _action_button(glyph: String, tip: String, action: StringName, danger: bool) -> Button:
+	var button := Button.new()
+	button.icon = Style.icon(glyph, 18, Style.DANGER if danger else Style.DIM)
+	button.tooltip_text = tip
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(func() -> void: action_requested.emit(action))
+	_style_ghost(button, false, danger)
+	return button
+
+
+## Lights the held tool's button; called whenever the menu is redrawn.
+func _sync_hand() -> void:
+	for id: StringName in _hand_buttons:
+		_style_ghost(_hand_buttons[id] as Button, tool == id, false)
 
 
 func _build_grid() -> Control:
@@ -232,9 +253,14 @@ func _build_grid() -> Control:
 	_grid.name = "Grid"
 	_grid.columns = 5
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_grid.add_theme_constant_override("h_separation", 8)
-	_grid.add_theme_constant_override("v_separation", 8)
-	scroll.add_child(_grid)
+	_grid.add_theme_constant_override("h_separation", 10)
+	_grid.add_theme_constant_override("v_separation", 10)
+	var inset := MarginContainer.new()
+	inset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for side in ["left", "top", "right", "bottom"]:
+		inset.add_theme_constant_override("margin_%s" % side, 4)
+	scroll.add_child(inset)
+	inset.add_child(_grid)
 
 	# Said, rather than left as an empty rectangle. A search with no results and a tab
 	# with nothing on it look identical when both are blank, and the player's next
@@ -242,6 +268,9 @@ func _build_grid() -> Control:
 	_empty = Label.new()
 	_empty.name = "Empty"
 	_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_empty.add_theme_color_override("font_color", Style.DIM)
+	_empty.add_theme_font_size_override("font_size", 15)
+	_empty.custom_minimum_size = Vector2(0.0, 120.0)
 	_empty.visible = false
 	holder.add_child(_empty)
 
@@ -251,7 +280,12 @@ func _build_grid() -> Control:
 	_settings_box.name = "ToolSettings"
 	_settings_box.add_theme_constant_override("separation", 6)
 	_settings_box.visible = false
-	holder.add_child(_settings_box)
+	_settings_card = PanelContainer.new()
+	_settings_card.name = "ToolSettingsCard"
+	_settings_card.visible = false
+	_settings_card.add_theme_stylebox_override("panel", Style.box(Style.SURFACE, 14.0, Style.LINE, 1, Vector2(16, 12)))
+	_settings_card.add_child(_settings_box)
+	holder.add_child(_settings_card)
 
 	return holder
 
@@ -316,59 +350,128 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
-## A rounded box from the palette. A helper because five widgets want one and each wants a
-## different fill, border and padding; the StyleBoxFlat defaults are square and borderless.
-func _box(
-	fill: Color, radius: float, line: Color = Color.TRANSPARENT, line_width: int = 0,
-	pad_x: float = 8.0, pad_y: float = 6.0
-) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = fill
-	box.set_corner_radius_all(int(radius))
-	box.set_border_width_all(line_width)
-	box.border_color = line
-	box.content_margin_left = pad_x
-	box.content_margin_right = pad_x
-	box.content_margin_top = pad_y
-	box.content_margin_bottom = pad_y
-	return box
-
-
 ## A card: a lifted plate with the thumbnail on it, lighter when hovered, outlined in the
-## accent when focused (the arrow keys and a gamepad move focus, so it has to show).
-func _style_card(button: Button) -> void:
-	var plate := _palette.surface.lightened(0.03)
-	button.add_theme_stylebox_override("normal", _box(plate, 12.0, _palette.outline.darkened(0.35), 1, 6.0, 8.0))
-	button.add_theme_stylebox_override("hover", _box(_palette.surface_hover, 12.0, _palette.accent.darkened(0.2), 1, 6.0, 8.0))
-	button.add_theme_stylebox_override("pressed", _box(_palette.accent.darkened(0.55), 12.0, _palette.accent, 2, 6.0, 8.0))
-	button.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0), 12.0, _palette.accent, 2, 6.0, 8.0))
-	button.add_theme_constant_override("icon_max_width", 56)
+## accent when focused (the arrow keys and a gamepad move focus, so it has to show). An armed
+## card (the prop the spawn key repeats, the tool mode in use) wears the accent fill.
+func _style_card(button: Button, armed: bool = false) -> void:
+	var pad := Vector2(8, 10)
+	var plate := Style.box(Style.ACCENT * Color(1, 1, 1, 0.16), 16.0, Style.ACCENT, 2, pad) if armed \
+		else Style.box(Style.SURFACE, 16.0, Style.LINE, 1, pad)
+	button.add_theme_stylebox_override("normal", plate)
+	button.add_theme_stylebox_override("hover", Style.box(Style.SURFACE_HOVER, 16.0, Style.ACCENT * Color(1, 1, 1, 0.65), 1, pad))
+	button.add_theme_stylebox_override("pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.22), 16.0, Style.ACCENT, 2, pad))
+	button.add_theme_stylebox_override("hover_pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.28), 16.0, Style.ACCENT, 2, pad))
+	button.add_theme_stylebox_override("focus", Style.box(Color(0, 0, 0, 0), 16.0, Style.ACCENT, 2, pad))
+	button.add_theme_constant_override("icon_max_width", 60)
 	button.add_theme_constant_override("h_separation", 0)
+	button.add_theme_constant_override("outline_size", 0)
+	button.add_theme_font_override("font", Style.bold(0.25))
+	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_color_override("font_color", Style.TEXT)
+	for state in ["font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(state, Color.WHITE)
+
+
+## A quiet button for the sidebar: a faint plate, lit with the accent while [param on].
+func _style_ghost(button: Button, on: bool, danger: bool) -> void:
+	var pad := Vector2(10, 8)
+	var tint := Style.DANGER if danger else Style.ACCENT
+	var plate := Style.box(Style.ACCENT * Color(1, 1, 1, 0.20), 10.0, Style.ACCENT, 1, pad) if on \
+		else Style.box(Style.SURFACE, 10.0, Style.LINE, 1, pad)
+	button.add_theme_stylebox_override("normal", plate)
+	button.add_theme_stylebox_override("hover", Style.box(tint * Color(1, 1, 1, 0.22), 10.0, tint * Color(1, 1, 1, 0.6), 1, pad))
+	button.add_theme_stylebox_override("pressed", Style.box(tint * Color(1, 1, 1, 0.34), 10.0, tint, 1, pad))
+	button.add_theme_stylebox_override("focus", Style.box(Color(0, 0, 0, 0), 10.0, tint, 2, pad))
+	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_color_override("font_color", Style.TEXT if on else Style.DIM)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_constant_override("h_separation", 7)
+
+
+## A category row: a faint rail, the accent as a fill and a bar on the left while chosen.
+func _style_pill(button: Button, on: bool = false) -> void:
+	var pad := Vector2(12, 7)
+	var fill := Style.box(Style.ACCENT * Color(1, 1, 1, 0.17) if on else Color(1, 1, 1, 0.0), 10.0, Color.TRANSPARENT, 0, pad)
+	if on:
+		fill.border_color = Style.ACCENT
+		fill.border_width_left = 3
+	button.add_theme_stylebox_override("normal", fill)
+	button.add_theme_stylebox_override("pressed", fill)
+	button.add_theme_stylebox_override("hover", Style.box(Style.ACCENT * Color(1, 1, 1, 0.24) if on else Color(1, 1, 1, 0.06), 10.0, Color.TRANSPARENT, 0, pad))
+	button.add_theme_stylebox_override("hover_pressed", Style.box(Style.ACCENT * Color(1, 1, 1, 0.26), 10.0, Color.TRANSPARENT, 0, pad))
+	button.add_theme_stylebox_override("focus", Style.box(Color(0, 0, 0, 0), 10.0, Style.ACCENT, 2, pad))
 	button.add_theme_font_size_override("font_size", 14)
-	for state in ["font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+	button.add_theme_color_override("font_color", Style.TEXT if on else Style.DIM)
+	for state in ["font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
 		button.add_theme_color_override(state, Color.WHITE)
 
 
-## A category chip: a pill, filled with the accent while it is the chosen one.
-func _style_pill(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", _box(Color(1, 1, 1, 0.04), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
-	button.add_theme_stylebox_override("hover", _box(Color(1, 1, 1, 0.09), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
-	button.add_theme_stylebox_override("pressed", _box(_palette.accent.darkened(0.3), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
-	button.add_theme_stylebox_override("hover_pressed", _box(_palette.accent.darkened(0.2), 16.0, Color.TRANSPARENT, 0, 12.0, 5.0))
-	button.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0), 16.0, _palette.accent, 2, 12.0, 5.0))
-	for state in ["font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
-		button.add_theme_color_override(state, Color.WHITE)
-
-
+## Tabs as an underlined strip: text and icon, the accent under the open one.
 func _style_tabs(bar: TabBar) -> void:
-	bar.add_theme_stylebox_override("tab_selected", _box(_palette.accent.darkened(0.25), 16.0, Color.TRANSPARENT, 0, 16.0, 6.0))
-	bar.add_theme_stylebox_override("tab_hovered", _box(Color(1, 1, 1, 0.08), 16.0, Color.TRANSPARENT, 0, 16.0, 6.0))
-	bar.add_theme_stylebox_override("tab_unselected", _box(Color(1, 1, 1, 0.03), 16.0, Color.TRANSPARENT, 0, 16.0, 6.0))
-	bar.add_theme_stylebox_override("tab_focus", _box(Color(0, 0, 0, 0), 16.0, _palette.accent, 2, 16.0, 6.0))
+	var pad := Vector2(14, 9)
+	var open := Style.box(Color(0, 0, 0, 0), 0.0, Style.ACCENT, 0, pad)
+	open.border_width_bottom = 2
+	bar.add_theme_stylebox_override("tab_selected", open)
+	bar.add_theme_stylebox_override("tab_hovered", Style.box(Color(1, 1, 1, 0.05), 8.0, Color.TRANSPARENT, 0, pad))
+	bar.add_theme_stylebox_override("tab_unselected", Style.box(Color(0, 0, 0, 0), 0.0, Color.TRANSPARENT, 0, pad))
+	bar.add_theme_stylebox_override("tab_focus", Style.box(Color(0, 0, 0, 0), 8.0, Style.ACCENT, 2, pad))
 	bar.add_theme_color_override("font_selected_color", Color.WHITE)
-	bar.add_theme_color_override("font_unselected_color", _palette.text_dim)
-	bar.add_theme_color_override("font_hovered_color", _palette.text)
-	bar.add_theme_constant_override("h_separation", 6)
+	bar.add_theme_color_override("font_unselected_color", Style.DIM)
+	bar.add_theme_color_override("font_hovered_color", Style.TEXT)
+	bar.add_theme_font_size_override("font_size", 14)
+	bar.add_theme_constant_override("h_separation", 8)
+	bar.add_theme_constant_override("icon_max_width", 16)
+
+
+## The glyph a tab wears: its own for the built-in ones, a parcel for a pack's.
+func _tab_glyph(index: int) -> String:
+	match index:
+		Tab.PROPS: return "cube"
+		Tab.ENTITIES: return "bolt"
+		Tab.NPCS: return "user"
+		Tab.WEAPONS: return "target"
+		Tab.TOOLS: return "wrench"
+		Tab.BUILDS: return "layers"
+		Tab.ADDONS: return "grid"
+	return "package"
+
+
+## Redraws every tab's icon, the open one in the accent. Hidden tabs keep theirs.
+func _sync_tab_icons() -> void:
+	if _tabs == null:
+		return
+	for i in _tabs.tab_count:
+		var on := i == _tabs.current_tab
+		_tabs.set_tab_icon(i, Style.icon(_tab_glyph(i), 16, Style.ACCENT.lightened(0.2) if on else Style.DIM))
+
+
+## Eases one property to a value, replacing a move already under way on the same node.
+func _ease(node: Control, property: String, to: Variant, seconds: float, delay: float = 0.0) -> void:
+	var key := &"ease_" + StringName(property)
+	if node.has_meta(key):
+		(node.get_meta(key) as Tween).kill()
+	var tween := node.create_tween()
+	node.set_meta(key, tween)
+	tween.tween_property(node, property, to, seconds).set_delay(delay).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+
+
+## A card swells a little under the pointer or the focus ring.
+func _wire_hover(card: Control) -> void:
+	if not animated:
+		return
+	card.resized.connect(func() -> void: card.pivot_offset = card.size * 0.5)
+	for enter in [card.mouse_entered, card.focus_entered]:
+		enter.connect(func() -> void: _ease(card, "scale", Vector2(1.035, 1.035), 0.14))
+	for leave in [card.mouse_exited, card.focus_exited]:
+		leave.connect(func() -> void: _ease(card, "scale", Vector2.ONE, 0.18))
+
+
+## Fades a freshly built card in, a few milliseconds after the one before it.
+func _reveal(card: Control, index: int) -> void:
+	if not animated or not card.is_inside_tree():
+		return
+	card.modulate.a = 0.0
+	_ease(card, "modulate:a", 1.0, 0.18, minf(index, 24) * 0.014)
 
 
 func _sync_pack_tabs() -> void:
@@ -384,6 +487,7 @@ func _sync_pack_tabs() -> void:
 		_tabs.remove_tab(_tabs.tab_count - 1)
 	for title in titles:
 		_tabs.add_tab(title)
+	_sync_tab_icons()
 
 
 ## Shows the NPCs and Pack Weapons tabs only while a spawn provider has entries of that kind, and
@@ -497,7 +601,9 @@ func _card(icon: Texture2D, text: String, tip: String) -> Button:
 	button.custom_minimum_size = CARD
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
+	button.focus_mode = Control.FOCUS_ALL
 	_style_card(button)
+	_wire_hover(button)
 	return button
 
 
@@ -506,7 +612,7 @@ func _build_card(entry: Dictionary) -> Button:
 	var build_name := str(entry.get("name", ""))
 	var custom := bool(entry.get("custom", false))
 	var card := _card(
-		null,
+		Style.icon("cube" if custom else "layers", 44, Style.ACCENT.lightened(0.15)),
 		build_name,
 		"%s\n%s · %d props\nClick to put it down in front of you." % [
 			build_name, "Custom prop, welded as one" if custom else "Saved build", int(entry.get("props", 0)),
