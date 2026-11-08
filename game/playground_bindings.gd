@@ -27,7 +27,6 @@ const DROP_WEAPON := &"pg_drop_weapon"
 const PHYS_GUN := &"pg_phys_gun"
 const GRAV_GUN := &"pg_grav_gun"
 const WEAPONS := &"pg_weapons"
-const STYLE := &"pg_style"
 ## Down a zee gun's sights while held (right mouse, the family's Aim row). With a tool or a toy
 ## in hand the right button is still its secondary (freeze, pull, a mode's second button).
 const AIM := &"pg_aim"
@@ -74,7 +73,6 @@ static func make() -> DotMenuBindings:
 	keys.add(BASH, &"bind_bash", "A gun's quick melee", "Mouse 3", "Tools")
 
 	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "T", "Tools")
-	keys.add(STYLE, &"bind_style", "Next movement style", "N", "Running")
 
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(PROFILES, &"bind_profiles", "Profile workbench (admins): edit NPCs and weapons live", "F6", "General")
