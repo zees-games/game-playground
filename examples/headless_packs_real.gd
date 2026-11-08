@@ -23,7 +23,7 @@ const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
 const MONSTERS: Array[String] = ["trex", "allosaurus", "raptor", "tiger", "thylacine", "bear"]
-const CHECKS := 66
+const CHECKS := 67
 const SECTIONS := 9
 
 var _entered := 0
