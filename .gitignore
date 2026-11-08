@@ -93,5 +93,15 @@ Thumbs.db
 /addons/zz_medieval_weapons
 # bootstrap-optional
 /addons/zz_historical_monsters
+# Each weapon pack's shipped profiles (cfg/addons/<pack>/weapon/*.yml): without them the Workbench's
+# weapon headings are empty and the packs fire at their scene defaults. The zz ones are skipped under --min.
+# bootstrap-link: zee-dot-weapons/cfg/addons/zee_weapons
+/cfg/addons/zee_weapons
+# bootstrap-link: arena-weapons/cfg/addons/arena_weapons
+/cfg/addons/arena_weapons
+# bootstrap-link: zz-modern-weapons/cfg/addons/zz_modern_weapons
+/cfg/addons/zz_modern_weapons
+# bootstrap-link: zz-medieval-weapons/cfg/addons/zz_medieval_weapons
+/cfg/addons/zz_medieval_weapons
 /cfg/addons
 /addons/dot_flashlight

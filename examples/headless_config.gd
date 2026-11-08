@@ -85,11 +85,11 @@ func _run() -> void:
 	for k in keys:
 		if not listed.has(k):
 			missing.append(k)
-	_check(missing.is_empty() and binder.profile_sets().size() == 3, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
-	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_arena", "id": binder.profile_id, "key": "wave_kill_reward", "value": 90})
+	_check(missing.is_empty() and binder.profile_sets().size() == 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
+	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_world", "id": binder.profile_id, "key": "wave_kill_reward", "value": 90})
 	_check(res.ok and config.wave_kill_reward == 90, "a workbench edit reaches the live config")
 	var files: Dictionary = wb.exporter.call("collect")
-	var text: String = files.get("cfg/game/game-playground/config_arena/game.yml", "")
+	var text: String = files.get("cfg/game/game-playground/config_world/game.yml", "")
 	_check(text.contains("wave_kill_reward: 90"), "the export holds the edit in the cfg layout")
 
 	var ambient := PlaygroundAmbience.cvar_types()
@@ -150,14 +150,14 @@ func _layers() -> void:
 	OS.unset_environment("PLAYGROUND_PROP_BUDGET")
 	_write("game/%s/config_arena/game.yml" % GAME, "map_seconds: 99.0\n")
 	_check(_child().contains("PROBE ok=false"), "strict: a key in the wrong file is refused")
-	for f in ["config_server", "config_props", "config_arena"]:
+	for f in ["config_server", "config_props", "config_arena", "config_world"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(ROOT.path_join("game/%s/%s/game.yml" % [GAME, f])))
 
 
 ## The shipped cfg files hold every key, in step with PlaygroundConfig, and change nothing as they are.
 func _templates(binder: DotGameConfigBinder) -> void:
 	var files := binder.template_files()
-	_check(files.size() == 3, "three shipped cfg files", str(files.size()))
+	_check(files.size() == 4, "four shipped cfg files", str(files.size()))
 	var stale := PackedStringArray()
 	for path: String in files:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:

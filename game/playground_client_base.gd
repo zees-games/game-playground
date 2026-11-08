@@ -513,15 +513,7 @@ func _add_noblock_and_workbench() -> void:
 	var wb := DotGameWorkbench.new()
 	wb.name = "Workbench"
 	wb.listen_host_fn = func() -> bool: return true
-	wb.add_set(playground.profiles.npcs, "NPCs")
-	wb.add_set(playground.profiles.weapons, "Weapons")
-	if playground.config_binder != null:
-		for set: DotProfileSet in playground.config_binder.profile_sets():
-			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
-	var _fl := playground.flashlight_conf()
-	if playground.flashlight_binder != null:
-		for set: DotProfileSet in playground.flashlight_binder.profile_sets():
-			wb.add_set(set, "Flashlight")
+	PlaygroundWorkbenchSets.add_sets(wb, playground, func() -> bool: return arena_on)
 	add_child(wb)
 	var started := wb.start(playground.profiles.runtime)
 	DotLog.result(CHANNEL, "the workbench", started)
@@ -541,15 +533,7 @@ func _start_remote_workbench() -> void:
 	wb.remote_client = workbench_remote
 	wb.remote_fn = func() -> bool: return true
 	wb.config = {"enabled": false}
-	wb.add_set(playground.profiles.npcs, "NPCs")
-	wb.add_set(playground.profiles.weapons, "Weapons")
-	if playground.config_binder != null:
-		for set: DotProfileSet in playground.config_binder.profile_sets():
-			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
-	var _fl := playground.flashlight_conf()
-	if playground.flashlight_binder != null:
-		for set: DotProfileSet in playground.flashlight_binder.profile_sets():
-			wb.add_set(set, "Flashlight")
+	PlaygroundWorkbenchSets.add_sets(wb, playground, func() -> bool: return arena_on)
 	add_child(wb)
 	var started := wb.start(playground.profiles.runtime)
 	DotLog.result(CHANNEL, "the remote workbench", started)
