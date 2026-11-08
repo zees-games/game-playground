@@ -127,6 +127,8 @@ func _ready() -> void:
 		# server's HIT event does (`_build_netcode`), and this world decides nothing.
 		playground.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
 			if id == player_id:
+				if killed:
+					note_offline(&"kills")
 				_on_hit(victim, amount, point, killed, headshot))
 	_sync_hud()
 

@@ -292,6 +292,9 @@ func _test_profile_workbench_2() -> void:
 
 	var client := PlaygroundClient.new()
 	_check(client._may_edit_profiles(), "offline the player is the server and may edit")
+	client.note_offline(&"props", 2)
+	client.note_offline(&"kills")
+	_check(int(client.offline_stats[&"props"]) == 2 and int(client.offline_stats[&"kills"]) == 1, "offline tallies feed the Tab board's stat columns")
 	var bridge := PlaygroundNetBridge.new()
 	client.bridge = bridge
 	_check(not client._may_edit_profiles(), "connected, nobody may edit until the server says so")

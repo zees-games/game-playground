@@ -22,6 +22,10 @@ func _wire_presentation() -> void:
 	playground.prop_shattered.connect(presentation.break_fx.shatter)
 
 	playground.undone.connect(_on_undone)
+	if bridge == null:
+		playground.undone.connect(func(who: StringName, _at: Vector3) -> void:
+			if who == player_id:
+				note_offline(&"undos"))
 
 	if playground.projectiles != null:
 		var layer := playground.projectiles
@@ -43,6 +47,8 @@ func _wire_presentation() -> void:
 		var body := prop.node as Node3D if prop != null else null
 		if body != null:
 			presentation.on_prop_spawned(body.global_position, prop.owner_id == player_id)
+		if prop != null and prop.owner_id == player_id:
+			note_offline(&"props")
 	)
 	playground.props.refused.connect(
 		func(id: StringName, _prop: StringName, _reason: String) -> void:

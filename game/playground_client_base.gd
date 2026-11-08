@@ -613,6 +613,10 @@ func _prepare_board(made: Object) -> void:
 		{"key": &"seconds", "title": "Time", "kind": DotMenuScoreboard.KIND_DURATION},
 		{"key": &"ping", "title": "Ping", "kind": DotMenuScoreboard.KIND_PING},
 	]
+	# Online the server's roster carries its own stat columns; offline the local tally does.
+	if bridge == null:
+		for stat: StringName in OFFLINE_STATS:
+			board.columns.append({"key": stat, "title": String(stat).capitalize(), "kind": DotMenuScoreboard.KIND_NUMBER})
 
 
 ## The board offline. Public so a suite can read it.
@@ -623,8 +627,23 @@ func board_snapshot() -> Dictionary:
 			var who: Object = playground.players[id]
 			rows.append({"id": str(id), "name": str(who.get("display_name")) if who.get("display_name") != null else str(id),
 				"seconds": int((Time.get_ticks_msec() - _started_msec) / 1000) if who == player else -1,
-				"ping": -1, "you": who == player})
+				"ping": -1, "you": who == player,
+				"props": int(offline_stats.get(&"props", 0)) if who == player else 0,
+				"undos": int(offline_stats.get(&"undos", 0)) if who == player else 0,
+				"kills": int(offline_stats.get(&"kills", 0)) if who == player else 0})
 	return {"server": {"name": "Playground", "game": "offline"}, "players": rows}
+
+
+## The stats an offline Tab board shows: this client's own count, since no server tracker runs.
+const OFFLINE_STATS: Array[StringName] = [&"props", &"undos", &"kills"]
+
+## Your own offline tallies, keyed by [constant OFFLINE_STATS]. Fed by the world's signals.
+var offline_stats: Dictionary = {}
+
+
+## Adds [param n] to one of your offline tallies.
+func note_offline(stat: StringName, n: int = 1) -> void:
+	offline_stats[stat] = int(offline_stats.get(stat, 0)) + n
 
 
 ## When this client started, for an offline board's "time".
