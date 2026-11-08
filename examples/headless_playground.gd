@@ -1,12 +1,12 @@
 extends "res://examples/headless_playground_part9.gd"
 
-const CHECKS := 782 + 22 + 9 + 10 + 8 + 1 + 4 + 15 + 2 + 1 + 26 + 3 + 2 + 2 + 1 + 8 + 1 + 5
+const CHECKS := 782 + 22 + 9 + 10 + 8 + 1 + 4 + 15 + 2 + 1 + 26 + 3 + 2 + 2 + 1 + 8 + 1 + 5 + 10
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 44
+const SECTIONS := 45
 
 ## What `_test_the_run_timer` and `_test_leaderboards` add when dot-timer is linked.
 const TIMER_SECTIONS := 2
@@ -103,6 +103,7 @@ func _run() -> void:
 	await _test_the_client_boots()
 	await _test_the_wheel_cycles_tools()
 	await _test_noclip_is_a_permission()
+	await _test_the_flashlight()
 	_test_view_cycle()
 
 	var sections := SECTIONS + (TIMER_SECTIONS if _timer_linked() else 0)

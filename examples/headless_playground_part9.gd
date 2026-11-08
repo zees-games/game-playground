@@ -746,3 +746,43 @@ func _test_zee_aim() -> void:
 	PlaygroundZee.disarm(bot)
 	bot.teleport(start, 90.0)
 	_done()
+
+
+func _test_the_flashlight() -> void:
+	_section("the flashlight: the map sets it, a player switches it, the downed and a config may not")
+
+	var cfg := playground.flashlight_conf()
+	var keys := PlaygroundBindings.make()
+	_check(cfg.key == "T" and playground.flashlight_binder != null, "the key is T and the config has a binder", cfg.key)
+	_check(str(keys.row_for_action(PlaygroundBindings.FLASHLIGHT).get("default", "")) == "T" and keys.defaults_on("T").size() == 1,
+		"the key is a bindings row, and nothing else defaults to T")
+	_check(not PlaygroundFlashlight.starts_on(cfg, "pg_flatgrass"), "the daylit sandbox starts dark")
+	_check(PlaygroundFlashlight.starts_on(cfg, "kz_sample"), "and a rock map starts lit")
+
+	var a := playground.add_player(&"fl_a", "Fl")
+	await get_tree().physics_frame
+	var was_state := cfg.default_state
+	cfg.default_state = DotFlashlightConfig.START_ON
+	a.flashlight_ready = false
+	for _i in range(4):
+		await get_tree().physics_frame
+	_check(a.flashlight, "a config that starts lit lights the player")
+	cfg.default_state = DotFlashlightConfig.START_OFF
+	a.flashlight_ready = false
+	for _i in range(4):
+		await get_tree().physics_frame
+	_check(not a.flashlight, "and one that starts dark does not")
+
+	_check(playground.toggle_flashlight(a.player_id) and a.flashlight, "the switch turns a light on")
+	_check(playground.toggle_flashlight(a.player_id) and not a.flashlight, "and the next press turns it off")
+
+	a.downed = true
+	_check(not playground.toggle_flashlight(a.player_id) and not a.flashlight, "somebody downed has no switch")
+	a.downed = false
+
+	cfg.enabled = false
+	_check(not playground.toggle_flashlight(a.player_id) and not a.flashlight, "a disabled config has no light")
+	cfg.enabled = true
+	cfg.default_state = was_state
+	playground.remove_player(&"fl_a")
+	_done()

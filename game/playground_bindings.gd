@@ -40,6 +40,8 @@ const MAP := &"dot_menu_maps"
 const VOICE_GAG := &"voice_gag"
 const VOICE_MUTE := &"voice_mute"
 const VIEW := &"pg_view"
+## The flashlight, on and off, for everybody who is up. F is use.
+const FLASHLIGHT := &"pg_flashlight"
 ## The admin workbench (live NPC and weapon profile edits); only an admin is let in.
 const PROFILES := &"pg_profiles"
 ## Staff: shows the map's spawn points and links, and the second key opens the one you look at.
@@ -71,6 +73,7 @@ static func make() -> DotMenuBindings:
 	keys.add(AIM, &"bind_aim", "Aim down a gun's sights (hold)", "Mouse 2", "Tools")
 	keys.add(BASH, &"bind_bash", "A gun's quick melee", "Mouse 3", "Tools")
 
+	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "T", "Tools")
 	keys.add(STYLE, &"bind_style", "Next movement style", "N", "Running")
 
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")

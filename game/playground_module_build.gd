@@ -570,6 +570,10 @@ func _start_workbench(rt: DotProfileRuntime) -> void:
 	workbench.add_set(game.profiles.weapons, "Weapons")
 	for set: DotProfileSet in game.config_binder.profile_sets():
 		workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var _fl := game.flashlight_conf()
+	if game.flashlight_binder != null:
+		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+			workbench.add_set(set, "Flashlight")
 	var ambient_set := DotGameWorkbench.cvar_set(console, PlaygroundAmbience.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (pg_ambient*)")
@@ -579,6 +583,8 @@ func _start_workbench(rt: DotProfileRuntime) -> void:
 		DotLog.result(CHANNEL, "the workbench", started)
 		return
 	game.config_binder.attach(rt)
+	if game.flashlight_binder != null:
+		game.flashlight_binder.attach(rt)
 	if ambient_set != null:
 		var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, rt, console)
 
@@ -624,6 +630,11 @@ func _bind_config() -> void:
 	game.config_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(name: String) -> bool:
 		return hand.has(name) or console.has_name(name))
 	game.config_binder.bind_commands(add_command)
+	var _fl := game.flashlight_conf()
+	if game.flashlight_binder != null:
+		var _flash_cvars := game.flashlight_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE,
+			func(name: String) -> bool: return console.has_name(name))
+		game.flashlight_binder.bind_commands(add_command)
 
 
 ## Config field -> the hand-written cvar that carries it. The binder skips these (its own `pg_<field>` name is

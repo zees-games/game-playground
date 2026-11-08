@@ -1,12 +1,12 @@
 extends "res://examples/headless_net_part7.gd"
 
-const CHECKS := 430
+const CHECKS := 434
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total above is the other half — see docs/testing.md.
-const SECTIONS := 51
+const SECTIONS := 52
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
@@ -79,6 +79,7 @@ func _run() -> void:
 		await _test_the_aim_bit_crosses()
 		# Lays the player down and stands them up again; adds no body.
 		await _test_downed_over_the_wire()
+		await _test_the_flashlight_crosses()
 		# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
 		# the leave, because a ball it kicks would be in the way of whatever came after.
 		await _test_map_toys_over_the_wire()

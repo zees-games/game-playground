@@ -161,6 +161,10 @@ var creative: bool = false
 ## client draws them crawling on the floor rather than standing for the ninety seconds.
 var downed: bool = false
 
+## The flashlight is on (server-owned, replicated); `flashlight_ready` is cleared on a new map so the next tick sets its start state.
+var flashlight: bool = false
+var flashlight_ready: bool = false
+
 ## The marker [member beacon] draws, while it does. Client side; built and freed by
 ## [method present_beacon], and never built on a server, which calls nothing that draws.
 var beacon_marker: DotFxBeacon = null
