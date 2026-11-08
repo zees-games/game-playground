@@ -601,7 +601,7 @@ func shoot_toy(collider: Variant, hit: Dictionary) -> bool:
 	if toys == null or not authoritative or not (collider is Object):
 		return false
 	return toys.shot(collider as Object, hit["point"], hit["direction"], float(hit["damage"])) >= 0 \
-		or DotPropToyBox.toy_of(collider) != null
+		or DotPropBodyBox.toy_of(collider) != null
 
 
 ## A player thrown by a toy: its count goes up, which every client hears. Server side.

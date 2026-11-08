@@ -276,14 +276,14 @@ var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 ## Zee guns lying in the world (`sv_weapon_drop*`); built in `_ready`, on both ends.
 var weapon_layer: Node = null
 
-## The current map's toys (dot-props' [DotPropToyBox]): built from `map_toys()` on both ends, simulated where [member authoritative] and
+## The current map's toys (dot-props' [DotPropBodyBox]): built from `map_toys()` on both ends, simulated where [member authoritative] and
 ## posed from snapshots on a client. A child of this node, not of the map, whose tree is classified onto `world` and would take every
 ## toy with it. Null before a map.
-var toys: DotPropToyBox = null
+var toys: DotPropBodyBox = null
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
-var toy_rules: DotPropToyRules = DotPropToyRules.new()
+var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
 
 ## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults, handed to every Zee rig.
 ## Bound by the module and followed by a client. No command carries the aim bit yet.

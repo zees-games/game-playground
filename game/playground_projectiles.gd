@@ -519,7 +519,7 @@ func colliders_in(at: Vector3, radius: float) -> Array:
 		var collider: Variant = result.get("collider")
 
 		if collider is Node3D and not (collider is StaticBody3D) and not out.has(collider) \
-				and DotPropToyBox.toy_of(collider) == null:
+				and DotPropBodyBox.toy_of(collider) == null:
 			out.append(collider)
 
 	return out

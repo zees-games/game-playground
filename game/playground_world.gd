@@ -562,7 +562,7 @@ func _build_toys(loaded: Node) -> void:
 	var placements: Array = loaded.call("map_toys") if loaded != null and loaded.has_method("map_toys") else []
 	var layout: DotPhysicsLayout = player_stack.physics.layout if player_stack != null and player_stack.physics != null else null
 
-	toys = DotPropToyBox.new()
+	toys = DotPropBodyBox.new()
 	toys.name = "Toys"
 	toys.authoritative = authoritative
 	toys.rules = toy_rules

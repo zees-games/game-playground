@@ -140,7 +140,7 @@ func _draw_props(entries: Array) -> void:
 func _draw_toys(placements: Array) -> void:
 	if placements.is_empty():
 		return
-	var box := DotPropToyBox.new()
+	var box := DotPropBodyBox.new()
 	box.name = "Toys"
 	box.authoritative = false
 	root.add_child(box)
@@ -148,7 +148,7 @@ func _draw_toys(placements: Array) -> void:
 	_toy_placements = placements
 
 
-var _toy_box: DotPropToyBox = null
+var _toy_box: DotPropBodyBox = null
 var _action_args: Array = []
 var _action_id := ""
 var _action_figure: DotHumanoidFigure = null

@@ -1,11 +1,11 @@
 extends DotNetBehaviour
 
-## One of the map's toys on the wire (dot-props' [DotPropToy]): where its moving part is and
+## One of the map's toys on the wire (dot-props' [DotPropBody]): where its moving part is and
 ## how it is turned, whether it is on, and how often it has been used.
 ##
 ## [b]The server's physics, never predicted[/b], for [PlaygroundPropNet]'s reason: Godot's
 ## rigid-body solver is not the same on two machines. The client's toy is frozen and posed from
-## these ([method DotPropToy.show_state]), so a see-saw a person stands on there is the plank the
+## these ([method DotPropBody.show_state]), so a see-saw a person stands on there is the plank the
 ## server tipped, an interpolation behind, and a roundabout's spin is measured from the poses.
 ##
 ## [b]Paired by index[/b]: both ends build the same toys in the same order from the map, so the
@@ -16,7 +16,7 @@ extends DotNetBehaviour
 ## a lost packet cost nothing but a late sound. Eight bits; it wraps. game-hide-n-seek's
 ## HsToyNet is the same file.
 
-var toy: DotPropToy = null
+var toy: DotPropBody = null
 
 var net_position: Vector3 = Vector3.ZERO
 var net_rotation: Quaternion = Quaternion.IDENTITY

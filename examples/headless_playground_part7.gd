@@ -98,10 +98,10 @@ func _toy_index(id: String) -> int:
 ## dot-props' toys on the sandbox, through the game's own paths: a walk pushes a ball, a shot sends
 ## one off, the use key kicks, a trampoline throws a player, a roundabout carries one, a blast throws a
 ## barrel, sv_toys 0 takes them away and a map change takes them with it.
-var _t_box: DotPropToyBox
+var _t_box: DotPropBodyBox
 var _t_player: PlaygroundPlayer
-var _t_ball: DotPropToy
-var _t_tramp: DotPropToy
+var _t_ball: DotPropBody
+var _t_tramp: DotPropBody
 
 func _test_toys() -> void:
 	_section("the sandbox's toys")
@@ -211,10 +211,10 @@ func _test_toys_2() -> void:
 		"%d thrown, %.2f m" % [thrown, barrel.body.global_position.distance_to(r0)])
 
 	# sv_toys 0: nothing to hit, kick or stand on; 1 brings them back.
-	var _off := playground.toy_rules.set_cvar(DotPropToyRules.CVAR_ENABLED, "0")
+	var _off := playground.toy_rules.set_cvar(DotPropBodyRules.CVAR_ENABLED, "0")
 	await get_tree().physics_frame
 	var hidden := not _t_ball.visible and playground.toy_aimed(_t_player) == -1
-	var _on := playground.toy_rules.set_cvar(DotPropToyRules.CVAR_ENABLED, "1")
+	var _on := playground.toy_rules.set_cvar(DotPropBodyRules.CVAR_ENABLED, "1")
 	_check(hidden and _t_ball.visible, "sv_toys 0 takes the toys away and 1 puts them back")
 
 	playground.remove_player(&"toyer")
@@ -282,7 +282,7 @@ func _test_every_maps_toys_stand_clear() -> void:
 
 
 ## [param toy]'s footprint in world space, flattened to the floor, or empty for a loose one.
-static func _flat(toy: DotPropToy) -> AABB:
+static func _flat(toy: DotPropBody) -> AABB:
 	var f := toy.footprint()
 	if f.size == Vector3.ZERO:
 		return AABB()
@@ -293,7 +293,7 @@ static func _flat(toy: DotPropToy) -> AABB:
 
 
 ## What [param toy]'s own shapes, lifted five centimetres off their floor, are inside of, or "".
-func _toy_inside(space: PhysicsDirectSpaceState3D, toy: DotPropToy, own: Array[RID], mask: int) -> String:
+func _toy_inside(space: PhysicsDirectSpaceState3D, toy: DotPropBody, own: Array[RID], mask: int) -> String:
 	for part: CollisionObject3D in [toy.fixed, toy.body]:
 		if part == null:
 			continue

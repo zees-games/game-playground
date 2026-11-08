@@ -378,7 +378,7 @@ func _test_glass_over_the_wire() -> void:
 	_done()
 
 
-func _toy_of(game: Playground, id: String) -> DotPropToy:
+func _toy_of(game: Playground, id: String) -> DotPropBody:
 	if game.toys == null:
 		return null
 	for t in game.toys.toys:

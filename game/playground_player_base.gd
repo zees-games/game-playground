@@ -91,9 +91,9 @@ var timer: Object = null
 var carry: DotPropCarry = null
 var carry_enabled_fn: Callable = Callable()
 
-## The map's toys (dot-props' [DotPropToyBox]), for the trampolines and pads that throw this
+## The map's toys (dot-props' [DotPropBodyBox]), for the trampolines and pads that throw this
 ## player and the roundabout that carries them. Set by the game on every map, both ends.
-var toys: DotPropToyBox = null
+var toys: DotPropBodyBox = null
 
 ## `func(index: int) -> void`: this player was thrown by toy [param index]. The game's, which
 ## counts the bounce on the server only (that is what a client hears).
