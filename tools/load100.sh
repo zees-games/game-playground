@@ -14,7 +14,7 @@ for n in "${STEPS[@]}"; do
 	taskset -c 0-3 timeout $((SECONDS_PER + 150)) godot --headless --path . res://tools/load_server.tscn -- --port $PORT --slots 128 $SERVER_ARGS +sv_maxplayers 128 > "$OUT/server_$n.log" 2>&1 &
 	SPID=$!
 	sleep 12
-	taskset -c 4-11 timeout $((SECONDS_PER + 120)) godot --headless --path . res://tools/load_swarm.tscn -- --port $PORT --clients "$n" --seconds "$SECONDS_PER" > "$OUT/swarm_$n.log" 2>&1
+	taskset -c 4-11 timeout $((SECONDS_PER + 120)) godot --headless --path . res://tools/load_swarm.tscn -- --port $PORT --clients "$n" --seconds "$SECONDS_PER" $SWARM_ARGS > "$OUT/swarm_$n.log" 2>&1
 	kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null
 	echo "== $n clients: $(grep -m1 'SWARM joined' "$OUT/swarm_$n.log")"
 	echo "   $(grep 'SWARM playing' "$OUT/swarm_$n.log" | tail -1)"
