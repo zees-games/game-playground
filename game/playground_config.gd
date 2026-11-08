@@ -91,6 +91,11 @@ extends DotConfig
 ## Whether the cue comes from where the undone thing was instead of the player's own ears.
 @export var undo_sound_spatial: bool = false
 
+@export_group("Disasters")
+
+## Whether a tornado also throws ragdoll parts and bodies in the `disaster_bodies` group, not only props.
+@export var disaster_fling_extra: bool = true
+
 @export_group("Records")
 
 ## Where records are kept. Empty keeps them in memory only.

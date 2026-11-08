@@ -9,6 +9,10 @@
 # Whether the cue comes from where the undone thing was instead of the player's own ears.
 # undo_sound_spatial: false
 
+# --- Disasters
+# Whether a tornado also throws ragdoll parts and bodies in the `disaster_bodies` group, not only props.
+# disaster_fling_extra: true
+
 # --- Props
 # Whether props can be spawned at all. Off makes it a pure movement server.
 # allow_props: true
