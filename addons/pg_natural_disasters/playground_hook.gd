@@ -13,6 +13,9 @@ extends Node3D
 
 const MANAGER := "res://addons/natural_disasters/runtime/dot_disaster_manager.gd"
 
+## Bodies in this group are flung like props wherever they sit in the tree.
+const EXTRA_GROUP := &"disaster_bodies"
+
 var manager: Node = null
 var _host: Node = null
 
@@ -92,7 +95,26 @@ func _bodies() -> Array:
 	if world is Node:
 		_collect(world as Node, out)
 
+	var cfg: Variant = _host.get("config") if _host != null else null
+	if cfg == null or cfg.get("disaster_fling_extra") != false:
+		_collect_extra(out)
+
 	return out
+
+
+func _collect_extra(out: Array) -> void:
+	if _host == null or not _host.is_inside_tree():
+		return
+	for node in _host.get_tree().get_nodes_in_group(EXTRA_GROUP):
+		if node is RigidBody3D and not out.has(node):
+			out.append(node)
+	var ragdolls: Variant = _host.get("ragdolls")
+	if ragdolls is Object and (ragdolls as Object).has_method("live"):
+		for body in (ragdolls as Object).call("live"):
+			if is_instance_valid(body):
+				for part in body.part_nodes():
+					if part is RigidBody3D and not out.has(part):
+						out.append(part)
 
 
 func _collect(node: Node, out: Array) -> void:

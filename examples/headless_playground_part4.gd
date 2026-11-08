@@ -286,6 +286,11 @@ func playground_receive(msg: Dictionary) -> void:
 		_check(not told_everyone.is_empty(), "and every client is told")
 		_check(hook.manager.get("players_fn").is_valid() and hook.manager.get("player_push_fn").is_valid(),
 			"and players are wired to be pushed by it")
+		var extra := RigidBody3D.new()
+		extra.add_to_group(&"disaster_bodies")
+		playground.add_child(extra)
+		_check(hook.call("_bodies").has(extra), "a body in the disaster_bodies group is thrown too")
+		extra.queue_free()
 		hook.manager.call("stop")
 
 		# Undo takes a disaster away like a prop, in spawn order, with a cue.
