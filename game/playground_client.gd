@@ -392,6 +392,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			playground.undo(player_id)
 	elif key.is_action(PlaygroundBindings.VEHICLE):
 		_use_vehicle()
+	elif key.is_action(PlaygroundBindings.FLASHLIGHT):
+		_toggle_flashlight()
 	elif key.is_action(PlaygroundBindings.RELOAD):
 		_unfreeze_all()
 	elif key.is_action(PlaygroundBindings.PHYS_GUN):

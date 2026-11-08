@@ -593,6 +593,11 @@ func ask_arm(prop_id: StringName) -> void:
 	_ask(PlaygroundEvents.Ask.ARM_PROP, PlaygroundEvents.write_id(prop_id))
 
 
+## Switch the flashlight. The server owns on/off and answers in the player's replicated state.
+func ask_flashlight() -> void:
+	_ask(PlaygroundEvents.Ask.ARM_PROP, PlaygroundEvents.write_arm(PlaygroundEvents.ARM_FLASHLIGHT, &""))
+
+
 func ask_drop_weapon() -> void:
 	_ask(PlaygroundEvents.Ask.ARM_PROP, PlaygroundEvents.write_arm(PlaygroundEvents.ARM_DROP_WEAPON, &""))
 

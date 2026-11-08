@@ -518,11 +518,17 @@ func _add_noblock_and_workbench() -> void:
 	if playground.config_binder != null:
 		for set: DotProfileSet in playground.config_binder.profile_sets():
 			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var _fl := playground.flashlight_conf()
+	if playground.flashlight_binder != null:
+		for set: DotProfileSet in playground.flashlight_binder.profile_sets():
+			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start(playground.profiles.runtime)
 	DotLog.result(CHANNEL, "the workbench", started)
 	if started.ok and playground.config_binder != null:
 		playground.config_binder.attach(playground.profiles.runtime)
+	if started.ok and playground.flashlight_binder != null:
+		playground.flashlight_binder.attach(playground.profiles.runtime)
 	platform.add_workbench(wb)
 
 
@@ -540,6 +546,10 @@ func _start_remote_workbench() -> void:
 	if playground.config_binder != null:
 		for set: DotProfileSet in playground.config_binder.profile_sets():
 			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var _fl := playground.flashlight_conf()
+	if playground.flashlight_binder != null:
+		for set: DotProfileSet in playground.flashlight_binder.profile_sets():
+			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start(playground.profiles.runtime)
 	DotLog.result(CHANNEL, "the remote workbench", started)

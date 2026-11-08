@@ -38,6 +38,8 @@ var net_beacon: bool = false
 ## `PlaygroundPlayer.creative`. Everybody's: a watcher sees who is building, and the client's
 ## own tools refuse a creative player's props before asking.
 var net_creative: bool = false
+## `PlaygroundPlayer.flashlight`. Everybody's: the beam is drawn for the others.
+var net_flashlight: bool = false
 ## `PlaygroundPlayer.downed`. Everybody's: the figure crawls on every client.
 var net_downed: bool = false
 
@@ -106,6 +108,7 @@ func _register_net_vars() -> void:
 
 	# Last, so the fields before it keep their places in the schema.
 	replicate(&"net_downed", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_flashlight", DotNetVar.Type.BOOL).server_driven()
 
 
 func _net_apply_input(input: DotNetInput, _tick: int) -> void:
@@ -151,6 +154,7 @@ func pull() -> void:
 		net_beacon = player.beacon
 		net_creative = player.creative
 		net_downed = player.downed
+		net_flashlight = player.flashlight
 		# A rig that has gone leaves the last values: the counter stops, so nothing fires.
 		if player.zee_rig != null:
 			ZeeWeaponNet.pull(player.zee_rig, self)
@@ -168,6 +172,7 @@ func _net_state_applied(tick: int) -> void:
 	player.beacon = net_beacon
 	player.creative = net_creative
 	player.downed = net_downed
+	player.flashlight = net_flashlight
 	_apply_weapon()
 	_correct_drawn()
 	# NOT the node, on a predicted entity: receive_snapshot calls this before the

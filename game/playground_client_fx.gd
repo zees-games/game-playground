@@ -1,4 +1,4 @@
-extends "res://game/playground_client_net.gd"
+extends "res://game/playground_client_flash.gd"
 
 
 ## Chat and voice, once the bridge exists.
@@ -226,6 +226,7 @@ func _process(_delta: float) -> void:
 	# After the interpolation, so a remote player's marker is placed where this frame
 	# draws them rather than where the last frame did.
 	_present_beacons(_delta)
+	_present_flashlights(_delta)
 
 	# `is_inside_tree`, not just null: a camera whose parent was freed is live but out of the
 	# scene, and writing its transform errors every frame.
