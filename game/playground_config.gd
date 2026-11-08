@@ -189,13 +189,13 @@ extends DotConfig
 ## Whether arena shots hurt everybody (true) or only players on other teams (false, once teams exist).
 @export var arena_friendly_fire: bool = true
 
+## Credits for an arena kill.
+@export_range(0, 10000, 1) var arena_kill_reward: int = 100
+
 @export_group("Economy")
 
 ## Credits for killing something the wave director sent.
 @export_range(0, 10000, 1) var wave_kill_reward: int = 60
-
-## Credits for an arena kill.
-@export_range(0, 10000, 1) var arena_kill_reward: int = 100
 
 @export_group("Npcs")
 
@@ -226,10 +226,13 @@ extends DotConfig
 
 
 ## `@export_group` -> the cfg file it lives in: `cfg/game/game-playground/config_<file>/game.yml`.
+## `config_arena` is the arena mode's alone (`pg_arena`), so the Workbench can leave it out while the mode is off;
+## the waves, NPCs and movement that every session uses are `config_world`.
 const CFG_FILES := {
 	"Content": "server", "Rules": "server", "Undo": "props", "Records": "server", "Server": "server",
 	"Props": "props",
-	"Arena": "arena", "Economy": "arena", "Npcs": "arena", "Movement": "arena",
+	"Arena": "arena",
+	"Economy": "world", "Npcs": "world", "Movement": "world",
 }
 
 

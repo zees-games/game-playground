@@ -566,16 +566,10 @@ func _start_workbench(rt: DotProfileRuntime) -> void:
 		admin_permit = server.admins.uid_has_permission
 	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
 		return admin_permit.is_valid() and actor is String and bool(admin_permit.call(actor, flag))
-	workbench.add_set(game.profiles.npcs, "NPCs")
-	workbench.add_set(game.profiles.weapons, "Weapons")
-	for set: DotProfileSet in game.config_binder.profile_sets():
-		workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
-	var _fl := game.flashlight_conf()
-	if game.flashlight_binder != null:
-		for set: DotProfileSet in game.flashlight_binder.profile_sets():
-			workbench.add_set(set, "Flashlight")
+	PlaygroundWorkbenchSets.add_sets(workbench, game, func() -> bool: return arena != null and arena.enabled)
 	var ambient_set := DotGameWorkbench.cvar_set(console, PlaygroundAmbience.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
+		DotWorkbenchScope.tag(ambient_set, {"owner": PlaygroundWorkbenchSets.GAME, "side": DotWorkbenchScope.SIDE_SERVER})
 		workbench.add_set(ambient_set, "Ambience (pg_ambient*)")
 	add_child(workbench)
 	var started := workbench.start(rt)
