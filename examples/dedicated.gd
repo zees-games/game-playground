@@ -9,6 +9,8 @@ extends "res://examples/dedicated_part1.gd"
 ## The join between the game and the server: the console, the module lifecycle, the permission
 ## flags, and `sv_tickrate` all the way to a record's `tick_rate`. Nothing here opens a socket.
 
+const PgTestPorts := preload("test_ports.gd")
+
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)

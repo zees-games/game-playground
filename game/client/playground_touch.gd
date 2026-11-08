@@ -1,4 +1,3 @@
-class_name PlaygroundTouch
 extends RefCounted
 
 ## The on-screen buttons a phone needs: fire, alt-fire, jump, crouch, the hold-to-open spawn menu, tool previous/next,
