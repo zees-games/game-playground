@@ -26,7 +26,7 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 var _stats_errors: PackedStringArray = []
 
 const SECTIONS := 32
-const CHECKS := 300
+const CHECKS := 301
 
 ## What the run timer's checks add when `res://addons/dot_timer` is linked (and
 ## `addons/pg_timer` turns it on): the records section and the timer's halves of the
@@ -641,6 +641,13 @@ func _test_progress() -> void:
 		progress.stats.session_values(&"pg-test").get_cell(DotStatsHitzones.HITS, "zone:neck") >= 1.0,
 		"a hit with a hit_group is filed by body zone through the dot-stats hitzone hook"
 	)
+
+	var held := DotStatsValues.new()
+	held.values = {"kills": 10.0}
+	progress.rank.seed_baseline(&"pg-test", held)
+	progress.note(&"pg-test", &"deaths", 2.0)
+	_check(progress.stats.session_values(&"pg-test").get_value(PlaygroundProgress.RANK_SCORE, 0.0) == 9.0,
+		"rank_score is built on the stored lifetime (10 kills) plus the session (2 deaths), not the session alone")
 
 	var written: DotResult = await progress.achievements.flush()
 	_check(written.ok, "progress writes to disk", str(written.error))

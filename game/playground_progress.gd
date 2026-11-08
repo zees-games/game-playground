@@ -24,6 +24,9 @@ const CHANNEL := "playground.progress"
 
 const PROGRESS_DIR := "user://playground_achievements"
 
+## The published skill figure the site orders by (dot-stats' DotStatsRank).
+const RANK_SCORE := &"rank_score"
+
 
 ## Somebody earned something. Server side; the module tells everybody.
 signal earned(player_key: String, id: StringName, title: String, points: int)
@@ -32,6 +35,9 @@ signal earned(player_key: String, id: StringName, title: String, points: int)
 var stats: DotStatsTracker = null
 var achievements: DotAchievementTracker = null
 var link: DotAchievementStatsLink = null
+
+## The skill rank, built on lifetime totals. Players are the tracker key, the same one the store knows them by.
+var rank: DotStatsRank = null
 
 var game: Playground = null
 
@@ -65,6 +71,7 @@ static func stats_schema() -> DotStatsSchema:
 	fastest.publish = true
 	fastest.decimals = 3
 
+	var _rank := DotStatsRank.declare(schema, RANK_SCORE, "Rank score")
 	DotStatsHitzones.declare(schema)
 	return schema
 
@@ -187,6 +194,19 @@ func setup(p_game: Playground) -> DotResult:
 	if backbone != null:
 		stats.reporter.client = backbone
 
+	rank = DotStatsRank.new()
+	rank.stat_id = RANK_SCORE
+	rank.terms = [
+		{"stat": "kills", "weight": 1.0},
+		{"stat": "deaths", "weight": -0.5},
+		{"stat": "finishes", "weight": 2.0},
+		{"stat": "falls", "weight": -0.1},
+	]
+	# Filed straight on the tracker: going through _record would republish the rank from inside its own publish.
+	rank.record_fn = func(who: Variant, stat: StringName, value: float) -> void:
+		if stats != null and stats.has_player(StringName(str(who))):
+			var _filed := stats.record(StringName(str(who)), stat, value)
+
 	achievements = DotAchievementTracker.new()
 	achievements.name = "Achievements"
 	achievements.catalogue = catalogue()
@@ -280,7 +300,16 @@ func _record(player_id: StringName, stat: StringName, value: float) -> void:
 		})
 		return
 
-	stats.record(StringName(key), stat, value)
+	var filed := stats.record(StringName(key), stat, value)
+
+	if filed.ok and stat != RANK_SCORE:
+		_publish_rank(StringName(key))
+
+
+## Republishes the rank score from the stored lifetime totals plus this session.
+func _publish_rank(key: StringName) -> void:
+	if rank != null and stats != null and stats.has_player(key):
+		var _score := rank.publish_lifetime(key, stats.session_values(key), stats.schema)
 
 
 ## The tracker key of a player id; "" when there is none yet.
@@ -315,6 +344,10 @@ func begin(player_key: String) -> void:
 	if player_key == "":
 		return
 
+	# Before this session's figures reach the store: reading later would count them twice.
+	if rank != null and stats.store != null:
+		rank.load_baseline(stats.store, StringName(player_key))
+
 	stats.begin(player_key)
 	achievements.begin(player_key)
 
@@ -324,6 +357,8 @@ func end(player_key: String) -> void:
 		return
 
 	stats.end(player_key)
+	if rank != null:
+		rank.forget(StringName(player_key))
 	achievements.end(player_key)
 
 
