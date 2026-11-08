@@ -407,7 +407,7 @@ func _teach_weapon(pack: String, provider: Variant, entry: Dictionary, host: Nod
 		def.colour = PlaygroundZeeScript.SLOT_COLOURS.get(pack_def.slot, Color(0.62, 0.68, 0.78))
 		def.meta = {"zee": want, "slot": pack_def.slot, "provider": pack, "pack_def": pack_def}
 		weapons.append(def)
-		PlaygroundZeeScript.add_provider_def(def)
+		PlaygroundZeeScript.add_provider_def(def, provider as Object)
 		return
 
 	DotLog.warn(CHANNEL, "a weapon row names a weapon its provider's weapon_defs() lacks", {"pack": pack, "weapon": want})

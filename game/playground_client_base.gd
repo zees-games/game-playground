@@ -259,6 +259,14 @@ var view_arms: Node = null
 ## Where the arms hold the zee weapon in hand (dot-player-char API 8); null with nothing held.
 var held_grip: DotViewGrip = null
 var _arms_down := false
+## Where the avatar's firing hand rests in first person, in the camera's metres. The avatar's, not the
+## weapon's: every weapon is moved so its grip sits here, so the arms keep one place, one size and one
+## look through every swap, and only their pose (the support hand on the fore-end) changes.
+const HAND_SEAT := Vector3(0.16, -0.2, -0.36)
+## The view model's move that seats the current weapon's grip at [constant HAND_SEAT] (hip; aiming fades it).
+var hand_seat_offset := Vector3.ZERO
+## The weapon [member hand_seat_offset] was measured for.
+var _seated_for: StringName = &""
 
 
 ## The downed player's own arms (dot-player-char API 7); nothing on an older build.
@@ -272,6 +280,9 @@ func _build_view_arms() -> void:
 	view_arms = load(VIEW_ARMS_SCRIPT).new()
 	view_arms.name = "ViewArms"
 	arms_pivot.add_child(view_arms)
+	# The avatar's body never leans toward a weapon: a weapon is moved to the hand instead.
+	if "max_lean" in view_arms:
+		view_arms.set("max_lean", 0.0)
 	view_arms.call("build")
 
 

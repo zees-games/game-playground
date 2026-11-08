@@ -678,6 +678,8 @@ func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 		# The viewmodel_fov lens scales the weapon 2.5x and pushes it past the arms' reach.
 		zee_view.remove_from_group(&"dot_view_model")
 		(zee_view as ZeeViewModel).hands_fov = 0.0
+		# Before this client's frame, which then moves it to the avatar's hand (its lens resets the position each frame).
+		zee_view.process_priority = -1
 
 	var rig := PlaygroundZee.arm(
 		player, def, ZeeWeaponRig.Role.LOCAL, bridge == null,
@@ -698,6 +700,11 @@ func _arm_zee(def: PlaygroundWeaponDef) -> bool:
 
 ## The weapon's own measured grip and fore-end, onto the arms.
 func _on_hands_reached(anchor: Node3D, grip: Vector3, fore: Vector3, pose: StringName) -> void:
+	var hands := zee_view as ZeeViewModel
+	if hands != null and hands.equipped() != _seated_for and hands.aim_fraction() <= 0.0:
+		# At the hip the grip is the art's rest grip in the view model's own space.
+		_seated_for = hands.equipped()
+		hand_seat_offset = HAND_SEAT - grip
 	var made := PlaygroundViewGrip.update(held_grip, anchor, grip, fore, pose)
 	if made != held_grip:
 		held_grip = made
@@ -717,6 +724,8 @@ func _disarm_zee() -> void:
 		zee_view.queue_free()
 	zee_view = null
 	held_grip = null
+	_seated_for = &""
+	hand_seat_offset = Vector3.ZERO
 	if view_arms is DotPlayerViewArms:
 		(view_arms as DotPlayerViewArms).set_held(null)
 
