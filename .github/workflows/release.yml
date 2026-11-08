@@ -28,7 +28,7 @@ jobs:
     # @v1.3.3: a game whose own folders under addons/ have no plugin.cfg is still packed as a game.
     release:
         needs: validate
-        uses: modcommunity/dot-ci/.github/workflows/release.yml@v1.3.3
+        uses: modcommunity/dot-ci/.github/workflows/release.yml@v1.3.14
         permissions:
             contents: write
         with:
