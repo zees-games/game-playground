@@ -36,7 +36,7 @@
 GAME_NAME="Playground"
 PACK="playground"
 EXTRA_PACKS=""
-SUITES="headless_config headless_workbench headless_workbench_scope headless_playground headless_net headless_presentation headless_stack headless_packs_real dedicated headless_mapcfg headless_weapondrop headless_spawntool"
+SUITES="headless_config headless_workbench headless_workbench_scope headless_playground headless_net headless_presentation headless_stack headless_packs_real dedicated headless_mapcfg headless_weapondrop headless_spawntool headless_avatar_arms"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail

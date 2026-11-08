@@ -12,10 +12,28 @@ func _present_view_arms(delta: float) -> void:
 		_arms_down = down
 		view_arms.call("set_downed", down)
 	var hands := zee_view as ZeeViewModel if zee_view != null and is_instance_valid(zee_view) else null
+	if hands != null and held_grip != null:
+		# The weapon to the avatar's hand, not the hand to the weapon; sights up, the art's own aim hold.
+		hands.position = hand_seat_offset * (1.0 - hands.aim_fraction())
 	arms_pivot.visible = first and (hands == null or not hands.is_scoped())
 	arms_pivot.global_position = camera.global_position
 	arms_pivot.global_rotation = Vector3(0.0, camera.global_rotation.y, 0.0)
 	view_arms.call("tick", player.speed(), delta)
+	_present_own_held()
+
+
+## Your own gun in your own hand. In first person the view model on the avatar's arms IS the gun, so
+## the third-person copy on the body only casts its shadow: drawn, its barrel showed under the view
+## model as a second gun (the long sniper most of all). Third person and everybody else see it whole.
+func _present_own_held() -> void:
+	var held: Variant = player.zee_world if player != null else null
+	if not (held is Node3D) or not is_instance_valid(held):
+		return
+	var mode := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if player.body_shown() \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	for mesh in (held as Node3D).find_children("*", "GeometryInstance3D", true, false):
+		if (mesh as GeometryInstance3D).cast_shadow != mode:
+			(mesh as GeometryInstance3D).cast_shadow = mode
 
 
 func _on_menu_action_chosen(id: StringName) -> void:
