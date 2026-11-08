@@ -334,10 +334,13 @@ func _run_entry(item: Item, spawn: Variant, ctx: Context) -> Variant:
 		return DotResult.fail(DotError.CODE_STATE, "no such player")
 
 	if spawn is Callable:
+		var known := _runtime_npcs(ctx.world)
 		var out: Variant = (spawn as Callable).call({
 			"game": game, "world": ctx.world, "player_id": ctx.who, "at": ctx.at,
 			"kind": item.kind, "cfg_hint": item.cfg_hint, "authoritative": true,
 		})
+		if not out is DotResult or (out as DotResult).ok:
+			_adopt_runtime_npcs(game, ctx, known)
 		return out if out is DotResult else DotResult.success(item.key())
 
 	if spawn is Dictionary and item.kind != "weapon":
@@ -363,6 +366,76 @@ func _run_entry(item: Item, spawn: Variant, ctx: Context) -> Variant:
 		return _spawn_body(item, target, ctx)
 
 	return DotResult.fail(DotError.CODE_INVALID, "kind %s needs a Callable spawn" % item.kind)
+
+
+## Every NPC a pack's self-ticking runtime (a child of [param world] with the `zhm_runtime` meta, as
+## zz-historical-monsters makes) holds, as `{instance_id: spawner}`.
+func _runtime_npcs(world: Node) -> Dictionary:
+	var out := {}
+
+	if world == null:
+		return out
+
+	for runtime in world.get_children():
+		var spawner: Variant = runtime.get("spawner") if runtime.has_meta(&"zhm_runtime") else null
+
+		if spawner is DotNpcSpawner:
+			for npc in (spawner as DotNpcSpawner).all_npcs():
+				out[npc.instance_id] = spawner
+
+	return out
+
+
+## Removes every monster a pack's runtime holds, the dead lying about included: a map change takes everything
+## spawned on the old map away. Returns how many went.
+func despawn_all(world: Node) -> int:
+	var all := _runtime_npcs(world)
+
+	for id: int in all:
+		(all[id] as DotNpcSpawner).remove(id, DotNpcSpawner.REASON_CLEANUP)
+
+	return all.size()
+
+
+## Makes the pack's fresh monsters part of this game: they see the players (the runtime's own source is
+## the `players` group, which this game does not use, so they stood in an idle pose forever), and
+## the player's undo takes them away.
+func _adopt_runtime_npcs(game: Object, ctx: Context, known: Dictionary) -> void:
+	var now := _runtime_npcs(ctx.world)
+	var fresh: Dictionary = {}
+
+	for id: int in now:
+		if not known.has(id):
+			fresh[id] = now[id]
+
+	for runtime in ctx.world.get_children():
+		if runtime.has_meta(&"zhm_runtime") and not (runtime.get("candidates_source") as Callable).is_valid():
+			runtime.set("candidates_source", _player_prey.bind(game))
+
+	if fresh.is_empty():
+		return
+
+	ctx.push_undo(func() -> void:
+		for id: int in fresh:
+			if is_instance_valid(fresh[id]):
+				(fresh[id] as DotNpcSpawner).remove(id, DotNpcSpawner.REASON_ADMIN)
+	)
+
+
+## The players as the monsters' prey: `{id, position, loudness}` rows.
+static func _player_prey(game: Object) -> Array:
+	var out: Array = []
+
+	if not is_instance_valid(game):
+		return out
+
+	var players: Dictionary = game.get("players")
+
+	for id: StringName in players:
+		var player: Node3D = players[id]
+		out.append({"id": id, "position": player.global_position, "faction": &"player", "loudness": 12.0})
+
+	return out
 
 
 ## The weapon id a data row names: `weapon_id`, else `weapon`, else the row's own id.

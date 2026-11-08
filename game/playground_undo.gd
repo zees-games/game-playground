@@ -44,6 +44,11 @@ func undo(who: StringName) -> bool:
 	return false
 
 
+## Forgets every entry: what they would undo is gone with the map.
+func clear() -> void:
+	_stacks.clear()
+
+
 func count(who: StringName) -> int:
 	return (_stacks.get(who, []) as Array).size()
 

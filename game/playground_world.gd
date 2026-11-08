@@ -670,6 +670,13 @@ func _on_map_changing(_from: DotMapDef, _to: DotMapDef) -> void:
 
 	_clear_toys()
 
+	# Pack-made monsters and the undo history that would reach for them (props went above).
+	if addons != null:
+		addons.despawn_all(world)
+
+	if undo_stack != null:
+		undo_stack.clear()
+
 
 func _on_map_changed(map: DotMapDef, loaded: Node) -> void:
 		# A map that has to be told something before it can build itself, duck-typed so a delivered map of the same shape works and this

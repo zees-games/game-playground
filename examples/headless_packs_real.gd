@@ -23,8 +23,8 @@ const PlaygroundSpawnMenu := preload("../game/playground_spawn_menu.gd")
 
 const PACKS: Array[String] = ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
 const MONSTERS: Array[String] = ["trex", "allosaurus", "raptor", "tiger", "thylacine", "bear"]
-const CHECKS := 49
-const SECTIONS := 7
+const CHECKS := 66
+const SECTIONS := 9
 
 var _entered := 0
 var _completed := 0
@@ -67,6 +67,8 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await _test_menu()
 	await _test_weapons()
+	await _test_alive_and_undo()
+	await _test_map_change_clears()
 	await _test_monsters()
 	_test_override()
 	_test_live_edit()
@@ -157,6 +159,46 @@ func _test_weapons() -> void:
 	_done()
 
 
+func _test_alive_and_undo() -> void:
+	_section("a spawned monster hunts, animates, and the undo removes it")
+	var bot: PlaygroundPlayer = _game.players[&"bot"]
+	bot.teleport(Vector3(0, 1, 0), 0.0)
+	await get_tree().physics_frame
+	var row: Dictionary = {}
+	for r in _npc_rows:
+		if str(r["key"]).ends_with("raptor"):
+			row = r
+	_check(not row.is_empty(), "the raptor has a menu row")
+	var before := _bodies()
+	var at := bot.global_position + Vector3(0, 0, -8)
+	var res: DotResult = _game.activate_addon_item(str(row["key"]), 0, at, &"bot")
+	_check(res.ok, "it spawns", "" if res.ok else res.error.message)
+	await get_tree().physics_frame
+	var fresh := _bodies().filter(func(n: Node) -> bool: return not before.has(n) and n.has_method(&"effective_anim"))
+	_check(fresh.size() == 1, "as one body", str(fresh.size()))
+	var body: Node3D = fresh[0]
+	var start := body.global_position
+	var anims := {}
+	for _i in 240:
+		await get_tree().physics_frame
+		if is_instance_valid(body):
+			anims[int(body.call(&"effective_anim"))] = true
+	_check(anims.size() >= 2, "its animation state changes over the ticks", str(anims.keys()))
+	_check(body.global_position.distance_to(start) > 1.0 or anims.has(0) == false, "and it moves toward the player", "%.2f m" % body.global_position.distance_to(start))
+	_check(int(body.call(&"effective_anim")) != 0, "and is not standing in the idle pose", str(body.call(&"effective_anim")))
+	_check(_game.undo_stack.count(&"bot") >= 1, "the spawn is on the player's undo stack")
+	_check(_game.undo(&"bot"), "undo succeeds")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(not is_instance_valid(body) or body.is_queued_for_deletion(), "and the monster is gone")
+	_check(not _game.undo(&"bot"), "a second undo has nothing")
+	var props_before: int = _game.props.world_count()
+	_game.props.spawn(&"barrel", &"bot", at)
+	_check(_game.props.world_count() == props_before + 1, "a prop still spawns")
+	_check(_game.undo(&"bot") and _game.props.world_count() == props_before, "and the game's undo still removes it")
+	_done()
+
+
 func _test_monsters() -> void:
 	_section("every monster spawns in front of the player")
 	var bot: PlaygroundPlayer = _game.players[&"bot"]
@@ -180,6 +222,32 @@ func _test_monsters() -> void:
 	_check(spawned_all, "each of the three activations puts a body in the world")
 	_check(near, "within four metres of where the player aimed")
 	await get_tree().create_timer(0.5).timeout
+	_done()
+
+
+func _test_map_change_clears() -> void:
+	_section("a map change despawns the monsters and clears the undo history")
+	var bot: PlaygroundPlayer = _game.players[&"bot"]
+	var row: Dictionary = {}
+	for r in _npc_rows:
+		if str(r["key"]).ends_with("raptor"):
+			row = r
+	var at := bot.global_position + Vector3(0, 0, -8)
+	for _i in 2:
+		_game.activate_addon_item(str(row["key"]), 0, at, &"bot")
+	await get_tree().physics_frame
+	var held := _game.addons._runtime_npcs(_game.world)
+	_check(held.size() >= 2, "two monsters stand on the first map", str(held.size()))
+	var spawner: DotNpcSpawner = held[held.keys()[0]]
+	spawner.damage(held.keys()[0], 100000.0, &"bot")
+	_check(_game.undo_stack.count(&"bot") >= 1, "and the undo history holds them")
+	var changed: DotResult = await _game.change_map(&"pg_flatgrass")
+	_check(changed.ok, "the map changes", "" if changed.ok else changed.error.message)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(_game.addons._runtime_npcs(_game.world).is_empty(), "no monster is left, dead ones included")
+	_check(_game.undo_stack.count(&"bot") == 0, "the undo history is empty")
+	_check(not _game.undo(&"bot"), "undo has nothing to take")
 	_done()
 
 
