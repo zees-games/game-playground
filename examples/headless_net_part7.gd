@@ -139,6 +139,59 @@ func _test_drawn_ammo_corrected_2() -> void:
 	_done()
 
 
+## Noclip is a permission the server hands out: the client's V press (BUTTON_NOCLIP in its command)
+## only takes when the server's policy allows it, and revoking the permit ends it.
+func _noclip_command(pressed: bool) -> DotFpsCommand:
+	var c := DotFpsCommand.new()
+	c.buttons = DotFpsCommand.BUTTON_NOCLIP if pressed else 0
+	return c
+
+
+## One V press (edge) from the client, then a few ticks to settle; returns the server body's noclip state.
+func _press_v_over_the_wire() -> bool:
+	await _steps(2, _noclip_command(true))
+	await _steps(4, _noclip_command(false))
+	_exchange()
+	await _steps(2)
+	return _server_player().controller.state.mode == DotFpsState.Mode.NOCLIP
+
+
+func _test_noclip_over_the_wire() -> void:
+	_section("noclip over the wire follows the server's permission")
+
+	var theirs := _server_player()
+	if theirs == null or _client_player() == null:
+		_check(false, "both ends have the player")
+		_done()
+		return
+	var saved_mode := _server_game.config.noclip
+	var saved_policy := _server_game.noclip_policy
+	_server_game.config.noclip = "permission"
+
+	_server_game.noclip_policy = func(_id: StringName) -> bool: return false
+	await _steps(3)
+	_check(not await _press_v_over_the_wire(), "without the permission V does nothing on the server")
+	_check(_client_player().controller.state.mode != DotFpsState.Mode.NOCLIP, "and the client is not in noclip either")
+
+	_server_game.noclip_policy = func(id: StringName) -> bool: return id == &"u%d" % SESSION
+	await _steps(3)
+	_check(await _press_v_over_the_wire(), "with the permission the server body goes into noclip")
+	_check(_client_player().controller.state.mode == DotFpsState.Mode.NOCLIP, "and the client's prediction agrees")
+	_check(not await _press_v_over_the_wire(), "a second press leaves noclip")
+
+	_check(await _press_v_over_the_wire(), "back in noclip")
+	_server_game.noclip_policy = func(_id: StringName) -> bool: return false
+	await _steps(4)
+	_exchange()
+	await _steps(2)
+	_check(_server_player().controller.state.mode != DotFpsState.Mode.NOCLIP, "revoking the permission ends noclip on the server")
+
+	_server_game.config.noclip = saved_mode
+	_server_game.noclip_policy = saved_policy
+	await _steps(3)
+	_done()
+
+
 func _test_grenade_for_a_joiner() -> void:
 	_section("a grenade already in the air is sent to a player who joins")
 	await _disconnect()
