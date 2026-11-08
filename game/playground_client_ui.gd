@@ -717,26 +717,6 @@ func _unfreeze_all() -> void:
 
 # --- Styles, tracks and maps -----------------------------------------------
 
-func _cycle_style() -> void:
-	var styles := playground.style_order
-
-	if styles.is_empty():
-		return
-
-	_style_index = (_style_index + 1) % styles.size()
-
-	var chosen: DotFpsStyle = playground.movement_styles[styles[_style_index]]
-
-	if bridge != null:
-		# The server owns which style a player is on: it decides what the movement IS,
-		# and both ends have to derive the same tunables or prediction diverges.
-		bridge.ask_style(chosen.id)
-		return
-
-	if playground.set_player_style(player_id, chosen.id) and hud != null:
-		hud.notice("Style: %s" % chosen.display_name)
-
-
 ## First person to third and back, through the controller switch. A different motor, not a moved
 ## camera: a sandbox ranks nothing, so it can afford the better third-person movement (camera-
 ## relative input, spring-arm orbit rig, coyote time, jump buffer).

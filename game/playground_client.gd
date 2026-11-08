@@ -404,9 +404,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cycle_weapon()
 	elif _wheel_cycle(key):
 		pass
-	elif key.is_action(PlaygroundBindings.STYLE):
-		# Tab is the scoreboard, held, as in every game here; the style moved to N.
-		_cycle_style()
 	elif key.is_action(DotMenuBindings.LOADOUT_ACTION) and loadout_menu != null and not arena_on:
 		# B opens the loadout only in the arena (the menu is disabled outside it, so the key
 		# reaches here): said, rather than a key that does nothing.

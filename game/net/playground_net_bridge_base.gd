@@ -642,10 +642,6 @@ func inventory_manager() -> DotInvManager:
 	return inventory_net.local_manager() if inventory_net != null and not net.is_server else null
 
 
-func ask_style(style_id: StringName) -> void:
-	_ask(PlaygroundEvents.Ask.STYLE, PlaygroundEvents.write_index(_style_index(style_id)))
-
-
 func _ask(kind: int, body: PackedByteArray) -> void:
 	if net != null and not net.is_server:
 		net.send(PlaygroundRequest.new(kind, body), 1)

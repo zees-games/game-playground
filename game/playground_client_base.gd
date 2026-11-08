@@ -167,9 +167,6 @@ var _aiming: bool = false
 ## `_unhandled_input`, and the 'Click to play' notice in `_process`.
 var _was_driving: bool = false
 
-## Where the style key is in the list.
-var _style_index: int = 0
-
 ## Whether the physics gun's button is down.
 var _holding: bool = false
 var _wheel: DotWeaponWheel
