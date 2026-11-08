@@ -14,5 +14,11 @@ func _prepare(label: String) -> Variant:
 
 
 func _roster() -> Array:
+	var out: Array = []
 	var world = _client.get("playground") if _client != null else null
-	return world.players.values() if world != null else []
+	if world != null:
+		out.append_array(world.players.values())
+	var me = _client.get("player") if _client != null else null
+	if me != null and not out.has(me):
+		out.append(me)
+	return out
