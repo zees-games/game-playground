@@ -118,6 +118,7 @@ func _physics_process(delta: float) -> void:
 ## One simulated tick for everything, in the order a dedicated server uses: move every player, then time the tick with the
 ## position the move produced. Timing first shifts every run by one tick, a different amount at each tickrate.
 func _simulate_tick(step: float) -> void:
+	_advance_flashlights()
 	var _t_props_maps := DotFrameCost.now()
 	props.advance(step)
 	maps.advance(step)
@@ -638,3 +639,51 @@ func apply_pass_through() -> void:
 		if who != null and who.controller != null:
 			entries[id] = {"body": who, "controller": who.controller}
 	body_rules.apply_exceptions(entries)
+
+
+## The flashlight config, made on first use.
+func flashlight_conf() -> DotFlashlightConfig:
+	if flashlight_config == null:
+		flashlight_config = PlaygroundFlashlight.make_config()
+		flashlight_binder = PlaygroundFlashlight.make_binder(flashlight_config)
+		DotLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
+	return flashlight_config
+
+
+## The map id the light rules are asked about.
+func flashlight_map_id() -> String:
+	return String(maps.current.id) if maps != null and maps.current != null else ""
+
+
+## A new map sets everybody's light by its mood (a lit map starts dark). Server side.
+func _advance_flashlights() -> void:
+	if not authoritative:
+		return
+
+	var cfg := flashlight_conf()
+	var map_id := flashlight_map_id()
+
+	if map_id != _flashlight_map:
+		_flashlight_map = map_id
+		for p: PlaygroundPlayer in players.values():
+			p.flashlight_ready = false
+
+	for id: Variant in players:
+		var body := players[id] as PlaygroundPlayer
+
+		if not body.flashlight_ready:
+			body.flashlight_ready = true
+			body.flashlight = PlaygroundFlashlight.starts_on(cfg, map_id)
+
+
+## A player who is up switches their light. Refused while downed or watching, and where the config disallows it. Server side.
+func toggle_flashlight(id: StringName) -> bool:
+	var body := players.get(id) as PlaygroundPlayer
+
+	if body == null or body.downed \
+			or (player_stack != null and player_stack.spectate != null and player_stack.spectate.is_spectating(String(id))) \
+			or not DotFlashlightRules.allowed_on(flashlight_conf(), flashlight_map_id()):
+		return false
+
+	body.flashlight = not body.flashlight
+	return true

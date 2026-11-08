@@ -250,3 +250,38 @@ func _test_the_aim_bit_crosses() -> void:
 	await _steps(INPUT_LEAD + 8)
 	PlaygroundZee.disarm(mirror)
 	_done()
+
+
+func _test_the_flashlight_crosses() -> void:
+	_section("the flashlight is asked for, and the server's state comes back to everybody")
+
+	var theirs := _server_player()
+	var mirror := _client_player()
+	if theirs == null or mirror == null:
+		_check(false, "both ends have the player")
+		_done()
+		return
+
+	var was := theirs.flashlight
+	_client_bridge.ask_flashlight()
+	_exchange()
+	await _steps(4)
+	_exchange()
+	await _steps(4)
+	_check(theirs.flashlight != was, "the server switched it")
+	_check(mirror.flashlight == theirs.flashlight, "and the owner is told")
+
+	_client_bridge.ask_flashlight()
+	_exchange()
+	await _steps(4)
+	_exchange()
+	await _steps(4)
+	_check(theirs.flashlight == was and mirror.flashlight == was, "the next ask switches it back")
+
+	theirs.downed = true
+	_client_bridge.ask_flashlight()
+	_exchange()
+	await _steps(4)
+	_check(theirs.flashlight == was, "a downed player's ask is refused")
+	theirs.downed = false
+	_done()

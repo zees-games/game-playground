@@ -5,6 +5,7 @@ const PlaygroundPaths := preload("playground_paths.gd")
 const PlaygroundZee := preload("playground_zee.gd")
 
 const PlaygroundConfig := preload("playground_config.gd")
+const PlaygroundFlashlight := preload("playground_flashlight.gd")
 const PlaygroundEntity := preload("entities/playground_entity.gd")
 const PlaygroundInventory := preload("playground_inventory.gd")
 const PlaygroundLimits := preload("playground_limits.gd")
@@ -319,6 +320,11 @@ static func make_view_rules() -> DotPlayerViewRules:
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by `_ready`.
 var config_binder: DotGameConfigBinder = null
+
+## The flashlight's config and binder, made on first use so a suite that builds a game by hand still has one; the map the lights were last set for.
+var flashlight_config: DotFlashlightConfig = null
+var flashlight_binder: DotGameConfigBinder = null
+var _flashlight_map: String = ""
 
 ## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or
 ## `DotGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.

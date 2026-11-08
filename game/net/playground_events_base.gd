@@ -442,6 +442,8 @@ const ARM_LOAD_BUILD := 5
 const ARM_ADDON_ITEM := 6
 ## Throw the gun in my hands.
 const ARM_DROP_WEAPON := 7
+## Switch my flashlight.
+const ARM_FLASHLIGHT := 8
 
 ## The most a tool's settings may take on the wire. A tool has a handful of numbers.
 const TOOL_SETTINGS_BYTES := 512

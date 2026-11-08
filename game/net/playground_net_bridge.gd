@@ -330,6 +330,8 @@ func _on_request(message: DotNetMessage) -> void:
 						_spawn_for(id, Playground.pickup_id_of(weapon_id))
 				PlaygroundEvents.ARM_DROP_WEAPON:
 					var _gun = game.weapon_layer.throw_for(id)
+				PlaygroundEvents.ARM_FLASHLIGHT:
+					var _switched := game.toggle_flashlight(id)
 				PlaygroundEvents.ARM_BUILDS:
 					builds_requested.emit(peer_id)
 				PlaygroundEvents.ARM_LOAD_BUILD:

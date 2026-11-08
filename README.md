@@ -53,6 +53,7 @@ There are two maps built in, beside the custom maps the map pack adds:
 | **1** / **2** / **3** | Physics gun / gravity gun / your weapons |
 | **E** | Spawn the last prop again |
 | **F** | Use: press a button, pull a lever, get in or out of a vehicle |
+| **T** | Flashlight (starts off on the daylit sandbox, on in the rock maps). A lit beam is seen by everyone who can see you |
 | **R** | Unfreeze everything you froze, or reload, or the tool gun's third action |
 | **Z** | Undo your last spawn |
 | **WASD** / **Space** / **Ctrl** | Move / jump (hold to keep hopping) / crouch |
