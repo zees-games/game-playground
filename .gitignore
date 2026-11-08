@@ -73,6 +73,8 @@ Thumbs.db
 /addons/dot_team
 /addons/dot_server_query
 /addons/dot_game
+# dot-sim: optional native library (snapshot codec); without its built library the GDScript twins run.
+/addons/dot_sim
 /addons/dot_workbench
 /addons/dot_weapon
 /addons/zee_weapons
