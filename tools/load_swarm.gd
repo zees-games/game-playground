@@ -59,7 +59,7 @@ func _arg(name: String, fallback: String) -> String:
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	DotLog.set_level(DotLog.Level.INFO if OS.get_cmdline_user_args().has("--verbose") else DotLog.Level.ERROR)
 	_hz = int(_arg("--hz", "64"))
 	_port = int(_arg("--port", "27399"))
 	_seconds = float(_arg("--seconds", "30"))
@@ -103,10 +103,23 @@ func _run(count: int) -> void:
 		await get_tree().create_timer(0.5).timeout
 		waited += 0.5
 	print("SWARM joined=%d/%d after %.1f s" % [_playing(), count, waited])
+	_print_stuck()
 	_clients[0].link.send_kind(DotEnvelope.SCOREBOARD_WANT, {"open": true})
 	_started = Time.get_ticks_msec() / 1000.0
 	_last_report = _started
 	set_physics_process(true)
+
+
+## One line per client that never reached playing: which stage it is stuck in, so a join failure reads as
+## "never challenged", "challenged, no answer" or "loaded, never entered" instead of only a count.
+func _print_stuck() -> void:
+	for i in _clients.size():
+		var c: Client = _clients[i]
+		if c.link.is_playing():
+			continue
+		var peer := c.root.multiplayer.multiplayer_peer
+		print("SWARM stuck client=%d peer_status=%d challenged=%s" % [
+			i, peer.get_connection_status() if peer != null else -1, c.link.server_hostname != ""])
 
 
 func _stub_load(_peer: int, _info: Dictionary, c: Client) -> void:
