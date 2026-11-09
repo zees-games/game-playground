@@ -183,6 +183,7 @@ func _test_death_and_clearing() -> void:
 	_arm(bea)
 	var _gone = layer.throw_for(&"u2")
 	layer.drops.tick(3.0)
+	layer.drops.scan()  # expiry runs on the scan pass (sv_weapon_drop_scan), not every tick
 	_check(layer.drops.count() == 0, "sv_weapon_drop_time makes a drop vanish")
 	layer.rules.lifetime = 60.0
 
