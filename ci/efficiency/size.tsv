@@ -20,8 +20,6 @@ game/net/playground_net_bridge.gd::_on_event	98
 game/playground_client.gd::_build_netcode	100
 game/playground_client.gd::_ready	138
 game/playground_client.gd::_unhandled_input	146
-game/playground_client_ui.gd	847
-game/playground.gd	802
 game/playground.gd::add_player	98
 game/playground_map_survey_base.gd::_link_regions	90
 game/playground_map_survey_base.gd::_rasterise	120

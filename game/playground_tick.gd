@@ -687,3 +687,13 @@ func toggle_flashlight(id: StringName) -> bool:
 
 	body.flashlight = not body.flashlight
 	return true
+
+
+## What [param player_id] wants their NPCs to carry, or [param fallback].
+func npc_weapon_for(player_id: StringName, fallback: StringName = &"") -> StringName:
+	var chosen: Variant = npc_weapon_choice.get(player_id, null)
+
+	if chosen == null or StringName(str(chosen)) == &"":
+		return fallback
+
+	return StringName(str(chosen))

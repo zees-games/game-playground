@@ -1,14 +1,5 @@
 extends "playground_tick.gd"
 
-## What [param player_id] wants their NPCs to carry, or [param fallback].
-func npc_weapon_for(player_id: StringName, fallback: StringName = &"") -> StringName:
-	var chosen: Variant = npc_weapon_choice.get(player_id, null)
-
-	if chosen == null or StringName(str(chosen)) == &"":
-		return fallback
-
-	return StringName(str(chosen))
-
 
 ## Sets what [param player_id]'s next NPCs carry. Refuses a weapon an NPC cannot use.
 func set_npc_weapon_choice(player_id: StringName, weapon_id: StringName) -> DotResult:
