@@ -1,4 +1,4 @@
-extends "res://game/playground_spawn_menu_base.gd"
+extends "res://game/playground_spawn_menu_cards.gd"
 
 
 
@@ -485,74 +485,86 @@ func _setting_row(field: Dictionary, values: Dictionary) -> Control:
 
 	match str(field["type"]):
 		"float":
-			var slider := HSlider.new()
-			slider.min_value = float(field["min"])
-			slider.max_value = float(field["max"])
-			slider.step = float(field.get("step", 0.05))
-			slider.value = float(values.get(key, field["default"]))
-			slider.custom_minimum_size = Vector2(220, 0)
-			# A track, drawn. The theme here draws a slider as its grabber alone, and a lone
-			# dot gives no sense of where in the range a value is — a rendered frame showed
-			# "Lift" and "String" as two dots floating beside their numbers.
-			var track := StyleBoxFlat.new()
-			track.bg_color = Color(1, 1, 1, 0.12)
-			track.content_margin_top = 2.0
-			track.content_margin_bottom = 2.0
-			track.set_corner_radius_all(2)
-			var filled := StyleBoxFlat.new()
-			filled.bg_color = Style.ACCENT
-			filled.content_margin_top = 2.0
-			filled.content_margin_bottom = 2.0
-			filled.set_corner_radius_all(2)
-			slider.add_theme_stylebox_override("slider", track)
-			slider.add_theme_stylebox_override("grabber_area", filled)
-			slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-			var shown := Label.new()
-			shown.text = "%.2f" % slider.value
-			slider.value_changed.connect(func(value: float) -> void:
-				shown.text = "%.2f" % value
-				_set_setting(key, value)
-			)
-			row.add_child(slider)
-			row.add_child(shown)
+			_float_setting(row, key, field, values)
 		"bool":
 			var tick := CheckBox.new()
 			tick.button_pressed = bool(values.get(key, field["default"]))
 			tick.toggled.connect(func(on: bool) -> void: _set_setting(key, on))
 			row.add_child(tick)
 		"colour":
-			for hex in field.get("options", []):
-				var swatch := Button.new()
-				swatch.custom_minimum_size = Vector2(28, 28)
-				swatch.tooltip_text = "#%s" % hex
-				var fill := StyleBoxFlat.new()
-				fill.bg_color = Color.html(str(hex))
-				fill.set_border_width_all(3 if str(values.get(key, "")) == str(hex) else 1)
-				fill.border_color = Color.WHITE if str(values.get(key, "")) == str(hex) else Color(1, 1, 1, 0.2)
-				fill.set_corner_radius_all(14)
-				swatch.add_theme_stylebox_override("normal", fill)
-				swatch.add_theme_stylebox_override("hover", fill)
-				swatch.pressed.connect(func() -> void:
-					_set_setting(key, str(hex))
-					_rebuild_settings()
-				)
-				row.add_child(swatch)
+			_colour_setting(row, key, field, values)
 		"choice":
-			var list := OptionButton.new()
-			var options: Array = field.get("options", [])
-			for option in options:
-				var def := PlaygroundZee.find_def(StringName(str(option)))
-				list.add_item(def.name_or_id() if def != null else str(option))
-				list.set_item_metadata(list.item_count - 1, str(option))
-				if str(option) == str(values.get(key, field["default"])):
-					list.select(list.item_count - 1)
-			list.item_selected.connect(func(index: int) -> void:
-				_set_setting(key, str(list.get_item_metadata(index)))
-			)
-			row.add_child(list)
+			_choice_setting(row, key, field, values)
 
 	return row
 
+
+## A slider with a drawn track and its value beside it.
+func _float_setting(row: HBoxContainer, key: String, field: Dictionary, values: Dictionary) -> void:
+	var slider := HSlider.new()
+	slider.min_value = float(field["min"])
+	slider.max_value = float(field["max"])
+	slider.step = float(field.get("step", 0.05))
+	slider.value = float(values.get(key, field["default"]))
+	slider.custom_minimum_size = Vector2(220, 0)
+	# A track, drawn. The theme here draws a slider as its grabber alone, and a lone
+	# dot gives no sense of where in the range a value is — a rendered frame showed
+	# "Lift" and "String" as two dots floating beside their numbers.
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(1, 1, 1, 0.12)
+	track.content_margin_top = 2.0
+	track.content_margin_bottom = 2.0
+	track.set_corner_radius_all(2)
+	var filled := StyleBoxFlat.new()
+	filled.bg_color = Style.ACCENT
+	filled.content_margin_top = 2.0
+	filled.content_margin_bottom = 2.0
+	filled.set_corner_radius_all(2)
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", filled)
+	slider.add_theme_stylebox_override("grabber_area_highlight", filled)
+	var shown := Label.new()
+	shown.text = "%.2f" % slider.value
+	slider.value_changed.connect(func(value: float) -> void:
+		shown.text = "%.2f" % value
+		_set_setting(key, value)
+	)
+	row.add_child(slider)
+	row.add_child(shown)
+
+## One swatch per option, the chosen one ringed.
+func _colour_setting(row: HBoxContainer, key: String, field: Dictionary, values: Dictionary) -> void:
+	for hex in field.get("options", []):
+		var swatch := Button.new()
+		swatch.custom_minimum_size = Vector2(28, 28)
+		swatch.tooltip_text = "#%s" % hex
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = Color.html(str(hex))
+		fill.set_border_width_all(3 if str(values.get(key, "")) == str(hex) else 1)
+		fill.border_color = Color.WHITE if str(values.get(key, "")) == str(hex) else Color(1, 1, 1, 0.2)
+		fill.set_corner_radius_all(14)
+		swatch.add_theme_stylebox_override("normal", fill)
+		swatch.add_theme_stylebox_override("hover", fill)
+		swatch.pressed.connect(func() -> void:
+			_set_setting(key, str(hex))
+			_rebuild_settings()
+		)
+		row.add_child(swatch)
+
+## A drop-down over the options, zee weapons shown by name.
+func _choice_setting(row: HBoxContainer, key: String, field: Dictionary, values: Dictionary) -> void:
+	var list := OptionButton.new()
+	var options: Array = field.get("options", [])
+	for option in options:
+		var def := PlaygroundZee.find_def(StringName(str(option)))
+		list.add_item(def.name_or_id() if def != null else str(option))
+		list.set_item_metadata(list.item_count - 1, str(option))
+		if str(option) == str(values.get(key, field["default"])):
+			list.select(list.item_count - 1)
+	list.item_selected.connect(func(index: int) -> void:
+		_set_setting(key, str(list.get_item_metadata(index)))
+	)
+	row.add_child(list)
 
 ## Puts [param values] in as tool [param id]'s settings without sending them anywhere: what the
 ## server says a selected prop IS, for the edit mode. The panel is redrawn only when something

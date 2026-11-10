@@ -25,34 +25,9 @@ func _run() -> void:
 	print("playground — headless integration")
 	print("")
 
-	playground = Playground.new()
-
-	var config := PlaygroundConfig.new()
-	# Records in memory: a headless run must not write into the user's data directory.
-	config.records_directory = ""
-	# No map on boot: the tests below load their own and would race a boot load.
-	config.initial_map = &"pg_flatgrass"
-	config.map_seconds = 0.0
-	playground.config = config
-
-	add_child(playground)
-
-	# Two frames: `_ready` awaits its first map change, so one is not enough to finish booting.
-	await get_tree().process_frame
-	await get_tree().process_frame
-
-	# `-- --only=<method>` runs the boot and that one section, for working on it: nothing
-	# else runs, so the totals are not checked and the exit code is the section's alone.
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--only="):
-			await _test_boots()
-			await Callable(self, arg.substr(7)).call()
-			print("")
-			print("ONLY %s: %d passed, %d failed (totals not checked)" % [arg.substr(7), _passed, _failed])
-			for line in _failures:
-				print("  FAIL  %s" % line)
-			get_tree().quit(1 if _failed > 0 else 0)
-			return
+	await _boot()
+	if await _run_only():
+		return
 
 	await _test_boots()
 	await _test_tick_rate_comes_from_the_engine()
@@ -109,6 +84,42 @@ func _run() -> void:
 	var sections := SECTIONS + (TIMER_SECTIONS if _timer_linked() else 0)
 	var checks := CHECKS + (TIMER_CHECKS if _timer_linked() else 0)
 	_report_sections(_entered, _completed, sections, checks)
+
+
+## The playground, on the flat map, with records in memory.
+func _boot() -> void:
+	playground = Playground.new()
+
+	var config := PlaygroundConfig.new()
+	# Records in memory: a headless run must not write into the user's data directory.
+	config.records_directory = ""
+	# No map on boot: the tests below load their own and would race a boot load.
+	config.initial_map = &"pg_flatgrass"
+	config.map_seconds = 0.0
+	playground.config = config
+
+	add_child(playground)
+
+	# Two frames: `_ready` awaits its first map change, so one is not enough to finish booting.
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
+	# `-- --only=<method>` runs the boot and that one section, for working on it: nothing
+	# else runs, so the totals are not checked and the exit code is the section's alone.
+## Returns whether it was asked for, and then has run and quit.
+func _run_only() -> bool:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--only="):
+			await _test_boots()
+			await Callable(self, arg.substr(7)).call()
+			print("")
+			print("ONLY %s: %d passed, %d failed (totals not checked)" % [arg.substr(7), _passed, _failed])
+			for line in _failures:
+				print("  FAIL  %s" % line)
+			get_tree().quit(1 if _failed > 0 else 0)
+			return true
+	return false
 
 
 ## Whether a point is over a box seen from above.

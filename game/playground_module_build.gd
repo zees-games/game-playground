@@ -230,240 +230,28 @@ func _build_extras() -> DotResult:
 	services.command_entered.connect(_on_chat_command)
 	services.chat.message_accepted.connect(_on_chat_accepted)
 
-	arena = PlaygroundArena.new()
-	arena.name = "Arena"
-	add_child(arena)
+	var staged: DotResult = _build_arena_stage()
+	if not staged.ok:
+		return staged
 
-	var fought := arena.setup(game)
+	staged = _build_waves_stage()
+	if not staged.ok:
+		return staged
 
-	if not fought.ok:
-		return fought.wrap("The arena could not be set up")
+	staged = _build_economy_stage()
+	if not staged.ok:
+		return staged
 
-	_build_loading()
+	staged = _build_progress_stage()
+	if not staged.ok:
+		return staged
 
-	arena.health_changed.connect(_on_health_changed)
-	arena.player_killed.connect(_on_player_killed)
-	arena.damage_landed.connect(func(attacker: StringName, victim: StringName, damage: DotDamage) -> void:
-		if progress != null:
-			progress.report_hit(attacker, victim, damage)
-	)
-
-	_wire_arena_hooks()
-	arena.clock_changed.connect(bridge.broadcast_match)
-	_build_loadout_command()
-
-	_build_mod_tools()
-	_build_map_edit()
-
-	waves = PlaygroundWaves.new()
-	waves.name = "Waves"
-	add_child(waves)
-
-	# A real server keeps what its wave NPCs learn of each map across restarts. Set here
-	# and not in the waves, because every suite builds waves and only a server loads this.
-	waves.heat.persist = true
-
-	var waved := waves.setup(game)
-
-	if not waved.ok:
-		return waved.wrap("The waves could not be set up")
-
-	# Every wave NPC to every client. They were never replicated: a connected player was
-	# hunted by a wave they could not see.
-	if bridge != null:
-		bridge.watch_npc_spawner(waves.spawner, PlaygroundWaves.shared_catalogue())
-
-	# A grenade in the air is a danger the waves get out from under, on their own clock.
-	if game.projectiles != null:
-		game.projectiles.add_board(waves.sounds, waves.spawner.now)
-
-	# The director paces against real health when the arena is on, and against proximity
-	# alone when it is not. One callable rather than two code paths.
-	# Something the director sent has died, and somebody killed it. The wave mode is
-	# what makes a price list worth having: a wave pays, a jeep costs, and a player who
-	# spent everything on turrets has to earn the next one.
-	waves.spawner.died.connect(func(_npc: DotNpcInstance, by: StringName) -> void:
-		shop.on_wave_kill(by))
-
-	waves.health_fn = func(id: StringName) -> float:
-		var health := arena.health_of(id)
-		return health.fraction() if health != null else 1.0
-
-	shop = PlaygroundShop.new()
-	shop.name = "Shop"
-	add_child(shop)
-
-	var priced := shop.setup(game)
-
-	if not priced.ok:
-		return priced.wrap("The shop could not be set up")
-
-	# The bridge charges through this and knows nothing about prices. Unset it and
-	# everything is free, which is what this game was before there was a price list.
-	bridge.charge_fn = shop.charge
-	# Asked before a spawn, which is charged only once it exists. See _spawn_for.
-	bridge.may_charge_fn = shop.may_have
-	# A zee weapon's shot reaches dot-combat through this and nothing else.
-	bridge.shot_fn = _resolve_shot
-
-	spectate = PlaygroundSpectate.new()
-	spectate.name = "Spectate"
-	add_child(spectate)
-
-	var watching := spectate.bind(game)
-
-	if not watching.ok:
-		return watching.wrap("Spectating could not be set up")
-
-	spectate.arena = arena
-
-	# And the spawn director, which needs it for the protection window: a sandbox has
-	# nothing to be protected from and the arena's own match rules carry how long.
-	if game.player_stack != null:
-		game.player_stack.arena = arena
-		game.player_stack.refresh_spawn_rules()
-
-	downs = PlaygroundDowns.new()
-	downs.name = "Downs"
-	add_child(downs)
-
-	var dropped := downs.setup(game)
-
-	if not dropped.ok:
-		return dropped.wrap("Incapacitation could not be set up")
-
-	downs.arena = arena
-
-	# The arena asks and the downs layer answers, so the rule lives in one place. Unset
-	# it and everybody dies, which is what a deathmatch is.
-	arena.death_rule_fn = downs.report_zero_health
-
-	# A downed player who bleeds out is a death the scoreboard and respawn queue still have to hear about.
-	downs.died.connect(func(player_id: StringName, _reason: StringName) -> void:
-		if arena.enabled and player_id != &"":
-			arena.match_node.report_kill("", String(player_id), &"bleed_out", game.current_tick())
-			# A death like any other from here on, which it was not: nothing told a client a
-			# downed player had bled out. They crumple where they lay.
-			var fallen: PlaygroundPlayer = game.players.get(player_id, null)
-			if fallen != null:
-				fallen.death = arena.decide_death(player_id, null, DotPlayerDeathReactions.CRUMPLE)
-			arena.player_killed.emit(player_id, &"")
-	)
-
-	downs.revived.connect(func(player_id: StringName, _by: StringName, health: float) -> void:
-		var record := arena.health_of(player_id)
-		if record != null:
-			record.revive(clampf(health / game.config.arena_health, 0.05, 1.0))
-	)
-
-	# Being killed by a wave is what being downed is for, so the two switch together (no separate cvar).
-	downs.set_enabled(waves.is_enabled())
-
-	progress = PlaygroundProgress.new()
-	progress.name = "Progress"
-	progress.backbone = null
-	progress.key_for = _stats_key_for
-	add_child(progress)
-
-	var earned := progress.setup(game)
-
-	if not earned.ok:
-		return earned.wrap("Progress could not be set up")
-
-	progress.earned.connect(_on_earned)
-	_attach_stats_board()
-	# The registered tracker is what DotGameStatsReport's default apply flips.
-	DotRegistry.register(DotGameStatsFeed.SERVICE, progress.stats)
-	var _report := DotGameStatsReport.bind(self)
-
-	vote = PlaygroundVote.new()
-	vote.name = "Vote"
-	vote.player_count_fn = func() -> int: return game.players.size()
-	vote.commands_spec_fn = game.rotation_commands
-	vote.is_admin_fn = _voter_is_admin
-
-	# The drawn ballot, to each playing session with its own voter id (`u<userid>`), so the
-	# client shell marks the player's own choice. Topic `map_ballot`, beside a server's
-	# `game_ballot` when both votes are open at once.
-	vote.ballot_fn = func(state: Dictionary) -> void:
-		for session in server.playing_sessions():
-			var data := state.duplicate()
-			data["you"] = "u%d" % session.userid
-			server.send_notice(session, DotNotice.make(
-				&"", "", float(state.get("seconds", -1.0)), MAP_BALLOT_TOPIC, data
-			))
-
-	vote.people_fn = func(voter: StringName) -> Dictionary:
-		var session := server.session_by_userid(String(voter).trim_prefix("u").to_int())
-
-		if session == null:
-			return {}
-
-		var avatar: Variant = session.identity.get("avatar_url") if session.identity != null else ""
-		return {"name": session.display_name, "avatar": avatar if avatar is String else ""}
-
-	add_child(vote)
-
-	vote.game = game
-	var voted := vote.setup()
-
-	if not voted.ok:
-		return voted.wrap("The vote could not be set up")
-
-	vote.change_due.connect(_on_vote_change_due)
-
-	# Both map clocks follow the server's hibernation: they wait while nobody is here and restart when
-	# somebody joins. With `sv_hibernate_when_empty 0`, dot-vote's `empty_choice` changes the map instead.
-	if vote.director != null:
-		vote.director.follow_hibernation(server)
-	if game.maps != null:
-		game.maps.follow_hibernation(server)
-	vote.announced.connect(_on_vote_announced)
-
-	# The cues and the countdown, to every client. The ballot goes out as chat through
-	# `announced`; a sound and a number a HUD counts are what chat cannot carry.
-	vote.cue_due.connect(func(cue: StringName, seconds_left: int, runoff: bool) -> void:
-		if bridge != null:
-			bridge.broadcast_vote_cue(cue, seconds_left, runoff)
-	)
-
-	# The time left, from the clock that ends the map. The HUD drew the map session's,
-	# which on a client is a clock nobody extends; see `DotVoteClockView`.
-	vote.clock_due.connect(func(state: Dictionary) -> void:
-		if bridge != null:
-			bridge.broadcast_clock(state)
-	)
-
-	if bridge != null:
-		bridge.clock_fn = vote.clock_state
-
-	# [b]One clock that ends a map, and it is the vote's.[/b] See
-	# `Playground.rotation_ends_maps`.
-	game.rotation_ends_maps = false
-
-	# And the clock `pg_status` reports, for the same reason: the session's is no longer
-	# the one that ends the map.
-	game.clock_fn = vote.clock_state
-
-	var commanded := vote.install_commands(self)
-	DotLog.result(CHANNEL, "the vote's commands", commanded)
-
-	# The map menu (M), dot-vote's: a holder of `sv_map_menu_flag` changes the map now through the game's
-	# own change, anybody else gets a vote. Read by name: an older dot-vote has no `map_menu`.
-	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
-	if menu_half is Object:
-		(menu_half as Object).set(&"change_fn", game.change_map)
-
-	# The one signal that fires for every change however it happened (a console `pg_map`, the time
-	# limit, the vote), so the only connection: two would double the play history entries.
-	game.maps.changed.connect(func(map: DotMapDef, _world: Node) -> void:
-		vote.note_playing(map.id)
-	)
-
-	if game.maps.current != null:
-		vote.note_playing(game.maps.current.id)
+	staged = _build_vote_stage()
+	if not staged.ok:
+		return staged
 
 	return DotResult.success(null)
+
 
 
 # --- Chat, voice and votes -------------------------------------------------
@@ -658,3 +446,264 @@ func _mirror_hand_cvars() -> void:
 			c.force_set("1" if value else "0"))
 
 
+## Builds the arena, its hooks, the loadout command, the mod tools and map editing.
+func _build_arena_stage() -> DotResult:
+	arena = PlaygroundArena.new()
+	arena.name = "Arena"
+	add_child(arena)
+
+	var fought := arena.setup(game)
+
+	if not fought.ok:
+		return fought.wrap("The arena could not be set up")
+
+	_build_loading()
+
+	arena.health_changed.connect(_on_health_changed)
+	arena.player_killed.connect(_on_player_killed)
+	arena.damage_landed.connect(func(attacker: StringName, victim: StringName, damage: DotDamage) -> void:
+		if progress != null:
+			progress.report_hit(attacker, victim, damage)
+	)
+
+	_wire_arena_hooks()
+	arena.clock_changed.connect(bridge.broadcast_match)
+	_build_loadout_command()
+
+	_build_mod_tools()
+	_build_map_edit()
+
+	return DotResult.success(null)
+
+
+## Builds the waves and the wiring of their NPCs.
+func _build_waves_stage() -> DotResult:
+	waves = PlaygroundWaves.new()
+	waves.name = "Waves"
+	add_child(waves)
+
+	# A real server keeps what its wave NPCs learn of each map across restarts. Set here
+	# and not in the waves, because every suite builds waves and only a server loads this.
+	waves.heat.persist = true
+
+	var waved := waves.setup(game)
+
+	if not waved.ok:
+		return waved.wrap("The waves could not be set up")
+
+	# Every wave NPC to every client. They were never replicated: a connected player was
+	# hunted by a wave they could not see.
+	if bridge != null:
+		bridge.watch_npc_spawner(waves.spawner, PlaygroundWaves.shared_catalogue())
+
+	# A grenade in the air is a danger the waves get out from under, on their own clock.
+	if game.projectiles != null:
+		game.projectiles.add_board(waves.sounds, waves.spawner.now)
+
+	# The director paces against real health when the arena is on, and against proximity
+	# alone when it is not. One callable rather than two code paths.
+	# Something the director sent has died, and somebody killed it. The wave mode is
+	# what makes a price list worth having: a wave pays, a jeep costs, and a player who
+	# spent everything on turrets has to earn the next one.
+	waves.spawner.died.connect(func(_npc: DotNpcInstance, by: StringName) -> void:
+		shop.on_wave_kill(by))
+
+	waves.health_fn = func(id: StringName) -> float:
+		var health := arena.health_of(id)
+		return health.fraction() if health != null else 1.0
+
+	return DotResult.success(null)
+
+
+## Builds the shop, spectating and the downs layer.
+func _build_economy_stage() -> DotResult:
+	shop = PlaygroundShop.new()
+	shop.name = "Shop"
+	add_child(shop)
+
+	var priced := shop.setup(game)
+
+	if not priced.ok:
+		return priced.wrap("The shop could not be set up")
+
+	# The bridge charges through this and knows nothing about prices. Unset it and
+	# everything is free, which is what this game was before there was a price list.
+	bridge.charge_fn = shop.charge
+	# Asked before a spawn, which is charged only once it exists. See _spawn_for.
+	bridge.may_charge_fn = shop.may_have
+	# A zee weapon's shot reaches dot-combat through this and nothing else.
+	bridge.shot_fn = _resolve_shot
+
+	spectate = PlaygroundSpectate.new()
+	spectate.name = "Spectate"
+	add_child(spectate)
+
+	var watching := spectate.bind(game)
+
+	if not watching.ok:
+		return watching.wrap("Spectating could not be set up")
+
+	spectate.arena = arena
+
+	# And the spawn director, which needs it for the protection window: a sandbox has
+	# nothing to be protected from and the arena's own match rules carry how long.
+	if game.player_stack != null:
+		game.player_stack.arena = arena
+		game.player_stack.refresh_spawn_rules()
+
+	downs = PlaygroundDowns.new()
+	downs.name = "Downs"
+	add_child(downs)
+
+	var dropped := downs.setup(game)
+
+	if not dropped.ok:
+		return dropped.wrap("Incapacitation could not be set up")
+
+	downs.arena = arena
+
+	# The arena asks and the downs layer answers, so the rule lives in one place. Unset
+	# it and everybody dies, which is what a deathmatch is.
+	arena.death_rule_fn = downs.report_zero_health
+
+	# A downed player who bleeds out is a death the scoreboard and respawn queue still have to hear about.
+	downs.died.connect(func(player_id: StringName, _reason: StringName) -> void:
+		if arena.enabled and player_id != &"":
+			arena.match_node.report_kill("", String(player_id), &"bleed_out", game.current_tick())
+			# A death like any other from here on, which it was not: nothing told a client a
+			# downed player had bled out. They crumple where they lay.
+			var fallen: PlaygroundPlayer = game.players.get(player_id, null)
+			if fallen != null:
+				fallen.death = arena.decide_death(player_id, null, DotPlayerDeathReactions.CRUMPLE)
+			arena.player_killed.emit(player_id, &"")
+	)
+
+	downs.revived.connect(func(player_id: StringName, _by: StringName, health: float) -> void:
+		var record := arena.health_of(player_id)
+		if record != null:
+			record.revive(clampf(health / game.config.arena_health, 0.05, 1.0))
+	)
+
+	# Being killed by a wave is what being downed is for, so the two switch together (no separate cvar).
+	downs.set_enabled(waves.is_enabled())
+
+	return DotResult.success(null)
+
+
+## Builds progress, achievements and the stats feed.
+func _build_progress_stage() -> DotResult:
+	progress = PlaygroundProgress.new()
+	progress.name = "Progress"
+	progress.backbone = null
+	progress.key_for = _stats_key_for
+	add_child(progress)
+
+	var earned := progress.setup(game)
+
+	if not earned.ok:
+		return earned.wrap("Progress could not be set up")
+
+	progress.earned.connect(_on_earned)
+	_attach_stats_board()
+	# The registered tracker is what DotGameStatsReport's default apply flips.
+	DotRegistry.register(DotGameStatsFeed.SERVICE, progress.stats)
+	var _report := DotGameStatsReport.bind(self)
+
+	return DotResult.success(null)
+
+
+## Builds the vote, its cues and the map menu.
+func _build_vote_stage() -> DotResult:
+	vote = PlaygroundVote.new()
+	vote.name = "Vote"
+	vote.player_count_fn = func() -> int: return game.players.size()
+	vote.commands_spec_fn = game.rotation_commands
+	vote.is_admin_fn = _voter_is_admin
+
+	# The drawn ballot, to each playing session with its own voter id (`u<userid>`), so the
+	# client shell marks the player's own choice. Topic `map_ballot`, beside a server's
+	# `game_ballot` when both votes are open at once.
+	vote.ballot_fn = func(state: Dictionary) -> void:
+		for session in server.playing_sessions():
+			var data := state.duplicate()
+			data["you"] = "u%d" % session.userid
+			server.send_notice(session, DotNotice.make(
+				&"", "", float(state.get("seconds", -1.0)), MAP_BALLOT_TOPIC, data
+			))
+
+	vote.people_fn = func(voter: StringName) -> Dictionary:
+		var session := server.session_by_userid(String(voter).trim_prefix("u").to_int())
+
+		if session == null:
+			return {}
+
+		var avatar: Variant = session.identity.get("avatar_url") if session.identity != null else ""
+		return {"name": session.display_name, "avatar": avatar if avatar is String else ""}
+
+	add_child(vote)
+
+	vote.game = game
+	var voted := vote.setup()
+
+	if not voted.ok:
+		return voted.wrap("The vote could not be set up")
+
+	vote.change_due.connect(_on_vote_change_due)
+
+	# Both map clocks follow the server's hibernation: they wait while nobody is here and restart when
+	# somebody joins. With `sv_hibernate_when_empty 0`, dot-vote's `empty_choice` changes the map instead.
+	if vote.director != null:
+		vote.director.follow_hibernation(server)
+	if game.maps != null:
+		game.maps.follow_hibernation(server)
+	vote.announced.connect(_on_vote_announced)
+
+	_wire_vote_out()
+
+	return DotResult.success(null)
+
+
+## The vote's cues and clocks to the clients, its commands, and the map-change record.
+func _wire_vote_out() -> void:
+	# The cues and the countdown, to every client. The ballot goes out as chat through
+	# `announced`; a sound and a number a HUD counts are what chat cannot carry.
+	vote.cue_due.connect(func(cue: StringName, seconds_left: int, runoff: bool) -> void:
+		if bridge != null:
+			bridge.broadcast_vote_cue(cue, seconds_left, runoff)
+	)
+
+	# The time left, from the clock that ends the map. The HUD drew the map session's,
+	# which on a client is a clock nobody extends; see `DotVoteClockView`.
+	vote.clock_due.connect(func(state: Dictionary) -> void:
+		if bridge != null:
+			bridge.broadcast_clock(state)
+	)
+
+	if bridge != null:
+		bridge.clock_fn = vote.clock_state
+
+	# [b]One clock that ends a map, and it is the vote's.[/b] See
+	# `Playground.rotation_ends_maps`.
+	game.rotation_ends_maps = false
+
+	# And the clock `pg_status` reports, for the same reason: the session's is no longer
+	# the one that ends the map.
+	game.clock_fn = vote.clock_state
+
+	var commanded := vote.install_commands(self)
+	DotLog.result(CHANNEL, "the vote's commands", commanded)
+
+	# The map menu (M), dot-vote's: a holder of `sv_map_menu_flag` changes the map now through the game's
+	# own change, anybody else gets a vote. Read by name: an older dot-vote has no `map_menu`.
+	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
+	if menu_half is Object:
+		(menu_half as Object).set(&"change_fn", game.change_map)
+
+	# The one signal that fires for every change however it happened (a console `pg_map`, the time
+	# limit, the vote), so the only connection: two would double the play history entries.
+	game.maps.changed.connect(func(map: DotMapDef, _world: Node) -> void:
+		vote.note_playing(map.id)
+	)
+
+	if game.maps.current != null:
+		vote.note_playing(game.maps.current.id)

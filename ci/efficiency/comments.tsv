@@ -3,8 +3,8 @@
 addons/pg_natural_disasters/playground_hook.gd::long_block	1
 addons/pg_timer/playground_hook.gd::banner	6
 addons/pg_timer/playground_hook.gd::long_block	2
-examples/dedicated.gd::history	3
-examples/dedicated.gd::long_block	13
+examples/dedicated.gd::history	2
+examples/dedicated.gd::long_block	7
 examples/headless_config.gd::long_block	1
 examples/headless_mapcfg.gd::long_block	1
 examples/headless_net.gd::long_block	1
@@ -193,3 +193,5 @@ tools/screenshot_net.gd::history	2
 tools/screenshot_net.gd::long_block	3
 tools/screenshot_views.gd::history	2
 tools/screenshot_views.gd::long_block	3
+examples/dedicated_part2.gd::history	1
+examples/dedicated_part2.gd::long_block	6

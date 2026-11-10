@@ -314,45 +314,8 @@ func _on_request(message: DotNetMessage) -> void:
 			_select_tool(session_id, id, PlaygroundEvents.read_id(reader))
 		PlaygroundEvents.Ask.ARM_PROP:
 			var arm := PlaygroundEvents.read_arm(reader)
-			if not bool(arm["ok"]):
-				return
-			match int(arm["sub"]):
-				PlaygroundEvents.ARM_TOOL:
-					_set_tool_mode(session_id, arm["id"] as StringName, str(arm["payload"]))
-				PlaygroundEvents.ARM_NPC_WEAPON:
-					var chosen := game.set_npc_weapon_choice(id, arm["id"] as StringName)
-					if not chosen.ok:
-						_tell(peer_id, PlaygroundEvents.Kind.NOTICE,
-							PlaygroundEvents.write_notice(session_id, chosen.error.message))
-				PlaygroundEvents.ARM_SPAWN_WEAPON:
-					var weapon_id := arm["id"] as StringName
-					if game.weapon_def(weapon_id) != null:
-						_spawn_for(id, Playground.pickup_id_of(weapon_id))
-				PlaygroundEvents.ARM_DROP_WEAPON:
-					var _gun = game.weapon_layer.throw_for(id)
-				PlaygroundEvents.ARM_FLASHLIGHT:
-					var _switched := game.toggle_flashlight(id)
-				PlaygroundEvents.ARM_BUILDS:
-					builds_requested.emit(peer_id)
-				PlaygroundEvents.ARM_LOAD_BUILD:
-					build_load_requested.emit(peer_id, String(arm["id"]))
-				PlaygroundEvents.ARM_ADDON_ITEM:
-					var looked: Variant = JSON.parse_string(str(arm["payload"])) if str(arm["payload"]) != "" else null
-					var at := Vector3.ZERO
-					if looked is Array and (looked as Array).size() == 3:
-						at = Vector3(float(looked[0]), float(looked[1]), float(looked[2]))
-					var started := game.activate_addon_item(String(arm["id"]), session_id, at, id)
-					DotLog.result(CHANNEL, "an addon item was asked for", started)
-					if not started.ok:
-						_tell(peer_id, PlaygroundEvents.Kind.NOTICE,
-							PlaygroundEvents.write_notice(session_id, started.error.message))
-				_:
-					var prop_id := arm["id"] as StringName
-					if game.props.catalogue != null and game.props.catalogue.get_prop(prop_id) != null:
-						_armed_of[session_id] = prop_id
-						var toy: PlaygroundWeapon = _toy_of.get(session_id)
-						if toy != null:
-							toy.armed = prop_id
+			if bool(arm["ok"]):
+				_on_arm(peer_id, session_id, id, arm)
 		PlaygroundEvents.Ask.UNDO:
 			game.undo(id)
 		PlaygroundEvents.Ask.CLEAR_MINE:
@@ -398,6 +361,47 @@ func _on_request(message: DotNetMessage) -> void:
 		PlaygroundEvents.Ask.INVENTORY:
 			if inventory_net != null:
 				inventory_net.on_ask(peer_id, session_id, reader)
+
+
+## One ARM_PROP ask: which tool mode, NPC weapon, spawned weapon, build or addon item the player armed.
+func _on_arm(peer_id: int, session_id: int, id: StringName, arm: Dictionary) -> void:
+	match int(arm["sub"]):
+		PlaygroundEvents.ARM_TOOL:
+			_set_tool_mode(session_id, arm["id"] as StringName, str(arm["payload"]))
+		PlaygroundEvents.ARM_NPC_WEAPON:
+			var chosen := game.set_npc_weapon_choice(id, arm["id"] as StringName)
+			if not chosen.ok:
+				_tell(peer_id, PlaygroundEvents.Kind.NOTICE,
+					PlaygroundEvents.write_notice(session_id, chosen.error.message))
+		PlaygroundEvents.ARM_SPAWN_WEAPON:
+			var weapon_id := arm["id"] as StringName
+			if game.weapon_def(weapon_id) != null:
+				_spawn_for(id, Playground.pickup_id_of(weapon_id))
+		PlaygroundEvents.ARM_DROP_WEAPON:
+			var _gun = game.weapon_layer.throw_for(id)
+		PlaygroundEvents.ARM_FLASHLIGHT:
+			var _switched := game.toggle_flashlight(id)
+		PlaygroundEvents.ARM_BUILDS:
+			builds_requested.emit(peer_id)
+		PlaygroundEvents.ARM_LOAD_BUILD:
+			build_load_requested.emit(peer_id, String(arm["id"]))
+		PlaygroundEvents.ARM_ADDON_ITEM:
+			var looked: Variant = JSON.parse_string(str(arm["payload"])) if str(arm["payload"]) != "" else null
+			var at := Vector3.ZERO
+			if looked is Array and (looked as Array).size() == 3:
+				at = Vector3(float(looked[0]), float(looked[1]), float(looked[2]))
+			var started := game.activate_addon_item(String(arm["id"]), session_id, at, id)
+			DotLog.result(CHANNEL, "an addon item was asked for", started)
+			if not started.ok:
+				_tell(peer_id, PlaygroundEvents.Kind.NOTICE,
+					PlaygroundEvents.write_notice(session_id, started.error.message))
+		_:
+			var prop_id := arm["id"] as StringName
+			if game.props.catalogue != null and game.props.catalogue.get_prop(prop_id) != null:
+				_armed_of[session_id] = prop_id
+				var toy: PlaygroundWeapon = _toy_of.get(session_id)
+				if toy != null:
+					toy.armed = prop_id
 
 
 func _on_event(message: DotNetMessage) -> void:

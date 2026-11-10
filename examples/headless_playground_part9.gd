@@ -722,30 +722,33 @@ func _test_zee_aim() -> void:
 		"the aim argument is the weapon command's aim button")
 
 	# The spread: first shots of a held trigger with the sights down, then up for longer than they take to rise.
-	var spreads := func(aim: bool) -> float:
-		var command := PlaygroundZee.command_for(0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim)
-		var at := 300000
-		for i in range(playground.tick_rate * 2):
-			at += 1
-			var _o := rig.simulate_tick(command, at)
-		var total := 0.0
-		var shots := 0
-		for i in range(playground.tick_rate):
-			at += 1
-			rig.arsenal.current().magazine = held.magazine
-			var fire := PlaygroundZee.command_for(DotFpsCommand.BUTTON_USER_0 if i % 2 == 0 else 0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim)
-			var outcome := rig.simulate_tick(fire, at)
-			for shot in outcome.shots:
-				total += shot.spread
-				shots += 1
-		return total / float(maxi(shots, 1))
-	var hip_spread: float = spreads.call(false)
-	var aimed_spread: float = spreads.call(true)
+	var hip_spread := _zee_mean_spread(rig, held, false)
+	var aimed_spread := _zee_mean_spread(rig, held, true)
 	_check(hip_spread > 0.0 and aimed_spread < hip_spread * 0.9,
 		"and the sights close the spread", "hip %.3f, aimed %.3f degrees, rule %.2f" % [hip_spread, aimed_spread, rules.spread_for(held.id)])
 	PlaygroundZee.disarm(bot)
 	bot.teleport(start, 90.0)
 	_done()
+
+
+## The mean spread of a held trigger's shots over a second, sights up or down, after two seconds to settle.
+func _zee_mean_spread(rig: ZeeWeaponRig, held: DotWeaponDef, aim: bool) -> float:
+	var command := PlaygroundZee.command_for(0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim)
+	var at := 300000
+	for i in range(playground.tick_rate * 2):
+		at += 1
+		var _o := rig.simulate_tick(command, at)
+	var total := 0.0
+	var shots := 0
+	for i in range(playground.tick_rate):
+		at += 1
+		rig.arsenal.current().magazine = held.magazine
+		var fire := PlaygroundZee.command_for(DotFpsCommand.BUTTON_USER_0 if i % 2 == 0 else 0, 0.0, 0.0, PlaygroundZee.slot_of(rig), aim)
+		var outcome := rig.simulate_tick(fire, at)
+		for shot in outcome.shots:
+			total += shot.spread
+			shots += 1
+	return total / float(maxi(shots, 1))
 
 
 func _test_the_flashlight() -> void:

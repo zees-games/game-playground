@@ -208,7 +208,6 @@ func _build_gate() -> void:
 	platform.force_offline = link == null and OS.get_cmdline_user_args().has("--offline")
 	platform.link = link
 	platform.use_standalone_content = fetch_content
-	platform.use_locked_content = fetch_content
 	# Not built by the platform: the settings document is PlaygroundPresentation's (handed over by `adopt_menu`) and the console follows that menu.
 	# The pointer is the platform's except while the Q menu or server browser is up; Tab is the roster's, not the platform's board.
 	platform.use_settings = false

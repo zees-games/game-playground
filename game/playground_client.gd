@@ -207,6 +207,40 @@ func _build_netcode() -> DotResult:
 			state["settings"], str(state["refused"]))
 	)
 	bridge.combat_received.connect(_on_combat)
+	_follow_server_rules()
+	# The server's pg_ambient* set drives the quiet layer; the player's sliders multiply on top.
+	if presentation != null and presentation.ambient != null:
+		presentation.ambient.follow_settings(presentation.settings, playground.ambient_rules)
+	_build_ragdolls()
+	bridge.body_fell.connect(func(figure: Node3D, death: DotPlayerDeath) -> void:
+		if ragdolls != null and figure.is_inside_tree():
+			_land_on_the_world()
+			var _fell := ragdolls.spawn(figure, death)
+	)
+	_connect_bridge_notices()
+
+	# Stock tunables until there is a player to ask; _adopt swaps them in when JOIN arrives.
+	_sampler = PlaygroundTouch.make_sampler(DotFpsTunables.new(), _touch_ignores)
+
+	# Nothing may be sent before the peer says it can receive: dot-server's signon ends before
+	# this scene exists, so earlier sends hit a missing node and the client never joins.
+	if link.has_method("is_playing") and bool(link.call("is_playing")):
+		bridge.ask_ready()
+		workbench_remote.ask()
+	elif link.has_signal("spawned"):
+		link.connect("spawned", bridge.ask_ready, CONNECT_ONE_SHOT)
+		link.connect("spawned", workbench_remote.ask, CONNECT_ONE_SHOT)
+
+	# Nothing in dot-net writes an RTT sample; without one the clock believes the link is instant.
+	if link.has_method("ping_ms"):
+		bridge.rtt_source = func() -> float:
+			return float(maxi(0, int(link.call("ping_ms"))))
+
+	return net.start()
+
+
+## The server's rule sets this end follows: bodies, drops, props, aim down sights, the camera, collision and ambience.
+func _follow_server_rules() -> void:
 	# The server's sv_ragdoll* set: this end draws the bodies.
 	if link != null:
 		var _bodies := playground.ragdoll_rules.follow_cvars(link)
@@ -219,15 +253,10 @@ func _build_netcode() -> DotResult:
 		var _solid := playground.body_rules.follow_cvars(link)
 		var _ambient := playground.ambient_rules.follow_cvars(link)
 		_follow_arena(link)
-	# The server's pg_ambient* set drives the quiet layer; the player's sliders multiply on top.
-	if presentation != null and presentation.ambient != null:
-		presentation.ambient.follow_settings(presentation.settings, playground.ambient_rules)
-	_build_ragdolls()
-	bridge.body_fell.connect(func(figure: Node3D, death: DotPlayerDeath) -> void:
-		if ragdolls != null and figure.is_inside_tree():
-			_land_on_the_world()
-			var _fell := ragdolls.spawn(figure, death)
-	)
+
+
+## The bridge's hits, matches, progress, notices and the vote cue, to the HUD and the presentation.
+func _connect_bridge_notices() -> void:
 	bridge.hit_received.connect(_on_hit)
 	bridge.match_received.connect(_on_match)
 	bridge.progress_received.connect(_on_progress)
@@ -254,24 +283,6 @@ func _build_netcode() -> DotResult:
 			presentation.on_vote_cue(StringName(str(info.get("cue", ""))))
 	)
 
-	# Stock tunables until there is a player to ask; _adopt swaps them in when JOIN arrives.
-	_sampler = PlaygroundTouch.make_sampler(DotFpsTunables.new(), _touch_ignores)
-
-	# Nothing may be sent before the peer says it can receive: dot-server's signon ends before
-	# this scene exists, so earlier sends hit a missing node and the client never joins.
-	if link.has_method("is_playing") and bool(link.call("is_playing")):
-		bridge.ask_ready()
-		workbench_remote.ask()
-	elif link.has_signal("spawned"):
-		link.connect("spawned", bridge.ask_ready, CONNECT_ONE_SHOT)
-		link.connect("spawned", workbench_remote.ask, CONNECT_ONE_SHOT)
-
-	# Nothing in dot-net writes an RTT sample; without one the clock believes the link is instant.
-	if link.has_method("ping_ms"):
-		bridge.rtt_source = func() -> float:
-			return float(maxi(0, int(link.call("ping_ms"))))
-
-	return net.start()
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -25,69 +25,8 @@ func _run() -> void:
 	_test_inventory_wire()
 
 	if await _build():
-		await _test_handshake()
-		await _test_prediction()
-		await _test_local_is_predicted()
-		await _test_prop_replication()
-		await _test_prop_request()
-		await _test_tools()
-		await _test_prop_removal()
-		await _test_vehicle_over_the_wire()
-		await _test_timer()
-		await _test_lossy()
-		# Both halves share one physics space, so a test that advances the world moves every later
-		# reading. This one spawns no body; before the vehicle test it made that flake.
-		await _test_weapon_request()
-		# Adds a second body to the shared physics space, and takes it back out.
-		await _test_blind_and_beacon()
-		# Adds a body to the shared world and takes it back out.
-		await _test_somebody_else_is_drawn()
-		_test_clock_wire()
-		# Adds no body and moves nothing; it builds the services and takes them down again.
-		await _test_chat_end_to_end()
-		# Before the inventory sections, whose bag it must not find a barrel in; the inventory
-		# runs last of them because the rejoin takes the player's body out and back.
-		await _test_refused_spawn_is_free()
-		await _test_inventory_predicted()
-		await _test_inventory_refused()
-		await _test_inventory_lost()
-		await _test_inventory_from_the_server()
-		await _test_inventory_is_private()
-		await _test_nothing_before_ready()
-		await _test_inventory_flood()
-		await _test_inventory_rejoin()
-		await _test_zee_over_the_wire()
-		await _test_toys_over_the_wire()
-		# Last but the leave: it resizes the crate and spawns an NPC.
-		await _test_tool_look_and_armed_npcs()
-		# Adds no body: a grenade is a ray swept each tick, not a physics object.
-		await _test_grenade_over_the_wire()
-		await _test_own_grenade_predicted()
-		await _test_utility_over_the_wire()
-		# Spawns a platform and takes it out again; nothing after it but the leave.
-		await _test_riding_over_the_wire()
-		await _test_button_over_the_wire()
-		await _test_builds_over_the_wire()
-		await _test_edit_over_the_wire()
-		await _test_map_props_over_the_wire()
-		await _test_held_over_the_wire()
-		await _test_glass_over_the_wire()
-		await _test_swimming_over_the_wire()
-		await _test_avatars_over_the_wire()
-		# Arms a gun and puts it away again; adds no body.
-		await _test_drawn_ammo_corrected()
-		await _test_the_aim_bit_crosses()
-		# Lays the player down and stands them up again; adds no body.
-		await _test_downed_over_the_wire()
-		await _test_the_flashlight_crosses()
-		# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
-		# the leave, because a ball it kicks would be in the way of whatever came after.
-		await _test_map_toys_over_the_wire()
-		# Moves only the player's own body (noclip, then back); adds none.
-		await _test_noclip_over_the_wire()
-		await _test_grenade_for_a_joiner()
-		await _test_movement_over_the_wire()
-		await _test_leave()
+		await _connected_sequence_one()
+		await _connected_sequence_two()
 
 	_test_the_remote_workbench()
 
@@ -99,6 +38,77 @@ func _run() -> void:
 		"%d: %s" % [seen.size(), ", ".join(seen.slice(0, 3))])
 
 	_finish()
+
+
+## From the handshake to the chat: the order is the suite's (both halves share one physics space).
+func _connected_sequence_one() -> void:
+	await _test_handshake()
+	await _test_prediction()
+	await _test_local_is_predicted()
+	await _test_prop_replication()
+	await _test_prop_request()
+	await _test_tools()
+	await _test_prop_removal()
+	await _test_vehicle_over_the_wire()
+	await _test_timer()
+	await _test_lossy()
+	# Both halves share one physics space, so a test that advances the world moves every later
+	# reading. This one spawns no body; before the vehicle test it made that flake.
+	await _test_weapon_request()
+	# Adds a second body to the shared physics space, and takes it back out.
+	await _test_blind_and_beacon()
+	# Adds a body to the shared world and takes it back out.
+	await _test_somebody_else_is_drawn()
+	_test_clock_wire()
+	# Adds no body and moves nothing; it builds the services and takes them down again.
+	await _test_chat_end_to_end()
+
+
+## The inventory sections to the leave.
+func _connected_sequence_two() -> void:
+	# Before the inventory sections, whose bag it must not find a barrel in; the inventory
+	# runs last of them because the rejoin takes the player's body out and back.
+	await _test_refused_spawn_is_free()
+	await _test_inventory_predicted()
+	await _test_inventory_refused()
+	await _test_inventory_lost()
+	await _test_inventory_from_the_server()
+	await _test_inventory_is_private()
+	await _test_nothing_before_ready()
+	await _test_inventory_flood()
+	await _test_inventory_rejoin()
+	await _test_zee_over_the_wire()
+	await _test_toys_over_the_wire()
+	# Last but the leave: it resizes the crate and spawns an NPC.
+	await _test_tool_look_and_armed_npcs()
+	# Adds no body: a grenade is a ray swept each tick, not a physics object.
+	await _test_grenade_over_the_wire()
+	await _test_own_grenade_predicted()
+	await _test_utility_over_the_wire()
+	# Spawns a platform and takes it out again; nothing after it but the leave.
+	await _test_riding_over_the_wire()
+	await _test_button_over_the_wire()
+	await _test_builds_over_the_wire()
+	await _test_edit_over_the_wire()
+	await _test_map_props_over_the_wire()
+	await _test_held_over_the_wire()
+	await _test_glass_over_the_wire()
+	await _test_swimming_over_the_wire()
+	await _test_avatars_over_the_wire()
+	# Arms a gun and puts it away again; adds no body.
+	await _test_drawn_ammo_corrected()
+	await _test_the_aim_bit_crosses()
+	# Lays the player down and stands them up again; adds no body.
+	await _test_downed_over_the_wire()
+	await _test_the_flashlight_crosses()
+	# The map's toys: kicks a ball and spins the roundabout, changes map and back. Last but
+	# the leave, because a ball it kicks would be in the way of whatever came after.
+	await _test_map_toys_over_the_wire()
+	# Moves only the player's own body (noclip, then back); adds none.
+	await _test_noclip_over_the_wire()
+	await _test_grenade_for_a_joiner()
+	await _test_movement_over_the_wire()
+	await _test_leave()
 
 
 func _finish() -> void:

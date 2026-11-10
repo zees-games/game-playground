@@ -66,6 +66,50 @@ func _module_load() -> DotResult:
 	if not dressed.ok:
 		DotLog.result(CHANNEL, "the identity layer", dressed)
 
+	_register_commands()
+	_register_map_commands()
+	_register_addon_cvars()
+
+	_bind_limits()
+	_bind_slots()
+	_bind_pickup()
+	_bind_creative()
+	_bind_props_feel()
+	var blocked := _bind_noblock()
+	if not blocked.ok:
+		return blocked
+	_bind_config()
+
+	server.client_disconnected.connect(_on_client_disconnected)
+	game.maps.map_over.connect(_on_map_over)
+	game.run_filed.connect(_on_run_filed)
+
+	hook_post("client_spawn", _on_client_spawn)
+
+	# dot-server's own chat is cancelled here, not listened to: [DotChatRouter] has the rules, and both
+	# running would leak admin chat. Only a pre-hook can cancel; handle_message broadcasts on return.
+	hook_pre("player_chat", _on_player_chat)
+
+	# dot-chat makes the join and leave notices now, so dot-server's would be a second one
+	# on a second path.
+	if server.chat != null:
+		server.chat.announce_joins = false
+
+	_build_query_provider()
+
+	game.maps.changed.connect(_report_map)
+	_report_map(game.maps.current)
+
+	log_info("playground loaded", {
+		"map": String(game.maps.current.id) if game.maps.current != null else "-",
+		"tick_rate": game.tick_rate,
+	})
+
+	return DotResult.success(null)
+
+
+## Spawn and style, props, and the commands of the addons an operator turns on.
+func _register_commands() -> void:
 	# --- Spawn and style ---------------------------------------------------
 	add_command(
 		"pg_restart", _cmd_restart,
@@ -80,7 +124,25 @@ func _module_load() -> DotResult:
 	if game.run_timer != null and game.run_timer.has_method("bind_commands"):
 		game.run_timer.call("bind_commands", add_command, _target)
 
+	# --- Props -------------------------------------------------------------
+	add_command("pg_prop", _cmd_prop, "Spawn a prop in front of you", "").with_chat()
+	add_command("pg_undo", _cmd_undo, "Remove the last prop you spawned", "").with_chat()
+	add_command("pg_save", _cmd_save, "Save everything you have built: pg_save <name>", "").with_chat()
+	add_command("pg_load", _cmd_load, "Put a saved build down in front of you: pg_load <name>", "").with_chat()
+	add_command("pg_builds", _cmd_builds, "List your saved builds", "").with_chat()
+	add_command("pg_build_delete", _cmd_build_delete, "Delete a saved build: pg_build_delete <name>", "").with_chat()
+	add_command(
+		"pg_props_clear", _cmd_props_clear,
+		"Remove every prop, or one player's",
+		DotAdminFlags.GENERIC
+	).with_chat()
 
+	add_command("pg_status", _cmd_status, "What this server is doing", "").with_chat()
+	_register_addon_commands()
+
+
+## Maps: `map`, `maps` and `mapinfo` and the rotation file.
+func _register_map_commands() -> void:
 	# `.with_chat()` makes a command typable from chat whatever `sv_chat_commands` says; these survive an
 	# operator turning it off, and the map commands below rely on the flag.
 
@@ -111,22 +173,57 @@ func _module_load() -> DotResult:
 
 	bind_map_commands(add_command)
 
-	# --- Props -------------------------------------------------------------
-	add_command("pg_prop", _cmd_prop, "Spawn a prop in front of you", "").with_chat()
-	add_command("pg_undo", _cmd_undo, "Remove the last prop you spawned", "").with_chat()
-	add_command("pg_save", _cmd_save, "Save everything you have built: pg_save <name>", "").with_chat()
-	add_command("pg_load", _cmd_load, "Put a saved build down in front of you: pg_load <name>", "").with_chat()
-	add_command("pg_builds", _cmd_builds, "List your saved builds", "").with_chat()
-	add_command("pg_build_delete", _cmd_build_delete, "Delete a saved build: pg_build_delete <name>", "").with_chat()
-	add_command(
-		"pg_props_clear", _cmd_props_clear,
-		"Remove every prop, or one player's",
-		DotAdminFlags.GENERIC
-	).with_chat()
 
-	add_command("pg_status", _cmd_status, "What this server is doing", "").with_chat()
+## The cvars the addons' rule sets bind, and the Workbench sets over them.
+func _register_addon_cvars() -> void:
+	# The tick rate is dot-server's `sv_tickrate`, not duplicated: a second cvar could disagree with the engine's.
+	add_cvar(
+		"pg_map_seconds",
+		str(int(game.maps.time_limit.duration)),
+		"Seconds a map runs before the next one is chosen. 0 disables it."
+	)
 
-	# --- The addons an operator turns on -----------------------------------
+	# Every NPC's reaction time and how good it is, over the character its kind was given.
+	# NOTIFY, because players should know the NPCs just got harder.
+	game.npc_skill.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
+
+	# Thrown grenades: arena_weapons' sv_grenade_* set (bounce, friction, flash, smoke and fire times).
+	var _grenades := game.grenade_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
+	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's
+	# reaction from them; REPLICATED, because the clients draw the bodies.
+	var _ragdolls := game.ragdoll_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+	var _drops = game.weapon_layer.bind_cvars(add_cvar)
+	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
+	# server took away and draws the rest.
+	var _toys := game.toy_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+	# Aim down sights: the numbers the simulation reads cross as one JSON cvar, `zee_ads_rules`.
+	var _ads := game.ads_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
+	# dot-player-controller's mp_forceview (view mode) and mp_solidplayers (players block each other),
+	# REPLICATED: the client places its camera under the first and predicts its player under the second.
+	var _views := game.view_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+	var _bodies := game.body_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
+	var _ambient := game.ambient_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+	)
+	# The Workbench started with the netcode, before these addon cvars existed: list their sets now.
+	var _addon_sets := PlaygroundWorkbenchSets.add_cvar_sets(workbench, console, game.profiles.runtime)
+
+
+## The commands of the addons an operator turns on.
+func _register_addon_commands() -> void:
 	add_command(
 		"pg_services", _cmd_services,
 		"Show chat, voice and moderation", DotAdminFlags.GENERIC
@@ -178,87 +275,3 @@ func _module_load() -> DotResult:
 	add_command(
 		"pg_mute", _cmd_mute, "pg_mute <who> <seconds> [reason]", DotAdminFlags.MUTE
 	).with_chat()
-
-	# The tick rate is dot-server's `sv_tickrate`, not duplicated: a second cvar could disagree with the engine's.
-	add_cvar(
-		"pg_map_seconds",
-		str(int(game.maps.time_limit.duration)),
-		"Seconds a map runs before the next one is chosen. 0 disables it."
-	)
-
-	# Every NPC's reaction time and how good it is, over the character its kind was given.
-	# NOTIFY, because players should know the NPCs just got harder.
-	game.npc_skill.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
-
-	# Thrown grenades: arena_weapons' sv_grenade_* set (bounce, friction, flash, smoke and fire times).
-	var _grenades := game.grenade_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
-	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's
-	# reaction from them; REPLICATED, because the clients draw the bodies.
-	var _ragdolls := game.ragdoll_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-	var _drops = game.weapon_layer.bind_cvars(add_cvar)
-	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
-	# server took away and draws the rest.
-	var _toys := game.toy_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-	# Aim down sights: the numbers the simulation reads cross as one JSON cvar, `zee_ads_rules`.
-	var _ads := game.ads_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-
-	# dot-player-controller's mp_forceview (view mode) and mp_solidplayers (players block each other),
-	# REPLICATED: the client places its camera under the first and predicts its player under the second.
-	var _views := game.view_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-	var _bodies := game.body_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-
-	var _ambient := game.ambient_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
-	)
-	# The Workbench started with the netcode, before these addon cvars existed: list their sets now.
-	var _addon_sets := PlaygroundWorkbenchSets.add_cvar_sets(workbench, console, game.profiles.runtime)
-
-	_bind_limits()
-	_bind_slots()
-	_bind_pickup()
-	_bind_creative()
-	_bind_props_feel()
-	var blocked := _bind_noblock()
-	if not blocked.ok:
-		return blocked
-	_bind_config()
-
-	server.client_disconnected.connect(_on_client_disconnected)
-	game.maps.map_over.connect(_on_map_over)
-	game.run_filed.connect(_on_run_filed)
-
-	hook_post("client_spawn", _on_client_spawn)
-
-	# dot-server's own chat is cancelled here, not listened to: [DotChatRouter] has the rules, and both
-	# running would leak admin chat. Only a pre-hook can cancel; handle_message broadcasts on return.
-	hook_pre("player_chat", _on_player_chat)
-
-	# dot-chat makes the join and leave notices now, so dot-server's would be a second one
-	# on a second path.
-	if server.chat != null:
-		server.chat.announce_joins = false
-
-	_build_query_provider()
-
-	game.maps.changed.connect(_report_map)
-	_report_map(game.maps.current)
-
-	log_info("playground loaded", {
-		"map": String(game.maps.current.id) if game.maps.current != null else "-",
-		"tick_rate": game.tick_rate,
-	})
-
-	return DotResult.success(null)
-
-

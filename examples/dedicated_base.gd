@@ -633,6 +633,15 @@ func _test_progress() -> void:
 		"a best time keeps the LOWEST reading, not the newest"
 	)
 
+	_check_hit_zones_and_rank(progress)
+
+	var written: DotResult = await progress.achievements.flush()
+	_check(written.ok, "progress writes to disk", str(written.error))
+	_section_done()
+
+
+## A hit with a body zone is filed by zone, and the rank score builds on the stored lifetime.
+func _check_hit_zones_and_rank(progress: PlaygroundProgress) -> void:
 	var zoned := DotDamage.make(1, 2, 5.0, _module().get("arena").combat.damage_type(&"kinetic"))
 	zoned.hit_group = DotHitGroup.NECK
 	zoned.weapon_id = &"probe"
@@ -649,9 +658,6 @@ func _test_progress() -> void:
 	_check(progress.stats.session_values(&"pg-test").get_value(PlaygroundProgress.RANK_SCORE, 0.0) == 9.0,
 		"rank_score is built on the stored lifetime (10 kills) plus the session (2 deaths), not the session alone")
 
-	var written: DotResult = await progress.achievements.flush()
-	_check(written.ok, "progress writes to disk", str(written.error))
-	_section_done()
 
 
 ## `pg_status`'s "time left" is the vote's clock, and an extend moves it. It once read the map
