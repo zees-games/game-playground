@@ -104,6 +104,10 @@ func _net_physics(delta: float) -> void:
 	if net == null or bridge == null or not net.is_running():
 		return
 
+	# Snapshots read since the last frame are reconciled before the clock moves: the replay runs to the clock's
+	# tick, and after `advance` that is a tick `predict_tick` has yet to simulate, so it was played twice.
+	net.flush_reconcile()
+
 	var ticks := net.clock.advance(delta)
 
 	var sampler := active_sampler()
