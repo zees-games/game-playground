@@ -1,4 +1,4 @@
-extends "res://game/playground_spawn_menu_cards.gd"
+extends "playground_spawn_menu_cards.gd"
 
 
 

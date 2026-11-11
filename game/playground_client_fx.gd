@@ -1,4 +1,4 @@
-extends "res://game/playground_client_flash.gd"
+extends "playground_client_flash.gd"
 
 
 ## Chat and voice, once the bridge exists.

@@ -1,4 +1,4 @@
-extends "res://game/playground_module_handlers.gd"
+extends "playground_module_handlers.gd"
 
 const PlaygroundWorkbenchSets := preload("playground_workbench_sets.gd")
 

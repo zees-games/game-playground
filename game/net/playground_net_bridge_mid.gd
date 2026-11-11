@@ -1,4 +1,4 @@
-extends "res://game/net/playground_net_bridge_base.gd"
+extends "playground_net_bridge_base.gd"
 
 
 ## Builds the inventory's half of the wire, when the game has an inventory.

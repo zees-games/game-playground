@@ -1,4 +1,4 @@
-extends "res://game/playground_client_net.gd"
+extends "playground_client_net.gd"
 
 ## The flashlight's presentation, split out of the client: the light on the eye and the others' beams (dot-flashlight); the server owns on/off. No `class_name`; the fx half extends this.
 
