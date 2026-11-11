@@ -675,7 +675,7 @@ func _test_the_maps_are_surveyed() -> void:
 			"%s: and nowhere a spawn reaches is a place with no way out" % id,
 			"; ".join(found["trapped"]))
 
-	# The custom maps game-playlot-maps delivers, linked in as `maps/custom`. Named rather
+	# The custom maps playlot-maps delivers, linked in as `maps/custom`. Named rather
 	# than listed off the directory, so a checkout without the link fails here instead of
 	# surveying nothing and passing.
 	_tmas_data_script = load("res://maps/pg_data.gd") as GDScript

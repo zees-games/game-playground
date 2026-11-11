@@ -37,7 +37,7 @@ The files of [CLAUDE.md](../CLAUDE.md)'s layout, one by one.
 | `game/playground_client.gd`, `playground_hud.gd`, `playground_spawn_menu.gd`, `playground_icons.gd`, `playground_presentation.gd`, `playground_rope_view.gd`, `game/client/` | the client: not headless |
 | `game/net/` | the dot-net bridge, link, per-kind net classes, events and requests, the bag's wire |
 | `game/playground_map.gd`, `playground_geometry.gd`, `playground_lighting.gd`, `playground_map_survey.gd`, `playground_materials.gd`, `playground_worldgen.gd` | the map base, box building and the palette, each map's dot-lighting, the survey, materials, the generator |
-| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (builds a JSON map), `custom/` (game-playlot-maps, linked) |
+| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (builds a JSON map), `custom/` (playlot-maps, linked) |
 | `examples/` | the five suites |
 | `tools/` | `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd` |
 | `assets/` | vendored CC0 art: zee weapons and arms, the character kit, Kenney's prototype grid |
