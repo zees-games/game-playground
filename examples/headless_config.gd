@@ -10,7 +10,10 @@ const PlaygroundConfig := preload("../game/playground_config.gd")
 const PlaygroundAmbience := preload("../game/playground_ambience.gd")
 const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundWaves := preload("../game/playground_waves.gd")
-const ROOT := "user://pg_cfgtest"
+## One directory per suite process (the probe child is handed its parent's): user:// is shared by
+## every copy of this project on a box, and two suites at once wrote and deleted each other's cfg files.
+const ROOT_ARG := "--cfgroot="
+var ROOT := _root()
 const GAME := "game-playground"
 const CHECKS := 42
 const SECTIONS := 4
@@ -22,6 +25,13 @@ var _finished := 0
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
 	_run.call_deferred()
+
+
+func _root() -> String:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with(ROOT_ARG):
+			return a.substr(ROOT_ARG.length())
+	return "user://pg_cfgtest_%d" % OS.get_process_id()
 
 
 func _run() -> void:
@@ -50,17 +60,17 @@ func _run() -> void:
 	_check(binder.diff_yaml().contains("arena_score_limit: 7"), "the diff names the edit")
 	_npc_scales()
 	_check(config.move_speed == 7.0 and config.jump_height == 1.15 and config.move_gravity == 20.0, "the movement defaults are the map layout constants")
-	var schema_path := "user://pg_config_schema.json"
+	var schema_path := ROOT + "_config_schema.json"
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
 
-	var bad := FileAccess.open("user://pg_config_bad.json", FileAccess.WRITE)
+	var bad := FileAccess.open(ROOT + "_config_bad.json", FileAccess.WRITE)
 	bad.store_string('{"no_such_field": 1}')
 	bad.close()
-	var strict := PlaygroundConfig.make_binder(PlaygroundConfig.new(), "user://pg_config_bad.json")
+	var strict := PlaygroundConfig.make_binder(PlaygroundConfig.new(), ROOT + "_config_bad.json")
 	strict.strict = true
 	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
-	DirAccess.remove_absolute("user://pg_config_bad.json")
+	DirAccess.remove_absolute(ROOT + "_config_bad.json")
 
 	_entered += 2
 	_layers()
@@ -133,7 +143,7 @@ func _write(rel: String, text: String) -> void:
 func _child() -> String:
 	var out: Array = []
 	OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
-		"res://examples/headless_config.tscn", "--", "--probe", "--pg-arena-score-limit=9", "--pg-max-players=12"], out, true)
+		"res://examples/headless_config.tscn", "--", "--probe", ROOT_ARG + ROOT, "--pg-arena-score-limit=9", "--pg-max-players=12"], out, true)
 	return "".join(PackedStringArray(out))
 
 
