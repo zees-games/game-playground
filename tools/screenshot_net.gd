@@ -123,6 +123,10 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _run() -> void:
 	var seconds := 6.0
 	var out := "res://screenshots/net.png"
@@ -163,6 +167,7 @@ func _run() -> void:
 		var path := "%s_%d.png" % [base, i]
 		image.save_png(ProjectSettings.globalize_path(path))
 		print("saved %s" % path)
+		await _seq.record(get_tree(), ProjectSettings.globalize_path(path))
 
 	_report()
 	if _walk:
@@ -197,6 +202,7 @@ func _bleed_out(base: String) -> void:
 		var path := "%s_died_%d.png" % [base, i]
 		get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(path))
 		print("saved %s" % path)
+		await _seq.record(get_tree(), ProjectSettings.globalize_path(path))
 
 
 func _build() -> void:

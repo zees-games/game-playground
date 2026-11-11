@@ -56,10 +56,15 @@ func _run() -> void:
 	get_tree().quit()
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _shot(shot_name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var path := ProjectSettings.globalize_path("%s/%s.png" % [OUT_DIR, shot_name])
 	print(shot_name, " -> ", error_string(get_viewport().get_texture().get_image().save_png(path)))
+	await _seq.record(get_tree(), path)
 
 
 func _frames(count: int) -> void:

@@ -53,6 +53,10 @@ func _run() -> void:
 	get_tree().quit(failed)
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _shot(shot_name: String, expected: StringName) -> int:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
@@ -62,6 +66,7 @@ func _shot(shot_name: String, expected: StringName) -> int:
 	print("%s: expect %s ok=%s, view %s, camera %s (client camera current %s), hands %s -> %s" % [shot_name,
 		_client.player.view_mode(), cam.get_path() if cam != null else "none", _client.camera.current,
 		_describe_hands(cam), error_string(image.save_png(path))])
+	await _seq.record(get_tree(), path)
 	return 0 if hands_ok else 1
 
 

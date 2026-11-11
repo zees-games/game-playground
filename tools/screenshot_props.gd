@@ -55,11 +55,29 @@ func _initialize() -> void:
 	cam.look_at_from_position(Vector3(0, 6.5, 9.5), Vector3(0, 0.8, -1.0))
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq. The state machine holds still while it records, and `_seq_end` defers the quit until it is done.
+var _seq := DotShotSeq.new()
+var _seq_active := false
+var _seq_end := false
+
+
+func _seq_begin(path: String) -> void:
+	if _seq.enabled():
+		_seq.begin(path)
+		_seq_active = true
+
+
+
 func _process(_delta: float) -> bool:
+	if _seq_active:
+		_seq_active = _seq.step(root)
+		return false
+	if _seq_end:
+		return true
 	_frames += 1
 	if _frames == 6:
-		root.get_viewport().get_texture().get_image().save_png(
-			ProjectSettings.globalize_path("res://screenshots/props_models.png")
-		)
-		quit(0)
+		var path := ProjectSettings.globalize_path("res://screenshots/props_models.png")
+		root.get_viewport().get_texture().get_image().save_png(path)
+		_seq_begin(path)
+		_seq_end = true
 	return false

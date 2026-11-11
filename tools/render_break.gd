@@ -26,6 +26,10 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _run() -> void:
 	await get_tree().create_timer(2.5).timeout
 	var cam := _client.camera.global_transform
@@ -37,4 +41,5 @@ func _run() -> void:
 	var image := get_viewport().get_texture().get_image()
 	print("break: %s, bursts %d" % [error_string(image.save_png(ProjectSettings.globalize_path(OUT_DIR + "/break.png"))),
 		_client.presentation.break_fx.break_fx.spawned])
+	await _seq.record(get_tree(), ProjectSettings.globalize_path(OUT_DIR + "/break.png"))
 	get_tree().quit()

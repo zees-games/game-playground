@@ -81,6 +81,10 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _shot(shot_name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
@@ -91,6 +95,7 @@ func _shot(shot_name: String) -> void:
 	print("%s: crosshair %s opacity %.2f, scope %.2f, fov %.1f -> %s" % [shot_name,
 		"shown" if cross.visible else "hidden", float(cross.get("aim_opacity")) if "aim_opacity" in cross else -1.0,
 		float(scope.get("fraction")), _client.camera.fov, error_string(image.save_png(path))])
+	await _seq.record(get_tree(), path)
 
 
 func _frames(count: int) -> void:

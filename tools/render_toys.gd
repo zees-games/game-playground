@@ -25,6 +25,10 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out := args[0] if args.size() > 0 else "/tmp"
@@ -40,5 +44,6 @@ func _run() -> void:
 		print("%s: toy view %s" % [id, "present" if ok else "MISSING"])
 		failed += 0 if ok else 1
 		get_viewport().get_texture().get_image().save_png("%s/toy_%s.png" % [out, id])
+		await _seq.record(get_tree(), "%s/toy_%s.png" % [out, id])
 	print("toys: %d failed" % failed)
 	get_tree().quit(failed)

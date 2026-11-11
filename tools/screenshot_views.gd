@@ -78,7 +78,25 @@ func _initialize() -> void:
 	root.add_child(_game)
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq. The state machine holds still while it records, and `_seq_end` defers the quit until it is done.
+var _seq := DotShotSeq.new()
+var _seq_active := false
+var _seq_end := false
+
+
+func _seq_begin(path: String) -> void:
+	if _seq.enabled():
+		_seq.begin(path)
+		_seq_active = true
+
+
+
 func _process(_delta: float) -> bool:
+	if _seq_active:
+		_seq_active = _seq.step(root)
+		return false
+	if _seq_end:
+		return true
 	if _done:
 		return true
 
@@ -345,6 +363,8 @@ func _capture(shot_name: String) -> void:
 	if image.save_png(path) != OK:
 		push_error("could not write %s" % path)
 		return
+
+	_seq_begin(path)
 
 	# Reported at CAPTURE time, not at arrange time. `DotTpsCameraRig.follow` runs once a
 	# frame from `DotTpsController._process`, so everything about the rig is still at its

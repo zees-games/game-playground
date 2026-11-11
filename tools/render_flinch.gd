@@ -37,8 +37,14 @@ func _run() -> void:
 	get_tree().quit(0 if moved else 1)
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _shot(shot_name: String) -> Transform3D:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
-	print("%s: %s" % [shot_name, error_string(image.save_png(ProjectSettings.globalize_path("%s/%s.png" % [OUT_DIR, shot_name])))])
+	var path := ProjectSettings.globalize_path("%s/%s.png" % [OUT_DIR, shot_name])
+	print("%s: %s" % [shot_name, error_string(image.save_png(path))])
+	await _seq.record(get_tree(), path)
 	return _client.camera.global_transform

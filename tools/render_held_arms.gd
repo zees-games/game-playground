@@ -24,6 +24,10 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
+var _seq := DotShotSeq.new()
+
+
 func _run() -> void:
 	var out := OS.get_cmdline_user_args()[0] if OS.get_cmdline_user_args().size() > 0 else "/tmp"
 	DirAccess.make_dir_recursive_absolute(out)
@@ -42,5 +46,6 @@ func _run() -> void:
 		print("%s (%s): hand error %.3f m" % [pose, chosen[pose], err])
 		failed += 0 if err >= 0.0 and err < (0.05 if pose in PlaygroundViewGrip.ONE_HAND else (0.13 if pose == &"heavy" else 0.10)) else 1
 		get_viewport().get_texture().get_image().save_png("%s/held_%s.png" % [out, pose])
+		await _seq.record(get_tree(), "%s/held_%s.png" % [out, pose])
 	print("held arms: %d failed" % failed)
 	get_tree().quit(failed)
