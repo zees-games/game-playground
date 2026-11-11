@@ -599,6 +599,12 @@ func set_tool_settings(id: StringName, values: Dictionary) -> void:
 
 ## Switches tab from code, as a click on the tab bar would.
 func show_tab(tab: Tab) -> void:
+	# A pack tab sits after the enum's last value and exists only while a pack provides
+	# one, so a caller can ask for a tab that is not there: ignore it rather than index
+	# the bar out of bounds.
+	if _tabs != null and int(tab) >= _tabs.tab_count:
+		push_warning("PlaygroundSpawnMenu.show_tab: no tab %d (%d tabs)" % [int(tab), _tabs.tab_count])
+		return
 	if _tabs != null:
 		# Through the TabBar rather than by setting `_tab`, so the bar and the grid
 		# cannot disagree about which tab is open.

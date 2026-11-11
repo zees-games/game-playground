@@ -239,6 +239,11 @@ func _test_spawn_menu_4() -> void:
 	_sm_menu._on_search_changed("")
 	await get_tree().process_frame
 
+	# A tab past the last one (a pack tab with no pack) is ignored, not an out-of-bounds index.
+	var tab_before: Variant = _sm_menu.describe().get("tab")
+	_sm_menu.show_tab(PlaygroundSpawnMenu.Tab.size() as PlaygroundSpawnMenu.Tab)
+	_check(_sm_menu.describe().get("tab") == tab_before, "show_tab past the last tab leaves the open tab alone")
+
 	# Entities tab
 
 	_sm_menu.show_tab(PlaygroundSpawnMenu.Tab.ENTITIES)

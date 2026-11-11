@@ -149,6 +149,14 @@ func _build() -> void:
 	_game_menu.scoreboard.source = _sample_board
 
 	_shots = _shot_list()
+	# A pack tab shot needs a pack: zee-dot-weapons is a sibling checkout, absent in a worktree.
+	# Without it the menu has no such tab, so the shot is dropped instead of indexing past the bar.
+	if _menu.describe().get("pack_tabs", []).is_empty():
+		_shots = _shots.filter(func(s: Dictionary) -> bool:
+			if s.has("tab") and int(s["tab"]) >= PlaygroundSpawnMenu.Tab.size():
+				print("screenshot_menus: skipping %s, no pack tab" % s["file"])
+				return false
+			return true)
 	# SHOTS=a,b renders only the files whose name contains one of the words (a quick look at one tab).
 	var only := OS.get_environment("SHOTS")
 	if only != "":
