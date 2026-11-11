@@ -254,6 +254,14 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	glass.pitch_max = 1.7
 	c.add(glass)
 
+	_add_tool_cues(c)
+	_add_service_cues(c)
+	_add_body_sounds(c)
+	return c
+
+
+## The grab, undo, punt, buy and refusal cues, split out of [method sound_catalogue].
+static func _add_tool_cues(c: DotAudioCatalogue) -> void:
 	var grab := DotAudioDef.new()
 	grab.id = &"tool_grab"
 	grab.path = "%s/tool_grab.ogg" % SOUND_DIR
@@ -290,6 +298,9 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	refused.priority = 85
 	c.add(refused)
 
+
+## The vote, beacon and wave cues, split out of [method sound_catalogue].
+static func _add_service_cues(c: DotAudioCatalogue) -> void:
 	# The map vote's cues. Flat, on the interface bus: a ballot is about the server, not
 	# about a place in it. The ids are PlaygroundVote's, which its rules name too.
 	for vote_id in [
@@ -327,6 +338,9 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	wave.priority = 100
 	c.add(wave)
 
+
+## Falling bodies and map toys, split out of [method sound_catalogue].
+static func _add_body_sounds(c: DotAudioCatalogue) -> void:
 	# A body landing: dot-player-char's stock death sounds (Kenney, CC0), shipped in the addon.
 	for row: Dictionary in DotPlayerDeathSounds.rows():
 		var fall := DotAudioDef.new()
@@ -363,8 +377,6 @@ static func sound_catalogue() -> DotAudioCatalogue:
 		toy.pitch_max = float(row["pitch_max"])
 		toy.cooldown_ms = int(row["cooldown_ms"])
 		c.add(toy)
-
-	return c
 
 
 ## The undo cue and its positional twin, split out of [method sound_catalogue] to keep it short.

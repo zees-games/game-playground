@@ -159,7 +159,28 @@ static func add_drop_ins(catalogue: DotPropCatalogue, drop_dir: String) -> Packe
 
 static func catalogue() -> DotPropCatalogue:
 	var out := DotPropCatalogue.new()
+	_add_props(out)
+	_add_entities(out)
 
+	for vehicle in PlaygroundVehicles.catalogue().vehicles:
+		out.add(_vehicle_prop(vehicle))
+
+	out.add(_balloon())
+	out.add(_waypoint())
+	out.add(_spawn_point())
+	out.add(_debris())
+
+	for machine in _machines():
+		out.add(machine)
+
+	for weapon in PlaygroundZee.defs():
+		out.add(_pickup(weapon))
+
+	return out
+
+
+## The plain props, split out of [method catalogue].
+static func _add_props(out: DotPropCatalogue) -> void:
 	# id, name, category, shape, extent, colour, mass kg, cost, size
 	var props := [
 		[&"plank", "Plank", &"construction", "box", Vector3(3.0, 0.15, 0.6),
@@ -222,6 +243,9 @@ static func catalogue() -> DotPropCatalogue:
 			prop.explode_force = 300.0
 		out.add(prop)
 
+
+## The NPC, turret and armed NPC rows, split out of [method catalogue].
+static func _entity_rows() -> Array:
 	# id, name, script, extent, colour, mass kg, cost, meta
 	#
 	# Entities cost more than props of the same size on purpose: each one runs a
@@ -276,6 +300,14 @@ static func catalogue() -> DotPropCatalogue:
 			}],
 	]
 
+	entities.append_array(_armed_rows())
+
+	return entities
+
+
+## The soldiers and the rebel, split out of [method _entity_rows].
+static func _armed_rows() -> Array:
+	var rows := []
 	# Armed NPCs: dot-npc-ai's tactical brain with a zee weapon in hand. What they carry is
 	# the player's choice on the entities tab, or `weapon` here when they made none. A
 	# soldier is on `hostile` and fights players and rebels; a rebel is on `player`, never
@@ -288,19 +320,24 @@ static func catalogue() -> DotPropCatalogue:
 		"hearing": 18.0, "line_of_sight": 0.0, "near": 8.0, "far": 18.0, "reach": 1.6,
 		"armed": true,
 	}
-	entities.append([&"npc_soldier", "Soldier", "npc_soldier", Vector3(0.8, 1.8, 0.8),
+	rows.append([&"npc_soldier", "Soldier", "npc_soldier", Vector3(0.8, 1.8, 0.8),
 		"5a6470", 85.0, 6, _merged(armed, {
 			"faction": "hostile", "skill": "normal", "weapon": "zee_smg",
 		})])
-	entities.append([&"npc_soldier_elite", "Soldier (elite)", "npc_soldier", Vector3(0.8, 1.9, 0.8),
+	rows.append([&"npc_soldier_elite", "Soldier (elite)", "npc_soldier", Vector3(0.8, 1.9, 0.8),
 		"2c3138", 95.0, 8, _merged(armed, {
 			"faction": "hostile", "skill": "hard", "weapon": "zee_rifle", "health": 160.0,
 		})])
-	entities.append([&"npc_rebel", "Rebel", "npc_soldier", Vector3(0.8, 1.75, 0.8),
+	rows.append([&"npc_rebel", "Rebel", "npc_soldier", Vector3(0.8, 1.75, 0.8),
 		"6f8a4e", 80.0, 6, _merged(armed, {
 			"faction": "player", "skill": "normal", "weapon": "zee_pistol", "follow": 1.0,
 		})])
+	return rows
 
+
+## The NPCs, turrets and armed NPCs, split out of [method catalogue].
+static func _add_entities(out: DotPropCatalogue) -> void:
+	var entities := _entity_rows()
 	for row in entities:
 		var entity := DotPropDef.make(row[0], SCENE_ENTITY)
 		entity.display_name = row[1]
@@ -330,22 +367,6 @@ static func catalogue() -> DotPropCatalogue:
 
 		entity.meta = meta
 		out.add(entity)
-
-	for vehicle in PlaygroundVehicles.catalogue().vehicles:
-		out.add(_vehicle_prop(vehicle))
-
-	out.add(_balloon())
-	out.add(_waypoint())
-	out.add(_spawn_point())
-	out.add(_debris())
-
-	for machine in _machines():
-		out.add(machine)
-
-	for weapon in PlaygroundZee.defs():
-		out.add(_pickup(weapon))
-
-	return out
 
 
 ## Health per prop, for `destruction`. What is not here does not break: the slab, the pillar
