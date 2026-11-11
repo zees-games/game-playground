@@ -86,7 +86,7 @@ func _run() -> void:
 	for k in keys:
 		if not listed.has(k):
 			missing.append(k)
-	_check(missing.is_empty() and binder.profile_sets().size() == 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
+	_check(missing.is_empty() and binder.profile_sets().size() >= 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
 	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_world", "id": binder.profile_id, "key": "wave_kill_reward", "value": 90})
 	_check(res.ok and config.wave_kill_reward == 90, "a workbench edit reaches the live config")
 	var files: Dictionary = wb.exporter.call("collect")
@@ -158,7 +158,8 @@ func _layers() -> void:
 ## The shipped cfg files hold every key, in step with PlaygroundConfig, and change nothing as they are.
 func _templates(binder: DotGameConfigBinder) -> void:
 	var files := binder.template_files()
-	_check(files.size() == 4, "four shipped cfg files", str(files.size()))
+	# One file per config set (server, props, arena, world and whatever an addon adds), counted off the binder so a new set does not leave a stale number here.
+	_check(files.size() >= 4 and files.size() == binder.profile_sets().size(), "one shipped cfg file per config set", "%d files, %d sets" % [files.size(), binder.profile_sets().size()])
 	var stale := PackedStringArray()
 	for path: String in files:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:

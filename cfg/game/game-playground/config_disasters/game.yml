@@ -1,0 +1,6 @@
+# game-playground: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-playground/config_disasters/game.yml. Layers: defaults < this < env < argv.
+
+# --- Disasters
+# Whether a tornado also throws ragdoll parts and bodies in the `disaster_bodies` group, not only props.
+# disaster_fling_extra: true
