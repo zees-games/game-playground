@@ -25,7 +25,7 @@ const PlaygroundInventory := preload("../game/playground_inventory.gd")
 const PlaygroundInventoryNet := preload("../game/net/playground_inventory_net.gd")
 const PlaygroundRequest := preload("../game/net/playground_request.gd")
 
-## game-playground over the wire: a real server, a real client, and a lossy loopback between them.
+## game-playlot over the wire: a real server, a real client, and a lossy loopback between them.
 ##
 ## The sandbox half replicates props: server-owned rigid bodies a client only draws, with a reliable announcement beside the snapshot. The client runs on a DIFFERENT tick rate from the server, because one process has one engine rate and agreeing would pass for the wrong reason. Run: `godot --headless --path . res://examples/headless_net.tscn`
 

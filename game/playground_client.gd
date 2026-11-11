@@ -44,7 +44,7 @@ func _ready() -> void:
 			var _played := presentation.on_toy(id, at, strength))
 	add_child(playground)
 
-	# Custom maps the server's game names as dependencies (game-playground-maps): fetched in
+	# Custom maps the server's game names as dependencies (game-playlot-maps): fetched in
 	# the same content sync as this game, so mounted by now. Added before any map change can
 	# name one, which on a client is the HELLO still to come.
 	if link != null:

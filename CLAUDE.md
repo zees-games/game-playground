@@ -1,6 +1,8 @@
-# game-playground
+# game-playlot
 
 A physics sandbox first: hold Q, pick a prop, an NPC or a weapon, click it and it is yours; hold it with a physics gun, freeze it, throw it, wire it, weld it, undo it. With map support. Networked over dot-net and delivered as a signed dot-cloud pack.
+
+The game is **Zee's Playlot** (it was Playground; the repository was game-playground). **Wire and storage ids keep the old name on purpose**: the pack ids `gamemann/game-playground` and `gamemann/game-playground-maps`, the cfg game id `game-playground` (`cfg/game/game-playground/`), the dot-server-deploy pack `playground`, the site app slug `playground`, `user://playground_*` paths, the map document kind `playground_map`, node names, log channels and the `Playground*` class and file names. Change one only together with dot-server-deploy, website-city and dot-cloud.
 
 It is the only place dot-player-controller, dot-map, dot-props, dot-npc and dot-leaderboard run together, and the bugs that cost days here were all in the seams between them. `examples/headless_playground.tscn` is the point of the repository.
 
@@ -29,7 +31,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | Path | What |
 | --- | --- |
 | `game/` | `playground.gd` (the simulation, headless), the player, the server module and services, props, `entities/`, `weapons/` and `toolgun/`, the modes, the bag, the client (not headless), `net/`, the maps' base, geometry and lighting. File by file: [docs](docs/README.md#where-the-code-is) |
-| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (a JSON map), `custom/` (game-playground-maps, linked) |
+| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (a JSON map), `custom/` (game-playlot-maps, linked) |
 | `examples/` | the eight suites (`headless_mapcfg`: per-map cvars; `headless_config`: the config binder and workbench) |
 | `tools/` | `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd`, `publish.sh` (the CDN pack: `tools/publish.sh VERSION`, dev lock in `content.lock.json`) |
 | `addons/pg_timer/` | the optional run-timer adapter: does nothing unless `addons/dot_timer` is linked ([timer](docs/timer.md)) |

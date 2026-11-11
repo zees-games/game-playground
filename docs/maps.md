@@ -1,6 +1,6 @@
 # Maps
 
-Maps are content, not projects (see dot-map's [docs/content.md](../../dot-map/docs/content.md) for why a project per map falls apart). The built-in maps are `pg_flatgrass` (hand-built: a 200 m grass plate with walls, a movement corner and the map's toys, and the default everywhere), `pg_generated` (seeded) and `pg_data` (builds any JSON map document). The custom maps are documents from game-playground-maps, linked in as `maps/custom`.
+Maps are content, not projects (see dot-map's [docs/content.md](../../dot-map/docs/content.md) for why a project per map falls apart). The built-in maps are `pg_flatgrass` (hand-built: a 200 m grass plate with walls, a movement corner and the map's toys, and the default everywhere), `pg_generated` (seeded) and `pg_data` (builds any JSON map document). The custom maps are documents from game-playlot-maps, linked in as `maps/custom`.
 
 ## No map here is timed
 

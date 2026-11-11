@@ -411,7 +411,7 @@ var arena_hurt: Callable = Callable()
 var rotation_file: DotMapRotationFile = null
 
 
-## Where a checkout links game-playground-maps' documents.
+## Where a checkout links game-playlot-maps' documents.
 const CUSTOM_MAPS_DIR := "res://maps/custom"
 
 ## The one scene every map document is built by. See `maps/pg_data.gd`.

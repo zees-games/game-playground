@@ -45,7 +45,7 @@ func _initialize() -> void:
 	var index := args.find("--map")
 	var id := args[index + 1] if index >= 0 and index + 1 < args.size() else "pg_flatgrass"
 
-	# A custom map (game-playground-maps, linked as maps/custom) is a document the shared
+	# A custom map (game-playlot-maps, linked as maps/custom) is a document the shared
 	# data-map scene builds.
 	var custom := "res://maps/custom/%s.json" % id
 	var doc_at := args.find("--doc")
@@ -155,7 +155,7 @@ var _action_figure: DotHumanoidFigure = null
 var _toy_placements: Array = []
 
 
-## Maps converted from a community .bsp (game-playground-maps' tools/import_bsp.py): they have no
+## Maps converted from a community .bsp (game-playlot-maps' tools/import_bsp.py): they have no
 ## hand-picked angles, so these are worked out from the document, an oblique view over the
 ## whole thing, a high view straight down and the player's eye at the spawn facing the middle.
 const IMPORTED := ["pgc_construct_small", "pgc_smallbase", "pgc_mountain_resort"]

@@ -4,7 +4,7 @@ The Q menu's NPCs and pack weapons come from dot-core profiles (`docs/profiles.m
 
 ## NPCs
 
-`cfg/game/game-playground/npc/<id>.yml` (game tier; the game key is the repository name) over `cfg/addons/dot-npc/npc/` and under `cfg/server/game/game-playground/npc/` and `cfg/server/addons/dot-npc/npc/`.
+`cfg/game/game-playground/npc/<id>.yml` (game tier; the game key is the repository's original name, kept when the repository became game-playlot so operator cfg and packs keep resolving) over `cfg/addons/dot-npc/npc/` and under `cfg/server/game/game-playground/npc/` and `cfg/server/addons/dot-npc/npc/`.
 
 - A profile named like a catalogue entry (`npc_chaser.yml`) overrides **only the keys it states**: `name`, `health`, `speed`, `sight`, `sight_angle`, `hearing`, `faction`, `los`, `cost`, `extra:` (copied to the entry's `meta`, where `tune` reads them). A key counts as stated when it differs from the schema default or was edited at runtime.
 - `menu: {category, icon, sort, hidden}` regroups, sets the card's icon (a `res://` image; the drawn one otherwise), orders and hides. `enabled: false` hides too. The Entities tab sorts by `menu.sort`, catalogue order breaks ties.

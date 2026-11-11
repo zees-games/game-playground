@@ -337,7 +337,7 @@ func _test_the_client_boots_5() -> void:
 	h.keycode = KEY_H
 	h.pressed = true
 	var helped := _tcb_kept_menu != null and _tcb_kept_menu.handle_event(h) and _tcb_kept_menu.help.is_open()
-	_check(helped and _tcb_kept_menu.help.about != "" and _tcb_kept_menu.help.heading() == "How to play Playground",
+	_check(helped and _tcb_kept_menu.help.about != "" and _tcb_kept_menu.help.heading() == "How to play Zee's Playlot",
 		"H opens the help screen, which says what the game is before the keys")
 	if _tcb_kept_menu != null:
 		_tcb_kept_menu.close_all()

@@ -56,7 +56,7 @@ func _real_pack_rows() -> Array:
 
 func _sample_board() -> Dictionary:
 	return {
-		"server": {"name": "Playground  |  build anything", "map": "pg_flatgrass", "players": 4, "max": 24},
+		"server": {"name": "Playlot  |  build anything", "map": "pg_flatgrass", "players": 4, "max": 24},
 		"you": "2",
 		"stat_columns": [{"key": "props", "title": "Props", "column": "number"}, {"key": "kills", "title": "Kills", "column": "number"}],
 		"players": [

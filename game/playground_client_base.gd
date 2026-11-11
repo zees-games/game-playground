@@ -574,7 +574,7 @@ static func add_general_rows(game_menu: DotMenu) -> void:
 	DotMenuStock.add_gore_row(video)
 	var general := game_menu.page(&"general")
 	if general != null:
-		general.section("Playground") \
+		general.section("Playlot") \
 			.add(DotMenuRow.toggle(&"hold_to_open_menu", "Hold the spawn-menu key", "Off: pressing it opens the spawn menu and pressing it again closes it.")) \
 			.add(DotMenuRow.toggle(&"prop_sounds", "Prop sounds", "Crates, barrels and everything else you knock about."))
 		# Camera motion beside the sandbox's own rows: the dip, the lean and the widening, each a
@@ -605,7 +605,7 @@ static func fill_help(help: DotMenuHelp) -> void:
 func _prepare_board(made: Object) -> void:
 	# Typed: `columns` is a typed array, which an untyped Object will not assign to.
 	var board := made as DotMenuScoreboard
-	board.title_text = "Playground"
+	board.title_text = "Zee's Playlot"
 	board.columns = [
 		{"key": &"name", "title": "Player", "width": 3.0},
 		{"key": &"score", "title": "Score", "kind": DotMenuScoreboard.KIND_NUMBER},
@@ -623,7 +623,7 @@ func board_snapshot() -> Dictionary:
 			rows.append({"id": str(id), "name": str(who.get("display_name")) if who.get("display_name") != null else str(id),
 				"seconds": int((Time.get_ticks_msec() - _started_msec) / 1000) if who == player else -1,
 				"ping": -1, "you": who == player})
-	return {"server": {"name": "Playground", "game": "offline"}, "players": rows}
+	return {"server": {"name": "Playlot", "game": "offline"}, "players": rows}
 
 
 ## When this client started, for an offline board's "time".

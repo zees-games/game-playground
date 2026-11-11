@@ -1,6 +1,6 @@
-This is a game to demonstrate the capabilities of the [**Dot collection**](https://moddingcommunity.com/co/4-dot-assets) built on-top of [Godot 4](https://godotengine.org/) and [TMC's gaming platform](https://moddingcommunity.com/play). In this 3D game, players are allowed to do whatever they want. It is intended to be a sandbox game. Players may hold the **Q** button in-game to bring up a menu to spawn props, NPCs, and weapons. You may also interact with props in the world using the physics and gravity guns. This is inspired by classic Sandbox games like Garry's Mod!
+**Zee's Playlot** is a game to demonstrate the capabilities of the [**Dot collection**](https://moddingcommunity.com/co/4-dot-assets) built on-top of [Godot 4](https://godotengine.org/) and [TMC's gaming platform](https://moddingcommunity.com/play). In this 3D game, players are allowed to do whatever they want. It is intended to be a sandbox game. Players may hold the **Q** button in-game to bring up a menu to spawn props, NPCs, and weapons. You may also interact with props in the world using the physics and gravity guns. This is inspired by classic Sandbox games like Garry's Mod!
 
-![Preview](https://github.com/zees-games/game-playground/blob/main/images/preview.gif?raw=true)
+![Preview](https://github.com/zees-games/game-playlot/blob/main/images/preview.gif?raw=true)
 
 *Play on my test server [here](https://moddingcommunity.com/playground/s/pg01/play)!*
 
@@ -73,7 +73,7 @@ You need [Godot 4.7](https://godotengine.org/download). The game is built from m
 git clone https://github.com/modcommunity/dot-bootstrap.git
 cd dot-bootstrap
 ./bootstrap.sh
-cd projects/game-playground
+cd projects/game-playlot
 ./game.sh
 ```
 

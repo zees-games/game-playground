@@ -33,7 +33,7 @@
 # PACK is the game's id in dot-server-deploy (empty if it has no server), EXTRA_PACKS
 # are other packs it needs as id:repository pairs, and SUITES are the scenes in
 # examples/ that test it.
-GAME_NAME="Playground"
+GAME_NAME="Playlot"
 PACK="playground"
 EXTRA_PACKS=""
 SUITES="headless_config headless_workbench headless_workbench_scope headless_playground headless_net headless_presentation headless_stack headless_packs_real dedicated headless_mapcfg headless_weapondrop headless_spawntool headless_avatar_arms"

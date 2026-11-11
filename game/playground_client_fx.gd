@@ -127,7 +127,7 @@ func _build_pause() -> void:
 	game_menu.settings = settings
 	game_menu.bindings = keys
 	var config := DotMenuConfig.new()
-	config.brand_name = "Playground"
+	config.brand_name = "Zee's Playlot"
 	# By name: an older dot-menu has no such property, and assigning it would stop this function.
 	if &"menu_button_corner" in config:
 		config.set(&"menu_button_corner", &"top_left")

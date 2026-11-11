@@ -8,7 +8,7 @@ const PlaygroundMaterials := preload("../game/playground_materials.gd")
 ## [b]Why a document and not a script.[/b] The built-in maps are `_build()`s full of
 ## constants, which is right for a map that ships inside this game. A map written for one
 ## server and delivered beside the game is a different thing: it lives in another pack
-## (game-playground-maps), mounted at its own prefix, and a script there that `extends`
+## (game-playlot-maps), mounted at its own prefix, and a script there that `extends`
 ## this game's map base by path names a path that is only right in one of the two places it
 ## runs — the family's mount constraint. A JSON document of boxes is data: both packs can be
 ## anywhere, a person can read it when a map will not load, and dot-map's catalogue lists it

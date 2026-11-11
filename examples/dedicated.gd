@@ -340,7 +340,7 @@ func _test_map_commands() -> void:
 		String(game.maps.current.id)
 	)
 
-	# A custom map from game-playground-maps, through the same catalogue and the same command.
+	# A custom map from game-playlot-maps, through the same catalogue and the same command.
 	_run_command("map pgc_quarry")
 	for _i in range(10):
 		await get_tree().process_frame

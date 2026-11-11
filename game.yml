@@ -18,7 +18,7 @@ content_id: gamemann/game-playground
 version: 0.0.0
 kind: pack
 
-name: Playground
+name: "Zee's Playlot"
 max_players: 32
 
 scene: scenes/pg_server.tscn
@@ -35,7 +35,7 @@ metadata:
   # (dot-server-deploy's cfg/content.yml) has to be on every player's machine too: `client`
   # asks a host to fetch each one before the game loads and send it to every player as a
   # dependency. This game names no map pack itself; it ships its built-in maps, and the
-  # custom ones are game-playground-maps, which a server owner gets by default and can remove.
+  # custom ones are game-playlot-maps, which a server owner gets by default and can remove.
   maps_delivery: client
   map_vote:
     trigger: rtv_only

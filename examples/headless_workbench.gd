@@ -1,6 +1,6 @@
 extends DotGameWorkbenchSuite
 
-## game-playground: the workbench over the config binder, one edit per profile set, the export and its cfg round trip.
+## game-playlot: the workbench over the config binder, one edit per profile set, the export and its cfg round trip.
 ## Run: godot --headless --path . res://examples/headless_workbench.tscn
 
 const PlaygroundConfig := preload("../game/playground_config.gd")

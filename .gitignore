@@ -85,9 +85,9 @@ Thumbs.db
 # Optional: natural-disasters, shown in the Addons tab by addons/pg_natural_disasters.
 /addons/natural_disasters
 
-# The custom sandbox maps are game-playground-maps, a repository and a pack of their own.
+# The custom sandbox maps are game-playlot-maps, a repository and a pack of their own.
 # "ci" asks dot-ci (v1.3.0+) to link them on the runner too: the suites load all of them.
-# bootstrap-link: game-playground-maps/maps ci
+# bootstrap-link: game-playlot-maps/maps ci
 /maps/custom
 # Optional packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters): dot-bootstrap links
 # them by default and skips them under --min; the game runs without.
