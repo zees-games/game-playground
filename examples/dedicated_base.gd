@@ -47,7 +47,7 @@ var platform: PlaygroundPlatform = null
 
 ## The app's URL segment on the website, this game's code name. Display only: a listing prints it
 ## and nothing treats it as proof.
-const APP_URL := "playground"
+const APP_URL := "playlot"
 
 
 ## The loaded module, looked up every time because `_test_module_unloads_cleanly` unloads it. Typed

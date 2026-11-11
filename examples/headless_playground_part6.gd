@@ -111,7 +111,7 @@ func _test_spawn_menu_2() -> void:
 	var on: DotResult = PlaygroundBrowser.site_listing()
 	var listing: DotBrowserSourceBackbone = on.value if on.ok else null
 	_check(
-		listing != null and listing.config.page_url(1).contains("app=playground"),
+		listing != null and listing.config.page_url(1).contains("app=playlot"),
 		"and this game's servers are when one is",
 		listing.config.page_url(1) if listing != null else str(on.error)
 	)
@@ -131,7 +131,7 @@ func _test_spawn_menu_2() -> void:
 	_check(
 		web_listing.ok and web_listing.value != null
 			and web_listing.value.config.page_url(1).begins_with("https://site.example/api/content/server/list")
-			and web_listing.value.config.page_url(1).contains("app=playground"),
+			and web_listing.value.config.page_url(1).contains("app=playlot"),
 		"so a web client lists its own site's servers without a flag"
 	)
 	var saved_default := PlaygroundBrowser.default_backbone_url

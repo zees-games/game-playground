@@ -34,8 +34,9 @@ const CHANNEL := "playground.browser"
 
 const DEFAULT_PORT := 27015
 
-## This game's app on the site, the slug its server pages live under.
-const SITE_APP := "playground"
+## This game's app on the site, the slug its server pages live under. It was `playground` until
+## the Playlot rename; the site keeps that slug as a redirect, so older clients still list.
+const SITE_APP := "playlot"
 
 ## How often the list refreshes itself while it is open, in seconds.
 ##
