@@ -26,17 +26,12 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
-## Frame sequence after each still (DOT_SHOT_FRAMES, set by the .sh); see DotShotSeq.
-var _seq := DotShotSeq.new()
-
-
 func _shot(name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
 	var path := ProjectSettings.globalize_path("res://screenshots/%s.png" % name)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	print("render_cover: %s %s" % [path, image.save_png(path)])
-	await _seq.record(get_tree(), path)
 	await _seq.record(get_tree(), path)
 
 
