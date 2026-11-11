@@ -15,6 +15,9 @@ const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 const PORT := 27299
 
 var _server_pid := -1
+## Frame sequence after each still (DOT_SHOT_FRAMES); see DotShotSeq. The headless
+## cover_server renders nothing, so the clips are recorded here on the client.
+var _seq := DotShotSeq.new()
 
 
 func _ready() -> void:
@@ -33,6 +36,7 @@ func _shot(name: String) -> void:
 	var path := ProjectSettings.globalize_path("res://screenshots/%s.png" % name)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	print("render_cover: %s %s" % [path, image.save_png(path)])
+	await _seq.record(get_tree(), path)
 	await _seq.record(get_tree(), path)
 
 
