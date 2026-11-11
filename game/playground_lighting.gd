@@ -60,7 +60,7 @@ static func build(parent: Node3D, lighting: Dictionary = {}) -> DirectionalLight
 	return sun
 
 
-## The zenith in the document's `sky_top`, where it gives one. game-arena and g2gfast
+## The zenith in the document's `sky_top`, where it gives one. game-fatal-contact and g2gfast
 ## repaint their skies after the rig the same way.
 static func _paint_sky_top(parent: Node3D, lighting: Dictionary) -> void:
 	var top: Variant = lighting.get("sky_top", null)

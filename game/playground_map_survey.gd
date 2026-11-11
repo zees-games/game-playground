@@ -37,7 +37,7 @@ extends "res://game/playground_map_survey_base.gd"
 ## than its true shape, so a ramp can only ever be over-reported. Each of these is a place
 ## to extend it the day a map needs it, not a bug.
 ##
-## Reimplemented from a description of game-arena's `arena_map_survey.gd` (`[gate-sweep-2]`)
+## Reimplemented from a description of game-fatal-contact's `arena_map_survey.gd` (`[gate-sweep-2]`)
 ## rather than copied: separate repositories, and the family's rule is a copy per project.
 
 

@@ -300,7 +300,7 @@ func _test_the_client_boots_4() -> void:
 		"yaw %.3f -> %.3f" % [_tcb_released_yaw, _tcb_client.player.controller.state.yaw]
 	)
 
-	# Escape releases and never captures; a click captures (game-g2gfast's contract, for the browser).
+	# Escape releases and never captures; a click captures (game-airdrift's contract, for the browser).
 	# `Input.mouse_mode` is a no-op under the dummy display server, so this checks the configuration,
 	# that no screen is up, and that Escape on an uncaptured pointer opens the menu.
 	var plat: DotGameClient = _tcb_client.platform

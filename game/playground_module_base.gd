@@ -104,7 +104,7 @@ func _module_name() -> String:
 
 
 ## A [DotQueryProvider] over this module. An inner class because it is one method and a
-## reference, which is game-arena's pattern for the same thing.
+## reference, which is game-fatal-contact's pattern for the same thing.
 class PlaygroundQueryProvider extends DotQueryProvider:
 	## Held as an [Object]: this script has no [code]class_name[/code] and an inner class
 	## cannot name the outer script it lives in.

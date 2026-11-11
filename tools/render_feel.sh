@@ -9,7 +9,7 @@
 #
 # Writes screenshots/feel/<scenario>_NNN.png, <scenario>.csv (every frame) and
 # <scenario>_sheet.png (the sequence on one page, if PIL is there). Needs xvfb-run: under
-# --headless every saved frame is empty. Copied from game-arena's, as the family's rule is.
+# --headless every saved frame is empty. Copied from game-fatal-contact's, as the family's rule is.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out=screenshots/feel

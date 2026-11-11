@@ -539,7 +539,7 @@ func tick(current_tick: int, delta: float) -> void:
 	# The clock, once a second. [b]A mirroring client's match never runs[/b] — nothing
 	# ticks it, so `seconds_remaining()` is derived from a tick that is still zero. A
 	# number produced correctly on the server and never sent is this family's most
-	# repeated bug, and game-arena shipped exactly it.
+	# repeated bug, and game-fatal-contact shipped exactly it.
 	if current_tick % maxi(game.tick_rate, 1) == 0:
 		_announce_clock()
 
@@ -762,7 +762,7 @@ func _on_respawn_due(key: String, spawn: DotSpawnPoint, _tick_value: int) -> voi
 
 
 ## Whether [param id] is inside their spawn protection: a loadout chosen now goes into their
-## hands at once (`PlaygroundModule.rearm_if_allowed`), as game-arena's does.
+## hands at once (`PlaygroundModule.rearm_if_allowed`), as game-fatal-contact's does.
 func is_protected(id: StringName) -> bool:
 	var health := health_of(id)
 	return enabled and health != null and health.alive and health.is_protected(_tick)

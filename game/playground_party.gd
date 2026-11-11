@@ -14,8 +14,8 @@ extends Node
 ## | | migrates | why |
 ## | --- | --- | --- |
 ## | game-hungario | yes | a continuous arena with no round to be in the middle of |
-## | game-arena | no | the host holds the match clock, the score and every hitbox |
-## | game-g2gfast | no | a time made of two machines' clocks is worse than no time |
+## | game-fatal-contact | no | the host holds the match clock, the score and every hitbox |
+## | game-airdrift | no | a time made of two machines' clocks is worse than no time |
 ## | **this one** | **no** | **the world is the host's physics state and does not move** |
 ##
 ## The trust model is `HOST_AUTHORITATIVE` rather than sandboxed, which is the other

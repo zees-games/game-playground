@@ -10,7 +10,7 @@ const PlaygroundZee := preload("playground_zee.gd")
 ## its shots and its [DotWeaponSpawn]s. The game resolved the shots and ignored the spawns,
 ## so a thrown frag left the hand, cost a grenade and never existed. dot-weapon returns a
 ## spawn because a projectile is an entity with a lifetime, and something has to fly it.
-## game-arena's `arena_projectiles.gd` is the same job against that game's analytic map.
+## game-fatal-contact's `arena_projectiles.gd` is the same job against that game's analytic map.
 ## This one is written separately, as the family's rule says, because the sandbox's world
 ## is Godot physics: crates, welds and whatever somebody built. A grenade has to bounce off
 ## those as well as the floor.

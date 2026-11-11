@@ -404,7 +404,7 @@ func tick(current_tick: int) -> void:
 ## [b]Signal order.[/b] A map change emits `map_ready` and respawns everybody, and nothing
 ## orders this node's handler before the respawn. Losing that race means the director
 ## still holds the previous map's starts and answers with a real site, a real transform
-## and a successful `DotResult` — for a map nobody is standing in. game-g2gfast shipped
+## and a successful `DotResult` — for a map nobody is standing in. game-airdrift shipped
 ## exactly that for the length of one debugging session; its surf section found it as a
 ## bot that never left the ground.
 func _ensure_sites_current() -> void:
@@ -449,7 +449,7 @@ func blocks_damage(
 ## Opens or closes the protection window according to whether anybody can shoot.
 ##
 ## The arena layer's own match rules carry the number. A second copy written here would
-## be the disagreement game-arena had between its effect table and its modes.
+## be the disagreement game-fatal-contact had between its effect table and its modes.
 func refresh_spawn_rules() -> void:
 	if spawns == null or game == null:
 		return
@@ -459,7 +459,7 @@ func refresh_spawn_rules() -> void:
 		arena.match_node.rules.spawn_protection_sec
 		if fighting and arena.match_node != null else 0.0
 	)
-	# Off for game-arena's reason: it is what a fight wants and it can only be revoked in
+	# Off for game-fatal-contact's reason: it is what a fight wants and it can only be revoked in
 	# one of the two records of it. See `ArenaPlayerStack.refresh_spawn_rules`.
 	spawns.rules.protection_breaks_on_attack = false
 

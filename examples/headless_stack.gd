@@ -11,7 +11,7 @@ const PlaygroundPlayerStack := preload("../game/playground_player_stack.gd")
 ## godot --headless --path . res://examples/headless_stack.tscn
 ## [/codeblock]
 ##
-## [b]A three-hundred-line player layer with no suite that named it.[/b] game-arena got
+## [b]A three-hundred-line player layer with no suite that named it.[/b] game-fatal-contact got
 ## one; this game did not, so the roster, the sides, the classes, the collision layout,
 ## the spawn director, the view switch and the character were exercised only as far as
 ## `setup()` running inside somebody else's test.

@@ -9,7 +9,7 @@
 # every frame it saves is empty, which is worse than no screenshot because it looks like
 # one.
 #
-# Copied from game-arena's rather than shared with it: these are separate repositories
+# Copied from game-fatal-contact's rather than shared with it: these are separate repositories
 # and that is the family's rule. The angles differ, because a 200 m sandbox with a movement corner
 # and a park is not a deathmatch arena.
 set -euo pipefail

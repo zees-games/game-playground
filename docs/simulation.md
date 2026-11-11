@@ -39,7 +39,7 @@ Facing a direction is `atan2(-dx, -dz)`: `DotFpsMotor._view_basis` builds forwar
 
 **A teleport stops a run, if there is one** (`PlaygroundPlayer.stop_run`, a no-op without a timer). A teleport that kept the clock running is the simplest cheat on a timed map; only a map's own TELEPORT zone keeps it, and that is the adapter's.
 
-**A respawn here is a teleport of the same body** (`Playground.spawn_player`), so nothing a handler set is lost and `DotModTools.respawned` is never called: blind, beacon, noclip and freeze all survive a respawn (game-arena ends the last two with the body).
+**A respawn here is a teleport of the same body** (`Playground.spawn_player`), so nothing a handler set is lost and `DotModTools.respawned` is never called: blind, beacon, noclip and freeze all survive a respawn (game-fatal-contact ends the last two with the body).
 
 `Playground.spawn_player` steps a spawn to the nearest free point on two rings of eight at `SPAWN_SPACING` (1.5 m) (`_clear_of_players`), which stays on the smallest start pad; past seventeen people the centre is shared. Every start here is one point, and without this two players joining stood inside each other's heads.
 

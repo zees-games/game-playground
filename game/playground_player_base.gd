@@ -69,7 +69,7 @@ var anim: DotPlayerAnimDriver = null
 ## added a `DotFpsView` after the controller had looked for one, so `controller.view` was null
 ## and the view never ran: no dip, no lean, no widening, and the recoil `_present_zee` handed
 ## it went nowhere. The client writes the camera itself (the interpolated eye, below), which
-## is game-arena's arrangement, so the arithmetic comes here instead of a node that would
+## is game-fatal-contact's arrangement, so the arithmetic comes here instead of a node that would
 ## write the same camera.
 var camera_motion: DotFpsViewMotion = null
 
@@ -608,13 +608,13 @@ func present_camera(camera: Camera3D, delta: float, base_fov: float, shake: Vect
 		deg_to_rad(controller.state.yaw + punch.y),
 		deg_to_rad(lean)
 	)
-	# [param zoom] is a zee gun's aim (1 at the hip), after the widening, as game-arena's lens.
+	# [param zoom] is a zee gun's aim (1 at the hip), after the widening, as game-fatal-contact's lens.
 	camera.fov = (base_fov + widen) * (clampf(zoom, 0.01, 1.0) if is_finite(zoom) else 1.0)
 
 
 ## Holds a landing until the drawn eye reaches the floor ([method _kick_landing]): the signal
 ## comes from the tick that lands, and the frames after it still draw part of the fall, so a
-## kick here would add the dip to the last of the fall (game-arena measured the jump).
+## kick here would add the dip to the last of the fall (game-fatal-contact measured the jump).
 func _on_landed(impact: float) -> void:
 	if camera_motion == null:
 		return

@@ -17,7 +17,7 @@ const PlaygroundPresentation := preload("../game/playground_presentation.gd")
 ##
 ## [b]It asks `is_playing`, not "did I get a handle".[/b] A handle says the pool had room;
 ## only [method DotAudioSink.is_playing] says a speaker is moving. The first version of
-## this probe, in game-arena, reported four sounds on a run in which the engine refused
+## this probe, in game-fatal-contact, reported four sounds on a run in which the engine refused
 ## playback four times — a probe that can be satisfied by the bug it is looking for.
 ##
 ## Run through `tools/audio_probe.sh`. [b]Not `--headless`[/b]: `AudioServer` reports

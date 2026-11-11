@@ -25,7 +25,7 @@ const PlaygroundPaths := preload("playground_paths.gd")
 ## Start and end keep their old meanings (green-ish and red-ish) so a route still reads.
 ## The floor is the exception to "bright": a mid cool grey, because it fills half of every
 ## frame, and near white (0.90, 0.91, 0.97) it rendered as a fifth of a flat map's pixels at
-## pure white under Compatibility; the pastels on it now read against it (game-arena's
+## pure white under Compatibility; the pastels on it now read against it (game-fatal-contact's
 ## ground is the same shade, for the same reason).
 const COLOUR_FLOOR := Color(0.66, 0.68, 0.76)
 const COLOUR_RAMP := Color(0.60, 0.82, 1.00)

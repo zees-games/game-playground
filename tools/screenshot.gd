@@ -377,7 +377,7 @@ func _stage_action(id: String, kind: StringName, action: String) -> Array[Dictio
 ## [method PlaygroundPresentation.on_tool_beam], from a player's eye on the field.
 ##
 ## [b]The puff is slowed to a twentieth of real speed and restarted once spawned[/b], for
-## game-arena's reason: it lives 420 ms and a software frame under xvfb is long enough that
+## game-fatal-contact's reason: it lives 420 ms and a software frame under xvfb is long enough that
 ## the frame saved at full speed is the one after it went out. The beam is a mesh and is
 ## not affected. `present` is not called again, so dot-fx retires nothing while the
 ## frames are taken.
@@ -468,7 +468,7 @@ func _stage_grenades() -> Array[Dictionary]:
 ## [b]Frame-counted rather than awaited.[/b] `SceneTree._process` is expected to return a
 ## bool synchronously; making it a coroutine returns a signal object instead, which is
 ## truthy, so the tree quits on the first frame and writes nothing. That is what
-## game-arena's first version of this file did and the reason its comment says so.
+## game-fatal-contact's first version of this file did and the reason its comment says so.
 ## Frame sequence after each still (DOT_SHOT_FRAMES); see DotShotSeq.
 var _seq := DotShotSeq.new()
 var _seq_active := false
