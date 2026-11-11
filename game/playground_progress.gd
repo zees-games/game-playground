@@ -73,6 +73,7 @@ static func stats_schema() -> DotStatsSchema:
 
 	var _rank := DotStatsRank.declare(schema, RANK_SCORE, "Rank score")
 	DotStatsHitzones.declare(schema)
+	var _shots := DotStatsShots.declare(schema)
 	return schema
 
 

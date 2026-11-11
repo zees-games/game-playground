@@ -604,6 +604,7 @@ func _build_progress_stage() -> DotResult:
 		return earned.wrap("Progress could not be set up")
 
 	progress.earned.connect(_on_earned)
+	var _bound := progress.feed.bind_shots(arena.combat.shot_resolved)
 	_attach_stats_board()
 	# The registered tracker is what DotGameStatsReport's default apply flips.
 	DotRegistry.register(DotGameStatsFeed.SERVICE, progress.stats)
