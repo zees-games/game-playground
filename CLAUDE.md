@@ -31,7 +31,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first, and each addon's own `CLAUDE
 | Path | What |
 | --- | --- |
 | `game/` | `playground.gd` (the simulation, headless), the player, the server module and services, props, `entities/`, `weapons/` and `toolgun/`, the modes, the bag, the client (not headless), `net/`, the maps' base, geometry and lighting. File by file: [docs](docs/README.md#where-the-code-is) |
-| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (a JSON map), `custom/` (game-playlot-maps, linked) |
+| `maps/` | `pg_flatgrass` (hand-built, the default), `pg_generated`, `pg_data` (a JSON map), `custom/` (playlot-maps, linked) |
 | `examples/` | the eight suites (`headless_mapcfg`: per-map cvars; `headless_config`: the config binder and workbench) |
 | `tools/` | `map_props.gd`, `screenshot*.sh`, `render_feel.sh`, `audio_probe.sh`, `loudness_pilot.gd`, `publish.sh` (the CDN pack: `tools/publish.sh VERSION`, dev lock in `content.lock.json`) |
 | `addons/pg_timer/` | the optional run-timer adapter: does nothing unless `addons/dot_timer` is linked ([timer](docs/timer.md)) |

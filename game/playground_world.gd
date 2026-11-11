@@ -327,7 +327,7 @@ static func map_catalogue() -> DotMapCatalogue:
 		map.author = "playground"
 		catalogue.add(map)
 
-	# Custom maps from game-playlot-maps, where a checkout links them in (dot-bootstrap's
+	# Custom maps from playlot-maps, where a checkout links them in (dot-bootstrap's
 	# `maps/custom`). A delivered server and client add the same documents from the mounted
 	# pack instead, with [method add_map_directory].
 	var _linked := add_map_docs(catalogue, PlaygroundPaths.rebase(CUSTOM_MAPS_DIR))
