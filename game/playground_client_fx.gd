@@ -151,10 +151,10 @@ func _build_pause() -> void:
 			if auth == null or not is_instance_valid(auth) or not auth.has_method(&"account_key"):
 				return ""
 			return str(auth.call(&"account_key")))
-	var _flinch := platform.add_hit_flinch(
+	_hit_flinch = platform.add_hit_flinch(
 		active_sampler,
 		func() -> Variant: return camera if view_id() == &"fp" else null,
-		func() -> bool: return _aiming and mouse_drives_view() and not _menu_is_open() and view_id() == &"fp")
+		func() -> bool: return _aim_wanted() and mouse_drives_view() and not _menu_is_open() and view_id() == &"fp")
 	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
 	DotLog.result("playground.client", "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	_add_noblock_and_workbench()
@@ -251,6 +251,10 @@ func _process(_delta: float) -> void:
 	# player's own field of view, so it never compounds.
 	var hands := zee_view as ZeeViewModel if zee_view != null and is_instance_valid(zee_view) and _zee_rig() != null else null
 	var zoom := hands.aim_fov_scale() if hands != null else 1.0
+	# The look slows with the lens, so a zoomed scope is steady to aim (the arena's look_scale).
+	for sampler: DotFpsSampler in [_sampler, player.sampler]:
+		if sampler != null:
+			sampler.look_scale = zoom
 	player.present_camera(camera, _delta, fov, shake, punch, zoom)
 	_present_view_arms(_delta)
 	if hud != null:

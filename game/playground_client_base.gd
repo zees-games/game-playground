@@ -164,6 +164,8 @@ var _zee_buttons: int = 0
 ## The Aim key held with a zee gun in hand (`PlaygroundBindings.AIM`, right mouse): the hands
 ## come up and the lens zooms. Presentation only.
 var _aiming: bool = false
+## The hit flinch the platform drives; `blocked()` refuses the sights for a moment after a hit (sv_unscope_hit).
+var _hit_flinch: DotGameHitFlinch = null
 
 ## Whether the pointer was a look input at the last frame; see the click branch of
 ## `_unhandled_input`, and the 'Click to play' notice in `_process`.
@@ -717,6 +719,11 @@ func _bind_look() -> void:
 	for sampler: DotFpsSampler in [_sampler, player.sampler if player != null else null]:
 		if sampler != null and sampler.tunables != null:
 			applier.bind_look(sampler.tunables)
+
+
+## The Aim key counts unless a hit has just knocked the sights down.
+func _aim_wanted() -> bool:
+	return _aiming and not (_hit_flinch != null and _hit_flinch.blocked())
 
 
 func active_sampler() -> DotFpsSampler:
