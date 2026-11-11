@@ -14,6 +14,8 @@
 /addons/dot_leaderboard
 /addons/dot_ui
 /addons/dot_server
+# bootstrap fetches the release zip into addons/dot_net/native/bin and export copies it beside the exe (dot-bootstrap: bootstrap-natives).
+# bootstrap-natives: dot-net v0.1.30 native/bin
 /addons/dot_net
 /addons/dot_npc
 /addons/dot_vehicle
