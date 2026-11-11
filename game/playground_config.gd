@@ -241,8 +241,20 @@ const CFG_FILES := {
 }
 
 
+## The game's own id since the rename, and the ids it had before (oldest first).
+const GAME_ID := "game-playlot"
+const FORMER_IDS: PackedStringArray = ["game-playground"]
+
+
+## Declares the rename to dot-core (API 31), so a deployment's `cfg/game/game-playground/` tiers and
+## rotation `games:` keys keep applying to the game under its new id. Idempotent.
+static func register_ids() -> void:
+	DotAddonConfig.register_former_game(GAME_ID, FORMER_IDS)
+
+
 ## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
 static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
+	register_ids()
 	var b := DotGameConfigBinder.create(config, "game-playground", "pg", json_path)
 	b.grouped = true
 	b.group_files = CFG_FILES

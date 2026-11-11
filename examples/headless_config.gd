@@ -12,7 +12,7 @@ const PlaygroundSpawnables := preload("../game/playground_spawnables.gd")
 const PlaygroundWaves := preload("../game/playground_waves.gd")
 const ROOT := "user://pg_cfgtest"
 const GAME := "game-playground"
-const CHECKS := 41
+const CHECKS := 42
 const SECTIONS := 4
 
 var _entered := 0
@@ -32,6 +32,7 @@ func _run() -> void:
 	_entered += 1
 	var config := PlaygroundConfig.new()
 	var binder := PlaygroundConfig.make_binder(config)
+	_check(DotAddonConfig.game_names("game-playlot") == PackedStringArray(["game-playground", "game-playlot"]), "the binder registers game-playground as game-playlot's former id", str(DotAddonConfig.game_names("game-playlot")))
 	binder.strict = true
 	_check(binder.load_layers().ok, "defaults load")
 	_check(binder.diff().is_empty(), "no diff at the code defaults")
