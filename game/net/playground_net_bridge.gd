@@ -1,4 +1,4 @@
-extends "res://game/net/playground_net_bridge_ask.gd"
+extends "playground_net_bridge_ask.gd"
 
 
 

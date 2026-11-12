@@ -1,4 +1,4 @@
-extends "res://game/net/playground_events_base.gd"
+extends "playground_events_base.gd"
 
 
 # --- Inventory -------------------------------------------------------------

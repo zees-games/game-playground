@@ -1,4 +1,4 @@
-extends "res://game/playground_player_base.gd"
+extends "playground_player_base.gd"
 
 func set_water(boxes: Array[AABB]) -> void:
 	swim.volumes = boxes

@@ -21,6 +21,7 @@ const PlaygroundWeapon := preload("weapons/playground_weapon.gd")
 const PlaygroundWeapons := preload("playground_weapons.gd")
 const PlaygroundZee := preload("playground_zee.gd")
 const PlaygroundWeaponDef := preload("weapons/playground_weapon_def.gd")
+const PlaygroundTouch := preload("client/playground_touch.gd")
 
 ## Boots a playable playground: one local player, a camera, a HUD, a spawn menu and the keys
 ## (listed in docs/client.md). Separate from [Playground], the simulation: a dedicated server

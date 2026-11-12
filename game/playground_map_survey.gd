@@ -1,4 +1,4 @@
-extends "res://game/playground_map_survey_base.gd"
+extends "playground_map_survey_base.gd"
 
 ## A slot and reach sweep over a built-in map's boxes: what a player can stand on, what
 ## they can get to from a spawn, what they cannot get back out of, and where two boxes

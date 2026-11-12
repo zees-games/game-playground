@@ -1,4 +1,4 @@
-extends "res://game/playground_client_fx.gd"
+extends "playground_client_fx.gd"
 
 
 

@@ -1,4 +1,4 @@
-extends "res://game/playground_module_build.gd"
+extends "playground_module_build.gd"
 ## Binds a [Playground] to a [DotServer]: the console commands an operator and an admin type.
 ##
 ## The only file in the project that names dot-server; a game wanting a dedicated server writes

@@ -1,4 +1,4 @@
-extends "res://game/playground_module_base.gd"
+extends "playground_module_base.gd"
 ## The rest of the console commands: limits, arena, waves, shop, vote and punishments.
 
 

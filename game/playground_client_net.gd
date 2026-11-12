@@ -1,4 +1,4 @@
-extends "res://game/playground_client_ui.gd"
+extends "playground_client_ui.gd"
 
 
 func _wire_presentation() -> void:

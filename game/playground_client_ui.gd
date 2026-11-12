@@ -1,4 +1,4 @@
-extends "res://game/playground_client_base.gd"
+extends "playground_client_base.gd"
 
 
 ## Shows the arms only while downed in first person, and drives them at the player's speed.

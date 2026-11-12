@@ -1,4 +1,4 @@
-extends "res://game/net/playground_net_bridge_mid.gd"
+extends "playground_net_bridge_mid.gd"
 
 
 func _connect_projectiles() -> void:

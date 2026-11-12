@@ -1,4 +1,4 @@
-extends "res://game/playground_presentation_base.gd"
+extends "playground_presentation_base.gd"
 
 func setup() -> DotResult:
 	# Randomness first: the map generator asks DotRegistry for a seed source, and one registered

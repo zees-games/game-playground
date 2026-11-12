@@ -1,4 +1,4 @@
-extends "res://game/playground_module_handlers.gd"
+extends "playground_module_handlers.gd"
 
 ## What a server browser is told about this sandbox: the GAME part of a DQP/A2S query.
 ##

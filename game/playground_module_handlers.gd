@@ -1,4 +1,4 @@
-extends "res://game/playground_module_cmds.gd"
+extends "playground_module_cmds.gd"
 
 ## The server's tick, which is the whole game's. Driven from here, not the game's loop: it has to run between
 ## dot-net applying inputs and building the snapshot. `Playground.external_tick` stands the game's loop down.
