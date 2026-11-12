@@ -352,6 +352,8 @@ func _build_loadouts() -> DotResult:
 	loadouts.load_layered_config = false
 	loadouts.schema = loadout_schema(game.weapons)
 	loadouts.register_service = false
+	# Adds what the site store says the player owns (no-op without a backbone client).
+	DotGameStoreEntitlements.attach(loadouts)
 	add_child(loadouts)
 
 	return loadouts.setup().wrap("dot-loadout could not be set up")
