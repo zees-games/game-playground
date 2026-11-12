@@ -23,6 +23,7 @@ var _costs := {}
 var _sim_usec := 0.0
 var _send_usec := 0.0
 var _tick_n := 0
+var _swarm_pid := -1
 var _second_at := 0.0
 var _cpu_last := 0.0
 var _wall_last := 0.0
@@ -113,6 +114,21 @@ func _run() -> void:
 	_second_at = Time.get_ticks_msec() / 1000.0
 	_cpu_last = _cpu_seconds()
 	_wall_last = _second_at
+	# `--swarm N --run S`: this scene alone is the whole measurement (one job a box can be handed): it starts the swarm of N clients
+	# as a child process, runs S seconds and quits, so tools/load100.sh's two processes are not needed.
+	var swarm_n := int(_arg("--swarm", "0"))
+	if swarm_n > 0:
+		var run_s := float(_arg("--run", "40"))
+		_swarm_pid = OS.create_process(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
+			"res://tools/load_swarm.tscn", "--", "--port", str(config.port), "--clients", str(swarm_n), "--seconds", str(run_s)])
+		print("load_server: swarm pid=%d clients=%d for %.0f s" % [_swarm_pid, swarm_n, run_s])
+		get_tree().create_timer(run_s + 12.0).timeout.connect(_finish)
+
+
+func _finish() -> void:
+	if _swarm_pid > 0:
+		OS.kill(_swarm_pid)
+	get_tree().quit()
 
 
 func _cpu_seconds() -> float:
