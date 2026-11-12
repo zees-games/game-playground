@@ -290,9 +290,17 @@ func _test_glance_pieces() -> void:
 
 	# A pack naming these classes does not parse on a shell whose dot-ui predates them, so the
 	# requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+	# The floor file exists to name the game addons solo play fetches; it must not lower dot-ui.
 	var asks := DotAddonApi.derive()
+	var floor_path := "res://" + DotAddonApi.FLOOR_FILE
+	var floors := {}
+	if FileAccess.file_exists(floor_path):
+		var parsed := DotAddonApi.parse(FileAccess.get_file_as_string(floor_path), DotAddonApi.FLOOR_FILE)
+		floors = {"dot_ui": 0}
+		if parsed.ok:
+			floors = parsed.value
 	_check(
-		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		int(DotAddonApi.apply_floors(asks, floors).get("dot_ui", 0)) >= 4,
 		"the pack asks a shell for dot-ui level 4, the glance pieces",
 		str(asks.get("dot_ui"))
 	)

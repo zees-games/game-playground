@@ -15,8 +15,8 @@ const PlaygroundWaves := preload("../game/playground_waves.gd")
 const ROOT_ARG := "--cfgroot="
 var ROOT := _root()
 const GAME := "game-playground"
-const CHECKS := 42
-const SECTIONS := 4
+const CHECKS := 44
+const SECTIONS := 5
 
 var _entered := 0
 var _finished := 0
@@ -72,6 +72,10 @@ func _run() -> void:
 	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
 	DirAccess.remove_absolute(ROOT + "_config_bad.json")
 
+	_entered += 1
+	_pack_floor()
+	_finished += 1
+
 	_entered += 2
 	_layers()
 	_finished += 1
@@ -114,6 +118,30 @@ func _run() -> void:
 	console.free()
 	_finished += 2
 	_report_sections(_entered, _finished, SECTIONS, CHECKS)
+
+
+## The pack ships only game/, maps/ and the committed addons/pg_*: a web shell carries dot_* alone,
+## and solo play fetches every other addon from the names in requires.floor.json. A Zee* or Aw*
+## class named in a shipped script whose addon the floor leaves out is a grey screen on playlot.app
+## ("Could not find type ZeeViewModel"), so every such addon must be named, at a sound floor.
+func _pack_floor() -> void:
+	var derived := DotAddonApi.derive("res://")
+	for dir in DirAccess.get_directories_at("res://addons"):
+		if dir.begins_with("pg_"):
+			derived.merge(DotAddonApi.derive("res://addons/%s" % dir))
+	var floors := {}
+	var path := "res://" + DotAddonApi.FLOOR_FILE
+	if FileAccess.file_exists(path):
+		var parsed := DotAddonApi.parse(FileAccess.get_file_as_string(path), DotAddonApi.FLOOR_FILE)
+		if parsed.ok:
+			floors = parsed.value
+	var unnamed := PackedStringArray()
+	for addon: String in derived:
+		if not addon.begins_with("dot_") and not addon.begins_with("pg_") and not floors.has(addon):
+			unnamed.append(addon)
+	_check(derived.has("zee_weapons") and unnamed.is_empty(), "%s names every addon the shell does not carry" % DotAddonApi.FLOOR_FILE, ",".join(unnamed))
+	var audit := DotAddonApi.floor_audit(floors, derived, DotAddonApi.guarded("res://"))
+	_check(not floors.is_empty() and audit.is_empty(), "its floors are sound", "; ".join(audit))
 
 
 ## Child process: loads the layers strictly over the test root and prints what the live config holds.
