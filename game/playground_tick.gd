@@ -338,12 +338,15 @@ func _float_props(step: float) -> void:
 		var _acted := DotPropBuoyancy.apply(body, volume, _half_height_of(prop), density, liquids, surface, step, gravity)
 
 
+## DotPropBuoyancy's shape names, indexed by [enum PlaygroundProp.Shape] (a constant, so the per-prop water step allocates nothing).
+const _BUOYANCY_SHAPES: Array[String] = ["box", "sphere", "cylinder"]
+
+
 static func _volume_of(prop: DotPropInstance) -> float:
 	if prop.def == null:
 		return 1.0
 	var scale := float(prop.node.get("size_scale")) if prop.node != null and prop.node.get("size_scale") != null else 1.0
-	var shape: String = ["box", "sphere", "cylinder"][PlaygroundProp.shape_of(prop.def)]
-	return DotPropBuoyancy.volume_of(PlaygroundProp.extent_of(prop.def), scale, shape)
+	return DotPropBuoyancy.volume_of(PlaygroundProp.extent_of(prop.def), scale, _BUOYANCY_SHAPES[PlaygroundProp.shape_of(prop.def)])
 
 
 static func _half_height_of(prop: DotPropInstance) -> float:

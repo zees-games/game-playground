@@ -154,7 +154,7 @@ func _build() -> void:
 	if _menu.describe().get("pack_tabs", []).is_empty():
 		_shots = _shots.filter(func(s: Dictionary) -> bool:
 			if s.has("tab") and int(s["tab"]) >= PlaygroundSpawnMenu.Tab.size():
-				print("screenshot_menus: skipping %s, no pack tab" % s["file"])
+				print("screenshot_menus: skipping ", s["file"], ", no pack tab")
 				return false
 			return true)
 	# SHOTS=a,b renders only the files whose name contains one of the words (a quick look at one tab).
@@ -163,7 +163,7 @@ func _build() -> void:
 		var words := only.split(",")
 		_shots = _shots.filter(func(s: Dictionary) -> bool:
 			for w in words:
-				if str(s["file"]).contains(w):
+				if String(s["file"]).contains(w):
 					return true
 			return false)
 

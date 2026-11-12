@@ -584,6 +584,16 @@ func _test_water() -> void:
 	# a lift added after the damping launched out of the basin to y 2081.
 	var bed_y: float = boxes[0].position.y if not boxes.is_empty() else -4.0
 	var ball := playground.props.spawn(&"beach_ball", &"bot", Vector3(-30.0, bed_y + 0.6, -60.0))
+	# The water step's volume per shape comes from a constant name table (no per-prop array): each
+	# shape still names DotPropBuoyancy's own volume for that prop (box crate, cylinder barrel, sphere ball).
+	var names := {PlaygroundProp.Shape.BOX: "box", PlaygroundProp.Shape.SPHERE: "sphere", PlaygroundProp.Shape.CYLINDER: "cylinder"}
+	var volume_bad := PackedStringArray()
+	for prop: DotPropInstance in [crate, barrel, boulder, ball]:
+		var want := DotPropBuoyancy.volume_of(PlaygroundProp.extent_of(prop.def), 1.0, names[PlaygroundProp.shape_of(prop.def)])
+		var got: float = playground._volume_of(prop)
+		if not is_equal_approx(got, want):
+			volume_bad.append("%s %s: %.4f vs %.4f" % [prop.def.id, names[PlaygroundProp.shape_of(prop.def)], got, want])
+	_check(volume_bad.is_empty(), "the water step's volume matches DotPropBuoyancy for each prop's shape", ", ".join(volume_bad))
 	var ball_top := -INF
 	for _i in range(40):
 		await _drive(&"bot", idle, 16)
