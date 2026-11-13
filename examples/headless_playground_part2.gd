@@ -252,14 +252,30 @@ func _test_boots() -> void:
 	# Two built in (the flat grass plane and `pg_generated`) and the custom maps linked in, each
 	# built by `pg_data`. The count is asserted, not the ids: a list of ids would be a second
 	# copy of `Playground.map_catalogue()`.
+	# The catalogue also takes documents from `user://maps` (internal-use originals unzipped on a developer machine), so what varies
+	# per machine is split out: only the documents under `maps/custom` are counted against the survey list, and the folder itself is
+	# compared with that list so a document nobody surveyed fails by name instead of as "26 in all, 24 documents".
 	var data_maps := 0
+	var user_maps := 0
 	for map: DotMapDef in playground.maps.catalogue.maps:
 		if map.meta.has("doc"):
-			data_maps += 1
+			if str(map.meta["doc"]).begins_with(playground.USER_MAPS_DIR):
+				user_maps += 1
+			else:
+				data_maps += 1
+	var on_disk: Array[String] = []
+	for file in DirAccess.get_files_at("res://maps/custom"):
+		if file.ends_with(".json"):
+			on_disk.append(file.get_basename())
+	var unsurveyed := on_disk.filter(func(id: String) -> bool: return not CUSTOM_MAPS.has(id))
+	var missing := CUSTOM_MAPS.filter(func(id: String) -> bool: return not on_disk.has(id))
+	_check(unsurveyed.is_empty() and missing.is_empty(),
+		"every document in maps/custom is surveyed here, and every surveyed one exists",
+		"not surveyed (add to CUSTOM_MAPS): %s; listed but absent: %s" % [unsurveyed, missing])
 	_check(
-		playground.maps.catalogue.size() == 2 + CUSTOM_MAPS.size() and data_maps == CUSTOM_MAPS.size(),
+		playground.maps.catalogue.size() == 2 + CUSTOM_MAPS.size() + user_maps and data_maps == CUSTOM_MAPS.size(),
 		"two maps built in and the custom ones beside them, one of them generated",
-		"%d in all, %d documents" % [playground.maps.catalogue.size(), data_maps]
+		"%d in all, %d documents (%d from user://maps), %d files in maps/custom" % [playground.maps.catalogue.size(), data_maps + user_maps, user_maps, on_disk.size()]
 	)
 	_check(
 		playground.maps.catalogue.has(&"pg_generated"),
