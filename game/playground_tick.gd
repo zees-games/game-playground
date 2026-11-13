@@ -62,8 +62,15 @@ func _ready() -> void:
 	# player's time then depends on their hardware.
 	set_physics_process(true)
 
-	if config.initial_map != &"":
-		var started: DotResult = await change_map(config.initial_map)
+	var first := config.initial_map
+	var asked := solo_start_map()
+	if authoritative and asked != &"" and maps.catalogue.get_map(asked) != null:
+		first = asked
+	elif asked != &"":
+		DotLog.warn(CHANNEL, "the shell's start map is not one this game has; the usual first map", {"map": asked})
+
+	if first != &"":
+		var started: DotResult = await change_map(first)
 		DotLog.result(CHANNEL, "loading the first map", started)
 
 	booted = true

@@ -52,15 +52,8 @@ func _ready() -> void:
 			var parts := DotGameDescriptor.split_key(str(key))
 			var _added := playground.add_map_directory(
 				DotCloudClient.mount_prefix_for(StringName(parts[0]), parts[1]).path_join("maps"))
-	else:
-		# Solo in the client shell: no server named the custom maps, so the shell fetched the
-		# packs a server owner would name (its `client/solo.json`) and publishes them under
-		# `dot_solo`. Looked up by name and duck-typed: a delivered game may not name a host's
-		# class. Absent everywhere else (a run from the repository, a suite).
-		var host: Object = DotRegistry.get_service(&"dot_solo")
-		if host != null and host.has_method(&"map_dirs"):
-			for dir: String in host.call(&"map_dirs", "maps"):
-				var _added := playground.add_map_directory(dir)
+	# Solo in the client shell, the playground added the packs the shell mounted itself, before its
+	# first map (`Playground.solo_map_dirs`), so a "Play map" link can start on one of them.
 
 	# The playground loads its own first map and this waits for it: `initial_map` is layered config, so loading
 	# one here would ignore --pg-map. `booted` is checked BEFORE the await: change_map can finish without

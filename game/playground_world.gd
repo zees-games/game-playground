@@ -1,6 +1,8 @@
 extends "playground_setup_props.gd"
 
 const BreakFx := preload("playground_break_fx.gd")
+## The client shell's solo host, which mounts map packs for a game played with no server.
+const SOLO_SERVICE := &"dot_solo"
 
 func _build_props() -> void:
 	props = DotPropSpawner.new()
@@ -283,6 +285,11 @@ func _build_maps() -> void:
 	add_child(maps)
 
 	maps.catalogue = _map_catalogue()
+	# Solo in the client shell: the map packs it mounted for this game (a whole maps pack, or one map's own pack for a
+	# "Play map" link), added before the first map so `start_map` can name one. See [method solo_map_dirs].
+	if authoritative:
+		for dir in solo_map_dirs("maps"):
+			var _added := add_map_docs(maps.catalogue, dir)
 
 	if config.catalogue_path != "":
 		var loaded := maps.load_catalogue(config.catalogue_path)
@@ -335,6 +342,26 @@ static func map_catalogue() -> DotMapCatalogue:
 	var _unzipped := add_map_docs(catalogue, USER_MAPS_DIR)
 
 	return catalogue
+
+
+## The `<pack>/<subdir>` directories of the map packs the client shell mounted for solo play (its `client/solo.json`, or the one
+## map pack of a "Play map" link), from the host it publishes as `dot_solo`. Looked up by name and duck-typed: a delivered game
+## may not name a host's class. Empty everywhere else (a server, a networked client, a run from the repository, a suite).
+static func solo_map_dirs(subdir: String) -> PackedStringArray:
+	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
+	if host == null or not host.has_method(&"map_dirs"):
+		return PackedStringArray()
+	return host.call(&"map_dirs", subdir)
+
+
+## The map the client shell was asked to start solo on (`--solo-map`, a hotspot "Play map" link), or empty with no host, an
+## older shell without `start_map`, or none asked. The first map is [member PlaygroundConfig.initial_map] unless this names one
+## the catalogue has.
+static func solo_start_map() -> StringName:
+	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
+	if host == null or not (&"start_map" in host):
+		return &""
+	return StringName(str(host.get(&"start_map")))
 
 
 ## Adds every map document (`*.json`) in [param dir] to [param catalogue], each built by [constant DATA_MAP_SCENE] with its path in
