@@ -56,7 +56,7 @@ const BACK_KEY := -1
 
 
 ## playlot-maps' documents this suite surveys. See `_test_the_maps_are_surveyed`.
-const CUSTOM_MAPS := ["pgc_plots", "pgc_quarry", "pgc_slopes", "pgc_town", "pgc_islands", "pgc_site", "pgc_warehouse", "pgc_canyon", "pgc_harbour", "pgc_bowl", "pgc_obstacle", "pgc_nature", "pgc_construct_small", "pgc_smallbase", "pgc_mountain_resort", "pgc_deadcity", "pgc_valley", "pgc_mallparking", "pgc_shambles"]
+const CUSTOM_MAPS := ["pgc_plots", "pgc_quarry", "pgc_slopes", "pgc_town", "pgc_islands", "pgc_site", "pgc_warehouse", "pgc_canyon", "pgc_harbour", "pgc_bowl", "pgc_obstacle", "pgc_nature", "pgc_construct_small", "pgc_smallbase", "pgc_mountain_resort", "pgc_deadcity", "pgc_valley", "pgc_mallparking", "pgc_shambles", "pgc_fork", "pgc_balkans", "pgc_vyten", "pgc_southside", "pgc_asheville"]
 
 
 ## The Q menu's NPCs and pack weapons come from profiles, a game profile overrides an entry, and an
