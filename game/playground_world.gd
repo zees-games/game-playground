@@ -331,6 +331,8 @@ static func map_catalogue() -> DotMapCatalogue:
 	# `maps/custom`). A delivered server and client add the same documents from the mounted
 	# pack instead, with [method add_map_directory].
 	var _linked := add_map_docs(catalogue, PlaygroundPaths.rebase(CUSTOM_MAPS_DIR))
+	# Internal-use-only originals (`*_orig` ids) unzipped into the user folder, never shipped; a built-in or linked id wins.
+	var _unzipped := add_map_docs(catalogue, USER_MAPS_DIR)
 
 	return catalogue
 

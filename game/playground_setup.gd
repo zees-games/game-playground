@@ -414,6 +414,9 @@ var rotation_file: DotMapRotationFile = null
 ## Where a checkout links playlot-maps' documents.
 const CUSTOM_MAPS_DIR := "res://maps/custom"
 
+## Where internal-use-only originals (`*_orig` ids) are unzipped to: the user folder, never shipped.
+const USER_MAPS_DIR := "user://maps"
+
 ## The one scene every map document is built by. See `maps/pg_data.gd`.
 const DATA_MAP_SCENE := "res://maps/pg_data.tscn"
 
