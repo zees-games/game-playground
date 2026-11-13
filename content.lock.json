@@ -13,6 +13,14 @@
 			},
 			"optional": false,
 			"version": "0.1.19"
+		},
+		{
+			"id": "gamemann/game-playlot",
+			"into": "",
+			"kind": "pack",
+			"manifest_sha256": "0469f1cdf80a7b96762c0920adee92af4ca6f6c497cde4d5d46fce693ec90480",
+			"optional": false,
+			"version": "0.1.30"
 		}
 	]
 }
