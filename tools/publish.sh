@@ -6,6 +6,6 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 V=${1:?usage: tools/publish.sh VERSION [flags]}; shift
 EX=(); for l in "$HERE"/addons/*; do [ -L "$l" ] && EX+=(--exclude-dir "$(basename "$l")"); done
-exec "$HERE/../dot-cloud/tools/publish_pack.sh" publish --source "$HERE" --id game-playground --version "$V" \
+exec "$HERE/../dot-cloud/tools/publish_pack.sh" publish --source "$HERE" --id game-playlot --version "$V" \
     "${EX[@]}" --exclude-dir images --exclude-dir screenshots \
     --lock "$HERE/content.lock.json" "$@"
