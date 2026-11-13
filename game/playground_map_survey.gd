@@ -33,9 +33,10 @@ extends "playground_map_survey_base.gd"
 ## as every route check here is, and not swept through the air: a wall between two
 ## platforms does not stop the survey's jump. Bunny-hop speed is not modelled — the reach
 ## is a running jump's, so a gap only a carried-speed player crosses reads as unreachable,
-## which errs toward reporting. And the slot sweep uses a tilted box's world AABB rather
-## than its true shape, so a ramp can only ever be over-reported. Each of these is a place
-## to extend it the day a map needs it, not a bug.
+## which errs toward reporting. The slot sweep measures plan outlines (a tilted box's is the
+## hull of its corners seen from above, so hillside slabs laid edge to edge touch) but the
+## height band of a tilted box is still its world AABB's. Each of these is a place to extend
+## it the day a map needs it, not a bug.
 ##
 ## Reimplemented from a description of game-fatal-contact's `arena_map_survey.gd` (`[gate-sweep-2]`)
 ## rather than copied: separate repositories, and the family's rule is a copy per project.
@@ -230,12 +231,9 @@ func _slots() -> Array[String]:
 	return found
 
 
-## The clear air between two boxes seen from above. Exact for boxes turned only about
-## the vertical; a tilted box is its world AABB.
+## The clear air between two boxes seen from above, between their plan outlines (see
+## [method _footprint]).
 static func _footprint_gap(a: Solid, b: Solid) -> float:
-	if not (a.upright and b.upright):
-		return PlaygroundMap.gap_between(a.bounds, b.bounds)
-
 	var pa := _footprint(a)
 	var pb := _footprint(b)
 
@@ -243,15 +241,36 @@ static func _footprint_gap(a: Solid, b: Solid) -> float:
 		return 0.0
 
 	var best := INF
-	for k in range(4):
+	for k in range(pa.size()):
 		for p in pb:
-			best = minf(best, _point_segment(p, pa[k], pa[(k + 1) % 4]))
+			best = minf(best, _point_segment(p, pa[k], pa[(k + 1) % pa.size()]))
+	for k in range(pb.size()):
 		for p in pa:
-			best = minf(best, _point_segment(p, pb[k], pb[(k + 1) % 4]))
+			best = minf(best, _point_segment(p, pb[k], pb[(k + 1) % pb.size()]))
 	return best
 
 
+## A box's outline seen from above, as a convex polygon: its four plan corners when it is
+## turned only about the vertical, else the hull of all eight corners. A tilted box's world
+## AABB would reach past its slope on both sides, so two hillside slabs a cell apart would
+## read as a crack.
 static func _footprint(s: Solid) -> PackedVector2Array:
+	if not s.upright:
+		var points := PackedVector2Array()
+		var half := s.size * 0.5
+		for i in range(8):
+			var corner := s.xform * Vector3(
+				half.x * (1.0 if i & 1 else -1.0),
+				half.y * (1.0 if i & 2 else -1.0),
+				half.z * (1.0 if i & 4 else -1.0)
+			)
+			points.append(Vector2(corner.x, corner.z))
+		var hull := Geometry2D.convex_hull(points)
+		# The hull comes back closed (its first point repeated last).
+		if hull.size() > 1 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+			hull.remove_at(hull.size() - 1)
+		return hull
+
 	var x := s.xform.basis.x * s.size.x * 0.5
 	var z := s.xform.basis.z * s.size.z * 0.5
 	var c := s.xform.origin
