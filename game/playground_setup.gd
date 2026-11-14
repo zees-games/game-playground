@@ -467,9 +467,13 @@ func _build_addons() -> void:
 	profiles.apply_npcs(props.catalogue)
 	profiles.runtime.profile_changed.connect(_on_profile_changed)
 	addons.profiles = profiles
-	var count := addons.scan(self, authoritative)
-	var providers := addons.scan_providers(self)
-	DotLog.info(CHANNEL, "addons folder scanned", {"hooks": count, "providers": providers, "plain": addons.skipped().size()})
+	var count := 0
+	var providers := 0
+	var roots := PlaygroundAddons.addon_roots(PlaygroundPaths.root())
+	for i in roots.size():
+		count += addons.scan(self, authoritative, roots[i])
+		providers += addons.scan_providers(self, roots[i], i == 0)
+	DotLog.info(CHANNEL, "addons folder scanned", {"roots": roots, "hooks": count, "providers": providers, "plain": addons.skipped().size()})
 
 
 ## Undoes [param who]'s newest spawn, prop or disaster. False when there is nothing to undo.

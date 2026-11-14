@@ -34,6 +34,8 @@ const UNDO_ADDON := "playground.undo"
 ## The spawn provider contract: `res://addons/<pack>/spawn_provider.gd`, or any object registered
 ## in [DotRegistry] under a name starting with [constant REGISTRY_PREFIX]. See docs/spawn-providers.md.
 const PROVIDER_FILE := "spawn_provider.gd"
+## The host's addons folder: what a build carries and what the shell overlays mount into.
+const ADDONS_ROOT := "res://addons"
 const PROVIDER_ENTRIES := "spawn_entries"
 const REGISTRY_PREFIX := "playground.spawn_provider"
 
@@ -150,13 +152,31 @@ func release() -> void:
 	_scene_spawns.clear()
 
 
+## Every `res://addons`-shaped folder to scan for hooks and providers: the host's, then the game's own
+## when [param game_root] (PlaygroundPaths.root()) is elsewhere. A delivered pack mounts at
+## res://dot_cloud/<id>/<version>/, so its own adapters (pg_natural_disasters, pg_timer) sit under that
+## prefix; scanning res://addons alone left the web-solo Disasters menu empty. Built in, one folder.
+static func addon_roots(game_root: String) -> PackedStringArray:
+	var out := PackedStringArray([ADDONS_ROOT])
+	var own := game_root.path_join("addons")
+
+	if own != ADDONS_ROOT:
+		out.append(own)
+
+	return out
+
+
 ## Finds and loads every hook under [param root] (a `res://addons`-shaped directory) and
-## lets each register. Returns how many hooks ran.
-func scan(host: Node, authoritative: bool, root: String = "res://addons") -> int:
+## lets each register. Returns how many hooks ran. A folder name already loaded from an earlier
+## root is passed over, so scanning the host's folder and the game's own never runs a hook twice.
+func scan(host: Node, authoritative: bool, root: String = ADDONS_ROOT) -> int:
 	var found := 0
 
 	for dir_name in DirAccess.get_directories_at(root):
 		var path := "%s/%s/%s" % [root, dir_name, HOOK_FILE]
+
+		if _hooks.has(dir_name):
+			continue
 
 		if not FileAccess.file_exists(path) and not ResourceLoader.exists(path):
 			_skipped.append(dir_name)
@@ -206,11 +226,14 @@ func load_hook(host: Node, authoritative: bool, addon: String, path: String) -> 
 ## Finds every spawn provider: `spawn_provider.gd` under each directory of [param root] and every
 ## object in [DotRegistry] named `playground.spawn_provider*`. Returns how many provided entries.
 ## A pack with neither is not an error: the menu simply has nothing from it.
-func scan_providers(host: Node, root: String = "res://addons") -> int:
+func scan_providers(host: Node, root: String = ADDONS_ROOT, registry: bool = true) -> int:
 	var found := 0
 
 	for dir_name in DirAccess.get_directories_at(root):
 		var path := "%s/%s/%s" % [root, dir_name, PROVIDER_FILE]
+
+		if _providers.has(dir_name):
+			continue
 
 		if not FileAccess.file_exists(path) and not ResourceLoader.exists(path):
 			continue
@@ -225,6 +248,9 @@ func scan_providers(host: Node, root: String = "res://addons") -> int:
 
 		if register_provider(dir_name, provider, host).ok:
 			found += 1
+
+	if not registry:
+		return found
 
 	for reg_name in DotRegistry.names():
 		if not String(reg_name).begins_with(REGISTRY_PREFIX):

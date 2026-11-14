@@ -266,6 +266,37 @@ func playground_receive(msg: Dictionary) -> void:
 	_check(preload("../game/net/playground_event.gd").fits(), "and every event kind still fits its field")
 	host.queue_free()
 
+	# A delivered game: its own adapters sit under the mount prefix, not res://addons. Web solo
+	# scanned only res://addons, so pg_natural_disasters never registered and the menu had no disasters.
+	_check(PlaygroundAddons.addon_roots("res://") == PackedStringArray(["res://addons"]),
+		"built in, the hooks are looked for in res://addons alone")
+	var mounted_roots := PlaygroundAddons.addon_roots("res://dot_cloud/gamemann/game-playground/0.1.30")
+	_check(mounted_roots == PackedStringArray(["res://addons", "res://dot_cloud/gamemann/game-playground/0.1.30/addons"]),
+		"delivered, the game's own addons folder under its mount is scanned too", str(mounted_roots))
+	var mounted := "user://pg_addon_scratch_mounted"
+	_write_fake_addon(mounted, "fake_with_hook", hooked)
+	_write_fake_addon(mounted, "fake_mounted", hooked)
+	var both := PlaygroundAddons.new()
+	var both_host := Node3D.new()
+	add_child(both_host)
+	DotLog.mirror_to_engine = false
+	var both_count := both.scan(both_host, true, root) + both.scan(both_host, true, mounted)
+	DotLog.mirror_to_engine = mirrored_add
+	_check(both_count == 2 and both.find("fake_mounted/hello") != null,
+		"a hook under the second root registers its entries", str(both_count))
+	_check(both.hook_count() == 2, "and a folder name already loaded from the first root does not run twice", str(both.hook_count()))
+	both.release()
+	both_host.queue_free()
+
+	# The site offers addon packs to Playlot by provides.json, and the solo shell fetches
+	# natural-disasters only when the derived requires.json names it (requires.uses.json).
+	var own_provides: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://provides.json"))
+	var own_kinds: Variant = ((own_provides as Dictionary).get("accepts", {}) as Dictionary).get("kinds", []) if own_provides is Dictionary else []
+	_check(own_kinds is Array and (own_kinds as Array).has("addon"),
+		"Playlot accepts addon packs from other games (provides.json accepts.kinds)", str(own_kinds))
+	_check(DotAddonApi.declared_uses("res://").has("natural_disasters"),
+		"requires.uses.json names natural_disasters, so web solo fetches its overlay")
+
 	# The real folder: dot_core has no hook, natural-disasters has an adapter
 	_check(playground.addons != null and playground.addons.skipped().has("dot_core"),
 		"the game scanned the real addons folder, and the libraries in it were left alone")

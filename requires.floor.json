@@ -2,6 +2,7 @@
   "format": 1,
   "addons": {
     "arena_weapons": 21,
+    "natural_disasters": 1,
     "zee_weapons": 6
   }
 }

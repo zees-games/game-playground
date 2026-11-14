@@ -2,7 +2,7 @@
     "schema": 1,
     "kinds": ["game"],
     "accepts": {
-        "kinds": ["weapon", "prop", "npc", "entity", "tool", "map"],
+        "kinds": ["weapon", "prop", "npc", "entity", "tool", "map", "addon"],
         "map_kinds": ["sandbox", "surf", "bhop", "kz", "race"]
     }
 }
