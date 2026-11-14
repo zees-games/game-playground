@@ -4,7 +4,7 @@
 # --- Arena
 # Seconds one arena round lasts. [10.0..7200.0]
 # arena_round_sec: 240.0
-# Kills that end an arena round. [1..1000]
+# Kills that end an arena round. [1..]
 # arena_score_limit: 25
 # Health an arena player spawns with, and the ceiling. [1.0..1000.0]
 # arena_health: 100.0

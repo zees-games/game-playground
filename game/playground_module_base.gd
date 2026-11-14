@@ -653,11 +653,17 @@ func _on_build_load_requested(peer_id: int, build_name: String) -> void:
 		bridge.tell_notice(peer_id, doc.error.message)
 		return
 	var state := player.controller.state
+	_apply_build_limit()
 	var placed := builds.place(game, player.player_id, doc.value, state.position, state.yaw)
 	if not placed.ok:
 		bridge.tell_notice(peer_id, placed.error.message)
 		return
 	bridge.tell_notice(peer_id, "Put down \"%s\": %d props." % [build_name, int(placed.value)])
+
+
+func _apply_build_limit() -> void:
+	if game != null and game.config != null:
+		PlaygroundBuilds.max_props = game.config.build_max_props
 
 
 func _cmd_save(ctx: DotCmdContext) -> void:
@@ -666,6 +672,7 @@ func _cmd_save(ctx: DotCmdContext) -> void:
 		ctx.reply("Usage: pg_save <name>, as a player.")
 		return
 	var state := player.controller.state
+	_apply_build_limit()
 	var doc := builds.capture(game, player.player_id, state.position, state.yaw)
 	if not doc.ok:
 		ctx.reply_error(doc)
@@ -687,6 +694,7 @@ func _cmd_load(ctx: DotCmdContext) -> void:
 		ctx.reply_error(doc)
 		return
 	var state := player.controller.state
+	_apply_build_limit()
 	var placed := builds.place(game, player.player_id, doc.value, state.position, state.yaw)
 	if not placed.ok:
 		ctx.reply_error(placed)

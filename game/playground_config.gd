@@ -112,6 +112,9 @@ extends DotConfig
 
 @export_group("Props")
 
+## Props one saved build may hold. 0 = unlimited.
+@export_range(0, 100000, 1, "or_greater") var build_max_props: int = 200
+
 ## Whether props can be spawned at all. Off makes it a pure movement server.
 @export var allow_props: bool = true
 
@@ -122,7 +125,7 @@ extends DotConfig
 ## set, and a cost budget of 64 under a count of 200 props meant the count was never the
 ## one a player met — an NPC costs six, so the budget refused the eleventh NPC before
 ## [code]pg_max_npcs[/code] could say anything, with a message about props.
-@export_range(0, 1000, 1) var prop_budget: int = 0
+@export_range(0, 1000, 1, "or_greater") var prop_budget: int = 0
 
 ## Whether a player may move, freeze or remove somebody else's props.
 ##
@@ -160,7 +163,7 @@ extends DotConfig
 @export_range(0.5, 60.0, 0.5) var debris_seconds: float = 6.0
 
 ## Props in the world at once, from everybody. 0 = unlimited.
-@export_range(0, 10000, 1) var prop_world_budget: int = 1024
+@export_range(0, 10000, 1, "or_greater") var prop_world_budget: int = 1024
 
 ## Seconds between one player's spawns.
 ##
@@ -177,7 +180,7 @@ extends DotConfig
 @export_range(10.0, 7200.0, 10.0) var arena_round_sec: float = 240.0
 
 ## Kills that end an arena round.
-@export_range(1, 1000, 1) var arena_score_limit: int = 25
+@export_range(1, 1000, 1, "or_greater") var arena_score_limit: int = 25
 
 ## Health an arena player spawns with, and the ceiling.
 @export_range(1.0, 1000.0, 1.0) var arena_health: float = 100.0

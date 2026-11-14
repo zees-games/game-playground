@@ -10,9 +10,11 @@
 # undo_sound_spatial: false
 
 # --- Props
+# Props one saved build may hold. 0 = unlimited. [0..]
+# build_max_props: 200
 # Whether props can be spawned at all. Off makes it a pure movement server.
 # allow_props: true
-# Props one player may have at once, counted in COST. 0 = unlimited, and 0 is the default. [0..1000]
+# Props one player may have at once, counted in COST. 0 = unlimited, and 0 is the default. [0..]
 # prop_budget: 0
 # Whether a player may move, freeze or remove somebody else's props.
 # touch_others_props: true
@@ -28,7 +30,7 @@
 # debris_pieces: 4
 #  [0.5..60.0]
 # debris_seconds: 6.0
-# Props in the world at once, from everybody. 0 = unlimited. [0..10000]
+# Props in the world at once, from everybody. 0 = unlimited. [0..]
 # prop_world_budget: 1024
 # Seconds between one player's spawns. [0.0..10.0]
 # prop_spawn_interval: 0.1

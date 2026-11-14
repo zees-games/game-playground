@@ -29,8 +29,9 @@ const ToolPhysprop := preload("toolgun/tool_physprop.gd")
 const FORMAT := 1
 
 ## The most props one build may hold. Past this a save is refused: a whole server's worth of
-## props in one file is a load that stalls the tick.
-const MAX_PROPS := 200
+## props in one file is a load that stalls the tick. 0 = unlimited. The server sets it from
+## `build_max_props` in the config (the default here is that setting's default).
+static var max_props: int = 200
 
 ## What a build's name may be: letters, digits, `-` and `_`, up to 32. It becomes a file name.
 const NAME_PATTERN := "^[A-Za-z0-9_-]{1,32}$"
@@ -42,7 +43,7 @@ var directory: String = "user://builds"
 # --- Capture ---------------------------------------------------------------------
 
 ## Everything [param owner_id] has in the world, relative to [param origin] and [param yaw]
-## (degrees, the way they face). Fails when they own nothing or more than [constant MAX_PROPS].
+## (degrees, the way they face). Fails when they own nothing or more than [member max_props].
 func capture(game: Node, owner_id: StringName, origin: Vector3, yaw: float) -> DotResult:
 	var spawner: DotPropSpawner = game.get("props")
 	var mine := spawner.props_of(owner_id).filter(func(p: DotPropInstance) -> bool:
@@ -50,8 +51,8 @@ func capture(game: Node, owner_id: StringName, origin: Vector3, yaw: float) -> D
 
 	if mine.is_empty():
 		return DotResult.fail(DotError.CODE_STATE, "You have nothing in the world to save.")
-	if mine.size() > MAX_PROPS:
-		return DotResult.fail(DotError.CODE_INVALID, "A build can hold %d props; you have %d." % [MAX_PROPS, mine.size()])
+	if max_props > 0 and mine.size() > max_props:
+		return DotResult.fail(DotError.CODE_INVALID, "A build can hold %d props; you have %d." % [max_props, mine.size()])
 
 	var frame := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), origin)
 	var inverse := frame.affine_inverse()
@@ -136,8 +137,8 @@ static func validate(doc: Variant, catalogue: DotPropCatalogue) -> DotResult:
 		return DotResult.fail(DotError.CODE_VERSION, "That build was saved in format %s; this server reads %d." % [doc.get("format"), FORMAT])
 
 	var props: Variant = doc.get("props")
-	if not (props is Array) or (props as Array).is_empty() or (props as Array).size() > MAX_PROPS:
-		return DotResult.fail(DotError.CODE_INVALID, "A build holds 1 to %d props." % MAX_PROPS)
+	if not (props is Array) or (props as Array).is_empty() or (max_props > 0 and (props as Array).size() > max_props):
+		return DotResult.fail(DotError.CODE_INVALID, "A build holds 1 to %d props." % max_props)
 
 	var unknown := PackedStringArray()
 	for entry: Variant in props:
